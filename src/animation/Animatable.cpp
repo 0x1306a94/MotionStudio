@@ -12,6 +12,21 @@
 
 namespace motion {
 
+namespace {
+
+// std::lower_bound / std::upper_bound 的比较函数（避免 lambda）。
+template <typename T>
+bool KeyframeBeforeTime(const Keyframe<T>& keyframe, FrameTime time) {
+    return keyframe.time < time;
+}
+
+template <typename T>
+bool TimeBeforeKeyframe(FrameTime time, const Keyframe<T>& keyframe) {
+    return time < keyframe.time;
+}
+
+}  // namespace
+
 template <typename T>
 Animatable<T>::Animatable(T staticValue) : value_(std::move(staticValue)) {}
 
@@ -109,21 +124,15 @@ const std::vector<Keyframe<T>>& Animatable<T>::keyframes() const {
 
 template <typename T>
 typename std::vector<Keyframe<T>>::iterator Animatable<T>::lowerBound(FrameTime time) {
-    return std::lower_bound(
-        keyframes_.begin(), keyframes_.end(), time,
-        [](const Keyframe<T>& keyframe, FrameTime target) {
-            return keyframe.time < target;
-        });
+    return std::lower_bound(keyframes_.begin(), keyframes_.end(), time,
+                            KeyframeBeforeTime<T>);
 }
 
 template <typename T>
 typename std::vector<Keyframe<T>>::const_iterator Animatable<T>::upperBound(
     FrameTime time) const {
-    return std::upper_bound(
-        keyframes_.begin(), keyframes_.end(), time,
-        [](FrameTime target, const Keyframe<T>& keyframe) {
-            return target < keyframe.time;
-        });
+    return std::upper_bound(keyframes_.begin(), keyframes_.end(), time,
+                            TimeBeforeKeyframe<T>);
 }
 
 template <typename T>

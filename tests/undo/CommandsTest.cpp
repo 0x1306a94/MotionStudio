@@ -111,12 +111,10 @@ TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
     shapeContent->elements.push_back(std::move(fill));
     scene.document.refreshEntityIndex();
 
-    fillRaw->color.addKeyframe([&] {
-        Keyframe<Color> keyframe;
-        keyframe.time = 10;
-        keyframe.value = Color{1, 0, 0, 1};
-        return keyframe;
-    }());
+    Keyframe<Color> colorKeyframe;
+    colorKeyframe.time = 10;
+    colorKeyframe.value = Color{1, 0, 0, 1};
+    fillRaw->color.addKeyframe(colorKeyframe);
     const EntityId layerId = scene.layer->id;
 
     scene.execute<RemoveLayerCommand>(scene.composition->id, layerId);
