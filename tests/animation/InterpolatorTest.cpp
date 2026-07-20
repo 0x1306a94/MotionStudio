@@ -43,8 +43,8 @@ TEST(InterpolatorTest, BezierPathLerpAssertsOnVertexCountMismatch) {
     BezierPath two = MakeTwoVertexPath(0);
     BezierPath three = MakeTwoVertexPath(0);
     three.vertices.push_back({{30, 0}, {}, {}});
-    // 顶点数不一致属数据约定违例：debug 下 assert 快速失败。
-    EXPECT_DEATH({ Interpolator<BezierPath>::Lerp(two, three, 0.5f); }, "顶点数");
+    // Vertex count mismatch is a contract violation: assert for fast failure in debug.
+    EXPECT_DEATH({ Interpolator<BezierPath>::Lerp(two, three, 0.5f); }, "vertex counts");
 }
 
 TEST(CubicBezierPointTest, MidpointOfStraightLine) {

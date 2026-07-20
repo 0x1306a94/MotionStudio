@@ -8,6 +8,7 @@
 
 namespace motion {
 
+// Groups child shape elements under a shared transform.
 class ShapeGroup : public ShapeElement {
 public:
     ShapeGroup();

@@ -11,34 +11,51 @@
 
 namespace motion {
 
+// Top-level document containing compositions, assets, and the entity index.
+// Structural mutations automatically keep the entity index up to date.
 class Document {
 public:
-    // ---- 结构修改入口（调用后自动刷新 EntityIndex）----
+    // ---- Structural mutations (entity index refreshed automatically) ----
 
-    // 返回插入后的裸指针（所有权仍在 Document）；composition 为空返回 nullptr。
+    // Adds a composition. Returns the inserted raw pointer (ownership stays in
+    // Document) or nullptr if composition is null.
+    // composition: the composition to add.
     Composition* addComposition(std::unique_ptr<Composition> composition);
-    // 移走合成（含其全部图层）；不存在返回 nullptr。
+    // Removes and returns a composition (including all its layers).
+    // Returns nullptr if not found.
+    // id: id of the composition to remove.
     std::unique_ptr<Composition> takeComposition(EntityId id);
 
-    // index < 0 或越界时追加到末尾。返回插入后的裸指针。
+    // Inserts a layer into a composition. Appends to the end when index < 0 or
+    // out of range. Returns the inserted raw pointer.
+    // compositionId: host composition of the layer.
+    // layer: the layer to add.
+    // index: insertion position (-1 to append).
     Layer* addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index = -1);
-    // 移走图层；不存在返回 nullptr。
+    // Removes and returns a layer from a composition.
+    // Returns nullptr if not found.
+    // compositionId: host composition of the layer.
+    // layerId: id of the layer to remove.
     std::unique_ptr<Layer> takeLayer(EntityId compositionId, EntityId layerId);
-    // 调整图层顺序；索引越界返回 false。
+    // Reorders a layer within a composition. Returns false on out-of-range index.
+    // compositionId: host composition of the layer.
+    // fromIndex: current position of the layer.
+    // toIndex: desired position after the move.
     bool moveLayer(EntityId compositionId, int fromIndex, int toIndex);
 
-    // ---- 查询 ----
+    // ---- Queries ----
 
     EntityIndex& entityIndex();
     const EntityIndex& entityIndex() const;
 
-    // 遍历整棵实体树重建索引。批量构造（如反序列化）后调用一次。
+    // Walks the entire entity tree to rebuild the index. Call once after batch
+    // construction (e.g. deserialization).
     void refreshEntityIndex();
 
     EntityId id = EntityId::Generate();
     std::string name;
     std::vector<std::unique_ptr<Composition>> compositions;
-    std::vector<Asset> assets;  // 图片/字体等文档级资源
+    std::vector<Asset> assets;  // document-level resources (images, fonts)
 
 private:
     EntityIndex entityIndex_;

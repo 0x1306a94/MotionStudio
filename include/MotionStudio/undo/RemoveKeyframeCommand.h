@@ -10,9 +10,11 @@
 
 namespace motion {
 
-// 删关键帧。execute 时接管关键帧，undo 时放回。
+// Removes a keyframe. execute() captures it and undo() puts it back.
 class RemoveKeyframeCommand : public Command {
 public:
+    // property: path to the animatable property.
+    // time: frame time of the keyframe to remove.
     RemoveKeyframeCommand(PropertyPath property, FrameTime time);
 
     void execute(Document& document) override;

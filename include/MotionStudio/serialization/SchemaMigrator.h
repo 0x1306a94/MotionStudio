@@ -6,14 +6,18 @@
 
 namespace motion {
 
-// 版本迁移链：v1 → v2 → ... → current，每步是纯函数 JSON → JSON。
-// M1 只有 v1，骨架先行，新版本在此挂迁移步骤。
-// 输入输出均为 JSON 文本，公共头不暴露第三方 JSON 类型。
+// Schema migration chain: v1 → v2 → ... → current. Each step is a pure
+// JSON → JSON function. M1 ships only v1; the skeleton is in place so new
+// versions can register their migration steps here.
+// Inputs and outputs are plain JSON text; the public header exposes no
+// third-party JSON types.
 class SchemaMigrator {
 public:
     static constexpr int currentVersion() { return 1; }
 
-    // 读取 schemaVersion 并迁移到当前版本；格式错误或版本不支持返回 Error。
+    // Reads the embedded schemaVersion and migrates to the current version.
+    // Returns Error on malformed JSON or unsupported version.
+    // jsonText: the JSON text to migrate.
     static Expected<std::string> migrate(const std::string& jsonText);
 };
 

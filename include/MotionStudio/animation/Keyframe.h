@@ -8,14 +8,19 @@
 
 namespace motion {
 
-// 关键帧：time 处的属性值 + 到下一关键帧的插值方式。
+// Keyframe: property value at a given time, plus the easing used to
+// interpolate towards the next keyframe.
 template <typename T>
 struct Keyframe {
+    // Frame time at which this keyframe is placed.
     FrameTime time = 0;
+    // Property value at this keyframe.
     T value{};
+    // Easing curve applied from this keyframe to the next.
     Easing easing = Easing::Linear();
 
-    // 空间手柄（仅 Vec2 类型使用）：相对 value 的偏移，决定运动路径的弧度。
+    // Spatial tangent handles (used only for Vec2 properties): offsets relative
+    // to value that shape the arc of the motion path between keyframes.
     std::optional<Vec2> spatialInTangent;
     std::optional<Vec2> spatialOutTangent;
 

@@ -20,36 +20,60 @@ public:
     virtual AnimatableType valueType() const = 0;
 };
 
-// 可动画属性：要么静态值，要么关键帧序列。
-// 关键帧操作只允许由 Command 调用，UI 不直接改模型。
-// 实现与显式实例化见 src/animation/Animatable.cpp；
-// 新增可动画类型需在那里登记实例化。
+// Animatable property: either a static value or an ordered keyframe sequence.
+// Keyframe mutations must go through commands; UI never mutates the model directly.
+// Implementation and explicit instantiations live in src/animation/Animatable.cpp;
+// new animatable types must be registered there.
 template <typename T>
 class Animatable : public AnimatableBase {
 public:
     Animatable() = default;
-    // 非 explicit：支持 `Animatable<float> opacity{1};` 式的成员初始化。
+
+    // Non-explicit: enables `Animatable<float> opacity{1};` style member init.
+    // staticValue: the value used when no keyframes are present.
     Animatable(T staticValue);
 
-    // 按 time 有序插入；同 time 已存在则替换。
+    // Inserts a keyframe ordered by time, replacing any existing keyframe at the same time.
+    // keyframe: keyframe to insert.
     void addKeyframe(Keyframe<T> keyframe);
+
+    // Removes the keyframe at the given time. No-op if none exists.
+    // time: frame time of the keyframe to remove.
     void removeKeyframe(FrameTime time);
-    // 移除并返回关键帧（MoveKeyframe 用）；不存在返回 nullopt。
+
+    // Removes and returns the keyframe at the given time (used by MoveKeyframe).
+    // Returns nullopt if no keyframe exists at that time.
+    // time: frame time of the keyframe to take.
     std::optional<Keyframe<T>> takeKeyframe(FrameTime time);
-    // 更新 time 处的关键帧；不存在返回 false。
+
+    // Replaces the keyframe at the given time.
+    // Returns false if no keyframe exists at that time.
+    // time: frame time of the keyframe to update.
+    // keyframe: replacement keyframe.
     bool updateKeyframe(FrameTime time, Keyframe<T> keyframe);
+
+    // Removes all keyframes, leaving the static value in effect.
     void clearKeyframes();
 
-    // 求值：无关键帧返回静态值；区间外钳制到首/末帧值（不外推）。
+    // Evaluates the property at the given time.
+    // Returns the static value when no keyframes are present; clamps to the
+    // first/last keyframe value outside the keyframe range (no extrapolation).
+    // time: frame time to evaluate at.
     T evaluate(FrameTime time) const;
 
     AnimatableType valueType() const override;
 
+    // Returns true if the property has keyframes (i.e. is animated rather than static).
     bool isAnimated() const;
 
+    // Returns the current static value.
     const T& staticValue() const;
+
+    // Sets the static value used when no keyframes are present.
+    // value: new static value.
     void setStaticValue(T value);
 
+    // Returns the keyframe list sorted by ascending time.
     const std::vector<Keyframe<T>>& keyframes() const;
 
 private:
@@ -58,7 +82,8 @@ private:
     typename std::vector<Keyframe<T>>::iterator find(FrameTime time);
 
     T value_{};
-    std::vector<Keyframe<T>> keyframes_;  // 按 time 升序
+    // Keyframes sorted by ascending time.
+    std::vector<Keyframe<T>> keyframes_;
 };
 
 }  // namespace motion

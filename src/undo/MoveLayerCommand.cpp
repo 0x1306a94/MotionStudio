@@ -24,7 +24,7 @@ bool MoveLayerCommand::mergeWith(const Command& other) {
         return false;
     }
     if (typed.fromIndex_ != toIndex_) {
-        return false;  // 仅合并连续拖动
+        return false;  // Only merge consecutive drags
     }
     toIndex_ = typed.toIndex_;
     return true;

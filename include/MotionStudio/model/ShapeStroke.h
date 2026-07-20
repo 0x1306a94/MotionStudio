@@ -8,6 +8,7 @@
 
 namespace motion {
 
+// Strokes the outline of preceding paths with an animatable color and width.
 class ShapeStroke : public ShapeElement {
 public:
     ShapeStroke();

@@ -10,31 +10,35 @@ namespace motion {
 class AnimatableBase;
 class Document;
 
-// 属性路径：定位实体内某个 Animatable<T>。
-// 语法（以 '.' 分段，数组段写作 name[index]）：
+// Property path that locates an Animatable<T> within an entity.
+// Syntax (dot-separated segments, array segments written as name[index]):
 //   Layer:         "transform.position" / "content.text"
-//                  "elements[0].color"（ShapeContent，Group 可继续 "elements[i]"）
-//   ShapeElement:  "color" / "path" / "width" ...（entityId 直接指向形状元素）
+//                  "elements[0].color" (ShapeContent; groups nest via "elements[i]")
+//   ShapeElement:  "color" / "path" / "width" ... (entityId points directly at the element)
 struct PropertyPath {
-    EntityId entityId;  // Layer 或 ShapeElement 的 ID
+    EntityId entityId;  // id of the owning Layer or ShapeElement
     std::string path;
 
     bool operator==(const PropertyPath& other) const;
     bool operator!=(const PropertyPath& other) const;
 };
 
-// 路径解析中间表示。
+// Intermediate representation of a parsed property path segment.
 struct PathSegment {
     std::string name;
-    int index = -1;  // -1 = 无数组下标
+    int index = -1;  // -1 = no array subscript
 
     bool operator==(const PathSegment& other) const;
 };
 
-// 解析 "a.b[2].c" → [{a,-1},{b,2},{c,-1}]；格式非法返回空。
+// Parses "a.b[2].c" into [{a,-1},{b,2},{c,-1}]. Returns empty on invalid format.
+// path: the dot-separated property path string.
 std::vector<PathSegment> ParsePropertyPath(const std::string& path);
 
-// 解析属性路径到 Animatable；实体不存在 / 路径无效 / 类型不符返回 nullptr。
+// Resolves a property path to its Animatable. Returns nullptr when the entity
+// does not exist, the path is invalid, or the type does not match.
+// document: the document to search.
+// property: the property path to resolve.
 AnimatableBase* ResolveAnimatable(Document& document, const PropertyPath& property);
 
 }  // namespace motion

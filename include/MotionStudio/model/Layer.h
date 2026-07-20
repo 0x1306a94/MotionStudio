@@ -27,32 +27,41 @@ struct Mask {
 
 class Layer {
 public:
-    // 按类型创建对应的 LayerContent。
+    // Constructs a layer with the matching LayerContent subtype.
+    // type: content variant to create.
     explicit Layer(LayerType type);
     ~Layer();
 
+    // Returns the content variant tag of this layer.
     LayerType type() const;
 
-    // 设置父图层。沿父链检测环路，会形成环（含自身为父）或目标不存在时
-    // 返回 false 且不修改；成功返回 true。
+    // Sets the parent layer. Detects cycles along the parent chain; returns
+    // false without modification if a cycle would form or the target does not
+    // exist, true on success.
+    // newParentId: id of the new parent (invalid id clears the parent).
+    // document: used to look up the target parent entity.
     bool setParent(EntityId newParentId, const Document& document);
 
+    // Returns the local transform matrix at the given time.
     Mat3 localTransform(FrameTime time) const;
+    // Returns the world transform matrix (accumulated through the parent chain).
+    // time: evaluation time in frames.
+    // document: used to resolve parent layers.
     Mat3 worldTransform(FrameTime time, const Document& document) const;
 
     EntityId id = EntityId::Generate();
     std::string name;
 
-    // 时间控制
-    FrameTime inPoint = 0;    // 在宿主合成时间轴上的起始帧
-    FrameTime outPoint = 0;   // 结束帧（exclusive）
-    FrameTime startTime = 0;  // 源时间偏移（Precomp 的源采样起点）
+    // Timing
+    FrameTime inPoint = 0;    // start frame on the host composition timeline
+    FrameTime outPoint = 0;   // end frame (exclusive)
+    FrameTime startTime = 0;  // source time offset (precomp sampling origin)
     double timeStretch = 1.0;
 
     bool visible = true;
     bool locked = false;
 
-    EntityId parentId;  // 无效 = 无父级
+    EntityId parentId;  // invalid id = no parent
     Transform transform;
     std::unique_ptr<LayerContent> content;
 

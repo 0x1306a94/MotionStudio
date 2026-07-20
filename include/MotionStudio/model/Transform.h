@@ -5,14 +5,14 @@
 
 namespace motion {
 
-// 图层变换，5 个可动画属性。每个 Layer 必有。
-// 世界变换：local = T(position) · R(rotation) · S(scale) · T(-anchorPoint)，
-// 再左乘父级世界变换。
+// Layer transform with five animatable properties. Every Layer owns one.
+// Local matrix: T(position) * R(rotation) * S(scale) * T(-anchorPoint),
+// then left-multiplied by the parent's world transform.
 struct Transform {
     Animatable<Vec2> anchorPoint{Vec2{0, 0}};
     Animatable<Vec2> position{Vec2{0, 0}};
     Animatable<Vec2> scale{Vec2{1, 1}};
-    Animatable<float> rotation{0.0f};   // 度
+    Animatable<float> rotation{0.0f};   // degrees
     Animatable<float> opacity{1.0f};    // 0.0 ~ 1.0
 };
 

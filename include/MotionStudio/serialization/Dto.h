@@ -13,13 +13,15 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeType.h"
 
-// JSON v1 schema 的枚举字符串映射（camelCase，与 Lottie 生态对齐）。
-// 文件结构见 Serializer.cpp；迁移只操作 JSON，不依赖运行时模型。
+// Enum ↔ string mappings for the JSON v1 schema (camelCase, aligned with the
+// Lottie ecosystem). File layout is defined in Serializer.cpp; migration
+// operates purely on JSON and does not depend on runtime model types.
 namespace motion::dto {
 
 inline constexpr int SCHEMA_VERSION = 1;
 
-// 枚举 → 字符串不失败（全覆盖 + 兜底）；字符串 → 枚举未知时返回 Error。
+// Enum → string always succeeds (full coverage + fallback).
+// String → enum returns Error on unknown values.
 const char* ToString(LayerType type);
 Expected<LayerType> layerTypeFromString(const std::string& text);
 

@@ -16,7 +16,7 @@ void UndoManager::execute(Document& document, std::unique_ptr<Command> command) 
     if (mergeWindowOpen_ && !undoStack_.empty() &&
         now - lastExecuteTime_ <= mergeWindow_) {
         if (undoStack_.back()->mergeWith(*command)) {
-            lastExecuteTime_ = now;  // 吸收，不压栈
+            lastExecuteTime_ = now;  // Absorbed, not pushed
             return;
         }
     }

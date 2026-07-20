@@ -7,9 +7,13 @@
 
 namespace motion {
 
-// 改图层顺序。连续拖拽（前一个 toIndex == 后一个 fromIndex）可合并。
+// Reorders a layer. Consecutive drags (previous toIndex == next fromIndex)
+// are merged into a single undo step.
 class MoveLayerCommand : public Command {
 public:
+    // compositionId: host composition of the layer.
+    // fromIndex: current position of the layer.
+    // toIndex: desired position after the move.
     MoveLayerCommand(EntityId compositionId, int fromIndex, int toIndex);
 
     void execute(Document& document) override;

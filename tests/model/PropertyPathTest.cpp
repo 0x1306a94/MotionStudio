@@ -137,7 +137,7 @@ TEST(ResolveAnimatableTest, ReturnsNullForMissingOrInvalid) {
               nullptr);
     EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "transform"}), nullptr);
     EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "elements[0].width"}),
-              nullptr);  // fill 没有 width
+              nullptr);
     EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "elements[-1].color"}),
               nullptr);
 }

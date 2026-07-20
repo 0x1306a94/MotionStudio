@@ -10,9 +10,13 @@
 
 namespace motion {
 
-// 改关键帧缓动。目标帧不存在则为空操作。
+// Changes a keyframe's easing curve. No-op when the target keyframe does not
+// exist.
 class SetEasingCommand : public Command {
 public:
+    // property: path to the animatable property.
+    // time: frame time of the keyframe to modify.
+    // easing: the new easing curve.
     SetEasingCommand(PropertyPath property, FrameTime time, Easing easing);
 
     void execute(Document& document) override;

@@ -45,7 +45,7 @@ bool SetStaticValueCommand::mergeWith(const Command& other) {
     if (typed.property_ != property_) {
         return false;
     }
-    value_ = typed.value_;  // 保留 oldValue_，吸收最终值
+    value_ = typed.value_;  // Preserve oldValue_, absorb final value
     return true;
 }
 

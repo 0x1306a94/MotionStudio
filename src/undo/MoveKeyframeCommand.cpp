@@ -58,7 +58,7 @@ bool MoveKeyframeCommand::mergeWith(const Command& other) {
         return false;
     }
     if (typed.oldTime_ != newTime_) {
-        return false;  // 仅合并连续拖动
+        return false;  // Only merge consecutive drags
     }
     newTime_ = typed.newTime_;
     return true;

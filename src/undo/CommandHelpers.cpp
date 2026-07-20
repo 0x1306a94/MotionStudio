@@ -9,7 +9,6 @@ namespace motion {
 
 namespace {
 
-// 值类型与属性类型相符时设置静态值；oldValue 输出设置前的值。
 template <typename T>
 bool ApplyStaticValue(Animatable<T>* animatable, const PropertyValue& newValue,
                       PropertyValue& oldValue) {
@@ -45,7 +44,7 @@ bool ApplyEasing(Animatable<T>* animatable, FrameTime time, const Easing& easing
         updated.easing = easing;
         return animatable->updateKeyframe(time, std::move(updated));
     }
-    return false;  // 该类型上无此帧
+    return false;
 }
 
 }  // namespace
@@ -89,8 +88,8 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase* target, FrameTime ti
 }
 
 void AddKeyframeAny(AnimatableBase* target, const KeyframeData& keyframe) {
-    // variant 备选顺序：float / Vec2 / Color / BezierPath / std::string。
-    // 关键帧类型与属性类型不符时静默跳过。
+    // Variant alternative order: float / Vec2 / Color / BezierPath / std::string.
+    // Silently skip when keyframe type does not match property type.
     switch (keyframe.index()) {
         case 0:
             if (target->valueType() == AnimatableType::Float) {

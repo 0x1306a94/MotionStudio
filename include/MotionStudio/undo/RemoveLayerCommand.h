@@ -9,10 +9,13 @@
 
 namespace motion {
 
-// 删图层。execute 时接管 unique_ptr 所有权，undo 时原下标移回，
-// 完整恢复子结构与关键帧。
+// Removes a layer. execute() takes over the unique_ptr ownership and undo()
+// moves it back at the original index, restoring the whole subtree and
+// keyframes.
 class RemoveLayerCommand : public Command {
 public:
+    // compositionId: host composition of the layer.
+    // layerId: id of the layer to remove.
     RemoveLayerCommand(EntityId compositionId, EntityId layerId);
 
     void execute(Document& document) override;

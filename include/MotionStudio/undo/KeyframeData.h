@@ -10,7 +10,8 @@
 
 namespace motion {
 
-// 命令携带的关键帧（类型擦除，执行时按类型分发到 Animatable<T>）。
+// Type-erased keyframe carried by commands. Dispatched to the correct
+// Animatable<T> at execution time based on the active alternative.
 using KeyframeData =
     std::variant<Keyframe<float>, Keyframe<Vec2>, Keyframe<Color>,
                  Keyframe<BezierPath>, Keyframe<std::string>>;

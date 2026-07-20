@@ -9,9 +9,13 @@
 
 namespace motion {
 
-// 设置静态值。首次执行捕获旧值；同目标连续设置可合并（拖拽数值）。
+// Sets a static (non-keyframed) property value. Captures the old value on
+// first execution; consecutive sets on the same target are merged (e.g.
+// dragging a numeric slider).
 class SetStaticValueCommand : public Command {
 public:
+    // property: path to the animatable property to set.
+    // value: the new static value.
     SetStaticValueCommand(PropertyPath property, PropertyValue value);
 
     void execute(Document& document) override;

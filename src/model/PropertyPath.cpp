@@ -69,7 +69,7 @@ std::vector<PathSegment> ParsePropertyPath(const std::string& path) {
         }
         ++position;
         if (position >= path.size()) {
-            return {};  // 拒绝尾部 '.'
+            return {};  // Reject trailing '.'.
         }
     }
     return segments;
@@ -96,7 +96,7 @@ AnimatableBase* resolveTransformProperty(Transform& transform, const std::string
     return nullptr;
 }
 
-// 具体形状类型上的终端属性。
+// Terminal properties on concrete shape types.
 AnimatableBase* resolveShapeProperty(ShapeElement* element, const std::string& name) {
     switch (element->type()) {
         case ShapeType::Path:
@@ -159,7 +159,7 @@ AnimatableBase* resolveShapeProperty(ShapeElement* element, const std::string& n
     return nullptr;
 }
 
-// 从某个形状元素出发，按 segments[from..] 逐段下行，末段必须是属性名。
+// Walk segments[from..] from a shape element downward; the last segment must be a property name.
 AnimatableBase* resolveShapeSegments(ShapeElement* element,
                                      const std::vector<PathSegment>& segments,
                                      size_t from) {

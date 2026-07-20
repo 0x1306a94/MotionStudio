@@ -7,41 +7,66 @@
 
 namespace motion {
 
-// 插值策略 trait：Animatable<T> 不关心 T 的细节，插值方式经此注入。
-// 默认阶梯插值：离散类型（如 std::string 文本）保持前一关键帧的值直到下一关键帧。
-// （主模板为通用回退，须在头文件保留定义。）
+// Interpolation strategy trait. Animatable<T> delegates value blending to
+// this struct so it stays agnostic of T's specifics.
+// The primary template performs step (hold) interpolation — discrete types
+// like std::string keep the previous keyframe's value until the next one.
+// (The primary template must remain defined in the header as a generic fallback.)
 template <typename T>
 struct Interpolator {
     static T Lerp(const T& from, const T& /*to*/, float /*t*/) { return from; }
 };
 
-// 各特化的实现见 src/animation/Interpolator.cpp。
+// Specializations are implemented in src/animation/Interpolator.cpp.
 template <>
 struct Interpolator<float> {
+    // from: start value.
+    // to: end value.
+    // t: blend factor in [0,1].
     static float Lerp(float from, float to, float t);
 };
 
 template <>
 struct Interpolator<Vec2> {
+    // from: start vector.
+    // to: end vector.
+    // t: blend factor in [0,1].
     static Vec2 Lerp(const Vec2& from, const Vec2& to, float t);
 };
 
 template <>
 struct Interpolator<Color> {
+    // from: start color.
+    // to: end color.
+    // t: blend factor in [0,1].
     static Color Lerp(const Color& from, const Color& to, float t);
 };
 
 template <>
 struct Interpolator<BezierPath> {
-    // 逐顶点插值。M1 要求两路径顶点数一致：不一致属数据约定违例，
-    // debug 下 assert 快速失败，release 降级返回 from。
+    // Per-vertex interpolation. Both paths must have the same vertex count
+    // (data contract): a mismatch triggers an assert in debug builds and
+    // degrades to returning from in release builds.
+    // from: start path.
+    // to: end path (must have the same vertex count as from).
+    // t: blend factor in [0,1].
     static BezierPath Lerp(const BezierPath& from, const BezierPath& to, float t);
 };
 
-// 三次贝塞尔曲线取点：B(t) = (1-t)³P0 + 3(1-t)²t·P1 + 3(1-t)t²·P2 + t³·P3。
+// Evaluates a point on a cubic bezier curve:
+// B(t) = (1-t)^3*P0 + 3*(1-t)^2*t*P1 + 3*(1-t)*t^2*P2 + t^3*P3.
+// p0: first control point.
+// p1: second control point.
+// p2: third control point.
+// p3: fourth control point.
+// t: parameter in [0,1].
 Vec2 CubicBezierPoint(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, float t);
 
-// 空间插值：有空间手柄时沿贝塞尔弧线运动，否则退化为直线插值。
+// Spatial interpolation between two Vec2 keyframes: follows a bezier arc
+// when spatial tangent handles are present; falls back to linear lerp otherwise.
+// from: start keyframe.
+// to: end keyframe.
+// easedProgress: eased blend factor in [0,1].
 Vec2 EvaluateSpatial(const Keyframe<Vec2>& from, const Keyframe<Vec2>& to,
                      float easedProgress);
 

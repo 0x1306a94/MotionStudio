@@ -9,9 +9,13 @@
 
 namespace motion {
 
-// 加图层。undo 时取回所有权，redo 按记录的下标重新插入。
+// Adds a layer. execute() takes over the unique_ptr ownership and undo()
+// moves it back. Redo re-inserts at the recorded index.
 class AddLayerCommand : public Command {
 public:
+    // compositionId: host composition for the new layer.
+    // layer: takes ownership of the layer to add.
+    // index: insertion position (-1 to append).
     AddLayerCommand(EntityId compositionId, std::unique_ptr<Layer> layer, int index = -1);
 
     void execute(Document& document) override;

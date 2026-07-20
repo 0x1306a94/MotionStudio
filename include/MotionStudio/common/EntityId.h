@@ -6,17 +6,18 @@
 
 namespace motion {
 
-// 实体唯一标识。0 表示无效 ID。
-// 命令与引用一律通过 EntityId 寻址，不持有裸指针。
+// Unique entity identifier. 0 represents an invalid ID.
+// Commands and references always address entities via EntityId; raw pointers are never held.
 struct EntityId {
     uint64_t value = 0;
 
     bool operator==(const EntityId& other) const;
     bool operator!=(const EntityId& other) const;
 
+    // Returns true if this ID is not the invalid sentinel (0).
     bool isValid() const;
 
-    // 生成随机 ID（安全随机数源，不会返回无效值）。
+    // Generates a random ID from a secure random source; never returns an invalid value.
     static EntityId Generate();
 };
 

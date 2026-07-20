@@ -19,7 +19,7 @@ void RemoveKeyframeCommand::execute(Document& document) {
         removed_ = TakeKeyframeAny(target, time_);
         captured_ = true;
     } else {
-        TakeKeyframeAny(target, time_);  // redo：再次移除
+        TakeKeyframeAny(target, time_);
     }
 }
 

@@ -45,7 +45,7 @@ using motion::Vec2;
 
 namespace {
 
-// 覆盖全部类型与双态属性的文档。
+// Document covering all types and both static/animated properties.
 std::unique_ptr<Document> BuildRichDocument() {
     auto document = std::make_unique<Document>();
     document->name = "rich";
@@ -69,7 +69,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     composition->height = 720;
     composition->backgroundColor = Color{0.1f, 0.2f, 0.3f, 1};
 
-    // Shape 图层：7 种形状元素 + 关键帧 + 空间手柄 + mask。
+    // Shape layer: 7 shape element types + keyframes + spatial tangents + mask.
     auto shapeLayer = std::make_unique<Layer>(LayerType::Shape);
     shapeLayer->name = "shapes";
     shapeLayer->outPoint = 90;
@@ -126,7 +126,7 @@ std::unique_ptr<Document> BuildRichDocument() {
 
     composition->layers.push_back(std::move(shapeLayer));
 
-    // Null 父图层 + 引用它的子图层。
+    // Null parent layer + child layer referencing it.
     auto nullLayer = std::make_unique<Layer>(LayerType::Null);
     const motion::EntityId nullId = nullLayer->id;
     composition->layers.push_back(std::move(nullLayer));
@@ -178,7 +178,7 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     EXPECT_EQ(main.frameRate, (motion::FrameRate{30000, 1001}));
 
     const Layer& shapes = *main.layers[0];
-    // 关键帧 + 缓动 + 空间手柄恢复：逐帧求值与原文档一致。
+    // Keyframes + easing + spatial tangents restored: per-frame evaluation matches original.
     const Layer& originalShapes = *document->compositions[1]->layers[0];
     for (motion::FrameTime time : {0, 15, 30, 45, 60, 90}) {
         EXPECT_TRUE(motion::ApproxEqual(shapes.transform.position.evaluate(time),
@@ -189,13 +189,13 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     EXPECT_EQ(shapes.transform.position.keyframes()[0].easing, Easing::EaseIn());
     EXPECT_EQ(shapes.transform.rotation.staticValue(), 45.0f);
 
-    // EntityIndex 已重建：按原 ID 可解析。
+    // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);
     const auto* shapeContent = static_cast<const ShapeContent*>(shapes.content.get());
     EXPECT_NE((*restored)->entityIndex().findShape(shapeContent->elements[0]->id),
               nullptr);
 
-    // 父子关系保留。
+    // Parent-child relationship preserved.
     const Layer& textLayer = *main.layers[2];
     EXPECT_EQ(textLayer.parentId, main.layers[1]->id);
 }
@@ -237,7 +237,6 @@ TEST(SerializerTest, RejectsInvalidInput) {
 
     auto document = BuildRichDocument();
     std::string text = Serializer::serialize(*document);
-    // 破坏 layer content 的类型字段。
     const std::string broken = text.replace(text.find("\"type\": \"shape\""), 15,
                                             "\"type\": \"bogus\"");
     EXPECT_FALSE(Serializer::deserialize(broken).hasValue());

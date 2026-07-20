@@ -40,13 +40,13 @@ bool Easing::operator!=(const Easing& other) const { return !(*this == other); }
 
 namespace {
 
-// B(t) = 3(1-t)²t·p1 + 3(1-t)t²·p2 + t³（端点固定为 0 和 1）。
+// B(t) = 3(1-t)²t·p1 + 3(1-t)t²·p2 + t³ (endpoints fixed at 0 and 1).
 float cubicBezierAxis(float p1, float p2, float t) {
     const float mt = 1 - t;
     return 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t;
 }
 
-// B'(t) = 3(1-t)²·p1 + 6(1-t)t·(p2-p1) + 3t²·(1-p2)。
+// B'(t) = 3(1-t)²·p1 + 6(1-t)t·(p2-p1) + 3t²·(1-p2).
 float cubicBezierAxisDerivative(float p1, float p2, float t) {
     const float mt = 1 - t;
     return 3 * mt * mt * p1 + 6 * mt * t * (p2 - p1) + 3 * t * t * (1 - p2);
@@ -62,7 +62,7 @@ float SolveBezierEasing(float x1, float y1, float x2, float y2, float x) {
         return 1;
     }
 
-    // 阶段一：牛顿迭代（通常 4~8 次收敛）。
+    // Phase 1: Newton-Raphson (typically converges in 4-8 iterations).
     float t = x;
     for (int i = 0; i < 8; ++i) {
         const float error = cubicBezierAxis(x1, x2, t) - x;
@@ -76,7 +76,7 @@ float SolveBezierEasing(float x1, float y1, float x2, float y2, float x) {
         t -= error / derivative;
     }
 
-    // 阶段二：牛顿发散时二分兜底。
+    // Phase 2: Bisection fallback when Newton-Raphson diverges.
     if (t < 0 || t > 1) {
         float lo = 0;
         float hi = 1;

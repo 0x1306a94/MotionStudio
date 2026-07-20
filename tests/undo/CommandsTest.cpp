@@ -91,7 +91,7 @@ TEST(AddLayerCommandTest, AddUndoRedo) {
 
     scene.undo.redo(scene.document);
     EXPECT_EQ(scene.composition->layers.size(), 2u);
-    EXPECT_EQ(scene.composition->layers[1]->id, layerId);  // 回到记录的下标
+    EXPECT_EQ(scene.composition->layers[1]->id, layerId);
 }
 
 TEST(AddLayerCommandTest, InsertsAtIndex) {
@@ -125,7 +125,6 @@ TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
     ASSERT_EQ(scene.composition->layers.size(), 1u);
     auto* restoredFill = scene.document.entityIndex().findShape(fillRaw->id);
     ASSERT_NE(restoredFill, nullptr);
-    // 关键帧随子树完整恢复。
     EXPECT_EQ(restoredFill->id, fillRaw->id);
     auto* restoredLayer = scene.document.entityIndex().findLayer(layerId);
     auto* restoredContent = static_cast<ShapeContent*>(restoredLayer->content.get());
@@ -137,7 +136,7 @@ TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
 TEST(RemoveLayerCommandTest, ExecuteSkipsMissingLayer) {
     Scene scene;
     scene.execute<RemoveLayerCommand>(scene.composition->id, EntityId{999});
-    // 目标不存在 → 空操作；空命令仍入栈，undo 安全无副作用。
+    // Target missing → no-op; empty command still pushed, undo is safe.
     scene.undo.undo(scene.document);
     EXPECT_EQ(scene.composition->layers.size(), 1u);
 }
@@ -163,7 +162,7 @@ TEST(MoveLayerCommandTest, ConsecutiveDragsMerge) {
     for (int i = 0; i < 3; ++i) {
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
     }
-    // 0 → 1 → 2 → 3 的连续拖拽合并为一个 undo 单元。
+    // Consecutive drags 0 → 1 → 2 → 3 merge into a single undo unit.
     scene.execute<MoveLayerCommand>(scene.composition->id, 0, 1);
     scene.execute<MoveLayerCommand>(scene.composition->id, 1, 2);
     scene.execute<MoveLayerCommand>(scene.composition->id, 2, 3);
@@ -196,7 +195,7 @@ TEST(SetStaticValueCommandTest, MergesSameTargetKeepsOriginalValue) {
     scene.execute<SetStaticValueCommand>(path, PropertyValue{Vec2{30, 0}});
     EXPECT_EQ(scene.layer->transform.position.staticValue(), (Vec2{30, 0}));
 
-    scene.undo.undo(scene.document);  // 一次回退到最初的 0
+    scene.undo.undo(scene.document);
     EXPECT_EQ(scene.layer->transform.position.staticValue(), (Vec2{0, 0}));
 }
 
@@ -204,7 +203,7 @@ TEST(SetStaticValueCommandTest, TypeMismatchIsNoOp) {
     Scene scene;
     PropertyPath path = TransformPosition(scene.layer->id);
 
-    scene.execute<SetStaticValueCommand>(path, PropertyValue{1.0f});  // position 是 Vec2
+    scene.execute<SetStaticValueCommand>(path, PropertyValue{1.0f});
     EXPECT_EQ(scene.layer->transform.position.staticValue(), (Vec2{0, 0}));
 }
 
@@ -255,7 +254,7 @@ TEST(RemoveKeyframeCommandTest, MissingFrameIsNoOp) {
     PropertyPath path = TransformPosition(scene.layer->id);
 
     scene.execute<RemoveKeyframeCommand>(path, 42);
-    scene.undo.undo(scene.document);  // 不应崩溃
+    scene.undo.undo(scene.document);
     EXPECT_FALSE(scene.layer->transform.position.isAnimated());
 }
 
@@ -281,14 +280,14 @@ TEST(MoveKeyframeCommandTest, UndoRestoresOverwrittenKeyframe) {
     position.addKeyframe(PositionKeyframe(10, {10, 0}));
     position.addKeyframe(PositionKeyframe(30, {30, 0}));
 
-    scene.execute<MoveKeyframeCommand>(path, 10, 30);  // 覆盖 30 帧
+    scene.execute<MoveKeyframeCommand>(path, 10, 30);
     ASSERT_EQ(position.keyframes().size(), 1u);
     EXPECT_EQ(position.keyframes()[0].value, (Vec2{10, 0}));
 
     scene.undo.undo(scene.document);
     ASSERT_EQ(position.keyframes().size(), 2u);
     EXPECT_EQ(position.keyframes()[0].value, (Vec2{10, 0}));
-    EXPECT_EQ(position.keyframes()[1].value, (Vec2{30, 0}));  // 被覆盖者还原
+    EXPECT_EQ(position.keyframes()[1].value, (Vec2{30, 0}));
 }
 
 TEST(MoveKeyframeCommandTest, ConsecutiveDragsMerge) {
@@ -302,7 +301,7 @@ TEST(MoveKeyframeCommandTest, ConsecutiveDragsMerge) {
     ASSERT_EQ(scene.layer->transform.position.keyframes().size(), 1u);
     EXPECT_EQ(scene.layer->transform.position.keyframes()[0].time, motion::FrameTime(13));
 
-    scene.undo.undo(scene.document);  // 一步回到 10
+    scene.undo.undo(scene.document);
     EXPECT_EQ(scene.layer->transform.position.keyframes()[0].time, motion::FrameTime(10));
 }
 
@@ -323,7 +322,7 @@ TEST(SetEasingCommandTest, MissingFrameIsNoOp) {
     PropertyPath path = TransformPosition(scene.layer->id);
 
     scene.execute<SetEasingCommand>(path, 99, Easing::EaseIn());
-    scene.undo.undo(scene.document);  // 不应崩溃
+    scene.undo.undo(scene.document);
     EXPECT_FALSE(scene.layer->transform.position.isAnimated());
 }
 
@@ -334,12 +333,12 @@ TEST(CommandsTest, SkipWhenTargetEntityDeleted) {
     scene.execute<AddKeyframeCommand>(path, KeyframeData{PositionKeyframe(10, {50, 0})});
     scene.execute<RemoveLayerCommand>(scene.composition->id, scene.layer->id);
 
-    // 图层已删除：新命令静默跳过，不崩溃。
+    // Layer deleted: new command silently skips, no crash.
     scene.execute<SetStaticValueCommand>(path, PropertyValue{Vec2{1, 1}});
-    scene.undo.undo(scene.document);  // 跳过的命令 undo 也是空操作
+    scene.undo.undo(scene.document);  // Skipped command undo is also a no-op
 
-    scene.undo.undo(scene.document);  // 恢复图层
+    scene.undo.undo(scene.document);
     ASSERT_EQ(scene.composition->layers.size(), 1u);
-    scene.undo.undo(scene.document);  // 移除关键帧（图层已恢复，正常生效）
+    scene.undo.undo(scene.document);  // Remove keyframe (layer restored, takes effect)
     EXPECT_FALSE(scene.layer->transform.position.isAnimated());
 }

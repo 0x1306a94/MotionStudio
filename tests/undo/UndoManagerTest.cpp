@@ -17,7 +17,7 @@ using motion::UndoManager;
 
 namespace {
 
-// 对计数器做加减的测试命令；mergeKey 非空且相同则可合并。
+// Test command that adjusts a counter; merges when mergeKey is non-empty and matches.
 class AdjustCommand : public Command {
 public:
     AdjustCommand(int* target, int delta, std::string mergeKey = {})
@@ -26,8 +26,8 @@ public:
     void execute(Document&) override { *target_ += delta_; }
     void undo(Document&) override { *target_ -= delta_; }
 
-    // 测试专用命令：借用 Composite 作为类型标签，仅用于在本测试内识别同类命令
-    // （本测试不会出现真正的 CompositeCommand）。
+    // Test-only: borrow Composite as a type tag to identify same-kind commands in this test
+    // (no real CompositeCommand appears in this test).
     CommandKind kind() const override { return CommandKind::Composite; }
 
     bool mergeWith(const Command& other) override {
@@ -53,7 +53,7 @@ private:
     std::string mergeKey_;
 };
 
-// 记录执行顺序的命令。
+// Command that records execution order.
 class OrderCommand : public Command {
 public:
     OrderCommand(std::vector<std::string>* log, std::string name)
@@ -122,7 +122,7 @@ TEST(UndoManagerTest, MaxHistoryDropsOldest) {
         ++undoCount;
     }
     EXPECT_EQ(undoCount, 3);
-    EXPECT_EQ(counter, 2);  // 最旧的两次已被丢弃
+    EXPECT_EQ(counter, 2);
 }
 
 TEST(UndoManagerTest, ConsecutiveCommandsMergeWithinWindow) {
@@ -135,7 +135,7 @@ TEST(UndoManagerTest, ConsecutiveCommandsMergeWithinWindow) {
     manager.execute(document, std::make_unique<AdjustCommand>(&counter, 3, "drag"));
     EXPECT_EQ(counter, 6);
 
-    manager.undo(document);  // 一个 undo 单元回退全部
+    manager.undo(document);
     EXPECT_EQ(counter, 0);
     EXPECT_FALSE(manager.canUndo());
 }
@@ -178,7 +178,7 @@ TEST(UndoManagerTest, MergeWindowExpiryPreventsMerging) {
     manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "drag"));
 
     manager.undo(document);
-    EXPECT_EQ(counter, 1);  // 未合并，只回退第二次
+    EXPECT_EQ(counter, 1);
 }
 
 TEST(UndoManagerTest, UndoBreaksMergeWindow) {
@@ -189,7 +189,7 @@ TEST(UndoManagerTest, UndoBreaksMergeWindow) {
     manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "drag"));
     manager.undo(document);
     manager.redo(document);
-    // redo 后的新命令不应与栈顶合并。
+    // New command after redo should not merge with stack top.
     manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "drag"));
 
     manager.undo(document);

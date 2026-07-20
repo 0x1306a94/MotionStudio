@@ -7,7 +7,7 @@
 
 namespace motion {
 
-// 文档级资源（图片/字体）。M1 仅保留最小字段。
+// Document-level asset (image or font). M1 keeps only the minimal fields.
 struct Asset {
     EntityId id = EntityId::Generate();
     AssetType type = AssetType::Image;

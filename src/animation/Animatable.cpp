@@ -14,7 +14,7 @@ namespace motion {
 
 namespace {
 
-// std::lower_bound / std::upper_bound 的比较函数（避免 lambda）。
+// Comparison functions for std::lower_bound / std::upper_bound (avoids lambdas).
 template <typename T>
 bool KeyframeBeforeTime(const Keyframe<T>& keyframe, FrameTime time) {
     return keyframe.time < time;
@@ -141,7 +141,7 @@ typename std::vector<Keyframe<T>>::iterator Animatable<T>::find(FrameTime time) 
     return (it != keyframes_.end() && it->time == time) ? it : keyframes_.end();
 }
 
-// valueType() 按类型特化（须在显式实例化之前定义）。
+// valueType() specializations (must be defined before explicit instantiations).
 template <>
 AnimatableType Animatable<float>::valueType() const {
     return AnimatableType::Float;
@@ -163,7 +163,7 @@ AnimatableType Animatable<std::string>::valueType() const {
     return AnimatableType::String;
 }
 
-// 支持的可动画类型登记处。
+// Explicit instantiations for supported animatable types.
 template class Animatable<float>;
 template class Animatable<Vec2>;
 template class Animatable<Color>;

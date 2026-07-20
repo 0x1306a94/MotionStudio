@@ -5,13 +5,16 @@
 
 namespace motion {
 
-// Shape 元素基类。具体类型见 ShapePath/ShapeFill/ShapeStroke/ShapeGroup/
-// ShapeRect/ShapeEllipse/ShapeTrimPath；有序，渲染按序应用。
+// Base class for shape elements. Concrete types: ShapePath, ShapeFill,
+// ShapeStroke, ShapeGroup, ShapeRect, ShapeEllipse, ShapeTrimPath.
+// Elements are rendered in the order they appear in their parent list.
 class ShapeElement {
 public:
+    // type: which shape element variant this instance represents.
     explicit ShapeElement(ShapeType type);
     virtual ~ShapeElement();
 
+    // Returns the shape element variant tag.
     ShapeType type() const;
 
     EntityId id;

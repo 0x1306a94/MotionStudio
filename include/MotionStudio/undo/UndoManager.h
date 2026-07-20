@@ -13,15 +13,22 @@ namespace motion {
 
 class Document;
 
-// 双栈 undo/redo + 合并窗口。
-// execute 行为：执行命令 → 若栈顶命令与之间隔在合并窗口内且 mergeWith 成功则吸收
-// （不压栈，典型场景：拖拽）→ 否则压 undo 栈并清空 redo 栈 → 超 maxHistory 丢弃最旧。
+// Dual-stack undo/redo with a merge window.
+// execute() behavior: runs the command → if the top-of-stack command is within
+// the merge window and mergeWith succeeds, absorbs it (no push; typical for
+// drags) → otherwise pushes onto the undo stack and clears the redo stack →
+// drops the oldest entry when exceeding maxHistory.
 class UndoManager {
 public:
+    // maxHistory: maximum number of commands kept in the undo stack.
+    // mergeWindow: time window within which consecutive commands may merge.
     explicit UndoManager(size_t maxHistory = 200,
                          std::chrono::milliseconds mergeWindow =
                              std::chrono::milliseconds(500));
 
+    // Executes a command and records it for undo.
+    // document: the document to mutate.
+    // command: takes ownership of the command.
     void execute(Document& document, std::unique_ptr<Command> command);
     void undo(Document& document);
     void redo(Document& document);
@@ -31,8 +38,10 @@ public:
     std::string undoDescription() const;
     std::string redoDescription() const;
 
-    void endMergeGroup();  // 鼠标抬起时调用，关闭合并窗口
-    void clear();          // 打开/新建文档时清空历史（undo 历史不持久化）
+    // Call on mouse-up to close the merge window.
+    void endMergeGroup();
+    // Clears all history (undo history is not persisted).
+    void clear();
 
 private:
     std::deque<std::unique_ptr<Command>> undoStack_;

@@ -24,7 +24,7 @@ Color Interpolator<Color>::Lerp(const Color& from, const Color& to, float t) {
 BezierPath Interpolator<BezierPath>::Lerp(const BezierPath& from, const BezierPath& to,
                                           float t) {
     assert(from.vertices.size() == to.vertices.size() &&
-           "BezierPath 插值要求两关键帧顶点数一致");
+           "BezierPath interpolation requires matching vertex counts");
     if (from.vertices.size() != to.vertices.size()) {
         return from;
     }
@@ -54,7 +54,7 @@ Vec2 EvaluateSpatial(const Keyframe<Vec2>& from, const Keyframe<Vec2>& to,
     if (!from.spatialOutTangent || !to.spatialInTangent) {
         return Interpolator<Vec2>::Lerp(from.value, to.value, easedProgress);
     }
-    // 空间三次贝塞尔：P0=起点, P1=起点+出手柄, P2=终点+入手柄, P3=终点。
+    // Spatial cubic Bezier: P0=start, P1=start+outTangent, P2=end+inTangent, P3=end.
     return CubicBezierPoint(from.value, from.value + *from.spatialOutTangent,
                             to.value + *to.spatialInTangent, to.value, easedProgress);
 }

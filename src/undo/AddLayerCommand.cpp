@@ -18,10 +18,10 @@ void AddLayerCommand::execute(Document& document) {
     }
     Composition* composition = document.entityIndex().findComposition(compositionId_);
     if (!composition) {
-        return;  // 合成已删除 → 跳过
+        return;
     }
     document.addLayer(compositionId_, std::move(layer_), index_);
-    index_ = IndexOfLayer(*composition, layerId_);  // 记录实际位置供 undo/redo
+    index_ = IndexOfLayer(*composition, layerId_);
 }
 
 void AddLayerCommand::undo(Document& document) {

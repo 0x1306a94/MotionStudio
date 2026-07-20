@@ -6,6 +6,7 @@
 
 namespace motion {
 
+// Parametric rectangle with animatable position, size, and corner radius.
 class ShapeRect : public ShapeElement {
 public:
     ShapeRect();

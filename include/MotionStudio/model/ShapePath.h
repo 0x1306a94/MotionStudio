@@ -6,12 +6,14 @@
 
 namespace motion {
 
+// A free-form bezier path shape element.
 class ShapePath : public ShapeElement {
 public:
     ShapePath();
     ~ShapePath() override;
 
-    Animatable<BezierPath> path;  // 整条路径作为可动画值
+    // The entire path as a single animatable value.
+    Animatable<BezierPath> path;
 };
 
 }  // namespace motion

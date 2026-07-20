@@ -1,5 +1,5 @@
-// 验收：1000 次随机命令 + 随机 undo/redo，ASan 下无崩溃无泄漏；
-// undo 后序列化指纹与操作前一致。固定种子，可复现。
+// Acceptance: 1000 random commands + random undo/redo, no crash/leak under ASan;
+// serialization fingerprint after undo matches pre-operation state. Fixed seed for reproducibility.
 #include <memory>
 #include <random>
 #include <vector>
@@ -88,7 +88,7 @@ float RandomFloat(std::mt19937_64& rng) { return float(rng() % 1000) - 500.0f; }
 
 Vec2 RandomVec2(std::mt19937_64& rng) { return {RandomFloat(rng), RandomFloat(rng)}; }
 
-// 生成一条随机命令（目标可能不存在——命令必须安全跳过）。
+// Generate a random command (target may not exist — command must skip safely).
 std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64& rng, Document& document) {
     std::vector<Layer*> layers = CollectLayers(document);
     EntityId compositionId =

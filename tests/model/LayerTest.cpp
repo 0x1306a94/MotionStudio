@@ -50,7 +50,7 @@ TEST(SetParentTest, RejectsIndirectCycle) {
     ASSERT_TRUE(scene.childLayer->setParent(scene.parentLayer->id, scene.document));
     ASSERT_TRUE(grandchild->setParent(scene.childLayer->id, scene.document));
 
-    // parent → child → grandchild 链已存在，让 parent 认 grandchild 为父会成环。
+    // parent → child → grandchild chain exists; making parent's parent = grandchild would create a cycle.
     EXPECT_FALSE(scene.parentLayer->setParent(grandchild->id, scene.document));
     EXPECT_FALSE(scene.parentLayer->parentId.isValid());
 }
@@ -95,7 +95,7 @@ TEST(LayerTransformTest, WorldAppliesParentChain) {
 
 TEST(LayerTransformTest, WorldFallsBackToLocalWithDanglingParent) {
     TwoLayerScene scene;
-    // 绕过 setParent 直接写入悬空父 ID（模拟非法文件）。
+    // Bypass setParent and write a dangling parent ID directly (simulate corrupt file).
     scene.childLayer->parentId = EntityId{999};
     scene.childLayer->transform.position.setStaticValue({5, 5});
 

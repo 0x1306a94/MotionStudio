@@ -5,12 +5,14 @@
 
 namespace motion {
 
+// Layer content that references a document-level image asset.
 class ImageContent : public LayerContent {
 public:
     ImageContent();
     ~ImageContent() override;
 
-    EntityId assetId;  // 引用 Document 级 Asset
+    // References a document-level Asset by id.
+    EntityId assetId;
 };
 
 }  // namespace motion

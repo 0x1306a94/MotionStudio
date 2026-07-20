@@ -107,8 +107,8 @@ TEST(AnimatableTest, EvaluateUsesFirstKeyframeEasingPerSegment) {
     animatable.addKeyframe(FloatKeyframe(10, 10, Easing::Linear()));
     animatable.addKeyframe(FloatKeyframe(20, 20));
 
-    EXPECT_FLOAT_EQ(animatable.evaluate(5), 0.0f);   // 第一段 Hold
-    EXPECT_FLOAT_EQ(animatable.evaluate(15), 15.0f); // 第二段 Linear
+    EXPECT_FLOAT_EQ(animatable.evaluate(5), 0.0f);
+    EXPECT_FLOAT_EQ(animatable.evaluate(15), 15.0f);
 }
 
 TEST(AnimatableTest, EvaluateSpatialArcDiffersFromStraightLine) {
@@ -120,7 +120,7 @@ TEST(AnimatableTest, EvaluateSpatialArcDiffersFromStraightLine) {
     animatable.addKeyframe(from);
     animatable.addKeyframe(to);
 
-    // 三次贝塞尔中点：P0=(0,0) P1=(10,10) P2=(90,10) P3=(100,0) → (50, 7.5)
+    // Cubic bezier midpoint: P0=(0,0) P1=(10,10) P2=(90,10) P3=(100,0) → (50, 7.5)
     Vec2 mid = animatable.evaluate(5);
     EXPECT_TRUE(motion::ApproxEqual(mid, Vec2{50, 7.5f}));
 }

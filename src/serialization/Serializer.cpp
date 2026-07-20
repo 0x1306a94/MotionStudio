@@ -29,7 +29,7 @@ using json = nlohmann::json;
 
 namespace {
 
-// ---- JSON 非抛异常访问器（项目禁用 try/catch，nlohmann 的 at/get 会抛异常）----
+// ---- JSON non-throwing accessors (project disables try/catch; nlohmann at/get throw) ----
 
 const json* FindChild(const json& node, const char* key) {
     if (!node.is_object()) {
@@ -42,28 +42,28 @@ const json* FindChild(const json& node, const char* key) {
 Expected<const json*> Child(const json& node, const char* key) {
     const json* child = FindChild(node, key);
     if (!child) {
-        return Error(std::string("缺少字段: ") + key);
+        return Error(std::string("missing field: ") + key);
     }
     return child;
 }
 
 Expected<float> AsFloat(const json& node) {
     if (!node.is_number()) {
-        return Error("字段不是数字");
+        return Error("field is not a number");
     }
     return node.get<float>();
 }
 
 Expected<double> AsDouble(const json& node) {
     if (!node.is_number()) {
-        return Error("字段不是数字");
+        return Error("field is not a number");
     }
     return node.get<double>();
 }
 
 Expected<int64_t> AsInt64(const json& node) {
     if (!node.is_number_integer()) {
-        return Error("字段不是整数");
+        return Error("field is not an integer");
     }
     return node.get<int64_t>();
 }
@@ -79,26 +79,26 @@ Expected<int> AsInt(const json& node) {
 Expected<uint32_t> AsUint32(const json& node) {
     Expected<int64_t> value = AsInt64(node);
     if (!value || *value < 0 || *value > int64_t(UINT32_MAX)) {
-        return Error("字段不是合法的无符号整数");
+        return Error("field is not a valid unsigned integer");
     }
     return uint32_t(*value);
 }
 
 Expected<bool> AsBool(const json& node) {
     if (!node.is_boolean()) {
-        return Error("字段不是布尔值");
+        return Error("field is not a boolean");
     }
     return node.get<bool>();
 }
 
 Expected<std::string> AsString(const json& node) {
     if (!node.is_string()) {
-        return Error("字段不是字符串");
+        return Error("field is not a string");
     }
     return node.get<std::string>();
 }
 
-// ---- EntityId ↔ 16 字符 hex ----
+// ---- EntityId ↔ 16-char hex ----
 
 std::string IdToString(EntityId id) {
     char buffer[17];
@@ -107,14 +107,13 @@ std::string IdToString(EntityId id) {
     return buffer;
 }
 
-// std::from_chars 解析，不抛异常。
 Expected<EntityId> IdFromString(const std::string& text) {
     uint64_t value = 0;
     const char* begin = text.data();
     const char* end = begin + text.size();
     const auto result = std::from_chars(begin, end, value, 16);
     if (result.ec != std::errc() || result.ptr != end || value == 0) {
-        return Error("非法实体 ID: " + text);
+        return Error("invalid entity id: " + text);
     }
     return EntityId{value};
 }
@@ -131,7 +130,7 @@ Expected<EntityId> IdField(const json& node, const char* key) {
     return IdFromString(*text);
 }
 
-// ---- 叶子值 ----
+// ---- Leaf values ----
 
 json Vec2ToJson(Vec2 value) {
     return json::array({value.x, value.y});
@@ -139,7 +138,7 @@ json Vec2ToJson(Vec2 value) {
 
 Expected<Vec2> Vec2FromJson(const json& node) {
     if (!node.is_array() || node.size() != 2) {
-        return Error("Vec2 必须是 2 元素数组");
+        return Error("Vec2 must be a 2-element array");
     }
     Expected<float> x = AsFloat(node[0]);
     if (!x) {
@@ -158,14 +157,14 @@ json ColorToJson(Color value) {
 
 Expected<Color> ColorFromJson(const json& node) {
     if (!node.is_array() || node.size() != 4) {
-        return Error("Color 必须是 4 元素数组");
+        return Error("Color must be a 4-element array");
     }
     Expected<float> r = AsFloat(node[0]);
     Expected<float> g = AsFloat(node[1]);
     Expected<float> b = AsFloat(node[2]);
     Expected<float> a = AsFloat(node[3]);
     if (!r || !g || !b || !a) {
-        return Error("Color 分量不是数字");
+        return Error("Color component is not a number");
     }
     return Color{*r, *g, *b, *a};
 }
@@ -191,7 +190,7 @@ Expected<BezierPath> BezierPathFromJson(const json& node) {
     }
     const json* verticesNode = FindChild(node, "vertices");
     if (!verticesNode || !verticesNode->is_array()) {
-        return Error("缺少 vertices 数组");
+        return Error("missing the vertices array");
     }
     BezierPath path;
     path.closed = *closed;
@@ -200,20 +199,19 @@ Expected<BezierPath> BezierPathFromJson(const json& node) {
         Expected<const json*> inNode = Child(vertexNode, "inTangent");
         Expected<const json*> outNode = Child(vertexNode, "outTangent");
         if (!pointNode || !inNode || !outNode) {
-            return Error("顶点缺少切线字段");
+            return Error("vertex is missing a tangent field");
         }
         Expected<Vec2> point = Vec2FromJson(**pointNode);
         Expected<Vec2> inTangent = Vec2FromJson(**inNode);
         Expected<Vec2> outTangent = Vec2FromJson(**outNode);
         if (!point || !inTangent || !outTangent) {
-            return Error("顶点坐标非法");
+            return Error("invalid vertex coordinates");
         }
         path.vertices.push_back({*point, *inTangent, *outTangent});
     }
     return path;
 }
 
-// FromJson<T>：各类型的 JSON → 值解析。
 template <typename T>
 Expected<T> FromJson(const json& node);
 
@@ -258,7 +256,6 @@ Expected<BezierPath> FromJson<BezierPath>(const json& node) {
     return BezierPathFromJson(node);
 }
 
-// 取必选字段并按类型解析。
 template <typename T>
 Expected<T> ParseField(const json& node, const char* key) {
     Expected<const json*> child = Child(node, key);
@@ -298,14 +295,13 @@ Expected<Easing> EasingFromJson(const json& node) {
     Expected<float> outX = ParseField<float>(node, "outX");
     Expected<float> outY = ParseField<float>(node, "outY");
     if (!inX || !inY || !outX || !outY) {
-        return Error("Bezier 缓动缺少控制点字段");
+        return Error("Bezier easing is missing control point fields");
     }
     return Easing::Bezier(*inX, *inY, *outX, *outY);
 }
 
-// ---- Animatable<T>：静态 {"static": ...} / 关键帧 {"keyframes": [...]} ----
+// ---- Animatable<T>: static {"static": ...} / keyframes {"keyframes": [...]} ----
 
-// 属性值 → JSON 节点（按值类型分发）。
 json ValueToJson(float value) { return value; }
 json ValueToJson(const Vec2& value) { return Vec2ToJson(value); }
 json ValueToJson(const Color& value) { return ColorToJson(value); }
@@ -383,7 +379,7 @@ Expected<void> AnimatableFromJson(const json& node, Animatable<T>& animatable) {
     }
     if (const json* keyframesNode = FindChild(node, "keyframes")) {
         if (!keyframesNode->is_array()) {
-            return Error("keyframes 必须是数组");
+            return Error("keyframes must be an array");
         }
         for (const json& keyframeNode : *keyframesNode) {
             Expected<Keyframe<T>> keyframe = KeyframeFromJson<T>(keyframeNode);
@@ -474,7 +470,7 @@ Expected<Mask> MaskFromJson(const json& node) {
     return mask;
 }
 
-// ---- Shape 元素（判别字段 "type"）----
+// ---- Shape elements (discriminant field "type") ----
 
 json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements);
 
@@ -627,7 +623,7 @@ Expected<std::unique_ptr<ShapeElement>> ShapeFromJson(const json& node) {
             Expected<std::string> joinText = ParseField<std::string>(node, "join");
             Expected<float> miterLimit = ParseField<float>(node, "miterLimit");
             if (!capText || !joinText || !miterLimit) {
-                return Error("Stroke 缺少 cap/join/miterLimit 字段");
+                return Error("Stroke is missing the cap/join/miterLimit fields");
             }
             Expected<LineCap> cap = dto::lineCapFromString(*capText);
             if (!cap) {
@@ -655,7 +651,7 @@ Expected<std::unique_ptr<ShapeElement>> ShapeFromJson(const json& node) {
             }
             const json* elementsNode = FindChild(node, "elements");
             if (!elementsNode || !elementsNode->is_array()) {
-                return Error("Group 缺少 elements 数组");
+                return Error("Group is missing the elements array");
             }
             for (const json& childNode : *elementsNode) {
                 Expected<std::unique_ptr<ShapeElement>> child = ShapeFromJson(childNode);
@@ -756,7 +752,7 @@ Expected<std::unique_ptr<ShapeElement>> ShapeFromJson(const json& node) {
     return element;
 }
 
-// ---- LayerContent（判别字段 "type"）----
+// ---- LayerContent (discriminant field "type") ----
 
 json ContentToJson(const LayerContent& content) {
     json node{{"type", dto::ToString(content.type())}};
@@ -803,7 +799,7 @@ Expected<std::unique_ptr<LayerContent>> ContentFromJson(const json& node) {
             auto content = std::make_unique<ShapeContent>();
             const json* elementsNode = FindChild(node, "elements");
             if (!elementsNode || !elementsNode->is_array()) {
-                return Error("Shape 内容缺少 elements 数组");
+                return Error("Shape content is missing the elements array");
             }
             for (const json& elementNode : *elementsNode) {
                 Expected<std::unique_ptr<ShapeElement>> element = ShapeFromJson(elementNode);
@@ -860,7 +856,7 @@ Expected<std::unique_ptr<LayerContent>> ContentFromJson(const json& node) {
             return std::unique_ptr<LayerContent>(std::move(content));
         }
     }
-    return Error("未知 layer content 类型");
+    return Error("unknown layer content type");
 }
 
 // ---- Layer / Composition / Asset / Document ----
@@ -921,7 +917,7 @@ Expected<std::unique_ptr<Layer>> LayerFromJson(const json& node) {
     Expected<bool> visible = ParseField<bool>(node, "visible");
     Expected<bool> locked = ParseField<bool>(node, "locked");
     if (!inPoint || !outPoint || !startTime || !timeStretch || !visible || !locked) {
-        return Error("Layer 缺少时间/可见性字段");
+        return Error("Layer is missing the time/visibility fields");
     }
     layer->inPoint = *inPoint;
     layer->outPoint = *outPoint;
@@ -974,7 +970,7 @@ Expected<std::unique_ptr<Layer>> LayerFromJson(const json& node) {
 
     if (const json* masksNode = FindChild(node, "masks")) {
         if (!masksNode->is_array()) {
-            return Error("masks 必须是数组");
+            return Error("masks must be an array");
         }
         for (const json& maskNode : *masksNode) {
             Expected<Mask> mask = MaskFromJson(maskNode);
@@ -1031,14 +1027,14 @@ Expected<std::unique_ptr<Composition>> CompositionFromJson(const json& node) {
     Expected<uint32_t> num = ParseField<uint32_t>(**frameRateNode, "num");
     Expected<uint32_t> den = ParseField<uint32_t>(**frameRateNode, "den");
     if (!num || !den) {
-        return Error("frameRate 缺少 num/den 字段");
+        return Error("frameRate is missing the num/den fields");
     }
     composition->frameRate = {*num, *den};
 
     Expected<int> width = ParseField<int>(node, "width");
     Expected<int> height = ParseField<int>(node, "height");
     if (!width || !height) {
-        return Error("Composition 缺少 width/height 字段");
+        return Error("Composition is missing the width/height fields");
     }
     composition->width = *width;
     composition->height = *height;
@@ -1051,7 +1047,7 @@ Expected<std::unique_ptr<Composition>> CompositionFromJson(const json& node) {
 
     const json* layersNode = FindChild(node, "layers");
     if (!layersNode || !layersNode->is_array()) {
-        return Error("Composition 缺少 layers 数组");
+        return Error("Composition is missing the layers array");
     }
     for (const json& layerNode : *layersNode) {
         Expected<std::unique_ptr<Layer>> layer = LayerFromJson(layerNode);
@@ -1089,7 +1085,7 @@ Expected<Asset> AssetFromJson(const json& node) {
     Expected<std::string> name = ParseField<std::string>(node, "name");
     Expected<std::string> path = ParseField<std::string>(node, "path");
     if (!name || !path) {
-        return Error("Asset 缺少 name/path 字段");
+        return Error("Asset is missing the name/path fields");
     }
     asset.name = std::move(*name);
     asset.path = std::move(*path);
@@ -1125,7 +1121,7 @@ Expected<std::unique_ptr<Document>> Serializer::deserialize(const std::string& j
     }
     const json data = json::parse(*migrated, nullptr, false);
     if (data.is_discarded() || !data.is_object()) {
-        return Error("文档 JSON 解析失败");
+        return Error("failed to parse the document JSON");
     }
 
     auto document = std::make_unique<Document>();
@@ -1144,7 +1140,7 @@ Expected<std::unique_ptr<Document>> Serializer::deserialize(const std::string& j
 
     const json* assetsNode = FindChild(data, "assets");
     if (!assetsNode || !assetsNode->is_array()) {
-        return Error("缺少 assets 数组");
+        return Error("missing the assets array");
     }
     for (const json& assetNode : *assetsNode) {
         Expected<Asset> asset = AssetFromJson(assetNode);
@@ -1156,7 +1152,7 @@ Expected<std::unique_ptr<Document>> Serializer::deserialize(const std::string& j
 
     const json* compositionsNode = FindChild(data, "compositions");
     if (!compositionsNode || !compositionsNode->is_array()) {
-        return Error("缺少 compositions 数组");
+        return Error("missing the compositions array");
     }
     for (const json& compositionNode : *compositionsNode) {
         Expected<std::unique_ptr<Composition>> composition =

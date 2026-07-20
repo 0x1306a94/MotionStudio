@@ -33,7 +33,7 @@ TEST(SolveBezierEasingTest, LinearControlPointsGiveIdentity) {
 }
 
 TEST(SolveBezierEasingTest, SymmetricCurvePassesThroughCenter) {
-    // cubic-bezier(0.5, 0, 0.5, 1) 关于 (0.5, 0.5) 中心对称。
+    // cubic-bezier(0.5, 0, 0.5, 1) is symmetric about the center (0.5, 0.5).
     EXPECT_NEAR(SolveBezierEasing(0.5f, 0, 0.5f, 1, 0.5f), 0.5f, 1e-5f);
 }
 
@@ -42,6 +42,6 @@ TEST(SolveBezierEasingTest, EaseInLagsBehindLinear) {
 }
 
 TEST(SolveBezierEasingTest, YOvershootIsAllowed) {
-    // y 控制点越界产生回弹：中段 y < 0。
+    // Y control points outside [0,1] cause overshoot: mid-range y < 0.
     EXPECT_LT(SolveBezierEasing(0.5f, -0.5f, 0.5f, 1.5f, 0.25f), 0.0f);
 }

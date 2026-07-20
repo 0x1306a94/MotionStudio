@@ -2,7 +2,7 @@
 
 namespace motion {
 
-// RGBA，各分量线性空间 [0, 1]。
+// RGBA color with each component in linear space [0, 1].
 struct Color {
     float r = 0;
     float g = 0;

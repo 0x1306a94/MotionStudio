@@ -42,7 +42,7 @@ bool Layer::setParent(EntityId newParentId, const Document& document) {
         parentId = newParentId;
         return true;
     }
-    // 沿目标父链上行，遇到自身则会形成环。
+    // Walk up the target parent chain; reject if it would create a cycle.
     EntityId cursor = newParentId;
     while (cursor.isValid()) {
         if (cursor == id) {
@@ -50,7 +50,7 @@ bool Layer::setParent(EntityId newParentId, const Document& document) {
         }
         const Layer* ancestor = document.entityIndex().findLayer(cursor);
         if (!ancestor) {
-            return false;  // 父链悬空，拒绝
+            return false;  // Dangling parent chain, reject.
         }
         cursor = ancestor->parentId;
     }
@@ -71,7 +71,7 @@ Mat3 Layer::worldTransform(FrameTime time, const Document& document) const {
 
 Mat3 Layer::worldTransform(FrameTime time, const Document& document, int depth) const {
     Mat3 local = localTransform(time);
-    // depth 兜底：正常路径由 setParent 防环，此处防反序列化产生的非法环。
+    // Depth guard: setParent prevents cycles at runtime; this catches cycles from deserialization.
     if (!parentId.isValid() || depth >= 1024) {
         return local;
     }

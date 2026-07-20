@@ -9,9 +9,12 @@
 
 namespace motion {
 
-// 加关键帧。若该帧已有则记录被替换者，undo 时还原。
+// Adds a keyframe. If a keyframe at the same time already exists, records the
+// replaced one and restores it on undo.
 class AddKeyframeCommand : public Command {
 public:
+    // property: path to the animatable property.
+    // keyframe: the keyframe to add.
     AddKeyframeCommand(PropertyPath property, KeyframeData keyframe);
 
     void execute(Document& document) override;

@@ -5,6 +5,7 @@
 
 namespace motion {
 
+// Trims preceding paths to a sub-range defined by start/end and offset.
 class ShapeTrimPath : public ShapeElement {
 public:
     ShapeTrimPath();
@@ -12,7 +13,7 @@ public:
 
     Animatable<float> start{0.0f};   // 0.0 ~ 1.0
     Animatable<float> end{1.0f};     // 0.0 ~ 1.0
-    Animatable<float> offset{0.0f};  // 度
+    Animatable<float> offset{0.0f};  // degrees
 };
 
 }  // namespace motion

@@ -29,7 +29,7 @@ Expected<LayerType> layerTypeFromString(const std::string& text) {
     if (text == "precomp") {
         return LayerType::Precomp;
     }
-    return Error("未知 layer 类型: " + text);
+    return Error("unknown layer type: " + text);
 }
 
 const char* ToString(ShapeType type) {
@@ -67,7 +67,7 @@ Expected<ShapeType> shapeTypeFromString(const std::string& text) {
     if (text == "trimPath") {
         return ShapeType::TrimPath;
     }
-    return Error("未知 shape 类型: " + text);
+    return Error("unknown shape type: " + text);
 }
 
 const char* ToString(FillRule rule) {
@@ -81,7 +81,7 @@ Expected<FillRule> fillRuleFromString(const std::string& text) {
     if (text == "evenOdd") {
         return FillRule::EvenOdd;
     }
-    return Error("未知 fillRule: " + text);
+    return Error("unknown fill rule: " + text);
 }
 
 const char* ToString(LineCap cap) {
@@ -103,7 +103,7 @@ Expected<LineCap> lineCapFromString(const std::string& text) {
     if (text == "square") {
         return LineCap::Square;
     }
-    return Error("未知 lineCap: " + text);
+    return Error("unknown line cap: " + text);
 }
 
 const char* ToString(LineJoin join) {
@@ -125,7 +125,7 @@ Expected<LineJoin> lineJoinFromString(const std::string& text) {
     if (text == "bevel") {
         return LineJoin::Bevel;
     }
-    return Error("未知 lineJoin: " + text);
+    return Error("unknown line join: " + text);
 }
 
 const char* ToString(BlendMode mode) {
@@ -151,7 +151,7 @@ Expected<BlendMode> blendModeFromString(const std::string& text) {
     if (text == "add") {
         return BlendMode::Add;
     }
-    return Error("未知 blendMode: " + text);
+    return Error("unknown blend mode: " + text);
 }
 
 const char* ToString(MaskMode mode) {
@@ -173,7 +173,7 @@ Expected<MaskMode> maskModeFromString(const std::string& text) {
     if (text == "intersect") {
         return MaskMode::Intersect;
     }
-    return Error("未知 mask mode: " + text);
+    return Error("unknown mask mode: " + text);
 }
 
 const char* ToString(AssetType type) {
@@ -187,7 +187,7 @@ Expected<AssetType> assetTypeFromString(const std::string& text) {
     if (text == "font") {
         return AssetType::Font;
     }
-    return Error("未知 asset 类型: " + text);
+    return Error("unknown asset type: " + text);
 }
 
 const char* ToString(Easing::Type type) {
@@ -209,7 +209,7 @@ Expected<Easing::Type> easingTypeFromString(const std::string& text) {
     if (text == "hold") {
         return Easing::Type::Hold;
     }
-    return Error("未知 easing 类型: " + text);
+    return Error("unknown easing type: " + text);
 }
 
 }  // namespace motion::dto

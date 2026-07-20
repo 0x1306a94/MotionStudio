@@ -40,7 +40,7 @@ TEST(Mat3Test, ScaleScalesPoint) {
 }
 
 TEST(Mat3Test, CompositionMatchesTransformChain) {
-    // local = T(position) · S(scale) · T(-anchor)
+    // local = T(position) * S(scale) * T(-anchor)
     Mat3 local = Mat3::Translate({10, 20}) * Mat3::Scale({2, 2}) * Mat3::Translate({-1, -1});
     Vec2 transformed = local.transformPoint({2, 2});
     EXPECT_EQ(transformed, (Vec2{12, 22}));

@@ -5,12 +5,14 @@
 
 namespace motion {
 
+// Layer content that references another composition (pre-composition).
 class PrecompContent : public LayerContent {
 public:
     PrecompContent();
     ~PrecompContent() override;
 
-    EntityId compositionId;  // 引用另一个 Composition（预合成）
+    // References another Composition by id.
+    EntityId compositionId;
 };
 
 }  // namespace motion

@@ -8,12 +8,14 @@
 
 namespace motion {
 
+// Layer content that holds an ordered list of shape elements.
 class ShapeContent : public LayerContent {
 public:
     ShapeContent();
     ~ShapeContent() override;
 
-    std::vector<std::unique_ptr<ShapeElement>> elements;  // 有序
+    // Rendered in order; index 0 is drawn first.
+    std::vector<std::unique_ptr<ShapeElement>> elements;
 };
 
 }  // namespace motion

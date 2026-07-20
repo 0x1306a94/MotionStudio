@@ -10,10 +10,14 @@
 
 namespace motion {
 
-// 移动关键帧。记录目标帧上被覆盖的关键帧，undo 时一并还原。
-// 连续拖拽（other.oldTime == 本命令 newTime）可合并。
+// Moves a keyframe to a new time. Records any keyframe overwritten at the
+// destination and restores it on undo. Consecutive drags (other.oldTime ==
+// this command's newTime) are merged.
 class MoveKeyframeCommand : public Command {
 public:
+    // property: path to the animatable property.
+    // oldTime: current frame time of the keyframe.
+    // newTime: desired frame time after the move.
     MoveKeyframeCommand(PropertyPath property, FrameTime oldTime, FrameTime newTime);
 
     void execute(Document& document) override;

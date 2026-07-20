@@ -30,7 +30,7 @@ void AddKeyframeCommand::undo(Document& document) {
     if (!target) {
         return;
     }
-    TakeKeyframeAny(target, KeyframeTime(keyframe_));  // 移除本次加入的
+    TakeKeyframeAny(target, KeyframeTime(keyframe_));
     if (replaced_) {
         AddKeyframeAny(target, *replaced_);
     }

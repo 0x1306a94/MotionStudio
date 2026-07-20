@@ -10,14 +10,17 @@ class Composition;
 class Layer;
 class ShapeElement;
 
-// ID → 实体的全局扁平索引，O(1) 寻址。
-// 供 undo 命令与桥接层解析目标：命令只持 EntityId，实体已删除则解析为 nullptr。
+// Global flat index from EntityId to entity pointer for O(1) lookup.
+// Used by undo commands and bridge layers to resolve targets: commands hold
+// only EntityId, so a deleted entity resolves to nullptr.
 class EntityIndex {
 public:
+    // id: entity id to look up. Returns nullptr if not registered.
     Layer* findLayer(EntityId id) const;
     Composition* findComposition(EntityId id) const;
     ShapeElement* findShape(EntityId id) const;
 
+    // layer: non-owning pointer to register.
     void registerLayer(Layer* layer);
     void registerComposition(Composition* composition);
     void registerShape(ShapeElement* shape);

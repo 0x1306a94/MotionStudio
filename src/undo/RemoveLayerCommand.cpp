@@ -17,7 +17,7 @@ void RemoveLayerCommand::execute(Document& document) {
     }
     index_ = IndexOfLayer(*composition, layerId_);
     if (index_ < 0) {
-        return;  // 图层已删除 → 跳过
+        return;
     }
     layer_ = document.takeLayer(compositionId_, layerId_);
 }
