@@ -1,12 +1,23 @@
 #include "MotionStudio/serialization/Serializer.h"
 
 #include <cstdio>
-#include <stdexcept>
 
 #include <nlohmann/json.hpp>
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/NullContent.h"
+#include "MotionStudio/model/PrecompContent.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeEllipse.h"
+#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/ShapeGroup.h"
+#include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/ShapeStroke.h"
+#include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/serialization/Dto.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
 
@@ -29,9 +40,11 @@ EntityId idFromString(const std::string& text) {
     return EntityId{std::stoull(text, nullptr, 16)};
 }
 
-// ---- 叶子值 ----
+// ---- 叶子值（结构错误由 nlohmann 抛出，在 deserialize 边界统一转换）----
 
-json vec2ToJson(Vec2 value) { return json::array({value.x, value.y}); }
+json vec2ToJson(Vec2 value) {
+    return json::array({value.x, value.y});
+}
 
 Vec2 vec2FromJson(const json& node) {
     return {node.at(0).get<float>(), node.at(1).get<float>()};
@@ -111,13 +124,17 @@ json easingToJson(const Easing& easing) {
     return node;
 }
 
-Easing easingFromJson(const json& node) {
-    const Easing::Type type = dto::easingTypeFromString(node.at("type").get<std::string>());
-    if (type == Easing::Type::Bezier) {
+Expected<Easing> easingFromJson(const json& node) {
+    Expected<Easing::Type> type =
+        dto::easingTypeFromString(node.at("type").get<std::string>());
+    if (!type) {
+        return Error(type.errorMessage());
+    }
+    if (*type == Easing::Type::Bezier) {
         return Easing::Bezier(node.at("inX").get<float>(), node.at("inY").get<float>(),
                               node.at("outX").get<float>(), node.at("outY").get<float>());
     }
-    return type == Easing::Type::Hold ? Easing::Hold() : Easing::Linear();
+    return *type == Easing::Type::Hold ? Easing::Hold() : Easing::Linear();
 }
 
 // ---- Animatable<T>：静态 {"static": ...} / 关键帧 {"keyframes": [...]} ----
@@ -144,27 +161,39 @@ json animatableToJson(const Animatable<T>& animatable) {
 }
 
 template <typename T>
-void animatableFromJson(const json& node, Animatable<T>& animatable) {
+Expected<Keyframe<T>> keyframeFromJson(const json& node) {
+    Keyframe<T> keyframe;
+    keyframe.time = node.at("time").get<FrameTime>();
+    keyframe.value = valueFromNode<T>(node.at("value"));
+    Expected<Easing> easing = easingFromJson(node.at("easing"));
+    if (!easing) {
+        return Error(easing.errorMessage());
+    }
+    keyframe.easing = *easing;
+    if (node.contains("spatialInTangent")) {
+        keyframe.spatialInTangent = vec2FromJson(node.at("spatialInTangent"));
+    }
+    if (node.contains("spatialOutTangent")) {
+        keyframe.spatialOutTangent = vec2FromJson(node.at("spatialOutTangent"));
+    }
+    return keyframe;
+}
+
+template <typename T>
+Expected<void> animatableFromJson(const json& node, Animatable<T>& animatable) {
     if (node.contains("static")) {
         animatable.setStaticValue(valueFromNode<T>(node.at("static")));
     }
     if (node.contains("keyframes")) {
         for (const json& keyframeNode : node.at("keyframes")) {
-            Keyframe<T> keyframe;
-            keyframe.time = keyframeNode.at("time").get<FrameTime>();
-            keyframe.value = valueFromNode<T>(keyframeNode.at("value"));
-            keyframe.easing = easingFromJson(keyframeNode.at("easing"));
-            if (keyframeNode.contains("spatialInTangent")) {
-                keyframe.spatialInTangent =
-                    vec2FromJson(keyframeNode.at("spatialInTangent"));
+            Expected<Keyframe<T>> keyframe = keyframeFromJson<T>(keyframeNode);
+            if (!keyframe) {
+                return Error(keyframe.errorMessage());
             }
-            if (keyframeNode.contains("spatialOutTangent")) {
-                keyframe.spatialOutTangent =
-                    vec2FromJson(keyframeNode.at("spatialOutTangent"));
-            }
-            animatable.addKeyframe(std::move(keyframe));
+            animatable.addKeyframe(std::move(*keyframe));
         }
     }
+    return {};
 }
 
 // ---- Transform / Mask ----
@@ -177,12 +206,24 @@ json transformToJson(const Transform& transform) {
             {"opacity", animatableToJson(transform.opacity)}};
 }
 
-void transformFromJson(const json& node, Transform& transform) {
-    animatableFromJson(node.at("anchorPoint"), transform.anchorPoint);
-    animatableFromJson(node.at("position"), transform.position);
-    animatableFromJson(node.at("scale"), transform.scale);
-    animatableFromJson(node.at("rotation"), transform.rotation);
-    animatableFromJson(node.at("opacity"), transform.opacity);
+Expected<void> transformFromJson(const json& node, Transform& transform) {
+    Expected<void> result = animatableFromJson(node.at("anchorPoint"), transform.anchorPoint);
+    if (!result) {
+        return result;
+    }
+    result = animatableFromJson(node.at("position"), transform.position);
+    if (!result) {
+        return result;
+    }
+    result = animatableFromJson(node.at("scale"), transform.scale);
+    if (!result) {
+        return result;
+    }
+    result = animatableFromJson(node.at("rotation"), transform.rotation);
+    if (!result) {
+        return result;
+    }
+    return animatableFromJson(node.at("opacity"), transform.opacity);
 }
 
 json maskToJson(const Mask& mask) {
@@ -192,140 +233,213 @@ json maskToJson(const Mask& mask) {
             {"inverted", mask.inverted}};
 }
 
-Mask maskFromJson(const json& node) {
+Expected<Mask> maskFromJson(const json& node) {
     Mask mask;
     mask.path = bezierPathFromJson(node.at("path"));
-    mask.mode = dto::maskModeFromString(node.at("mode").get<std::string>());
-    animatableFromJson(node.at("opacity"), mask.opacity);
+    Expected<MaskMode> mode = dto::maskModeFromString(node.at("mode").get<std::string>());
+    if (!mode) {
+        return Error(mode.errorMessage());
+    }
+    mask.mode = *mode;
+    Expected<void> result = animatableFromJson(node.at("opacity"), mask.opacity);
+    if (!result) {
+        return Error(result.errorMessage());
+    }
     mask.inverted = node.at("inverted").get<bool>();
     return mask;
 }
 
 // ---- Shape 元素（判别字段 "type"）----
 
-json shapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements);
-
-json shapeToJson(const ShapeElement& element) {
-    json node{{"id", idToString(element.id)}, {"type", dto::toString(element.type())}};
-    switch (element.type()) {
-        case ShapeType::Path: {
-            const auto& shape = static_cast<const ShapePath&>(element);
-            node["path"] = animatableToJson(shape.path);
-            break;
-        }
-        case ShapeType::Fill: {
-            const auto& shape = static_cast<const ShapeFill&>(element);
-            node["color"] = animatableToJson(shape.color);
-            node["opacity"] = animatableToJson(shape.opacity);
-            node["fillRule"] = dto::toString(shape.fillRule);
-            break;
-        }
-        case ShapeType::Stroke: {
-            const auto& shape = static_cast<const ShapeStroke&>(element);
-            node["color"] = animatableToJson(shape.color);
-            node["width"] = animatableToJson(shape.width);
-            node["opacity"] = animatableToJson(shape.opacity);
-            node["cap"] = dto::toString(shape.cap);
-            node["join"] = dto::toString(shape.join);
-            node["miterLimit"] = shape.miterLimit;
-            break;
-        }
-        case ShapeType::Group: {
-            const auto& shape = static_cast<const ShapeGroup&>(element);
-            node["transform"] = transformToJson(shape.transform);
-            node["elements"] = shapesToJson(shape.elements);
-            break;
-        }
-        case ShapeType::Rect: {
-            const auto& shape = static_cast<const ShapeRect&>(element);
-            node["position"] = animatableToJson(shape.position);
-            node["size"] = animatableToJson(shape.size);
-            node["cornerRadius"] = animatableToJson(shape.cornerRadius);
-            break;
-        }
-        case ShapeType::Ellipse: {
-            const auto& shape = static_cast<const ShapeEllipse&>(element);
-            node["position"] = animatableToJson(shape.position);
-            node["size"] = animatableToJson(shape.size);
-            break;
-        }
-        case ShapeType::TrimPath: {
-            const auto& shape = static_cast<const ShapeTrimPath&>(element);
-            node["start"] = animatableToJson(shape.start);
-            node["end"] = animatableToJson(shape.end);
-            node["offset"] = animatableToJson(shape.offset);
-            break;
-        }
-    }
-    return node;
-}
+Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node);
 
 json shapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements) {
     json nodes = json::array();
     for (const auto& element : elements) {
-        nodes.push_back(shapeToJson(*element));
+        json node{{"id", idToString(element->id)},
+                  {"type", dto::toString(element->type())}};
+        switch (element->type()) {
+            case ShapeType::Path: {
+                const auto& shape = static_cast<const ShapePath&>(*element);
+                node["path"] = animatableToJson(shape.path);
+                break;
+            }
+            case ShapeType::Fill: {
+                const auto& shape = static_cast<const ShapeFill&>(*element);
+                node["color"] = animatableToJson(shape.color);
+                node["opacity"] = animatableToJson(shape.opacity);
+                node["fillRule"] = dto::toString(shape.fillRule);
+                break;
+            }
+            case ShapeType::Stroke: {
+                const auto& shape = static_cast<const ShapeStroke&>(*element);
+                node["color"] = animatableToJson(shape.color);
+                node["width"] = animatableToJson(shape.width);
+                node["opacity"] = animatableToJson(shape.opacity);
+                node["cap"] = dto::toString(shape.cap);
+                node["join"] = dto::toString(shape.join);
+                node["miterLimit"] = shape.miterLimit;
+                break;
+            }
+            case ShapeType::Group: {
+                const auto& shape = static_cast<const ShapeGroup&>(*element);
+                node["transform"] = transformToJson(shape.transform);
+                node["elements"] = shapesToJson(shape.elements);
+                break;
+            }
+            case ShapeType::Rect: {
+                const auto& shape = static_cast<const ShapeRect&>(*element);
+                node["position"] = animatableToJson(shape.position);
+                node["size"] = animatableToJson(shape.size);
+                node["cornerRadius"] = animatableToJson(shape.cornerRadius);
+                break;
+            }
+            case ShapeType::Ellipse: {
+                const auto& shape = static_cast<const ShapeEllipse&>(*element);
+                node["position"] = animatableToJson(shape.position);
+                node["size"] = animatableToJson(shape.size);
+                break;
+            }
+            case ShapeType::TrimPath: {
+                const auto& shape = static_cast<const ShapeTrimPath&>(*element);
+                node["start"] = animatableToJson(shape.start);
+                node["end"] = animatableToJson(shape.end);
+                node["offset"] = animatableToJson(shape.offset);
+                break;
+            }
+        }
+        nodes.push_back(std::move(node));
     }
     return nodes;
 }
 
-std::unique_ptr<ShapeElement> shapeFromJson(const json& node) {
-    const ShapeType type = dto::shapeTypeFromString(node.at("type").get<std::string>());
+Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
+    Expected<ShapeType> type = dto::shapeTypeFromString(node.at("type").get<std::string>());
+    if (!type) {
+        return Error(type.errorMessage());
+    }
     std::unique_ptr<ShapeElement> element;
-    switch (type) {
+    switch (*type) {
         case ShapeType::Path: {
             auto shape = std::make_unique<ShapePath>();
-            animatableFromJson(node.at("path"), shape->path);
+            Expected<void> result = animatableFromJson(node.at("path"), shape->path);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
             element = std::move(shape);
             break;
         }
         case ShapeType::Fill: {
             auto shape = std::make_unique<ShapeFill>();
-            animatableFromJson(node.at("color"), shape->color);
-            animatableFromJson(node.at("opacity"), shape->opacity);
-            shape->fillRule = dto::fillRuleFromString(node.at("fillRule").get<std::string>());
+            Expected<void> result = animatableFromJson(node.at("color"), shape->color);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("opacity"), shape->opacity);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            Expected<FillRule> fillRule =
+                dto::fillRuleFromString(node.at("fillRule").get<std::string>());
+            if (!fillRule) {
+                return Error(fillRule.errorMessage());
+            }
+            shape->fillRule = *fillRule;
             element = std::move(shape);
             break;
         }
         case ShapeType::Stroke: {
             auto shape = std::make_unique<ShapeStroke>();
-            animatableFromJson(node.at("color"), shape->color);
-            animatableFromJson(node.at("width"), shape->width);
-            animatableFromJson(node.at("opacity"), shape->opacity);
-            shape->cap = dto::lineCapFromString(node.at("cap").get<std::string>());
-            shape->join = dto::lineJoinFromString(node.at("join").get<std::string>());
+            Expected<void> result = animatableFromJson(node.at("color"), shape->color);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("width"), shape->width);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("opacity"), shape->opacity);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            Expected<LineCap> cap = dto::lineCapFromString(node.at("cap").get<std::string>());
+            if (!cap) {
+                return Error(cap.errorMessage());
+            }
+            Expected<LineJoin> join =
+                dto::lineJoinFromString(node.at("join").get<std::string>());
+            if (!join) {
+                return Error(join.errorMessage());
+            }
+            shape->cap = *cap;
+            shape->join = *join;
             shape->miterLimit = node.at("miterLimit").get<float>();
             element = std::move(shape);
             break;
         }
         case ShapeType::Group: {
             auto shape = std::make_unique<ShapeGroup>();
-            transformFromJson(node.at("transform"), shape->transform);
+            Expected<void> result =
+                transformFromJson(node.at("transform"), shape->transform);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
             for (const json& childNode : node.at("elements")) {
-                shape->elements.push_back(shapeFromJson(childNode));
+                Expected<std::unique_ptr<ShapeElement>> child = shapeFromJson(childNode);
+                if (!child) {
+                    return Error(child.errorMessage());
+                }
+                shape->elements.push_back(std::move(*child));
             }
             element = std::move(shape);
             break;
         }
         case ShapeType::Rect: {
             auto shape = std::make_unique<ShapeRect>();
-            animatableFromJson(node.at("position"), shape->position);
-            animatableFromJson(node.at("size"), shape->size);
-            animatableFromJson(node.at("cornerRadius"), shape->cornerRadius);
+            Expected<void> result =
+                animatableFromJson(node.at("position"), shape->position);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("size"), shape->size);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("cornerRadius"), shape->cornerRadius);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
             element = std::move(shape);
             break;
         }
         case ShapeType::Ellipse: {
             auto shape = std::make_unique<ShapeEllipse>();
-            animatableFromJson(node.at("position"), shape->position);
-            animatableFromJson(node.at("size"), shape->size);
+            Expected<void> result =
+                animatableFromJson(node.at("position"), shape->position);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("size"), shape->size);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
             element = std::move(shape);
             break;
         }
         case ShapeType::TrimPath: {
             auto shape = std::make_unique<ShapeTrimPath>();
-            animatableFromJson(node.at("start"), shape->start);
-            animatableFromJson(node.at("end"), shape->end);
-            animatableFromJson(node.at("offset"), shape->offset);
+            Expected<void> result = animatableFromJson(node.at("start"), shape->start);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("end"), shape->end);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            result = animatableFromJson(node.at("offset"), shape->offset);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
             element = std::move(shape);
             break;
         }
@@ -367,38 +481,51 @@ json contentToJson(const LayerContent& content) {
     return node;
 }
 
-std::unique_ptr<LayerContent> contentFromJson(const json& node) {
-    const LayerType type = dto::layerTypeFromString(node.at("type").get<std::string>());
-    switch (type) {
+Expected<std::unique_ptr<LayerContent>> contentFromJson(const json& node) {
+    Expected<LayerType> type = dto::layerTypeFromString(node.at("type").get<std::string>());
+    if (!type) {
+        return Error(type.errorMessage());
+    }
+    switch (*type) {
         case LayerType::Shape: {
             auto content = std::make_unique<ShapeContent>();
             for (const json& elementNode : node.at("elements")) {
-                content->elements.push_back(shapeFromJson(elementNode));
+                Expected<std::unique_ptr<ShapeElement>> element = shapeFromJson(elementNode);
+                if (!element) {
+                    return Error(element.errorMessage());
+                }
+                content->elements.push_back(std::move(*element));
             }
-            return content;
+            return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Image: {
             auto content = std::make_unique<ImageContent>();
             content->assetId = idFromString(node.at("assetId").get<std::string>());
-            return content;
+            return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Text: {
             auto content = std::make_unique<TextContent>();
-            animatableFromJson(node.at("text"), content->text);
+            Expected<void> result = animatableFromJson(node.at("text"), content->text);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
             content->fontFamily = node.at("fontFamily").get<std::string>();
-            animatableFromJson(node.at("fontSize"), content->fontSize);
-            return content;
+            result = animatableFromJson(node.at("fontSize"), content->fontSize);
+            if (!result) {
+                return Error(result.errorMessage());
+            }
+            return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Null:
-            return std::make_unique<NullContent>();
+            return std::unique_ptr<LayerContent>(std::make_unique<NullContent>());
         case LayerType::Precomp: {
             auto content = std::make_unique<PrecompContent>();
             content->compositionId =
                 idFromString(node.at("compositionId").get<std::string>());
-            return content;
+            return std::unique_ptr<LayerContent>(std::move(content));
         }
     }
-    throw std::invalid_argument("未知 layer content 类型");
+    return Error("未知 layer content 类型");
 }
 
 // ---- Layer / Composition / Asset / Document ----
@@ -429,9 +556,12 @@ json layerToJson(const Layer& layer) {
     return node;
 }
 
-std::unique_ptr<Layer> layerFromJson(const json& node) {
-    const LayerType type = dto::layerTypeFromString(node.at("type").get<std::string>());
-    auto layer = std::make_unique<Layer>(type);
+Expected<std::unique_ptr<Layer>> layerFromJson(const json& node) {
+    Expected<LayerType> type = dto::layerTypeFromString(node.at("type").get<std::string>());
+    if (!type) {
+        return Error(type.errorMessage());
+    }
+    auto layer = std::make_unique<Layer>(*type);
     layer->id = idFromString(node.at("id").get<std::string>());
     layer->name = node.at("name").get<std::string>();
     layer->inPoint = node.at("inPoint").get<FrameTime>();
@@ -440,14 +570,33 @@ std::unique_ptr<Layer> layerFromJson(const json& node) {
     layer->timeStretch = node.at("timeStretch").get<double>();
     layer->visible = node.at("visible").get<bool>();
     layer->locked = node.at("locked").get<bool>();
-    layer->blendMode = dto::blendModeFromString(node.at("blendMode").get<std::string>());
-    transformFromJson(node.at("transform"), layer->transform);
-    layer->content = contentFromJson(node.at("content"));
+
+    Expected<BlendMode> blendMode =
+        dto::blendModeFromString(node.at("blendMode").get<std::string>());
+    if (!blendMode) {
+        return Error(blendMode.errorMessage());
+    }
+    layer->blendMode = *blendMode;
+
+    Expected<void> result = transformFromJson(node.at("transform"), layer->transform);
+    if (!result) {
+        return Error(result.errorMessage());
+    }
+    Expected<std::unique_ptr<LayerContent>> content = contentFromJson(node.at("content"));
+    if (!content) {
+        return Error(content.errorMessage());
+    }
+    layer->content = std::move(*content);
+
     if (!node.at("parentId").is_null()) {
         layer->parentId = idFromString(node.at("parentId").get<std::string>());
     }
     for (const json& maskNode : node.at("masks")) {
-        layer->masks.push_back(maskFromJson(maskNode));
+        Expected<Mask> mask = maskFromJson(maskNode);
+        if (!mask) {
+            return Error(mask.errorMessage());
+        }
+        layer->masks.push_back(std::move(*mask));
     }
     return layer;
 }
@@ -468,7 +617,7 @@ json compositionToJson(const Composition& composition) {
             {"layers", std::move(layers)}};
 }
 
-std::unique_ptr<Composition> compositionFromJson(const json& node) {
+Expected<std::unique_ptr<Composition>> compositionFromJson(const json& node) {
     auto composition = std::make_unique<Composition>();
     composition->id = idFromString(node.at("id").get<std::string>());
     composition->name = node.at("name").get<std::string>();
@@ -480,7 +629,11 @@ std::unique_ptr<Composition> compositionFromJson(const json& node) {
     composition->height = node.at("height").get<int>();
     composition->backgroundColor = colorFromJson(node.at("backgroundColor"));
     for (const json& layerNode : node.at("layers")) {
-        composition->layers.push_back(layerFromJson(layerNode));
+        Expected<std::unique_ptr<Layer>> layer = layerFromJson(layerNode);
+        if (!layer) {
+            return Error(layer.errorMessage());
+        }
+        composition->layers.push_back(std::move(*layer));
     }
     return composition;
 }
@@ -492,10 +645,14 @@ json assetToJson(const Asset& asset) {
             {"path", asset.path}};
 }
 
-Asset assetFromJson(const json& node) {
+Expected<Asset> assetFromJson(const json& node) {
     Asset asset;
     asset.id = idFromString(node.at("id").get<std::string>());
-    asset.type = dto::assetTypeFromString(node.at("type").get<std::string>());
+    Expected<AssetType> type = dto::assetTypeFromString(node.at("type").get<std::string>());
+    if (!type) {
+        return Error(type.errorMessage());
+    }
+    asset.type = *type;
     asset.name = node.at("name").get<std::string>();
     asset.path = node.at("path").get<std::string>();
     return asset;
@@ -523,23 +680,37 @@ std::string Serializer::serialize(const Document& document) {
     return documentToJson(document).dump(2);
 }
 
-std::unique_ptr<Document> Serializer::deserialize(const std::string& jsonText) {
+Expected<std::unique_ptr<Document>> Serializer::deserialize(const std::string& jsonText) {
     try {
-        json data = json::parse(SchemaMigrator::migrate(jsonText));
+        Expected<std::string> migrated = SchemaMigrator::migrate(jsonText);
+        if (!migrated) {
+            return Error(migrated.errorMessage());
+        }
+        const json data = json::parse(*migrated);
 
         auto document = std::make_unique<Document>();
         document->id = idFromString(data.at("id").get<std::string>());
         document->name = data.at("name").get<std::string>();
         for (const json& assetNode : data.at("assets")) {
-            document->assets.push_back(assetFromJson(assetNode));
+            Expected<Asset> asset = assetFromJson(assetNode);
+            if (!asset) {
+                return Error(asset.errorMessage());
+            }
+            document->assets.push_back(std::move(*asset));
         }
         for (const json& compositionNode : data.at("compositions")) {
-            document->compositions.push_back(compositionFromJson(compositionNode));
+            Expected<std::unique_ptr<Composition>> composition =
+                compositionFromJson(compositionNode);
+            if (!composition) {
+                return Error(composition.errorMessage());
+            }
+            document->compositions.push_back(std::move(*composition));
         }
         document->refreshEntityIndex();
         return document;
-    } catch (const json::exception& error) {
-        throw std::invalid_argument(std::string("文档 JSON 解析失败: ") + error.what());
+    } catch (const std::exception& error) {
+        // nlohmann 内部抛出的结构性错误在此边界统一转换为 Error。
+        return Error(std::string("文档 JSON 解析失败: ") + error.what());
     }
 }
 

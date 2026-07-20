@@ -3,11 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/EntityId.h"
 
 namespace motion {
 
+class AnimatableBase;
 class Document;
 
 // 属性路径：定位实体内某个 Animatable<T>。
@@ -19,10 +19,8 @@ struct PropertyPath {
     EntityId entityId;  // Layer 或 ShapeElement 的 ID
     std::string path;
 
-    bool operator==(const PropertyPath& other) const {
-        return entityId == other.entityId && path == other.path;
-    }
-    bool operator!=(const PropertyPath& other) const { return !(*this == other); }
+    bool operator==(const PropertyPath& other) const;
+    bool operator!=(const PropertyPath& other) const;
 };
 
 // 路径解析中间表示。
@@ -30,9 +28,7 @@ struct PathSegment {
     std::string name;
     int index = -1;  // -1 = 无数组下标
 
-    bool operator==(const PathSegment& other) const {
-        return name == other.name && index == other.index;
-    }
+    bool operator==(const PathSegment& other) const;
 };
 
 // 解析 "a.b[2].c" → [{a,-1},{b,2},{c,-1}]；格式非法返回空。

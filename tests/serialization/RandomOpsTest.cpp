@@ -7,8 +7,19 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/serialization/Serializer.h"
-#include "MotionStudio/undo/Commands.h"
+#include "MotionStudio/undo/AddKeyframeCommand.h"
+#include "MotionStudio/undo/AddLayerCommand.h"
+#include "MotionStudio/undo/KeyframeData.h"
+#include "MotionStudio/undo/MoveKeyframeCommand.h"
+#include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/PropertyValue.h"
+#include "MotionStudio/undo/RemoveKeyframeCommand.h"
+#include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::AddKeyframeCommand;
@@ -144,7 +155,8 @@ TEST(RandomOpsTest, ThousandRandomOpsNoCrashAndRoundTripStable) {
 
     const std::string json = Serializer::serialize(document);
     auto restored = Serializer::deserialize(json);
-    EXPECT_EQ(Serializer::serialize(*restored), json);
+    ASSERT_TRUE(restored.hasValue());
+    EXPECT_EQ(Serializer::serialize(**restored), json);
 }
 
 TEST(RandomOpsTest, UndoRestoresSerializationFingerprint) {

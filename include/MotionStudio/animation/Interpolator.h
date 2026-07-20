@@ -2,27 +2,28 @@
 
 #include "MotionStudio/animation/Keyframe.h"
 #include "MotionStudio/common/BezierPath.h"
-#include "MotionStudio/common/Math.h"
+#include "MotionStudio/common/Color.h"
+#include "MotionStudio/common/Vec2.h"
 
 namespace motion {
 
 // 插值策略 trait：Animatable<T> 不关心 T 的细节，插值方式经此注入。
 // 默认阶梯插值：离散类型（如 std::string 文本）保持前一关键帧的值直到下一关键帧。
+// （主模板为通用回退，须在头文件保留定义。）
 template <typename T>
 struct Interpolator {
     static T lerp(const T& from, const T& /*to*/, float /*t*/) { return from; }
 };
 
+// 各特化的实现见 src/animation/Interpolator.cpp。
 template <>
 struct Interpolator<float> {
-    static float lerp(float from, float to, float t) { return from + (to - from) * t; }
+    static float lerp(float from, float to, float t);
 };
 
 template <>
 struct Interpolator<Vec2> {
-    static Vec2 lerp(const Vec2& from, const Vec2& to, float t) {
-        return from + (to - from) * t;
-    }
+    static Vec2 lerp(const Vec2& from, const Vec2& to, float t);
 };
 
 template <>
@@ -32,8 +33,8 @@ struct Interpolator<Color> {
 
 template <>
 struct Interpolator<BezierPath> {
-    // 逐顶点插值。M1 要求两路径顶点数一致，不一致抛 std::invalid_argument
-    //（自动顶点插入匹配留到 M2）。
+    // 逐顶点插值。M1 要求两路径顶点数一致：不一致属数据约定违例，
+    // debug 下 assert 快速失败，release 降级返回 from。
     static BezierPath lerp(const BezierPath& from, const BezierPath& to, float t);
 };
 

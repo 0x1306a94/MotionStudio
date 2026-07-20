@@ -2,35 +2,14 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/Composition.h"
-#include "MotionStudio/model/Layer.h"
-#include "MotionStudio/model/ShapeElement.h"
+#include "MotionStudio/model/EntityIndex.h"
 
 namespace motion {
-
-// ID → 实体的全局扁平索引，O(1) 寻址。
-// 供 undo 命令与桥接层解析目标：命令只持 EntityId，实体已删除则解析为 nullptr。
-class EntityIndex {
-public:
-    Layer* findLayer(EntityId id) const;
-    Composition* findComposition(EntityId id) const;
-    ShapeElement* findShape(EntityId id) const;
-
-    void registerLayer(Layer* layer);
-    void registerComposition(Composition* composition);
-    void registerShape(ShapeElement* shape);
-    void clear();
-
-private:
-    std::unordered_map<EntityId, Layer*> layers_;
-    std::unordered_map<EntityId, Composition*> compositions_;
-    std::unordered_map<EntityId, ShapeElement*> shapes_;
-};
 
 class Document {
 public:
@@ -50,8 +29,8 @@ public:
 
     // ---- 查询 ----
 
-    EntityIndex& entityIndex() { return entityIndex_; }
-    const EntityIndex& entityIndex() const { return entityIndex_; }
+    EntityIndex& entityIndex();
+    const EntityIndex& entityIndex() const;
 
     // 遍历整棵实体树重建索引。批量构造（如反序列化）后调用一次。
     void refreshEntityIndex();

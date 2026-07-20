@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MotionStudio/animation/Animatable.h"
-#include "MotionStudio/common/Math.h"
+#include "MotionStudio/common/Vec2.h"
 
 namespace motion {
 

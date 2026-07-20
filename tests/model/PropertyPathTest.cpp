@@ -2,12 +2,18 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/animation/Animatable.h"
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/PropertyPath.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/ShapeGroup.h"
+#include "MotionStudio/model/ShapeStroke.h"
+#include "MotionStudio/model/TextContent.h"
 
 using motion::Animatable;
 using motion::AnimatableBase;
-using motion::Color;
 using motion::Composition;
 using motion::Document;
 using motion::Layer;
@@ -19,7 +25,6 @@ using motion::ShapeContent;
 using motion::ShapeFill;
 using motion::ShapeGroup;
 using motion::ShapeStroke;
-using motion::Vec2;
 
 TEST(ParsePropertyPathTest, SimpleDottedPath) {
     auto segments = parsePropertyPath("transform.position");

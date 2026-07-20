@@ -3,7 +3,17 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
-#include "MotionStudio/undo/Commands.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/TextContent.h"
+#include "MotionStudio/undo/AddKeyframeCommand.h"
+#include "MotionStudio/undo/AddLayerCommand.h"
+#include "MotionStudio/undo/MoveKeyframeCommand.h"
+#include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveKeyframeCommand.h"
+#include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::AddKeyframeCommand;

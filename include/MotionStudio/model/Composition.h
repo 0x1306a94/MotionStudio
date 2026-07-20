@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/EntityId.h"
-#include "MotionStudio/common/Math.h"
 #include "MotionStudio/common/Time.h"
 #include "MotionStudio/model/Layer.h"
 

@@ -2,11 +2,31 @@
 
 #include <cctype>
 
+#include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/Document.h"
-#include "MotionStudio/model/LayerContent.h"
-#include "MotionStudio/model/ShapeElement.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeEllipse.h"
+#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/ShapeGroup.h"
+#include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/ShapeStroke.h"
+#include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/TextContent.h"
 
 namespace motion {
+
+bool PropertyPath::operator==(const PropertyPath& other) const {
+    return entityId == other.entityId && path == other.path;
+}
+
+bool PropertyPath::operator!=(const PropertyPath& other) const {
+    return !(*this == other);
+}
+
+bool PathSegment::operator==(const PathSegment& other) const {
+    return name == other.name && index == other.index;
+}
 
 std::vector<PathSegment> parsePropertyPath(const std::string& path) {
     std::vector<PathSegment> segments;
@@ -110,8 +130,9 @@ AnimatableBase* resolveShapeProperty(ShapeElement* element, const std::string& n
             if (name == "size") {
                 return &static_cast<ShapeRect*>(element)->size;
             }
-            if (name == "cornerRadius")
+            if (name == "cornerRadius") {
                 return &static_cast<ShapeRect*>(element)->cornerRadius;
+            }
             break;
         case ShapeType::Ellipse:
             if (name == "position") {

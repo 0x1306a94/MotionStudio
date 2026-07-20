@@ -52,6 +52,14 @@ void UndoManager::redo(Document& document) {
     undoStack_.push_back(std::move(command));
 }
 
+bool UndoManager::canUndo() const {
+    return !undoStack_.empty();
+}
+
+bool UndoManager::canRedo() const {
+    return !redoStack_.empty();
+}
+
 std::string UndoManager::undoDescription() const {
     return undoStack_.empty() ? std::string{} : undoStack_.back()->describe();
 }

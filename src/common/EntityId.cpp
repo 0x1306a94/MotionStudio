@@ -4,6 +4,18 @@
 
 namespace motion {
 
+bool EntityId::operator==(const EntityId& other) const {
+    return value == other.value;
+}
+
+bool EntityId::operator!=(const EntityId& other) const {
+    return value != other.value;
+}
+
+bool EntityId::isValid() const {
+    return value != 0;
+}
+
 EntityId EntityId::generate() {
     static thread_local std::mt19937_64 engine{std::random_device{}()};
     uint64_t value = 0;

@@ -1,0 +1,54 @@
+#include "MotionStudio/undo/SetEasingCommand.h"
+
+#include <utility>
+
+#include "MotionStudio/model/Document.h"
+#include "CommandHelpers.h"
+
+namespace motion {
+
+SetEasingCommand::SetEasingCommand(PropertyPath property, FrameTime time, Easing easing)
+    : property_(std::move(property)), time_(time), easing_(easing) {}
+
+void SetEasingCommand::execute(Document& document) {
+    AnimatableBase* target = resolveAnimatable(document, property_);
+    if (!target) {
+        return;
+    }
+    if (!captured_) {
+        Easing oldEasing;
+        found_ = applyEasingAny(target, time_, easing_, &oldEasing);
+        if (found_) {
+            oldEasing_ = oldEasing;
+        }
+        captured_ = true;
+    } else if (found_) {
+        applyEasingAny(target, time_, easing_, nullptr);
+    }
+}
+
+void SetEasingCommand::undo(Document& document) {
+    if (!captured_ || !found_) {
+        return;
+    }
+    AnimatableBase* target = resolveAnimatable(document, property_);
+    if (!target) {
+        return;
+    }
+    applyEasingAny(target, time_, *oldEasing_, nullptr);
+}
+
+bool SetEasingCommand::mergeWith(const Command& other) {
+    const auto* typed = dynamic_cast<const SetEasingCommand*>(&other);
+    if (!typed || typed->property_ != property_ || typed->time_ != time_) {
+        return false;
+    }
+    easing_ = typed->easing_;
+    return true;
+}
+
+std::string SetEasingCommand::describe() const {
+    return "Set Easing";
+}
+
+}  // namespace motion

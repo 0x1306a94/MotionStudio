@@ -54,15 +54,17 @@ common ← model ← animation ← undo
 ```
 motionstudio/
 ├── CMakeLists.txt                  # 顶层 CMake
-├── include/MotionStudio/           # 公共头文件（按模块分子目录）
+├── include/MotionStudio/           # 公共头文件（按模块分子目录，一类型一文件，
+│   │                               # 非模板实现一律放 src/，不暴露第三方类型）
 │   ├── core/                       # Version.h
-│   ├── common/                     # EntityId.h Time.h Math.h BezierPath.h
-│   ├── model/                      # Document.h Composition.h Layer.h Shape.h ...
-│   ├── animation/                  # Animatable.h Keyframe.h Easing.h BezierEasing.h ...
-│   ├── undo/                       # Command.h UndoManager.h Commands.h
+│   ├── common/                     # EntityId.h Time.h Vec2.h Color.h Mat3.h
+│   │                               # BezierPath.h Expected.h
+│   ├── model/                      # Document.h Composition.h Layer.h ShapeFill.h ...
+│   ├── animation/                  # Animatable.h Keyframe.h Easing.h Interpolator.h
+│   ├── undo/                       # Command.h UndoManager.h AddKeyframeCommand.h ...
 │   ├── render/                     # RenderAdapter.h SceneEvaluator.h DrawCommand.h ...
 │   ├── export/                     # LottieExporter.h
-│   └── serialization/              # Serializer.h SchemaMigrator.h dto/
+│   └── serialization/              # Serializer.h SchemaMigrator.h Dto.h
 ├── src/                            # 实现文件（与 include/ 同构，按模块分子目录）
 │   ├── CMakeLists.txt              # core 静态库（libmotionstudio_core.a）
 │   ├── core/ common/ model/ animation/ undo/ render/ export/ serialization/

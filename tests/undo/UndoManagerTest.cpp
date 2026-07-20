@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/undo/CompositeCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::Command;

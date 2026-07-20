@@ -3,8 +3,8 @@
 #include <optional>
 
 #include "MotionStudio/animation/Easing.h"
-#include "MotionStudio/common/Math.h"
 #include "MotionStudio/common/Time.h"
+#include "MotionStudio/common/Vec2.h"
 
 namespace motion {
 

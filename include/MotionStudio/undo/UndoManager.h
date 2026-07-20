@@ -26,8 +26,8 @@ public:
     void undo(Document& document);
     void redo(Document& document);
 
-    bool canUndo() const { return !undoStack_.empty(); }
-    bool canRedo() const { return !redoStack_.empty(); }
+    bool canUndo() const;
+    bool canRedo() const;
     std::string undoDescription() const;
     std::string redoDescription() const;
 

@@ -1,8 +1,16 @@
 #include "MotionStudio/animation/Interpolator.h"
 
-#include <stdexcept>
+#include <cassert>
 
 namespace motion {
+
+float Interpolator<float>::lerp(float from, float to, float t) {
+    return from + (to - from) * t;
+}
+
+Vec2 Interpolator<Vec2>::lerp(const Vec2& from, const Vec2& to, float t) {
+    return from + (to - from) * t;
+}
 
 Color Interpolator<Color>::lerp(const Color& from, const Color& to, float t) {
     return {
@@ -15,8 +23,10 @@ Color Interpolator<Color>::lerp(const Color& from, const Color& to, float t) {
 
 BezierPath Interpolator<BezierPath>::lerp(const BezierPath& from, const BezierPath& to,
                                           float t) {
+    assert(from.vertices.size() == to.vertices.size() &&
+           "BezierPath 插值要求两关键帧顶点数一致");
     if (from.vertices.size() != to.vertices.size()) {
-        throw std::invalid_argument("BezierPath 插值要求两关键帧顶点数一致");
+        return from;
     }
     BezierPath result;
     result.closed = from.closed;
@@ -48,5 +58,10 @@ Vec2 evaluateSpatial(const Keyframe<Vec2>& from, const Keyframe<Vec2>& to,
     return cubicBezierPoint(from.value, from.value + *from.spatialOutTangent,
                             to.value + *to.spatialInTangent, to.value, easedProgress);
 }
+
+template struct Interpolator<float>;
+template struct Interpolator<Vec2>;
+template struct Interpolator<Color>;
+template struct Interpolator<BezierPath>;
 
 }  // namespace motion

@@ -3,6 +3,9 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/ShapeGroup.h"
 
 using motion::Composition;
 using motion::Document;

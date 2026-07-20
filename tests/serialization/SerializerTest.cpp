@@ -1,10 +1,20 @@
 #include <memory>
-#include <stdexcept>
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/PrecompContent.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeEllipse.h"
+#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/ShapeGroup.h"
+#include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/ShapeStroke.h"
+#include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
 #include "MotionStudio/serialization/Serializer.h"
 
@@ -15,6 +25,7 @@ using motion::Composition;
 using motion::documentFingerprint;
 using motion::Document;
 using motion::Easing;
+using motion::Expected;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
@@ -121,8 +132,7 @@ std::unique_ptr<Document> buildRichDocument() {
     composition->layers.push_back(std::move(nullLayer));
 
     auto textLayer = std::make_unique<Layer>(LayerType::Text);
-    textLayer->setParent(nullId, *document);  // document 索引此时为空 → 拒绝；序列化仍保留目标 ID
-    textLayer->parentId = nullId;            // 直接建立父子关系
+    textLayer->parentId = nullId;
     auto* textContent = static_cast<motion::TextContent*>(textLayer->content.get());
     textContent->text.setStaticValue(std::string{"hello"});
     textContent->fontFamily = "PingFang SC";
@@ -149,18 +159,21 @@ TEST(SerializerTest, RoundTripIsJsonStable) {
     auto document = buildRichDocument();
     const std::string first = Serializer::serialize(*document);
 
-    auto restored = Serializer::deserialize(first);
-    const std::string second = Serializer::serialize(*restored);
+    Expected<std::unique_ptr<Document>> restored = Serializer::deserialize(first);
+    ASSERT_TRUE(restored.hasValue());
+    const std::string second = Serializer::serialize(**restored);
 
     EXPECT_EQ(first, second);
 }
 
 TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     auto document = buildRichDocument();
-    auto restored = Serializer::deserialize(Serializer::serialize(*document));
+    Expected<std::unique_ptr<Document>> restored =
+        Serializer::deserialize(Serializer::serialize(*document));
+    ASSERT_TRUE(restored.hasValue());
 
-    ASSERT_EQ(restored->compositions.size(), 2u);
-    const Composition& main = *restored->compositions[1];
+    ASSERT_EQ((*restored)->compositions.size(), 2u);
+    const Composition& main = *(*restored)->compositions[1];
     ASSERT_EQ(main.layers.size(), 5u);
     EXPECT_EQ(main.frameRate, (motion::FrameRate{30000, 1001}));
 
@@ -177,9 +190,10 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     EXPECT_EQ(shapes.transform.rotation.staticValue(), 45.0f);
 
     // EntityIndex 已重建：按原 ID 可解析。
-    EXPECT_NE(restored->entityIndex().findLayer(shapes.id), nullptr);
+    EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);
     const auto* shapeContent = static_cast<const ShapeContent*>(shapes.content.get());
-    EXPECT_NE(restored->entityIndex().findShape(shapeContent->elements[0]->id), nullptr);
+    EXPECT_NE((*restored)->entityIndex().findShape(shapeContent->elements[0]->id),
+              nullptr);
 
     // 父子关系保留。
     const Layer& textLayer = *main.layers[2];
@@ -213,31 +227,33 @@ TEST(SerializerTest, EntityIdSerializesAs16HexChars) {
 }
 
 TEST(SerializerTest, RejectsInvalidInput) {
-    EXPECT_THROW(Serializer::deserialize("not json"), std::invalid_argument);
-    EXPECT_THROW(Serializer::deserialize("{}"), std::invalid_argument);
-    EXPECT_THROW(Serializer::deserialize(R"({"schemaVersion": 99})"),
-                 std::invalid_argument);
+    EXPECT_FALSE(Serializer::deserialize("not json").hasValue());
+    EXPECT_FALSE(Serializer::deserialize("{}").hasValue());
+
+    Expected<std::unique_ptr<Document>> badVersion =
+        Serializer::deserialize(R"({"schemaVersion": 99})");
+    ASSERT_FALSE(badVersion.hasValue());
+    EXPECT_NE(badVersion.errorMessage().find("schemaVersion"), std::string::npos);
 
     auto document = buildRichDocument();
     std::string text = Serializer::serialize(*document);
-    // 破坏 layer 类型字段。
-    const auto broken = text.replace(text.find("\"type\": \"shape\""), 15,
-                                     "\"type\": \"bogus\"");
-    EXPECT_THROW(Serializer::deserialize(broken), std::invalid_argument);
+    // 破坏 layer content 的类型字段。
+    const std::string broken = text.replace(text.find("\"type\": \"shape\""), 15,
+                                            "\"type\": \"bogus\"");
+    EXPECT_FALSE(Serializer::deserialize(broken).hasValue());
 }
 
 TEST(SchemaMigratorTest, CurrentVersionPassesThrough) {
     const std::string text = R"({"schemaVersion": 1, "name": "x"})";
-    EXPECT_EQ(nlohmann::json::parse(SchemaMigrator::migrate(text)),
-              nlohmann::json::parse(text));
+    Expected<std::string> migrated = SchemaMigrator::migrate(text);
+    ASSERT_TRUE(migrated.hasValue());
+    EXPECT_EQ(nlohmann::json::parse(*migrated), nlohmann::json::parse(text));
 }
 
 TEST(SchemaMigratorTest, RejectsUnknownVersions) {
-    EXPECT_THROW(SchemaMigrator::migrate("{}"), std::invalid_argument);
-    EXPECT_THROW(SchemaMigrator::migrate(R"({"schemaVersion": 0})"),
-                 std::invalid_argument);
-    EXPECT_THROW(SchemaMigrator::migrate(R"({"schemaVersion": 2})"),
-                 std::invalid_argument);
+    EXPECT_FALSE(SchemaMigrator::migrate("{}").hasValue());
+    EXPECT_FALSE(SchemaMigrator::migrate(R"({"schemaVersion": 0})").hasValue());
+    EXPECT_FALSE(SchemaMigrator::migrate(R"({"schemaVersion": 2})").hasValue());
 }
 
 TEST(FingerprintTest, StableAndSensitiveToChange) {

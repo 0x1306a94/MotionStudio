@@ -7,18 +7,16 @@
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/EntityId.h"
-#include "MotionStudio/common/Math.h"
+#include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Time.h"
+#include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/LayerContent.h"
+#include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/Transform.h"
 
 namespace motion {
 
 class Document;
-
-enum class BlendMode { Normal, Multiply, Screen, Add };
-
-enum class MaskMode { Add, Subtract, Intersect };
 
 struct Mask {
     BezierPath path;
@@ -31,8 +29,9 @@ class Layer {
 public:
     // 按类型创建对应的 LayerContent。
     explicit Layer(LayerType type);
+    ~Layer();
 
-    LayerType type() const { return type_; }
+    LayerType type() const;
 
     // 设置父图层。沿父链检测环路，会形成环（含自身为父）或目标不存在时
     // 返回 false 且不修改；成功返回 true。

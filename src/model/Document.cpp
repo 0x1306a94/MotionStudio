@@ -2,36 +2,10 @@
 
 #include <algorithm>
 
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeGroup.h"
+
 namespace motion {
-
-Layer* EntityIndex::findLayer(EntityId id) const {
-    auto it = layers_.find(id);
-    return it == layers_.end() ? nullptr : it->second;
-}
-
-Composition* EntityIndex::findComposition(EntityId id) const {
-    auto it = compositions_.find(id);
-    return it == compositions_.end() ? nullptr : it->second;
-}
-
-ShapeElement* EntityIndex::findShape(EntityId id) const {
-    auto it = shapes_.find(id);
-    return it == shapes_.end() ? nullptr : it->second;
-}
-
-void EntityIndex::registerLayer(Layer* layer) { layers_[layer->id] = layer; }
-
-void EntityIndex::registerComposition(Composition* composition) {
-    compositions_[composition->id] = composition;
-}
-
-void EntityIndex::registerShape(ShapeElement* shape) { shapes_[shape->id] = shape; }
-
-void EntityIndex::clear() {
-    layers_.clear();
-    compositions_.clear();
-    shapes_.clear();
-}
 
 namespace {
 
@@ -139,6 +113,14 @@ bool Document::moveLayer(EntityId compositionId, int fromIndex, int toIndex) {
     layers.erase(layers.begin() + fromIndex);
     layers.insert(layers.begin() + toIndex, std::move(layer));
     return true;
+}
+
+EntityIndex& Document::entityIndex() {
+    return entityIndex_;
+}
+
+const EntityIndex& Document::entityIndex() const {
+    return entityIndex_;
 }
 
 }  // namespace motion

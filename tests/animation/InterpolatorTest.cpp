@@ -1,5 +1,3 @@
-#include <stdexcept>
-
 #include <gtest/gtest.h>
 
 #include "MotionStudio/animation/Interpolator.h"
@@ -41,11 +39,12 @@ TEST(InterpolatorTest, BezierPathLerpInterpolatesVertices) {
     EXPECT_EQ(result.vertices[1].point, (Vec2{15, 0}));
 }
 
-TEST(InterpolatorTest, BezierPathLerpRejectsVertexCountMismatch) {
-    BezierPath threeVertices = makeTwoVertexPath(0);
-    threeVertices.vertices.push_back({{30, 0}, {}, {}});
-    EXPECT_THROW(Interpolator<BezierPath>::lerp(makeTwoVertexPath(0), threeVertices, 0.5f),
-                 std::invalid_argument);
+TEST(InterpolatorTest, BezierPathLerpAssertsOnVertexCountMismatch) {
+    BezierPath two = makeTwoVertexPath(0);
+    BezierPath three = makeTwoVertexPath(0);
+    three.vertices.push_back({{30, 0}, {}, {}});
+    // 顶点数不一致属数据约定违例：debug 下 assert 快速失败。
+    EXPECT_DEATH({ Interpolator<BezierPath>::lerp(two, three, 0.5f); }, "顶点数");
 }
 
 TEST(CubicBezierPointTest, MidpointOfStraightLine) {

@@ -11,10 +11,10 @@ namespace motion {
 struct EntityId {
     uint64_t value = 0;
 
-    bool operator==(const EntityId& other) const { return value == other.value; }
-    bool operator!=(const EntityId& other) const { return value != other.value; }
+    bool operator==(const EntityId& other) const;
+    bool operator!=(const EntityId& other) const;
 
-    bool isValid() const { return value != 0; }
+    bool isValid() const;
 
     // 生成随机 ID（安全随机数源，不会返回无效值）。
     static EntityId generate();

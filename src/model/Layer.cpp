@@ -1,6 +1,11 @@
 #include "MotionStudio/model/Layer.h"
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/NullContent.h"
+#include "MotionStudio/model/PrecompContent.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/TextContent.h"
 
 namespace motion {
 
@@ -24,8 +29,13 @@ std::unique_ptr<LayerContent> makeContent(LayerType type) {
 
 }  // namespace
 
-Layer::Layer(LayerType type)
-    : content(makeContent(type)), type_(type) {}
+Layer::Layer(LayerType type) : content(makeContent(type)), type_(type) {}
+
+Layer::~Layer() = default;
+
+LayerType Layer::type() const {
+    return type_;
+}
 
 bool Layer::setParent(EntityId newParentId, const Document& document) {
     if (!newParentId.isValid()) {

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "MotionStudio/common/Math.h"
+#include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/Vec2.h"
 
 using motion::approxEqual;
 using motion::Mat3;
