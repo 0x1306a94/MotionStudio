@@ -7,6 +7,7 @@ add_executable(core_tests
     common/MathTest.cpp
     common/TimeTest.cpp
     animation/AnimatableTest.cpp
+    animation/EasingCssTest.cpp
     animation/EasingTest.cpp
     animation/InterpolatorTest.cpp
     model/DocumentTest.cpp
