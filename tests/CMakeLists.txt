@@ -12,6 +12,8 @@ add_executable(core_tests
     model/DocumentTest.cpp
     model/LayerTest.cpp
     model/PropertyPathTest.cpp
+    undo/CommandsTest.cpp
+    undo/UndoManagerTest.cpp
 )
 target_link_libraries(core_tests PRIVATE core GTest::gtest_main)
 gtest_discover_tests(core_tests)

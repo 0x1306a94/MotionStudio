@@ -6,6 +6,9 @@ add_library(core STATIC
     model/Document.cpp
     model/Layer.cpp
     model/PropertyPath.cpp
+    undo/Command.cpp
+    undo/Commands.cpp
+    undo/UndoManager.cpp
 )
 target_include_directories(core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_compile_options(core PRIVATE -Wall -Wextra)
