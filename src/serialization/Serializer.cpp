@@ -1,6 +1,8 @@
 #include "MotionStudio/serialization/Serializer.h"
 
+#include <charconv>
 #include <cstdio>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -27,93 +29,248 @@ using json = nlohmann::json;
 
 namespace {
 
+// ---- JSON 非抛异常访问器（项目禁用 try/catch，nlohmann 的 at/get 会抛异常）----
+
+const json* FindChild(const json& node, const char* key) {
+    if (!node.is_object()) {
+        return nullptr;
+    }
+    auto it = node.find(key);
+    return it == node.end() ? nullptr : &*it;
+}
+
+Expected<const json*> Child(const json& node, const char* key) {
+    const json* child = FindChild(node, key);
+    if (!child) {
+        return Error(std::string("缺少字段: ") + key);
+    }
+    return child;
+}
+
+Expected<float> AsFloat(const json& node) {
+    if (!node.is_number()) {
+        return Error("字段不是数字");
+    }
+    return node.get<float>();
+}
+
+Expected<double> AsDouble(const json& node) {
+    if (!node.is_number()) {
+        return Error("字段不是数字");
+    }
+    return node.get<double>();
+}
+
+Expected<int64_t> AsInt64(const json& node) {
+    if (!node.is_number_integer()) {
+        return Error("字段不是整数");
+    }
+    return node.get<int64_t>();
+}
+
+Expected<int> AsInt(const json& node) {
+    Expected<int64_t> value = AsInt64(node);
+    if (!value) {
+        return Error(value.errorMessage());
+    }
+    return int(*value);
+}
+
+Expected<uint32_t> AsUint32(const json& node) {
+    Expected<int64_t> value = AsInt64(node);
+    if (!value || *value < 0 || *value > int64_t(UINT32_MAX)) {
+        return Error("字段不是合法的无符号整数");
+    }
+    return uint32_t(*value);
+}
+
+Expected<bool> AsBool(const json& node) {
+    if (!node.is_boolean()) {
+        return Error("字段不是布尔值");
+    }
+    return node.get<bool>();
+}
+
+Expected<std::string> AsString(const json& node) {
+    if (!node.is_string()) {
+        return Error("字段不是字符串");
+    }
+    return node.get<std::string>();
+}
+
 // ---- EntityId ↔ 16 字符 hex ----
 
-std::string idToString(EntityId id) {
+std::string IdToString(EntityId id) {
     char buffer[17];
     std::snprintf(buffer, sizeof(buffer), "%016llx",
                   static_cast<unsigned long long>(id.value));
     return buffer;
 }
 
-EntityId idFromString(const std::string& text) {
-    return EntityId{std::stoull(text, nullptr, 16)};
+// std::from_chars 解析，不抛异常。
+Expected<EntityId> IdFromString(const std::string& text) {
+    uint64_t value = 0;
+    const char* begin = text.data();
+    const char* end = begin + text.size();
+    const auto result = std::from_chars(begin, end, value, 16);
+    if (result.ec != std::errc() || result.ptr != end || value == 0) {
+        return Error("非法实体 ID: " + text);
+    }
+    return EntityId{value};
 }
 
-// ---- 叶子值（结构错误由 nlohmann 抛出，在 deserialize 边界统一转换）----
+Expected<EntityId> IdField(const json& node, const char* key) {
+    Expected<const json*> child = Child(node, key);
+    if (!child) {
+        return Error(child.errorMessage());
+    }
+    Expected<std::string> text = AsString(**child);
+    if (!text) {
+        return Error(text.errorMessage());
+    }
+    return IdFromString(*text);
+}
 
-json vec2ToJson(Vec2 value) {
+// ---- 叶子值 ----
+
+json Vec2ToJson(Vec2 value) {
     return json::array({value.x, value.y});
 }
 
-Vec2 vec2FromJson(const json& node) {
-    return {node.at(0).get<float>(), node.at(1).get<float>()};
+Expected<Vec2> Vec2FromJson(const json& node) {
+    if (!node.is_array() || node.size() != 2) {
+        return Error("Vec2 必须是 2 元素数组");
+    }
+    Expected<float> x = AsFloat(node[0]);
+    if (!x) {
+        return Error(x.errorMessage());
+    }
+    Expected<float> y = AsFloat(node[1]);
+    if (!y) {
+        return Error(y.errorMessage());
+    }
+    return Vec2{*x, *y};
 }
 
-json colorToJson(Color value) {
+json ColorToJson(Color value) {
     return json::array({value.r, value.g, value.b, value.a});
 }
 
-Color colorFromJson(const json& node) {
-    return {node.at(0).get<float>(), node.at(1).get<float>(), node.at(2).get<float>(),
-            node.at(3).get<float>()};
+Expected<Color> ColorFromJson(const json& node) {
+    if (!node.is_array() || node.size() != 4) {
+        return Error("Color 必须是 4 元素数组");
+    }
+    Expected<float> r = AsFloat(node[0]);
+    Expected<float> g = AsFloat(node[1]);
+    Expected<float> b = AsFloat(node[2]);
+    Expected<float> a = AsFloat(node[3]);
+    if (!r || !g || !b || !a) {
+        return Error("Color 分量不是数字");
+    }
+    return Color{*r, *g, *b, *a};
 }
 
-json bezierPathToJson(const BezierPath& path) {
+json BezierPathToJson(const BezierPath& path) {
     json vertices = json::array();
     for (const BezierPath::Vertex& vertex : path.vertices) {
-        vertices.push_back({{"point", vec2ToJson(vertex.point)},
-                            {"inTangent", vec2ToJson(vertex.inTangent)},
-                            {"outTangent", vec2ToJson(vertex.outTangent)}});
+        vertices.push_back({{"point", Vec2ToJson(vertex.point)},
+                            {"inTangent", Vec2ToJson(vertex.inTangent)},
+                            {"outTangent", Vec2ToJson(vertex.outTangent)}});
     }
     return {{"closed", path.closed}, {"vertices", vertices}};
 }
 
-BezierPath bezierPathFromJson(const json& node) {
+Expected<BezierPath> BezierPathFromJson(const json& node) {
+    Expected<const json*> closedNode = Child(node, "closed");
+    if (!closedNode) {
+        return Error(closedNode.errorMessage());
+    }
+    Expected<bool> closed = AsBool(**closedNode);
+    if (!closed) {
+        return Error(closed.errorMessage());
+    }
+    const json* verticesNode = FindChild(node, "vertices");
+    if (!verticesNode || !verticesNode->is_array()) {
+        return Error("缺少 vertices 数组");
+    }
     BezierPath path;
-    path.closed = node.at("closed").get<bool>();
-    for (const json& vertexNode : node.at("vertices")) {
-        path.vertices.push_back({vec2FromJson(vertexNode.at("point")),
-                                 vec2FromJson(vertexNode.at("inTangent")),
-                                 vec2FromJson(vertexNode.at("outTangent"))});
+    path.closed = *closed;
+    for (const json& vertexNode : *verticesNode) {
+        Expected<const json*> pointNode = Child(vertexNode, "point");
+        Expected<const json*> inNode = Child(vertexNode, "inTangent");
+        Expected<const json*> outNode = Child(vertexNode, "outTangent");
+        if (!pointNode || !inNode || !outNode) {
+            return Error("顶点缺少切线字段");
+        }
+        Expected<Vec2> point = Vec2FromJson(**pointNode);
+        Expected<Vec2> inTangent = Vec2FromJson(**inNode);
+        Expected<Vec2> outTangent = Vec2FromJson(**outNode);
+        if (!point || !inTangent || !outTangent) {
+            return Error("顶点坐标非法");
+        }
+        path.vertices.push_back({*point, *inTangent, *outTangent});
     }
     return path;
 }
 
-// 属性值 → JSON 节点（按值类型分发）。
-json valueNode(float value) { return value; }
-json valueNode(const Vec2& value) { return vec2ToJson(value); }
-json valueNode(const Color& value) { return colorToJson(value); }
-json valueNode(const BezierPath& value) { return bezierPathToJson(value); }
-json valueNode(const std::string& value) { return value; }
-
+// FromJson<T>：各类型的 JSON → 值解析。
 template <typename T>
-T valueFromNode(const json& node);
+Expected<T> FromJson(const json& node);
 
 template <>
-float valueFromNode<float>(const json& node) {
-    return node.get<float>();
+Expected<float> FromJson<float>(const json& node) {
+    return AsFloat(node);
 }
 template <>
-Vec2 valueFromNode<Vec2>(const json& node) {
-    return vec2FromJson(node);
+Expected<double> FromJson<double>(const json& node) {
+    return AsDouble(node);
 }
 template <>
-Color valueFromNode<Color>(const json& node) {
-    return colorFromJson(node);
+Expected<int> FromJson<int>(const json& node) {
+    return AsInt(node);
 }
 template <>
-BezierPath valueFromNode<BezierPath>(const json& node) {
-    return bezierPathFromJson(node);
+Expected<int64_t> FromJson<int64_t>(const json& node) {
+    return AsInt64(node);
 }
 template <>
-std::string valueFromNode<std::string>(const json& node) {
-    return node.get<std::string>();
+Expected<uint32_t> FromJson<uint32_t>(const json& node) {
+    return AsUint32(node);
+}
+template <>
+Expected<bool> FromJson<bool>(const json& node) {
+    return AsBool(node);
+}
+template <>
+Expected<std::string> FromJson<std::string>(const json& node) {
+    return AsString(node);
+}
+template <>
+Expected<Vec2> FromJson<Vec2>(const json& node) {
+    return Vec2FromJson(node);
+}
+template <>
+Expected<Color> FromJson<Color>(const json& node) {
+    return ColorFromJson(node);
+}
+template <>
+Expected<BezierPath> FromJson<BezierPath>(const json& node) {
+    return BezierPathFromJson(node);
+}
+
+// 取必选字段并按类型解析。
+template <typename T>
+Expected<T> ParseField(const json& node, const char* key) {
+    Expected<const json*> child = Child(node, key);
+    if (!child) {
+        return Error(child.errorMessage());
+    }
+    return FromJson<T>(**child);
 }
 
 // ---- Easing ----
 
-json easingToJson(const Easing& easing) {
+json EasingToJson(const Easing& easing) {
     json node{{"type", dto::toString(easing.type)}};
     if (easing.type == Easing::Type::Bezier) {
         node["inX"] = easing.inX;
@@ -124,36 +281,52 @@ json easingToJson(const Easing& easing) {
     return node;
 }
 
-Expected<Easing> easingFromJson(const json& node) {
-    Expected<Easing::Type> type =
-        dto::easingTypeFromString(node.at("type").get<std::string>());
+Expected<Easing> EasingFromJson(const json& node) {
+    Expected<std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Error(typeText.errorMessage());
+    }
+    Expected<Easing::Type> type = dto::easingTypeFromString(*typeText);
     if (!type) {
         return Error(type.errorMessage());
     }
-    if (*type == Easing::Type::Bezier) {
-        return Easing::Bezier(node.at("inX").get<float>(), node.at("inY").get<float>(),
-                              node.at("outX").get<float>(), node.at("outY").get<float>());
+    if (*type != Easing::Type::Bezier) {
+        return *type == Easing::Type::Hold ? Easing::Hold() : Easing::Linear();
     }
-    return *type == Easing::Type::Hold ? Easing::Hold() : Easing::Linear();
+    Expected<float> inX = ParseField<float>(node, "inX");
+    Expected<float> inY = ParseField<float>(node, "inY");
+    Expected<float> outX = ParseField<float>(node, "outX");
+    Expected<float> outY = ParseField<float>(node, "outY");
+    if (!inX || !inY || !outX || !outY) {
+        return Error("Bezier 缓动缺少控制点字段");
+    }
+    return Easing::Bezier(*inX, *inY, *outX, *outY);
 }
 
 // ---- Animatable<T>：静态 {"static": ...} / 关键帧 {"keyframes": [...]} ----
 
+// 属性值 → JSON 节点（按值类型分发）。
+json ValueToJson(float value) { return value; }
+json ValueToJson(const Vec2& value) { return Vec2ToJson(value); }
+json ValueToJson(const Color& value) { return ColorToJson(value); }
+json ValueToJson(const BezierPath& value) { return BezierPathToJson(value); }
+json ValueToJson(const std::string& value) { return value; }
+
 template <typename T>
-json animatableToJson(const Animatable<T>& animatable) {
+json AnimatableToJson(const Animatable<T>& animatable) {
     if (!animatable.isAnimated()) {
-        return json{{"static", valueNode(animatable.staticValue())}};
+        return json{{"static", ValueToJson(animatable.staticValue())}};
     }
     json keyframes = json::array();
     for (const Keyframe<T>& keyframe : animatable.keyframes()) {
         json node{{"time", keyframe.time},
-                  {"value", valueNode(keyframe.value)},
-                  {"easing", easingToJson(keyframe.easing)}};
+                  {"value", ValueToJson(keyframe.value)},
+                  {"easing", EasingToJson(keyframe.easing)}};
         if (keyframe.spatialInTangent) {
-            node["spatialInTangent"] = vec2ToJson(*keyframe.spatialInTangent);
+            node["spatialInTangent"] = Vec2ToJson(*keyframe.spatialInTangent);
         }
         if (keyframe.spatialOutTangent) {
-            node["spatialOutTangent"] = vec2ToJson(*keyframe.spatialOutTangent);
+            node["spatialOutTangent"] = Vec2ToJson(*keyframe.spatialOutTangent);
         }
         keyframes.push_back(std::move(node));
     }
@@ -161,32 +334,59 @@ json animatableToJson(const Animatable<T>& animatable) {
 }
 
 template <typename T>
-Expected<Keyframe<T>> keyframeFromJson(const json& node) {
-    Keyframe<T> keyframe;
-    keyframe.time = node.at("time").get<FrameTime>();
-    keyframe.value = valueFromNode<T>(node.at("value"));
-    Expected<Easing> easing = easingFromJson(node.at("easing"));
+Expected<Keyframe<T>> KeyframeFromJson(const json& node) {
+    Expected<int64_t> time = ParseField<int64_t>(node, "time");
+    if (!time) {
+        return Error(time.errorMessage());
+    }
+    Expected<T> value = ParseField<T>(node, "value");
+    if (!value) {
+        return Error(value.errorMessage());
+    }
+    Expected<const json*> easingNode = Child(node, "easing");
+    if (!easingNode) {
+        return Error(easingNode.errorMessage());
+    }
+    Expected<Easing> easing = EasingFromJson(**easingNode);
     if (!easing) {
         return Error(easing.errorMessage());
     }
+    Keyframe<T> keyframe;
+    keyframe.time = *time;
+    keyframe.value = std::move(*value);
     keyframe.easing = *easing;
-    if (node.contains("spatialInTangent")) {
-        keyframe.spatialInTangent = vec2FromJson(node.at("spatialInTangent"));
+    if (const json* tangentNode = FindChild(node, "spatialInTangent")) {
+        Expected<Vec2> tangent = Vec2FromJson(*tangentNode);
+        if (!tangent) {
+            return Error(tangent.errorMessage());
+        }
+        keyframe.spatialInTangent = *tangent;
     }
-    if (node.contains("spatialOutTangent")) {
-        keyframe.spatialOutTangent = vec2FromJson(node.at("spatialOutTangent"));
+    if (const json* tangentNode = FindChild(node, "spatialOutTangent")) {
+        Expected<Vec2> tangent = Vec2FromJson(*tangentNode);
+        if (!tangent) {
+            return Error(tangent.errorMessage());
+        }
+        keyframe.spatialOutTangent = *tangent;
     }
     return keyframe;
 }
 
 template <typename T>
-Expected<void> animatableFromJson(const json& node, Animatable<T>& animatable) {
-    if (node.contains("static")) {
-        animatable.setStaticValue(valueFromNode<T>(node.at("static")));
+Expected<void> AnimatableFromJson(const json& node, Animatable<T>& animatable) {
+    if (const json* staticNode = FindChild(node, "static")) {
+        Expected<T> value = FromJson<T>(*staticNode);
+        if (!value) {
+            return Error(value.errorMessage());
+        }
+        animatable.setStaticValue(std::move(*value));
     }
-    if (node.contains("keyframes")) {
-        for (const json& keyframeNode : node.at("keyframes")) {
-            Expected<Keyframe<T>> keyframe = keyframeFromJson<T>(keyframeNode);
+    if (const json* keyframesNode = FindChild(node, "keyframes")) {
+        if (!keyframesNode->is_array()) {
+            return Error("keyframes 必须是数组");
+        }
+        for (const json& keyframeNode : *keyframesNode) {
+            Expected<Keyframe<T>> keyframe = KeyframeFromJson<T>(keyframeNode);
             if (!keyframe) {
                 return Error(keyframe.errorMessage());
             }
@@ -198,123 +398,155 @@ Expected<void> animatableFromJson(const json& node, Animatable<T>& animatable) {
 
 // ---- Transform / Mask ----
 
-json transformToJson(const Transform& transform) {
-    return {{"anchorPoint", animatableToJson(transform.anchorPoint)},
-            {"position", animatableToJson(transform.position)},
-            {"scale", animatableToJson(transform.scale)},
-            {"rotation", animatableToJson(transform.rotation)},
-            {"opacity", animatableToJson(transform.opacity)}};
+json TransformToJson(const Transform& transform) {
+    return {{"anchorPoint", AnimatableToJson(transform.anchorPoint)},
+            {"position", AnimatableToJson(transform.position)},
+            {"scale", AnimatableToJson(transform.scale)},
+            {"rotation", AnimatableToJson(transform.rotation)},
+            {"opacity", AnimatableToJson(transform.opacity)}};
 }
 
-Expected<void> transformFromJson(const json& node, Transform& transform) {
-    Expected<void> result = animatableFromJson(node.at("anchorPoint"), transform.anchorPoint);
-    if (!result) {
-        return result;
+Expected<void> TransformFromJson(const json& node, Transform& transform) {
+    const char* fields[] = {"anchorPoint", "position", "scale", "rotation", "opacity"};
+    Animatable<Vec2>* vec2Targets[] = {&transform.anchorPoint, &transform.position,
+                                       &transform.scale};
+    for (int i = 0; i < 3; ++i) {
+        Expected<const json*> child = Child(node, fields[i]);
+        if (!child) {
+            return Error(child.errorMessage());
+        }
+        Expected<void> result = AnimatableFromJson(**child, *vec2Targets[i]);
+        if (!result) {
+            return Error(result.errorMessage());
+        }
     }
-    result = animatableFromJson(node.at("position"), transform.position);
-    if (!result) {
-        return result;
+    Expected<const json*> rotationNode = Child(node, fields[3]);
+    if (!rotationNode) {
+        return Error(rotationNode.errorMessage());
     }
-    result = animatableFromJson(node.at("scale"), transform.scale);
-    if (!result) {
-        return result;
-    }
-    result = animatableFromJson(node.at("rotation"), transform.rotation);
-    if (!result) {
-        return result;
-    }
-    return animatableFromJson(node.at("opacity"), transform.opacity);
-}
-
-json maskToJson(const Mask& mask) {
-    return {{"path", bezierPathToJson(mask.path)},
-            {"mode", dto::toString(mask.mode)},
-            {"opacity", animatableToJson(mask.opacity)},
-            {"inverted", mask.inverted}};
-}
-
-Expected<Mask> maskFromJson(const json& node) {
-    Mask mask;
-    mask.path = bezierPathFromJson(node.at("path"));
-    Expected<MaskMode> mode = dto::maskModeFromString(node.at("mode").get<std::string>());
-    if (!mode) {
-        return Error(mode.errorMessage());
-    }
-    mask.mode = *mode;
-    Expected<void> result = animatableFromJson(node.at("opacity"), mask.opacity);
+    Expected<void> result = AnimatableFromJson(**rotationNode, transform.rotation);
     if (!result) {
         return Error(result.errorMessage());
     }
-    mask.inverted = node.at("inverted").get<bool>();
+    Expected<const json*> opacityNode = Child(node, fields[4]);
+    if (!opacityNode) {
+        return Error(opacityNode.errorMessage());
+    }
+    return AnimatableFromJson(**opacityNode, transform.opacity);
+}
+
+json MaskToJson(const Mask& mask) {
+    return {{"path", BezierPathToJson(mask.path)},
+            {"mode", dto::toString(mask.mode)},
+            {"opacity", AnimatableToJson(mask.opacity)},
+            {"inverted", mask.inverted}};
+}
+
+Expected<Mask> MaskFromJson(const json& node) {
+    Expected<BezierPath> path = ParseField<BezierPath>(node, "path");
+    if (!path) {
+        return Error(path.errorMessage());
+    }
+    Expected<std::string> modeText = ParseField<std::string>(node, "mode");
+    if (!modeText) {
+        return Error(modeText.errorMessage());
+    }
+    Expected<MaskMode> mode = dto::maskModeFromString(*modeText);
+    if (!mode) {
+        return Error(mode.errorMessage());
+    }
+    Mask mask;
+    mask.path = std::move(*path);
+    mask.mode = *mode;
+    Expected<const json*> opacityNode = Child(node, "opacity");
+    if (!opacityNode) {
+        return Error(opacityNode.errorMessage());
+    }
+    Expected<void> result = AnimatableFromJson(**opacityNode, mask.opacity);
+    if (!result) {
+        return Error(result.errorMessage());
+    }
+    Expected<bool> inverted = ParseField<bool>(node, "inverted");
+    if (!inverted) {
+        return Error(inverted.errorMessage());
+    }
+    mask.inverted = *inverted;
     return mask;
 }
 
 // ---- Shape 元素（判别字段 "type"）----
 
-Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node);
+json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements);
 
-json shapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements) {
+json ShapeToJson(const ShapeElement& element) {
+    json node{{"id", IdToString(element.id)}, {"type", dto::toString(element.type())}};
+    switch (element.type()) {
+        case ShapeType::Path: {
+            const auto& shape = static_cast<const ShapePath&>(element);
+            node["path"] = AnimatableToJson(shape.path);
+            break;
+        }
+        case ShapeType::Fill: {
+            const auto& shape = static_cast<const ShapeFill&>(element);
+            node["color"] = AnimatableToJson(shape.color);
+            node["opacity"] = AnimatableToJson(shape.opacity);
+            node["fillRule"] = dto::toString(shape.fillRule);
+            break;
+        }
+        case ShapeType::Stroke: {
+            const auto& shape = static_cast<const ShapeStroke&>(element);
+            node["color"] = AnimatableToJson(shape.color);
+            node["width"] = AnimatableToJson(shape.width);
+            node["opacity"] = AnimatableToJson(shape.opacity);
+            node["cap"] = dto::toString(shape.cap);
+            node["join"] = dto::toString(shape.join);
+            node["miterLimit"] = shape.miterLimit;
+            break;
+        }
+        case ShapeType::Group: {
+            const auto& shape = static_cast<const ShapeGroup&>(element);
+            node["transform"] = TransformToJson(shape.transform);
+            node["elements"] = ShapesToJson(shape.elements);
+            break;
+        }
+        case ShapeType::Rect: {
+            const auto& shape = static_cast<const ShapeRect&>(element);
+            node["position"] = AnimatableToJson(shape.position);
+            node["size"] = AnimatableToJson(shape.size);
+            node["cornerRadius"] = AnimatableToJson(shape.cornerRadius);
+            break;
+        }
+        case ShapeType::Ellipse: {
+            const auto& shape = static_cast<const ShapeEllipse&>(element);
+            node["position"] = AnimatableToJson(shape.position);
+            node["size"] = AnimatableToJson(shape.size);
+            break;
+        }
+        case ShapeType::TrimPath: {
+            const auto& shape = static_cast<const ShapeTrimPath&>(element);
+            node["start"] = AnimatableToJson(shape.start);
+            node["end"] = AnimatableToJson(shape.end);
+            node["offset"] = AnimatableToJson(shape.offset);
+            break;
+        }
+    }
+    return node;
+}
+
+json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements) {
     json nodes = json::array();
     for (const auto& element : elements) {
-        json node{{"id", idToString(element->id)},
-                  {"type", dto::toString(element->type())}};
-        switch (element->type()) {
-            case ShapeType::Path: {
-                const auto& shape = static_cast<const ShapePath&>(*element);
-                node["path"] = animatableToJson(shape.path);
-                break;
-            }
-            case ShapeType::Fill: {
-                const auto& shape = static_cast<const ShapeFill&>(*element);
-                node["color"] = animatableToJson(shape.color);
-                node["opacity"] = animatableToJson(shape.opacity);
-                node["fillRule"] = dto::toString(shape.fillRule);
-                break;
-            }
-            case ShapeType::Stroke: {
-                const auto& shape = static_cast<const ShapeStroke&>(*element);
-                node["color"] = animatableToJson(shape.color);
-                node["width"] = animatableToJson(shape.width);
-                node["opacity"] = animatableToJson(shape.opacity);
-                node["cap"] = dto::toString(shape.cap);
-                node["join"] = dto::toString(shape.join);
-                node["miterLimit"] = shape.miterLimit;
-                break;
-            }
-            case ShapeType::Group: {
-                const auto& shape = static_cast<const ShapeGroup&>(*element);
-                node["transform"] = transformToJson(shape.transform);
-                node["elements"] = shapesToJson(shape.elements);
-                break;
-            }
-            case ShapeType::Rect: {
-                const auto& shape = static_cast<const ShapeRect&>(*element);
-                node["position"] = animatableToJson(shape.position);
-                node["size"] = animatableToJson(shape.size);
-                node["cornerRadius"] = animatableToJson(shape.cornerRadius);
-                break;
-            }
-            case ShapeType::Ellipse: {
-                const auto& shape = static_cast<const ShapeEllipse&>(*element);
-                node["position"] = animatableToJson(shape.position);
-                node["size"] = animatableToJson(shape.size);
-                break;
-            }
-            case ShapeType::TrimPath: {
-                const auto& shape = static_cast<const ShapeTrimPath&>(*element);
-                node["start"] = animatableToJson(shape.start);
-                node["end"] = animatableToJson(shape.end);
-                node["offset"] = animatableToJson(shape.offset);
-                break;
-            }
-        }
-        nodes.push_back(std::move(node));
+        nodes.push_back(ShapeToJson(*element));
     }
     return nodes;
 }
 
-Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
-    Expected<ShapeType> type = dto::shapeTypeFromString(node.at("type").get<std::string>());
+Expected<std::unique_ptr<ShapeElement>> ShapeFromJson(const json& node) {
+    Expected<std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Error(typeText.errorMessage());
+    }
+    Expected<ShapeType> type = dto::shapeTypeFromString(*typeText);
     if (!type) {
         return Error(type.errorMessage());
     }
@@ -322,7 +554,11 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
     switch (*type) {
         case ShapeType::Path: {
             auto shape = std::make_unique<ShapePath>();
-            Expected<void> result = animatableFromJson(node.at("path"), shape->path);
+            Expected<const json*> pathNode = Child(node, "path");
+            if (!pathNode) {
+                return Error(pathNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**pathNode, shape->path);
             if (!result) {
                 return Error(result.errorMessage());
             }
@@ -331,16 +567,27 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
         }
         case ShapeType::Fill: {
             auto shape = std::make_unique<ShapeFill>();
-            Expected<void> result = animatableFromJson(node.at("color"), shape->color);
+            Expected<const json*> colorNode = Child(node, "color");
+            if (!colorNode) {
+                return Error(colorNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**colorNode, shape->color);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("opacity"), shape->opacity);
+            Expected<const json*> opacityNode = Child(node, "opacity");
+            if (!opacityNode) {
+                return Error(opacityNode.errorMessage());
+            }
+            result = AnimatableFromJson(**opacityNode, shape->opacity);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            Expected<FillRule> fillRule =
-                dto::fillRuleFromString(node.at("fillRule").get<std::string>());
+            Expected<std::string> ruleText = ParseField<std::string>(node, "fillRule");
+            if (!ruleText) {
+                return Error(ruleText.errorMessage());
+            }
+            Expected<FillRule> fillRule = dto::fillRuleFromString(*ruleText);
             if (!fillRule) {
                 return Error(fillRule.errorMessage());
             }
@@ -350,42 +597,68 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
         }
         case ShapeType::Stroke: {
             auto shape = std::make_unique<ShapeStroke>();
-            Expected<void> result = animatableFromJson(node.at("color"), shape->color);
+            const char* animatableFields[] = {"color", "width", "opacity"};
+            Animatable<Color>* colorTarget = &shape->color;
+            Expected<const json*> colorNode = Child(node, animatableFields[0]);
+            if (!colorNode) {
+                return Error(colorNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**colorNode, *colorTarget);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("width"), shape->width);
+            Expected<const json*> widthNode = Child(node, animatableFields[1]);
+            if (!widthNode) {
+                return Error(widthNode.errorMessage());
+            }
+            result = AnimatableFromJson(**widthNode, shape->width);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("opacity"), shape->opacity);
+            Expected<const json*> opacityNode = Child(node, animatableFields[2]);
+            if (!opacityNode) {
+                return Error(opacityNode.errorMessage());
+            }
+            result = AnimatableFromJson(**opacityNode, shape->opacity);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            Expected<LineCap> cap = dto::lineCapFromString(node.at("cap").get<std::string>());
+            Expected<std::string> capText = ParseField<std::string>(node, "cap");
+            Expected<std::string> joinText = ParseField<std::string>(node, "join");
+            Expected<float> miterLimit = ParseField<float>(node, "miterLimit");
+            if (!capText || !joinText || !miterLimit) {
+                return Error("Stroke 缺少 cap/join/miterLimit 字段");
+            }
+            Expected<LineCap> cap = dto::lineCapFromString(*capText);
             if (!cap) {
                 return Error(cap.errorMessage());
             }
-            Expected<LineJoin> join =
-                dto::lineJoinFromString(node.at("join").get<std::string>());
+            Expected<LineJoin> join = dto::lineJoinFromString(*joinText);
             if (!join) {
                 return Error(join.errorMessage());
             }
             shape->cap = *cap;
             shape->join = *join;
-            shape->miterLimit = node.at("miterLimit").get<float>();
+            shape->miterLimit = *miterLimit;
             element = std::move(shape);
             break;
         }
         case ShapeType::Group: {
             auto shape = std::make_unique<ShapeGroup>();
-            Expected<void> result =
-                transformFromJson(node.at("transform"), shape->transform);
+            Expected<const json*> transformNode = Child(node, "transform");
+            if (!transformNode) {
+                return Error(transformNode.errorMessage());
+            }
+            Expected<void> result = TransformFromJson(**transformNode, shape->transform);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            for (const json& childNode : node.at("elements")) {
-                Expected<std::unique_ptr<ShapeElement>> child = shapeFromJson(childNode);
+            const json* elementsNode = FindChild(node, "elements");
+            if (!elementsNode || !elementsNode->is_array()) {
+                return Error("Group 缺少 elements 数组");
+            }
+            for (const json& childNode : *elementsNode) {
+                Expected<std::unique_ptr<ShapeElement>> child = ShapeFromJson(childNode);
                 if (!child) {
                     return Error(child.errorMessage());
                 }
@@ -396,16 +669,27 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
         }
         case ShapeType::Rect: {
             auto shape = std::make_unique<ShapeRect>();
-            Expected<void> result =
-                animatableFromJson(node.at("position"), shape->position);
+            Expected<const json*> positionNode = Child(node, "position");
+            if (!positionNode) {
+                return Error(positionNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**positionNode, shape->position);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("size"), shape->size);
+            Expected<const json*> sizeNode = Child(node, "size");
+            if (!sizeNode) {
+                return Error(sizeNode.errorMessage());
+            }
+            result = AnimatableFromJson(**sizeNode, shape->size);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("cornerRadius"), shape->cornerRadius);
+            Expected<const json*> radiusNode = Child(node, "cornerRadius");
+            if (!radiusNode) {
+                return Error(radiusNode.errorMessage());
+            }
+            result = AnimatableFromJson(**radiusNode, shape->cornerRadius);
             if (!result) {
                 return Error(result.errorMessage());
             }
@@ -414,12 +698,19 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
         }
         case ShapeType::Ellipse: {
             auto shape = std::make_unique<ShapeEllipse>();
-            Expected<void> result =
-                animatableFromJson(node.at("position"), shape->position);
+            Expected<const json*> positionNode = Child(node, "position");
+            if (!positionNode) {
+                return Error(positionNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**positionNode, shape->position);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("size"), shape->size);
+            Expected<const json*> sizeNode = Child(node, "size");
+            if (!sizeNode) {
+                return Error(sizeNode.errorMessage());
+            }
+            result = AnimatableFromJson(**sizeNode, shape->size);
             if (!result) {
                 return Error(result.errorMessage());
             }
@@ -428,15 +719,28 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
         }
         case ShapeType::TrimPath: {
             auto shape = std::make_unique<ShapeTrimPath>();
-            Expected<void> result = animatableFromJson(node.at("start"), shape->start);
+            const char* trimFields[] = {"start", "end", "offset"};
+            Expected<const json*> startNode = Child(node, trimFields[0]);
+            if (!startNode) {
+                return Error(startNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**startNode, shape->start);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("end"), shape->end);
+            Expected<const json*> endNode = Child(node, trimFields[1]);
+            if (!endNode) {
+                return Error(endNode.errorMessage());
+            }
+            result = AnimatableFromJson(**endNode, shape->end);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            result = animatableFromJson(node.at("offset"), shape->offset);
+            Expected<const json*> offsetNode = Child(node, trimFields[2]);
+            if (!offsetNode) {
+                return Error(offsetNode.errorMessage());
+            }
+            result = AnimatableFromJson(**offsetNode, shape->offset);
             if (!result) {
                 return Error(result.errorMessage());
             }
@@ -444,53 +748,65 @@ Expected<std::unique_ptr<ShapeElement>> shapeFromJson(const json& node) {
             break;
         }
     }
-    element->id = idFromString(node.at("id").get<std::string>());
+    Expected<EntityId> id = IdField(node, "id");
+    if (!id) {
+        return Error(id.errorMessage());
+    }
+    element->id = *id;
     return element;
 }
 
 // ---- LayerContent（判别字段 "type"）----
 
-json contentToJson(const LayerContent& content) {
+json ContentToJson(const LayerContent& content) {
     json node{{"type", dto::toString(content.type())}};
     switch (content.type()) {
         case LayerType::Shape: {
             const auto& shape = static_cast<const ShapeContent&>(content);
-            node["elements"] = shapesToJson(shape.elements);
+            node["elements"] = ShapesToJson(shape.elements);
             break;
         }
         case LayerType::Image: {
             const auto& image = static_cast<const ImageContent&>(content);
-            node["assetId"] = idToString(image.assetId);
+            node["assetId"] = IdToString(image.assetId);
             break;
         }
         case LayerType::Text: {
             const auto& text = static_cast<const TextContent&>(content);
-            node["text"] = animatableToJson(text.text);
+            node["text"] = AnimatableToJson(text.text);
             node["fontFamily"] = text.fontFamily;
-            node["fontSize"] = animatableToJson(text.fontSize);
+            node["fontSize"] = AnimatableToJson(text.fontSize);
             break;
         }
         case LayerType::Null:
             break;
         case LayerType::Precomp: {
             const auto& precomp = static_cast<const PrecompContent&>(content);
-            node["compositionId"] = idToString(precomp.compositionId);
+            node["compositionId"] = IdToString(precomp.compositionId);
             break;
         }
     }
     return node;
 }
 
-Expected<std::unique_ptr<LayerContent>> contentFromJson(const json& node) {
-    Expected<LayerType> type = dto::layerTypeFromString(node.at("type").get<std::string>());
+Expected<std::unique_ptr<LayerContent>> ContentFromJson(const json& node) {
+    Expected<std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Error(typeText.errorMessage());
+    }
+    Expected<LayerType> type = dto::layerTypeFromString(*typeText);
     if (!type) {
         return Error(type.errorMessage());
     }
     switch (*type) {
         case LayerType::Shape: {
             auto content = std::make_unique<ShapeContent>();
-            for (const json& elementNode : node.at("elements")) {
-                Expected<std::unique_ptr<ShapeElement>> element = shapeFromJson(elementNode);
+            const json* elementsNode = FindChild(node, "elements");
+            if (!elementsNode || !elementsNode->is_array()) {
+                return Error("Shape 内容缺少 elements 数组");
+            }
+            for (const json& elementNode : *elementsNode) {
+                Expected<std::unique_ptr<ShapeElement>> element = ShapeFromJson(elementNode);
                 if (!element) {
                     return Error(element.errorMessage());
                 }
@@ -500,17 +816,33 @@ Expected<std::unique_ptr<LayerContent>> contentFromJson(const json& node) {
         }
         case LayerType::Image: {
             auto content = std::make_unique<ImageContent>();
-            content->assetId = idFromString(node.at("assetId").get<std::string>());
+            Expected<EntityId> assetId = IdField(node, "assetId");
+            if (!assetId) {
+                return Error(assetId.errorMessage());
+            }
+            content->assetId = *assetId;
             return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Text: {
             auto content = std::make_unique<TextContent>();
-            Expected<void> result = animatableFromJson(node.at("text"), content->text);
+            Expected<const json*> textNode = Child(node, "text");
+            if (!textNode) {
+                return Error(textNode.errorMessage());
+            }
+            Expected<void> result = AnimatableFromJson(**textNode, content->text);
             if (!result) {
                 return Error(result.errorMessage());
             }
-            content->fontFamily = node.at("fontFamily").get<std::string>();
-            result = animatableFromJson(node.at("fontSize"), content->fontSize);
+            Expected<std::string> fontFamily = ParseField<std::string>(node, "fontFamily");
+            if (!fontFamily) {
+                return Error(fontFamily.errorMessage());
+            }
+            content->fontFamily = std::move(*fontFamily);
+            Expected<const json*> fontSizeNode = Child(node, "fontSize");
+            if (!fontSizeNode) {
+                return Error(fontSizeNode.errorMessage());
+            }
+            result = AnimatableFromJson(**fontSizeNode, content->fontSize);
             if (!result) {
                 return Error(result.errorMessage());
             }
@@ -520,8 +852,11 @@ Expected<std::unique_ptr<LayerContent>> contentFromJson(const json& node) {
             return std::unique_ptr<LayerContent>(std::make_unique<NullContent>());
         case LayerType::Precomp: {
             auto content = std::make_unique<PrecompContent>();
-            content->compositionId =
-                idFromString(node.at("compositionId").get<std::string>());
+            Expected<EntityId> compositionId = IdField(node, "compositionId");
+            if (!compositionId) {
+                return Error(compositionId.errorMessage());
+            }
+            content->compositionId = *compositionId;
             return std::unique_ptr<LayerContent>(std::move(content));
         }
     }
@@ -530,8 +865,8 @@ Expected<std::unique_ptr<LayerContent>> contentFromJson(const json& node) {
 
 // ---- Layer / Composition / Asset / Document ----
 
-json layerToJson(const Layer& layer) {
-    json node{{"id", idToString(layer.id)},
+json LayerToJson(const Layer& layer) {
+    json node{{"id", IdToString(layer.id)},
               {"name", layer.name},
               {"type", dto::toString(layer.type())},
               {"inPoint", layer.inPoint},
@@ -541,95 +876,185 @@ json layerToJson(const Layer& layer) {
               {"visible", layer.visible},
               {"locked", layer.locked},
               {"blendMode", dto::toString(layer.blendMode)},
-              {"transform", transformToJson(layer.transform)},
-              {"content", contentToJson(*layer.content)}};
+              {"transform", TransformToJson(layer.transform)},
+              {"content", ContentToJson(*layer.content)}};
     if (layer.parentId.isValid()) {
-        node["parentId"] = idToString(layer.parentId);
+        node["parentId"] = IdToString(layer.parentId);
     } else {
         node["parentId"] = nullptr;
     }
     json masks = json::array();
     for (const Mask& mask : layer.masks) {
-        masks.push_back(maskToJson(mask));
+        masks.push_back(MaskToJson(mask));
     }
     node["masks"] = std::move(masks);
     return node;
 }
 
-Expected<std::unique_ptr<Layer>> layerFromJson(const json& node) {
-    Expected<LayerType> type = dto::layerTypeFromString(node.at("type").get<std::string>());
+Expected<std::unique_ptr<Layer>> LayerFromJson(const json& node) {
+    Expected<std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Error(typeText.errorMessage());
+    }
+    Expected<LayerType> type = dto::layerTypeFromString(*typeText);
     if (!type) {
         return Error(type.errorMessage());
     }
     auto layer = std::make_unique<Layer>(*type);
-    layer->id = idFromString(node.at("id").get<std::string>());
-    layer->name = node.at("name").get<std::string>();
-    layer->inPoint = node.at("inPoint").get<FrameTime>();
-    layer->outPoint = node.at("outPoint").get<FrameTime>();
-    layer->startTime = node.at("startTime").get<FrameTime>();
-    layer->timeStretch = node.at("timeStretch").get<double>();
-    layer->visible = node.at("visible").get<bool>();
-    layer->locked = node.at("locked").get<bool>();
 
-    Expected<BlendMode> blendMode =
-        dto::blendModeFromString(node.at("blendMode").get<std::string>());
+    Expected<EntityId> id = IdField(node, "id");
+    if (!id) {
+        return Error(id.errorMessage());
+    }
+    layer->id = *id;
+
+    Expected<std::string> name = ParseField<std::string>(node, "name");
+    if (!name) {
+        return Error(name.errorMessage());
+    }
+    layer->name = std::move(*name);
+
+    Expected<int64_t> inPoint = ParseField<int64_t>(node, "inPoint");
+    Expected<int64_t> outPoint = ParseField<int64_t>(node, "outPoint");
+    Expected<int64_t> startTime = ParseField<int64_t>(node, "startTime");
+    Expected<double> timeStretch = ParseField<double>(node, "timeStretch");
+    Expected<bool> visible = ParseField<bool>(node, "visible");
+    Expected<bool> locked = ParseField<bool>(node, "locked");
+    if (!inPoint || !outPoint || !startTime || !timeStretch || !visible || !locked) {
+        return Error("Layer 缺少时间/可见性字段");
+    }
+    layer->inPoint = *inPoint;
+    layer->outPoint = *outPoint;
+    layer->startTime = *startTime;
+    layer->timeStretch = *timeStretch;
+    layer->visible = *visible;
+    layer->locked = *locked;
+
+    Expected<std::string> blendText = ParseField<std::string>(node, "blendMode");
+    if (!blendText) {
+        return Error(blendText.errorMessage());
+    }
+    Expected<BlendMode> blendMode = dto::blendModeFromString(*blendText);
     if (!blendMode) {
         return Error(blendMode.errorMessage());
     }
     layer->blendMode = *blendMode;
 
-    Expected<void> result = transformFromJson(node.at("transform"), layer->transform);
+    Expected<const json*> transformNode = Child(node, "transform");
+    if (!transformNode) {
+        return Error(transformNode.errorMessage());
+    }
+    Expected<void> result = TransformFromJson(**transformNode, layer->transform);
     if (!result) {
         return Error(result.errorMessage());
     }
-    Expected<std::unique_ptr<LayerContent>> content = contentFromJson(node.at("content"));
+
+    Expected<const json*> contentNode = Child(node, "content");
+    if (!contentNode) {
+        return Error(contentNode.errorMessage());
+    }
+    Expected<std::unique_ptr<LayerContent>> content = ContentFromJson(**contentNode);
     if (!content) {
         return Error(content.errorMessage());
     }
     layer->content = std::move(*content);
 
-    if (!node.at("parentId").is_null()) {
-        layer->parentId = idFromString(node.at("parentId").get<std::string>());
-    }
-    for (const json& maskNode : node.at("masks")) {
-        Expected<Mask> mask = maskFromJson(maskNode);
-        if (!mask) {
-            return Error(mask.errorMessage());
+    const json* parentNode = FindChild(node, "parentId");
+    if (parentNode && !parentNode->is_null()) {
+        Expected<std::string> parentText = AsString(*parentNode);
+        if (!parentText) {
+            return Error(parentText.errorMessage());
         }
-        layer->masks.push_back(std::move(*mask));
+        Expected<EntityId> parentId = IdFromString(*parentText);
+        if (!parentId) {
+            return Error(parentId.errorMessage());
+        }
+        layer->parentId = *parentId;
+    }
+
+    if (const json* masksNode = FindChild(node, "masks")) {
+        if (!masksNode->is_array()) {
+            return Error("masks 必须是数组");
+        }
+        for (const json& maskNode : *masksNode) {
+            Expected<Mask> mask = MaskFromJson(maskNode);
+            if (!mask) {
+                return Error(mask.errorMessage());
+            }
+            layer->masks.push_back(std::move(*mask));
+        }
     }
     return layer;
 }
 
-json compositionToJson(const Composition& composition) {
+json CompositionToJson(const Composition& composition) {
     json layers = json::array();
     for (const auto& layer : composition.layers) {
-        layers.push_back(layerToJson(*layer));
+        layers.push_back(LayerToJson(*layer));
     }
-    return {{"id", idToString(composition.id)},
+    return {{"id", IdToString(composition.id)},
             {"name", composition.name},
             {"duration", composition.duration},
             {"frameRate",
              {{"num", composition.frameRate.num}, {"den", composition.frameRate.den}}},
             {"width", composition.width},
             {"height", composition.height},
-            {"backgroundColor", colorToJson(composition.backgroundColor)},
+            {"backgroundColor", ColorToJson(composition.backgroundColor)},
             {"layers", std::move(layers)}};
 }
 
-Expected<std::unique_ptr<Composition>> compositionFromJson(const json& node) {
+Expected<std::unique_ptr<Composition>> CompositionFromJson(const json& node) {
     auto composition = std::make_unique<Composition>();
-    composition->id = idFromString(node.at("id").get<std::string>());
-    composition->name = node.at("name").get<std::string>();
-    composition->duration = node.at("duration").get<FrameTime>();
-    const json& frameRate = node.at("frameRate");
-    composition->frameRate = {frameRate.at("num").get<uint32_t>(),
-                              frameRate.at("den").get<uint32_t>()};
-    composition->width = node.at("width").get<int>();
-    composition->height = node.at("height").get<int>();
-    composition->backgroundColor = colorFromJson(node.at("backgroundColor"));
-    for (const json& layerNode : node.at("layers")) {
-        Expected<std::unique_ptr<Layer>> layer = layerFromJson(layerNode);
+
+    Expected<EntityId> id = IdField(node, "id");
+    if (!id) {
+        return Error(id.errorMessage());
+    }
+    composition->id = *id;
+
+    Expected<std::string> name = ParseField<std::string>(node, "name");
+    if (!name) {
+        return Error(name.errorMessage());
+    }
+    composition->name = std::move(*name);
+
+    Expected<int64_t> duration = ParseField<int64_t>(node, "duration");
+    if (!duration) {
+        return Error(duration.errorMessage());
+    }
+    composition->duration = *duration;
+
+    Expected<const json*> frameRateNode = Child(node, "frameRate");
+    if (!frameRateNode) {
+        return Error(frameRateNode.errorMessage());
+    }
+    Expected<uint32_t> num = ParseField<uint32_t>(**frameRateNode, "num");
+    Expected<uint32_t> den = ParseField<uint32_t>(**frameRateNode, "den");
+    if (!num || !den) {
+        return Error("frameRate 缺少 num/den 字段");
+    }
+    composition->frameRate = {*num, *den};
+
+    Expected<int> width = ParseField<int>(node, "width");
+    Expected<int> height = ParseField<int>(node, "height");
+    if (!width || !height) {
+        return Error("Composition 缺少 width/height 字段");
+    }
+    composition->width = *width;
+    composition->height = *height;
+
+    Expected<Color> backgroundColor = ParseField<Color>(node, "backgroundColor");
+    if (!backgroundColor) {
+        return Error(backgroundColor.errorMessage());
+    }
+    composition->backgroundColor = *backgroundColor;
+
+    const json* layersNode = FindChild(node, "layers");
+    if (!layersNode || !layersNode->is_array()) {
+        return Error("Composition 缺少 layers 数组");
+    }
+    for (const json& layerNode : *layersNode) {
+        Expected<std::unique_ptr<Layer>> layer = LayerFromJson(layerNode);
         if (!layer) {
             return Error(layer.errorMessage());
         }
@@ -638,37 +1063,50 @@ Expected<std::unique_ptr<Composition>> compositionFromJson(const json& node) {
     return composition;
 }
 
-json assetToJson(const Asset& asset) {
-    return {{"id", idToString(asset.id)},
+json AssetToJson(const Asset& asset) {
+    return {{"id", IdToString(asset.id)},
             {"type", dto::toString(asset.type)},
             {"name", asset.name},
             {"path", asset.path}};
 }
 
-Expected<Asset> assetFromJson(const json& node) {
+Expected<Asset> AssetFromJson(const json& node) {
     Asset asset;
-    asset.id = idFromString(node.at("id").get<std::string>());
-    Expected<AssetType> type = dto::assetTypeFromString(node.at("type").get<std::string>());
+    Expected<EntityId> id = IdField(node, "id");
+    if (!id) {
+        return Error(id.errorMessage());
+    }
+    asset.id = *id;
+    Expected<std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Error(typeText.errorMessage());
+    }
+    Expected<AssetType> type = dto::assetTypeFromString(*typeText);
     if (!type) {
         return Error(type.errorMessage());
     }
     asset.type = *type;
-    asset.name = node.at("name").get<std::string>();
-    asset.path = node.at("path").get<std::string>();
+    Expected<std::string> name = ParseField<std::string>(node, "name");
+    Expected<std::string> path = ParseField<std::string>(node, "path");
+    if (!name || !path) {
+        return Error("Asset 缺少 name/path 字段");
+    }
+    asset.name = std::move(*name);
+    asset.path = std::move(*path);
     return asset;
 }
 
-json documentToJson(const Document& document) {
+json DocumentToJson(const Document& document) {
     json compositions = json::array();
     for (const auto& composition : document.compositions) {
-        compositions.push_back(compositionToJson(*composition));
+        compositions.push_back(CompositionToJson(*composition));
     }
     json assets = json::array();
     for (const Asset& asset : document.assets) {
-        assets.push_back(assetToJson(asset));
+        assets.push_back(AssetToJson(asset));
     }
     return {{"schemaVersion", dto::kSchemaVersion},
-            {"id", idToString(document.id)},
+            {"id", IdToString(document.id)},
             {"name", document.name},
             {"assets", std::move(assets)},
             {"compositions", std::move(compositions)}};
@@ -677,45 +1115,64 @@ json documentToJson(const Document& document) {
 }  // namespace
 
 std::string Serializer::serialize(const Document& document) {
-    return documentToJson(document).dump(2);
+    return DocumentToJson(document).dump(2);
 }
 
 Expected<std::unique_ptr<Document>> Serializer::deserialize(const std::string& jsonText) {
-    try {
-        Expected<std::string> migrated = SchemaMigrator::migrate(jsonText);
-        if (!migrated) {
-            return Error(migrated.errorMessage());
-        }
-        const json data = json::parse(*migrated);
-
-        auto document = std::make_unique<Document>();
-        document->id = idFromString(data.at("id").get<std::string>());
-        document->name = data.at("name").get<std::string>();
-        for (const json& assetNode : data.at("assets")) {
-            Expected<Asset> asset = assetFromJson(assetNode);
-            if (!asset) {
-                return Error(asset.errorMessage());
-            }
-            document->assets.push_back(std::move(*asset));
-        }
-        for (const json& compositionNode : data.at("compositions")) {
-            Expected<std::unique_ptr<Composition>> composition =
-                compositionFromJson(compositionNode);
-            if (!composition) {
-                return Error(composition.errorMessage());
-            }
-            document->compositions.push_back(std::move(*composition));
-        }
-        document->refreshEntityIndex();
-        return document;
-    } catch (const std::exception& error) {
-        // nlohmann 内部抛出的结构性错误在此边界统一转换为 Error。
-        return Error(std::string("文档 JSON 解析失败: ") + error.what());
+    Expected<std::string> migrated = SchemaMigrator::migrate(jsonText);
+    if (!migrated) {
+        return Error(migrated.errorMessage());
     }
+    const json data = json::parse(*migrated, nullptr, false);
+    if (data.is_discarded() || !data.is_object()) {
+        return Error("文档 JSON 解析失败");
+    }
+
+    auto document = std::make_unique<Document>();
+
+    Expected<EntityId> id = IdField(data, "id");
+    if (!id) {
+        return Error(id.errorMessage());
+    }
+    document->id = *id;
+
+    Expected<std::string> name = ParseField<std::string>(data, "name");
+    if (!name) {
+        return Error(name.errorMessage());
+    }
+    document->name = std::move(*name);
+
+    const json* assetsNode = FindChild(data, "assets");
+    if (!assetsNode || !assetsNode->is_array()) {
+        return Error("缺少 assets 数组");
+    }
+    for (const json& assetNode : *assetsNode) {
+        Expected<Asset> asset = AssetFromJson(assetNode);
+        if (!asset) {
+            return Error(asset.errorMessage());
+        }
+        document->assets.push_back(std::move(*asset));
+    }
+
+    const json* compositionsNode = FindChild(data, "compositions");
+    if (!compositionsNode || !compositionsNode->is_array()) {
+        return Error("缺少 compositions 数组");
+    }
+    for (const json& compositionNode : *compositionsNode) {
+        Expected<std::unique_ptr<Composition>> composition =
+            CompositionFromJson(compositionNode);
+        if (!composition) {
+            return Error(composition.errorMessage());
+        }
+        document->compositions.push_back(std::move(*composition));
+    }
+
+    document->refreshEntityIndex();
+    return document;
 }
 
 uint64_t documentFingerprint(const Document& document) {
-    const std::string compact = documentToJson(document).dump();
+    const std::string compact = DocumentToJson(document).dump();
     uint64_t hash = 14695981039346656037ull;  // FNV-1a 64
     for (const unsigned char byte : compact) {
         hash ^= byte;
