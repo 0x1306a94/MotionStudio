@@ -62,7 +62,9 @@ void Document::refreshEntityIndex() {
 }
 
 Composition* Document::addComposition(std::unique_ptr<Composition> composition) {
-    if (!composition) return nullptr;
+    if (!composition) {
+        return nullptr;
+    }
     compositions.push_back(std::move(composition));
     refreshEntityIndex();
     return compositions.back().get();
@@ -73,7 +75,9 @@ std::unique_ptr<Composition> Document::takeComposition(EntityId id) {
                            [&](const std::unique_ptr<Composition>& composition) {
                                return composition->id == id;
                            });
-    if (it == compositions.end()) return nullptr;
+    if (it == compositions.end()) {
+        return nullptr;
+    }
     std::unique_ptr<Composition> taken = std::move(*it);
     compositions.erase(it);
     refreshEntityIndex();
@@ -81,9 +85,13 @@ std::unique_ptr<Composition> Document::takeComposition(EntityId id) {
 }
 
 Layer* Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index) {
-    if (!layer) return nullptr;
+    if (!layer) {
+        return nullptr;
+    }
     Composition* composition = entityIndex_.findComposition(compositionId);
-    if (!composition) return nullptr;
+    if (!composition) {
+        return nullptr;
+    }
 
     Layer* raw = layer.get();
     const int count = int(composition->layers.size());
@@ -98,13 +106,17 @@ Layer* Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, 
 
 std::unique_ptr<Layer> Document::takeLayer(EntityId compositionId, EntityId layerId) {
     Composition* composition = entityIndex_.findComposition(compositionId);
-    if (!composition) return nullptr;
+    if (!composition) {
+        return nullptr;
+    }
 
     auto& layers = composition->layers;
     auto it = std::find_if(layers.begin(), layers.end(), [&](const std::unique_ptr<Layer>& entry) {
         return entry->id == layerId;
     });
-    if (it == layers.end()) return nullptr;
+    if (it == layers.end()) {
+        return nullptr;
+    }
 
     std::unique_ptr<Layer> taken = std::move(*it);
     layers.erase(it);
@@ -114,7 +126,9 @@ std::unique_ptr<Layer> Document::takeLayer(EntityId compositionId, EntityId laye
 
 bool Document::moveLayer(EntityId compositionId, int fromIndex, int toIndex) {
     Composition* composition = entityIndex_.findComposition(compositionId);
-    if (!composition) return false;
+    if (!composition) {
+        return false;
+    }
 
     auto& layers = composition->layers;
     const int count = int(layers.size());

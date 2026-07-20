@@ -31,7 +31,9 @@ void UndoManager::execute(Document& document, std::unique_ptr<Command> command) 
 }
 
 void UndoManager::undo(Document& document) {
-    if (undoStack_.empty()) return;
+    if (undoStack_.empty()) {
+        return;
+    }
     mergeWindowOpen_ = false;
     std::unique_ptr<Command> command = std::move(undoStack_.back());
     undoStack_.pop_back();
@@ -40,7 +42,9 @@ void UndoManager::undo(Document& document) {
 }
 
 void UndoManager::redo(Document& document) {
-    if (redoStack_.empty()) return;
+    if (redoStack_.empty()) {
+        return;
+    }
     mergeWindowOpen_ = false;
     std::unique_ptr<Command> command = std::move(redoStack_.back());
     redoStack_.pop_back();

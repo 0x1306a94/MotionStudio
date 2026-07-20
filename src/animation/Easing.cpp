@@ -27,8 +27,12 @@ Easing Easing::EaseIn() { return Bezier(0.42f, 0, 1, 1); }
 Easing Easing::EaseOut() { return Bezier(0, 0, 0.58f, 1); }
 
 bool Easing::operator==(const Easing& other) const {
-    if (type != other.type) return false;
-    if (type != Type::Bezier) return true;
+    if (type != other.type) {
+        return false;
+    }
+    if (type != Type::Bezier) {
+        return true;
+    }
     return inX == other.inX && inY == other.inY && outX == other.outX && outY == other.outY;
 }
 
@@ -51,16 +55,24 @@ float cubicBezierAxisDerivative(float p1, float p2, float t) {
 }  // namespace
 
 float solveBezierEasing(float x1, float y1, float x2, float y2, float x) {
-    if (x <= 0) return 0;
-    if (x >= 1) return 1;
+    if (x <= 0) {
+        return 0;
+    }
+    if (x >= 1) {
+        return 1;
+    }
 
     // 阶段一：牛顿迭代（通常 4~8 次收敛）。
     float t = x;
     for (int i = 0; i < 8; ++i) {
         const float error = cubicBezierAxis(x1, x2, t) - x;
-        if (std::abs(error) < 1e-7f) break;
+        if (std::abs(error) < 1e-7f) {
+            break;
+        }
         const float derivative = cubicBezierAxisDerivative(x1, x2, t);
-        if (std::abs(derivative) < 1e-7f) break;
+        if (std::abs(derivative) < 1e-7f) {
+            break;
+        }
         t -= error / derivative;
     }
 
@@ -71,7 +83,9 @@ float solveBezierEasing(float x1, float y1, float x2, float y2, float x) {
         t = x;
         for (int i = 0; i < 20; ++i) {
             const float current = cubicBezierAxis(x1, x2, t);
-            if (std::abs(current - x) < 1e-7f) break;
+            if (std::abs(current - x) < 1e-7f) {
+                break;
+            }
             if (current < x) {
                 lo = t;
             } else {

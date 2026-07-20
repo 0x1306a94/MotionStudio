@@ -88,7 +88,9 @@ struct Mat3 {
 
     bool operator==(const Mat3& other) const {
         for (int i = 0; i < 9; ++i) {
-            if (values[i] != other.values[i]) return false;
+            if (values[i] != other.values[i]) {
+                return false;
+            }
         }
         return true;
     }

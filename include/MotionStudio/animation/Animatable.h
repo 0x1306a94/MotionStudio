@@ -39,13 +39,17 @@ public:
 
     void removeKeyframe(FrameTime time) {
         auto it = find(time);
-        if (it != keyframes_.end()) keyframes_.erase(it);
+        if (it != keyframes_.end()) {
+            keyframes_.erase(it);
+        }
     }
 
     // 移除并返回关键帧（MoveKeyframe 用）；不存在返回 nullopt。
     std::optional<Keyframe<T>> takeKeyframe(FrameTime time) {
         auto it = find(time);
-        if (it == keyframes_.end()) return std::nullopt;
+        if (it == keyframes_.end()) {
+            return std::nullopt;
+        }
         Keyframe<T> taken = std::move(*it);
         keyframes_.erase(it);
         return taken;
@@ -54,7 +58,9 @@ public:
     // 更新 time 处的关键帧；不存在返回 false。
     bool updateKeyframe(FrameTime time, Keyframe<T> keyframe) {
         auto it = find(time);
-        if (it == keyframes_.end()) return false;
+        if (it == keyframes_.end()) {
+            return false;
+        }
         keyframe.time = time;
         *it = std::move(keyframe);
         return true;
@@ -64,9 +70,15 @@ public:
 
     // 求值：无关键帧返回静态值；区间外钳制到首/末帧值（不外推）。
     T evaluate(FrameTime time) const {
-        if (keyframes_.empty()) return value_;
-        if (time <= keyframes_.front().time) return keyframes_.front().value;
-        if (time >= keyframes_.back().time) return keyframes_.back().value;
+        if (keyframes_.empty()) {
+            return value_;
+        }
+        if (time <= keyframes_.front().time) {
+            return keyframes_.front().value;
+        }
+        if (time >= keyframes_.back().time) {
+            return keyframes_.back().value;
+        }
 
         auto it = upperBound(time);
         const Keyframe<T>& from = *(it - 1);

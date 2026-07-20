@@ -25,9 +25,13 @@ public:
     void undo(Document&) override { *target_ -= delta_; }
 
     bool mergeWith(const Command& other) override {
-        if (mergeKey_.empty()) return false;
+        if (mergeKey_.empty()) {
+            return false;
+        }
         const auto* typed = dynamic_cast<const AdjustCommand*>(&other);
-        if (!typed || typed->mergeKey_ != mergeKey_) return false;
+        if (!typed || typed->mergeKey_ != mergeKey_) {
+            return false;
+        }
         delta_ += typed->delta_;
         return true;
     }

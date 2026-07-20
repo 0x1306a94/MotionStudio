@@ -19,7 +19,9 @@ std::vector<PathSegment> parsePropertyPath(const std::string& path) {
             ++position;
         }
         segment.name = path.substr(nameStart, position - nameStart);
-        if (segment.name.empty()) return {};
+        if (segment.name.empty()) {
+            return {};
+        }
 
         if (position < path.size() && path[position] == '[') {
             ++position;
@@ -31,16 +33,24 @@ std::vector<PathSegment> parsePropertyPath(const std::string& path) {
                 hasDigit = true;
                 ++position;
             }
-            if (!hasDigit || position >= path.size() || path[position] != ']') return {};
+            if (!hasDigit || position >= path.size() || path[position] != ']') {
+                return {};
+            }
             ++position;
             segment.index = index;
         }
 
         segments.push_back(segment);
-        if (position >= path.size()) break;
-        if (path[position] != '.') return {};
+        if (position >= path.size()) {
+            break;
+        }
+        if (path[position] != '.') {
+            return {};
+        }
         ++position;
-        if (position >= path.size()) return {};  // 拒绝尾部 '.'
+        if (position >= path.size()) {
+            return {};  // 拒绝尾部 '.'
+        }
     }
     return segments;
 }
@@ -48,11 +58,21 @@ std::vector<PathSegment> parsePropertyPath(const std::string& path) {
 namespace {
 
 AnimatableBase* resolveTransformProperty(Transform& transform, const std::string& name) {
-    if (name == "anchorPoint") return &transform.anchorPoint;
-    if (name == "position") return &transform.position;
-    if (name == "scale") return &transform.scale;
-    if (name == "rotation") return &transform.rotation;
-    if (name == "opacity") return &transform.opacity;
+    if (name == "anchorPoint") {
+        return &transform.anchorPoint;
+    }
+    if (name == "position") {
+        return &transform.position;
+    }
+    if (name == "scale") {
+        return &transform.scale;
+    }
+    if (name == "rotation") {
+        return &transform.rotation;
+    }
+    if (name == "opacity") {
+        return &transform.opacity;
+    }
     return nullptr;
 }
 
@@ -60,31 +80,57 @@ AnimatableBase* resolveTransformProperty(Transform& transform, const std::string
 AnimatableBase* resolveShapeProperty(ShapeElement* element, const std::string& name) {
     switch (element->type()) {
         case ShapeType::Path:
-            if (name == "path") return &static_cast<ShapePath*>(element)->path;
+            if (name == "path") {
+                return &static_cast<ShapePath*>(element)->path;
+            }
             break;
         case ShapeType::Fill:
-            if (name == "color") return &static_cast<ShapeFill*>(element)->color;
-            if (name == "opacity") return &static_cast<ShapeFill*>(element)->opacity;
+            if (name == "color") {
+                return &static_cast<ShapeFill*>(element)->color;
+            }
+            if (name == "opacity") {
+                return &static_cast<ShapeFill*>(element)->opacity;
+            }
             break;
         case ShapeType::Stroke:
-            if (name == "color") return &static_cast<ShapeStroke*>(element)->color;
-            if (name == "width") return &static_cast<ShapeStroke*>(element)->width;
-            if (name == "opacity") return &static_cast<ShapeStroke*>(element)->opacity;
+            if (name == "color") {
+                return &static_cast<ShapeStroke*>(element)->color;
+            }
+            if (name == "width") {
+                return &static_cast<ShapeStroke*>(element)->width;
+            }
+            if (name == "opacity") {
+                return &static_cast<ShapeStroke*>(element)->opacity;
+            }
             break;
         case ShapeType::Rect:
-            if (name == "position") return &static_cast<ShapeRect*>(element)->position;
-            if (name == "size") return &static_cast<ShapeRect*>(element)->size;
+            if (name == "position") {
+                return &static_cast<ShapeRect*>(element)->position;
+            }
+            if (name == "size") {
+                return &static_cast<ShapeRect*>(element)->size;
+            }
             if (name == "cornerRadius")
                 return &static_cast<ShapeRect*>(element)->cornerRadius;
             break;
         case ShapeType::Ellipse:
-            if (name == "position") return &static_cast<ShapeEllipse*>(element)->position;
-            if (name == "size") return &static_cast<ShapeEllipse*>(element)->size;
+            if (name == "position") {
+                return &static_cast<ShapeEllipse*>(element)->position;
+            }
+            if (name == "size") {
+                return &static_cast<ShapeEllipse*>(element)->size;
+            }
             break;
         case ShapeType::TrimPath:
-            if (name == "start") return &static_cast<ShapeTrimPath*>(element)->start;
-            if (name == "end") return &static_cast<ShapeTrimPath*>(element)->end;
-            if (name == "offset") return &static_cast<ShapeTrimPath*>(element)->offset;
+            if (name == "start") {
+                return &static_cast<ShapeTrimPath*>(element)->start;
+            }
+            if (name == "end") {
+                return &static_cast<ShapeTrimPath*>(element)->end;
+            }
+            if (name == "offset") {
+                return &static_cast<ShapeTrimPath*>(element)->offset;
+            }
             break;
         case ShapeType::Group:
             break;
@@ -102,16 +148,22 @@ AnimatableBase* resolveShapeSegments(ShapeElement* element,
 
         if (segment.name == "elements" && segment.index >= 0) {
             auto* group = dynamic_cast<ShapeGroup*>(current);
-            if (!group || segment.index >= int(group->elements.size())) return nullptr;
+            if (!group || segment.index >= int(group->elements.size())) {
+                return nullptr;
+            }
             current = group->elements[size_t(segment.index)].get();
             continue;
         }
         if (segment.name == "transform") {
             auto* group = dynamic_cast<ShapeGroup*>(current);
-            if (!group || i + 1 != segments.size() - 1) return nullptr;
+            if (!group || i + 1 != segments.size() - 1) {
+                return nullptr;
+            }
             return resolveTransformProperty(group->transform, segments[i + 1].name);
         }
-        if (i != segments.size() - 1) return nullptr;
+        if (i != segments.size() - 1) {
+            return nullptr;
+        }
         return resolveShapeProperty(current, segment.name);
     }
     return nullptr;
@@ -121,7 +173,9 @@ AnimatableBase* resolveShapeSegments(ShapeElement* element,
 
 AnimatableBase* resolveAnimatable(Document& document, const PropertyPath& property) {
     const std::vector<PathSegment> segments = parsePropertyPath(property.path);
-    if (segments.empty()) return nullptr;
+    if (segments.empty()) {
+        return nullptr;
+    }
 
     if (Layer* layer = document.entityIndex().findLayer(property.entityId)) {
         const PathSegment& first = segments[0];
@@ -138,9 +192,15 @@ AnimatableBase* resolveAnimatable(Document& document, const PropertyPath& proper
         }
         if (first.name == "content" && segments.size() == 2) {
             auto* textContent = dynamic_cast<TextContent*>(layer->content.get());
-            if (!textContent) return nullptr;
-            if (segments[1].name == "text") return &textContent->text;
-            if (segments[1].name == "fontSize") return &textContent->fontSize;
+            if (!textContent) {
+                return nullptr;
+            }
+            if (segments[1].name == "text") {
+                return &textContent->text;
+            }
+            if (segments[1].name == "fontSize") {
+                return &textContent->fontSize;
+            }
             return nullptr;
         }
         return nullptr;
