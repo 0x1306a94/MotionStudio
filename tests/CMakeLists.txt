@@ -10,6 +10,7 @@ add_executable(core_tests
     animation/EasingCssTest.cpp
     animation/EasingTest.cpp
     animation/InterpolatorTest.cpp
+    animation/PathResampleTest.cpp
     model/DocumentTest.cpp
     model/LayerTest.cpp
     model/PropertyPathTest.cpp

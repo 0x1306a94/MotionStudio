@@ -1,6 +1,9 @@
 #include "MotionStudio/animation/Interpolator.h"
 
+#include <algorithm>
 #include <cassert>
+
+#include "MotionStudio/animation/PathResample.h"
 
 namespace motion {
 
@@ -23,10 +26,15 @@ Color Interpolator<Color>::Lerp(const Color& from, const Color& to, float t) {
 
 BezierPath Interpolator<BezierPath>::Lerp(const BezierPath& from, const BezierPath& to,
                                           float t) {
-    assert(from.vertices.size() == to.vertices.size() &&
-           "BezierPath interpolation requires matching vertex counts");
-    if (from.vertices.size() != to.vertices.size()) {
+    assert(from.closed == to.closed &&
+           "BezierPath interpolation requires matching closed flags");
+    if (from.closed != to.closed) {
         return from;
+    }
+    if (from.vertices.size() != to.vertices.size()) {
+        // Auto vertex matching: resample the shorter path along its edges.
+        const size_t targetCount = std::max(from.vertices.size(), to.vertices.size());
+        return Lerp(ResamplePath(from, targetCount), ResamplePath(to, targetCount), t);
     }
     BezierPath result;
     result.closed = from.closed;

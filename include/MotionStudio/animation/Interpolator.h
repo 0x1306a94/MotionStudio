@@ -44,11 +44,12 @@ struct Interpolator<Color> {
 
 template <>
 struct Interpolator<BezierPath> {
-    // Per-vertex interpolation. Both paths must have the same vertex count
-    // (data contract): a mismatch triggers an assert in debug builds and
-    // degrades to returning from in release builds.
+    // Per-vertex interpolation. Mismatched vertex counts are handled by
+    // resampling the shorter path along its edges (ResamplePath, M2 auto
+    // vertex matching). Mismatched closed flags are a data-contract violation:
+    // assert in debug builds, degrade to returning from in release builds.
     // from: start path.
-    // to: end path (must have the same vertex count as from).
+    // to: end path.
     // t: blend factor in [0,1].
     static BezierPath Lerp(const BezierPath& from, const BezierPath& to, float t);
 };

@@ -39,12 +39,27 @@ TEST(InterpolatorTest, BezierPathLerpInterpolatesVertices) {
     EXPECT_EQ(result.vertices[1].point, (Vec2{15, 0}));
 }
 
-TEST(InterpolatorTest, BezierPathLerpAssertsOnVertexCountMismatch) {
-    BezierPath two = MakeTwoVertexPath(0);
-    BezierPath three = MakeTwoVertexPath(0);
-    three.vertices.push_back({{30, 0}, {}, {}});
-    // Vertex count mismatch is a contract violation: assert for fast failure in debug.
-    EXPECT_DEATH({ Interpolator<BezierPath>::Lerp(two, three, 0.5f); }, "vertex counts");
+TEST(InterpolatorTest, BezierPathLerpAutoMatchesVertexCounts) {
+    // from: 2 vertices over [0,10]; to: 3 vertices over [0,20].
+    BezierPath from = MakeTwoVertexPath(0);
+    BezierPath to = MakeTwoVertexPath(0);
+    to.vertices.push_back({{20, 0}, {}, {}});
+
+    // from gets resampled to 3 vertices ((0,0),(5,0),(10,0)) before blending.
+    BezierPath result = Interpolator<BezierPath>::Lerp(from, to, 0.5f);
+    ASSERT_EQ(result.vertices.size(), 3u);
+    EXPECT_TRUE(motion::ApproxEqual(result.vertices[0].point, Vec2{0, 0}));
+    EXPECT_TRUE(motion::ApproxEqual(result.vertices[1].point, Vec2{7.5f, 0}));
+    EXPECT_TRUE(motion::ApproxEqual(result.vertices[2].point, Vec2{15, 0}));
+}
+
+TEST(InterpolatorTest, BezierPathLerpAssertsOnClosedFlagMismatch) {
+    BezierPath open = MakeTwoVertexPath(0);
+    BezierPath closed = MakeTwoVertexPath(0);
+    closed.closed = true;
+    // Open/closed conversion is a data-contract violation: assert in debug.
+    EXPECT_DEATH({ Interpolator<BezierPath>::Lerp(open, closed, 0.5f); },
+                 "closed flags");
 }
 
 TEST(CubicBezierPointTest, MidpointOfStraightLine) {

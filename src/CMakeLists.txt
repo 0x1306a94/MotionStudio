@@ -9,6 +9,7 @@ add_library(core STATIC
     animation/Animatable.cpp
     animation/Easing.cpp
     animation/Interpolator.cpp
+    animation/PathResample.cpp
     model/Document.cpp
     model/EntityIndex.cpp
     model/ImageContent.cpp
