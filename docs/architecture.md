@@ -25,7 +25,9 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具，定�
 
 **核心原则**：Core 层不知道任何渲染后端的存在。它在指定时间对场景求值，输出扁平化的绘制命令（`DrawCommandList`），由适配器消费。这样同一份动画数据可以对接 Metal 实时预览、Lottie 导出、未来的 OpenGL/Vulkan 渲染器。
 
-## 模块划分（core/）
+## 模块划分
+
+模块即 `src/`、`include/MotionStudio/`、`tests/` 下的同名子目录（`core/` 存放版本等库级基础设施）。
 
 | 模块 | 职责 |
 |---|---|
@@ -52,18 +54,21 @@ common ← model ← animation ← undo
 ```
 motionstudio/
 ├── CMakeLists.txt                  # 顶层 CMake
-├── core/                           # 纯 C++ 静态库
-│   ├── CMakeLists.txt
-│   ├── include/motionstudio/       # 公共头文件（按模块分子目录）
-│   │   ├── common/                 # EntityId.h Time.h Math.h BezierPath.h
-│   │   ├── model/                  # Document.h Composition.h Layer.h Shape.h ...
-│   │   ├── animation/              # Animatable.h Keyframe.h Easing.h BezierEasing.h ...
-│   │   ├── undo/                   # Command.h UndoManager.h Commands.h
-│   │   ├── render/                 # RenderAdapter.h SceneEvaluator.h DrawCommand.h ...
-│   │   ├── export/                 # LottieExporter.h
-│   │   └── serialization/          # Serializer.h SchemaMigrator.h dto/
-│   ├── src/                        # 与 include/ 同构的实现文件
-│   └── tests/                      # GoogleTest 单元测试
+├── include/MotionStudio/           # 公共头文件（按模块分子目录）
+│   ├── core/                       # Version.h
+│   ├── common/                     # EntityId.h Time.h Math.h BezierPath.h
+│   ├── model/                      # Document.h Composition.h Layer.h Shape.h ...
+│   ├── animation/                  # Animatable.h Keyframe.h Easing.h BezierEasing.h ...
+│   ├── undo/                       # Command.h UndoManager.h Commands.h
+│   ├── render/                     # RenderAdapter.h SceneEvaluator.h DrawCommand.h ...
+│   ├── export/                     # LottieExporter.h
+│   └── serialization/              # Serializer.h SchemaMigrator.h dto/
+├── src/                            # 实现文件（与 include/ 同构，按模块分子目录）
+│   ├── CMakeLists.txt              # core 静态库（libmotionstudio_core.a）
+│   ├── core/ common/ model/ animation/ undo/ render/ export/ serialization/
+├── tests/                          # GoogleTest 单元测试（与 src/ 同构）
+│   ├── CMakeLists.txt              # core_tests + gtest_discover_tests
+│   └── core/ ...
 ├── bridge/                         # C++ ↔ Swift 桥接层（extern "C"）
 │   ├── include/motionstudio_bridge.h
 │   └── src/bridge.cpp
@@ -78,6 +83,7 @@ motionstudio/
 │       │   │                       # MetalRenderAdapter.swift
 │       │   └── Inspector/          # PropertyInspector.swift
 │       └── Resources/Shaders.metal
+├── third_party/                    # depctl 按 DEPS 同步，不入库
 └── docs/                           # 本目录
 ```
 

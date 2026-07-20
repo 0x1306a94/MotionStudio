@@ -51,6 +51,7 @@
 /third_party
 /build
 /build*
+/.ccache
 
 .DS_Store
 
