@@ -136,19 +136,28 @@ void ms_free_string(const char* str);
 
 ## 第三方依赖
 
-| 库 | 用途 | 引入方式 |
+统一由 [depctl](https://github.com/0x1306a94/depctl) 管理：在根目录 `DEPS` 文件中声明依赖（仓库 URL + 固定 commit），depctl 浅克隆同步到 `third_party/`（不入库），CMake 以 `add_subdirectory` 消费。
+
+| 库 | 用途 | DEPS 声明 |
 |---|---|---|
-| [nlohmann/json](https://github.com/nlohmann/json) | JSON 序列化/解析 | header-only，随仓库引入 |
-| [GoogleTest](https://github.com/google/googletest) | Core 层单元测试 | CMake FetchContent |
+| [GoogleTest](https://github.com/google/googletest) | Core 层单元测试 | `third_party/googletest`（已声明） |
+| [nlohmann/json](https://github.com/nlohmann/json) | JSON 序列化/解析 | M1 引入序列化时加入 DEPS（header-only） |
 
 Core 层除此之外零第三方依赖。
 
+同步命令：
+
+```bash
+./sync_deps.sh   # 安装构建工具（cmake/ninja 等）与 depctl，再按 DEPS 同步 third_party/
+```
+
 ## 构建
 
+- 先执行 `./sync_deps.sh` 同步 `third_party/` 依赖
 - CMake，`CXX_STANDARD 17`，`POSITION_INDEPENDENT_CODE ON`
 - 产物：`libmotionstudio_core.a`（静态库）+ bridge 库
 - macOS 应用：Xcode 工程链接上述两个库（或 SwiftPM C target 封装）
-- CI：GitHub Actions，macOS runner 上编译 + 运行 ctest
+- CI：GitHub Actions，macOS runner 上 `sync_deps.sh` → 编译 → ctest
 
 ## 相关文档
 

@@ -2,11 +2,13 @@
 
 Motion Studio 分 5 个里程碑推进，总计约 18 周。每个里程碑有明确交付物与可验证的验收标准。设计文档：[architecture.md](architecture.md)、[data-model.md](data-model.md)、[timeline-evaluation.md](timeline-evaluation.md)、[rendering.md](rendering.md)。
 
+**测试原则**：M0–M2 是纯 C++ 核心层，不依赖 UI 与渲染后端，全部功能正确性由 GoogleTest 单元测试（CTest 驱动）验证；性能基准（如 M2 单帧求值 < 2ms）作为独立 benchmark 用例，CI 仅记录不阻断。UI 与渲染的验证从 M3 开始。
+
 ## 里程碑总览
 
 | 里程碑 | 周期 | 主题 | 核心验收 |
 |---|---|---|---|
-| M0 | 2 周 | 构建体系 | `cmake --build && ctest` 通过，Swift 能调通桥接 hello world |
+| M0 | 2 周 | 构建体系 | `cmake --build && ctest` 通过 |
 | M1 | 4 周 | 数据模型 + Undo | 1000 次随机操作 + undo/redo 无崩溃无泄漏（ASan） |
 | M2 | 3 周 | Timeline 求值 | 缓动曲线与 CSS 参考误差 < 1e-5；100 图层单帧求值 < 2ms |
 | M3 | 6 周 | macOS UI + Metal | 关键帧动画 60fps 播放；拖拽编辑 + undo/redo 正确 |
@@ -17,18 +19,17 @@ Motion Studio 分 5 个里程碑推进，总计约 18 周。每个里程碑有�
 ## M0 — 构建体系（2 周）
 
 **交付物**
-- 顶层 CMake：`core` 静态库（C++17）+ `bridge` 库 + `tests`
-- GoogleTest 测试框架接入（FetchContent + `gtest_discover_tests`），一个占位测试通过
-- GitHub Actions CI：macOS runner 编译 + ctest
-- Xcode 工程骨架：链接 core + bridge，Swift 端通过 modulemap 调用 `ms_version()` 成功
+- 顶层 CMake：`core` 静态库（C++17）+ `tests`
+- 依赖同步流程：[depctl](https://github.com/0x1306a94/depctl) + DEPS 声明（GoogleTest 同步至 `third_party/googletest`），CMake `add_subdirectory` + `gtest_discover_tests` 接入，一个占位测试通过
+- GitHub Actions CI：macOS runner 执行 `sync_deps.sh` → 编译 → ctest
 
 **验收**
 ```bash
-cmake -B build && cmake --build build && cd build && ctest   # 全绿
-# Xcode 运行 macOS app，界面打印 core 库版本号
+./sync_deps.sh
+cmake -B build -G Ninja && cmake --build build && cd build && ctest   # 全绿
 ```
 
-**关键点**：`POSITION_INDEPENDENT_CODE ON`；nlohmann/json 随仓库引入；CI 缓存编译产物。
+**关键点**：`POSITION_INDEPENDENT_CODE ON`；第三方依赖统一走 DEPS 声明（不入库）；CI 缓存编译产物。
 
 ---
 
@@ -76,7 +77,7 @@ cmake -B build && cmake --build build && cd build && ctest   # 全绿
 - 时间轴 UI：刻度/播放头、关键帧菱形显示、拖拽移动、缓动预设切换
 - 属性检查器：Transform 五属性编辑、添加/删除关键帧
 - 文件打开/保存（.msjson）+ ⌘Z / ⇧⌘Z 绑定 UndoManager
-- 桥接层扩充到覆盖 UI 所需全部函数（按模块分头文件）
+- 桥接层（extern "C"）从零搭建并覆盖 UI 所需全部函数（按模块分头文件）；Xcode 工程链接 core + bridge，Swift 经 modulemap 调用
 
 **验收**
 - 端到端：创建矩形 → position 加两个关键帧（EaseOut）→ 空格播放 → 矩形沿缓动运动，60fps
