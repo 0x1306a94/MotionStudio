@@ -2,20 +2,23 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 MoveKeyframeCommand::MoveKeyframeCommand(PropertyPath property, FrameTime oldTime,
                                          FrameTime newTime)
-    : property_(std::move(property)), oldTime_(oldTime), newTime_(newTime) {}
+    : property_(std::move(property))
+    , oldTime_(oldTime)
+    , newTime_(newTime) {
+}
 
-void MoveKeyframeCommand::execute(Document& document) {
+void MoveKeyframeCommand::execute(Document &document) {
     if (oldTime_ == newTime_) {
         return;
     }
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -31,11 +34,11 @@ void MoveKeyframeCommand::execute(Document& document) {
     AddKeyframeAny(target, *moved);
 }
 
-void MoveKeyframeCommand::undo(Document& document) {
+void MoveKeyframeCommand::undo(Document &document) {
     if (!captured_) {
         return;
     }
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -49,11 +52,11 @@ void MoveKeyframeCommand::undo(Document& document) {
     }
 }
 
-bool MoveKeyframeCommand::mergeWith(const Command& other) {
+bool MoveKeyframeCommand::mergeWith(const Command &other) {
     if (other.kind() != CommandKind::MoveKeyframe) {
         return false;
     }
-    const auto& typed = static_cast<const MoveKeyframeCommand&>(other);
+    const auto &typed = static_cast<const MoveKeyframeCommand &>(other);
     if (typed.property_ != property_) {
         return false;
     }

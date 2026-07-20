@@ -13,19 +13,19 @@ namespace motion {
 // Changes a keyframe's easing curve. No-op when the target keyframe does not
 // exist.
 class SetEasingCommand : public Command {
-public:
+  public:
     // property: path to the animatable property.
     // time: frame time of the keyframe to modify.
     // easing: the new easing curve.
     SetEasingCommand(PropertyPath property, FrameTime time, Easing easing);
 
-    void execute(Document& document) override;
-    void undo(Document& document) override;
-    bool mergeWith(const Command& other) override;
+    void execute(Document &document) override;
+    void undo(Document &document) override;
+    bool mergeWith(const Command &other) override;
     CommandKind kind() const override;
     std::string describe() const override;
 
-private:
+  private:
     PropertyPath property_;
     FrameTime time_;
     Easing easing_;

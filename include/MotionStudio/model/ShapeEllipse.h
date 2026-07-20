@@ -8,7 +8,7 @@ namespace motion {
 
 // Parametric ellipse with animatable position and size.
 class ShapeEllipse : public ShapeElement {
-public:
+  public:
     ShapeEllipse();
     ~ShapeEllipse() override;
 

@@ -7,7 +7,7 @@ namespace motion {
 
 // Layer content that references another composition (pre-composition).
 class PrecompContent : public LayerContent {
-public:
+  public:
     PrecompContent();
     ~PrecompContent() override;
 

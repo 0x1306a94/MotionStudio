@@ -3,6 +3,11 @@
 namespace motion {
 
 // Compositing blend mode for a layer.
-enum class BlendMode { Normal, Multiply, Screen, Add };
+enum class BlendMode {
+    Normal,
+    Multiply,
+    Screen,
+    Add
+};
 
 }  // namespace motion

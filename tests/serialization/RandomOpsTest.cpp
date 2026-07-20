@@ -27,8 +27,8 @@ using motion::AddLayerCommand;
 using motion::Color;
 using motion::Command;
 using motion::Composition;
-using motion::DocumentFingerprint;
 using motion::Document;
+using motion::DocumentFingerprint;
 using motion::Easing;
 using motion::EntityId;
 using motion::FrameTime;
@@ -51,10 +51,10 @@ using motion::Vec2;
 
 namespace {
 
-const char* kTransformProperties[] = {"transform.position", "transform.scale",
+const char *kTransformProperties[] = {"transform.position", "transform.scale",
                                       "transform.anchorPoint"};
 
-Document MakeRandomDocument(std::mt19937_64& rng) {
+Document MakeRandomDocument(std::mt19937_64 &rng) {
     Document document;
     document.name = "fuzz";
     const int compositionCount = 1 + int(rng() % 2);
@@ -64,7 +64,7 @@ Document MakeRandomDocument(std::mt19937_64& rng) {
         const int layerCount = int(rng() % 4);
         for (int j = 0; j < layerCount; ++j) {
             auto layer = std::make_unique<Layer>(LayerType::Shape);
-            auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
+            auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
             auto fill = std::make_unique<ShapeFill>();
             shapeContent->elements.push_back(std::move(fill));
             composition->layers.push_back(std::move(layer));
@@ -74,44 +74,53 @@ Document MakeRandomDocument(std::mt19937_64& rng) {
     return document;
 }
 
-std::vector<Layer*> CollectLayers(Document& document) {
-    std::vector<Layer*> layers;
-    for (auto& composition : document.compositions) {
-        for (auto& layer : composition->layers) {
+std::vector<Layer *> CollectLayers(Document &document) {
+    std::vector<Layer *> layers;
+    for (auto &composition : document.compositions) {
+        for (auto &layer : composition->layers) {
             layers.push_back(layer.get());
         }
     }
     return layers;
 }
 
-float RandomFloat(std::mt19937_64& rng) { return float(rng() % 1000) - 500.0f; }
+float RandomFloat(std::mt19937_64 &rng) {
+    return float(rng() % 1000) - 500.0f;
+}
 
-Vec2 RandomVec2(std::mt19937_64& rng) { return {RandomFloat(rng), RandomFloat(rng)}; }
+Vec2 RandomVec2(std::mt19937_64 &rng) {
+    return {RandomFloat(rng), RandomFloat(rng)};
+}
 
 // Generate a random command (target may not exist — command must skip safely).
-std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64& rng, Document& document) {
-    std::vector<Layer*> layers = CollectLayers(document);
+std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64 &rng, Document &document) {
+    std::vector<Layer *> layers = CollectLayers(document);
     EntityId compositionId =
         document.compositions.empty() ? EntityId{rng() % 100}
                                       : document.compositions[rng() %
-                                                              document.compositions.size()]->id;
+                                                              document.compositions.size()]
+                                            ->id;
     EntityId layerId = layers.empty() ? EntityId{rng() % 100}
                                       : layers[rng() % layers.size()]->id;
     PropertyPath property{layerId, kTransformProperties[rng() % 3]};
     const FrameTime time = FrameTime(rng() % 100);
 
     switch (rng() % 7) {
-        case 0:
+        case 0: {
             return std::make_unique<AddLayerCommand>(
                 compositionId, std::make_unique<Layer>(LayerType::Null));
-        case 1:
+        }
+        case 1: {
             return std::make_unique<RemoveLayerCommand>(compositionId, layerId);
-        case 2:
+        }
+        case 2: {
             return std::make_unique<MoveLayerCommand>(compositionId, int(rng() % 6),
                                                       int(rng() % 6));
-        case 3:
+        }
+        case 3: {
             return std::make_unique<SetStaticValueCommand>(
                 property, PropertyValue{RandomVec2(rng)});
+        }
         case 4: {
             Keyframe<Vec2> keyframe;
             keyframe.time = time;
@@ -120,12 +129,13 @@ std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64& rng, Document& docum
             return std::make_unique<AddKeyframeCommand>(
                 property, motion::KeyframeData{keyframe});
         }
-        case 5:
+        case 5: {
             return rng() % 2
-                       ? std::unique_ptr<Command>(
-                             std::make_unique<RemoveKeyframeCommand>(property, time))
-                       : std::make_unique<MoveKeyframeCommand>(
-                             property, time, FrameTime(rng() % 100));
+                ? std::unique_ptr<Command>(
+                      std::make_unique<RemoveKeyframeCommand>(property, time))
+                : std::make_unique<MoveKeyframeCommand>(
+                      property, time, FrameTime(rng() % 100));
+        }
         default: {
             const Easing easings[] = {Easing::Linear(), Easing::EaseIn(),
                                       Easing::EaseOut(), Easing::Hold()};

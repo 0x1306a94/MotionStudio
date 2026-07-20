@@ -7,7 +7,11 @@ namespace motion {
 // P2=(outX,outY), P3=(1,1), matching the CSS cubic-bezier(x1, y1, x2, y2)
 // convention where (inX,inY)=(x1,y1) and (outX,outY)=(x2,y2).
 struct Easing {
-    enum class Type { Linear, Bezier, Hold };
+    enum class Type {
+        Linear,
+        Bezier,
+        Hold
+    };
 
     Type type = Type::Linear;
     float inX = 0;
@@ -34,15 +38,15 @@ struct Easing {
     // Returns a standard ease-out curve: Bezier(0, 0, 0.58, 1).
     static Easing EaseOut();
 
-    bool operator==(const Easing& other) const;
-    bool operator!=(const Easing& other) const;
+    bool operator==(const Easing &other) const;
+    bool operator!=(const Easing &other) const;
 };
 
 // Maps a time progress in [0,1] to a value progress in [0,1].
 // For Bezier easings the y component may exceed [0,1] to produce overshoot effects.
 // easing: the easing curve to evaluate.
 // progress: normalized time progress in [0,1].
-float ApplyEasing(const Easing& easing, float progress);
+float ApplyEasing(const Easing &easing, float progress);
 
 // Solves the cubic bezier for y given x, using Newton's method with bisection
 // fallback (same strategy as CSS animation engines).

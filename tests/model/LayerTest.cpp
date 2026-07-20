@@ -17,9 +17,9 @@ namespace {
 
 struct TwoLayerScene {
     Document document;
-    Composition* composition;
-    Layer* parentLayer;
-    Layer* childLayer;
+    Composition *composition;
+    Layer *parentLayer;
+    Layer *childLayer;
 
     TwoLayerScene() {
         auto compositionPtr = std::make_unique<Composition>();
@@ -45,7 +45,7 @@ TEST(SetParentTest, RejectsSelfCycle) {
 
 TEST(SetParentTest, RejectsIndirectCycle) {
     TwoLayerScene scene;
-    Layer* grandchild =
+    Layer *grandchild =
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
     ASSERT_TRUE(scene.childLayer->setParent(scene.parentLayer->id, scene.document));
     ASSERT_TRUE(grandchild->setParent(scene.childLayer->id, scene.document));
@@ -69,9 +69,9 @@ TEST(SetParentTest, ClearingParentAlwaysSucceeds) {
 
 TEST(LayerTransformTest, LocalComposesTranslateRotateScaleAnchor) {
     Document document;
-    Composition* composition =
+    Composition *composition =
         document.addComposition(std::make_unique<Composition>());
-    Layer* layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
 
     layer->transform.position.setStaticValue({10, 20});
     layer->transform.scale.setStaticValue({2, 2});

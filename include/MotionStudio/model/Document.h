@@ -14,13 +14,13 @@ namespace motion {
 // Top-level document containing compositions, assets, and the entity index.
 // Structural mutations automatically keep the entity index up to date.
 class Document {
-public:
+  public:
     // ---- Structural mutations (entity index refreshed automatically) ----
 
     // Adds a composition. Returns the inserted raw pointer (ownership stays in
     // Document) or nullptr if composition is null.
     // composition: the composition to add.
-    Composition* addComposition(std::unique_ptr<Composition> composition);
+    Composition *addComposition(std::unique_ptr<Composition> composition);
     // Removes and returns a composition (including all its layers).
     // Returns nullptr if not found.
     // id: id of the composition to remove.
@@ -31,7 +31,7 @@ public:
     // compositionId: host composition of the layer.
     // layer: the layer to add.
     // index: insertion position (-1 to append).
-    Layer* addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index = -1);
+    Layer *addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index = -1);
     // Removes and returns a layer from a composition.
     // Returns nullptr if not found.
     // compositionId: host composition of the layer.
@@ -45,8 +45,8 @@ public:
 
     // ---- Queries ----
 
-    EntityIndex& entityIndex();
-    const EntityIndex& entityIndex() const;
+    EntityIndex &entityIndex();
+    const EntityIndex &entityIndex() const;
 
     // Walks the entire entity tree to rebuild the index. Call once after batch
     // construction (e.g. deserialization).
@@ -57,7 +57,7 @@ public:
     std::vector<std::unique_ptr<Composition>> compositions;
     std::vector<Asset> assets;  // document-level resources (images, fonts)
 
-private:
+  private:
     EntityIndex entityIndex_;
 };
 

@@ -12,7 +12,7 @@ namespace motion {
 // Non-template base returned by PropertyPath resolution; consumers downcast
 // to the concrete Animatable<T> via valueType() (dynamic_cast is banned).
 class AnimatableBase {
-public:
+  public:
     virtual ~AnimatableBase() = default;
 
     // Value type of the concrete Animatable<T>. Per-type definitions live in
@@ -26,7 +26,7 @@ public:
 // new animatable types must be registered there.
 template <typename T>
 class Animatable : public AnimatableBase {
-public:
+  public:
     Animatable() = default;
 
     // Non-explicit: enables `Animatable<float> opacity{1};` style member init.
@@ -67,16 +67,16 @@ public:
     bool isAnimated() const;
 
     // Returns the current static value.
-    const T& staticValue() const;
+    const T &staticValue() const;
 
     // Sets the static value used when no keyframes are present.
     // value: new static value.
     void setStaticValue(T value);
 
     // Returns the keyframe list sorted by ascending time.
-    const std::vector<Keyframe<T>>& keyframes() const;
+    const std::vector<Keyframe<T>> &keyframes() const;
 
-private:
+  private:
     typename std::vector<Keyframe<T>>::iterator lowerBound(FrameTime time);
     typename std::vector<Keyframe<T>>::const_iterator upperBound(FrameTime time) const;
     typename std::vector<Keyframe<T>>::iterator find(FrameTime time);

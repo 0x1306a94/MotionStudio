@@ -12,17 +12,17 @@ namespace motion {
 
 // Removes a keyframe. execute() captures it and undo() puts it back.
 class RemoveKeyframeCommand : public Command {
-public:
+  public:
     // property: path to the animatable property.
     // time: frame time of the keyframe to remove.
     RemoveKeyframeCommand(PropertyPath property, FrameTime time);
 
-    void execute(Document& document) override;
-    void undo(Document& document) override;
+    void execute(Document &document) override;
+    void undo(Document &document) override;
     CommandKind kind() const override;
     std::string describe() const override;
 
-private:
+  private:
     PropertyPath property_;
     FrameTime time_;
     std::optional<KeyframeData> removed_;

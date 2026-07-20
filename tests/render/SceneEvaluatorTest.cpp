@@ -32,17 +32,17 @@ namespace {
 
 struct RectScene {
     Document document;
-    Composition* composition;
-    Layer* layer;
-    ShapeRect* rect = nullptr;
-    ShapeFill* fill = nullptr;
+    Composition *composition;
+    Layer *layer;
+    ShapeRect *rect = nullptr;
+    ShapeFill *fill = nullptr;
 
     RectScene() {
         composition = document.addComposition(std::make_unique<Composition>());
         composition->duration = 100;
         layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
         layer->outPoint = 100;
-        auto* content = static_cast<ShapeContent*>(layer->content.get());
+        auto *content = static_cast<ShapeContent *>(layer->content.get());
         auto rectElement = std::make_unique<ShapeRect>();
         rect = rectElement.get();
         rect->position.setStaticValue(Vec2{100, 50});
@@ -70,7 +70,7 @@ TEST(SceneEvaluatorTest, MissingCompositionFails) {
 
 TEST(SceneEvaluatorTest, EmptyCompositionProducesViewportAndBackground) {
     Document document;
-    Composition* composition = document.addComposition(std::make_unique<Composition>());
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
     composition->width = 640;
     composition->height = 480;
     composition->backgroundColor = Color{0.5f, 0.5f, 0.5f, 1};
@@ -88,11 +88,11 @@ TEST(SceneEvaluatorTest, RectFillProducesOneWorldSpaceItem) {
     Expected<SceneState> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
-    const auto& evaluated = result->layers[0];
+    const auto &evaluated = result->layers[0];
     EXPECT_EQ(evaluated.id, scene.layer->id);
     EXPECT_FLOAT_EQ(evaluated.opacity, 1.0f);
     ASSERT_EQ(evaluated.shapeItems.size(), 1u);
-    const auto& item = evaluated.shapeItems[0];
+    const auto &item = evaluated.shapeItems[0];
     EXPECT_FALSE(item.isStroke);
     EXPECT_EQ(item.paint.color, (Color{1, 0, 0, 1}));
     ASSERT_EQ(item.path.vertices.size(), 4u);
@@ -108,13 +108,13 @@ TEST(SceneEvaluatorTest, LayerTransformAppliesToPath) {
     scene.layer->transform.position.setStaticValue(Vec2{10, 20});
     Expected<SceneState> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto& item = result->layers[0].shapeItems[0];
+    const auto &item = result->layers[0].shapeItems[0];
     EXPECT_EQ(item.path.vertices[0].point, (Vec2{90, 60}));
 }
 
 TEST(SceneEvaluatorTest, ParentTransformChain) {
     RectScene scene;
-    Layer* parent =
+    Layer *parent =
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
     parent->outPoint = 100;
     parent->transform.position.setStaticValue(Vec2{100, 0});
@@ -123,13 +123,13 @@ TEST(SceneEvaluatorTest, ParentTransformChain) {
     Expected<SceneState> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);  // Null parent produces no items
-    const auto& item = result->layers[0].shapeItems[0];
+    const auto &item = result->layers[0].shapeItems[0];
     EXPECT_EQ(item.path.vertices[0].point, (Vec2{180, 40}));
 }
 
 TEST(SceneEvaluatorTest, OpacityInheritsFromParent) {
     RectScene scene;
-    Layer* parent =
+    Layer *parent =
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
     parent->outPoint = 100;
     parent->transform.opacity.setStaticValue(0.5f);
@@ -169,7 +169,7 @@ TEST(SceneEvaluatorTest, InvisibleLayerSkipped) {
 
 TEST(SceneEvaluatorTest, GroupTransformComposesIntoPath) {
     RectScene scene;
-    auto* content = static_cast<ShapeContent*>(scene.layer->content.get());
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
     content->elements.clear();
     auto group = std::make_unique<ShapeGroup>();
     group->transform.position.setStaticValue(Vec2{5, 5});
@@ -183,14 +183,14 @@ TEST(SceneEvaluatorTest, GroupTransformComposesIntoPath) {
 
     Expected<SceneState> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto& item = result->layers[0].shapeItems[0];
+    const auto &item = result->layers[0].shapeItems[0];
     EXPECT_EQ(item.path.vertices[0].point, (Vec2{0, 0}));
     EXPECT_EQ(item.path.vertices[2].point, (Vec2{10, 10}));
 }
 
 TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
     RectScene scene;
-    auto* content = static_cast<ShapeContent*>(scene.layer->content.get());
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
     auto stroke = std::make_unique<ShapeStroke>();
     stroke->width.setStaticValue(3.0f);
     stroke->cap = motion::LineCap::Round;
@@ -199,7 +199,7 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
     Expected<SceneState> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
-    const auto& strokeItem = result->layers[0].shapeItems[1];
+    const auto &strokeItem = result->layers[0].shapeItems[1];
     EXPECT_TRUE(strokeItem.isStroke);
     EXPECT_FLOAT_EQ(strokeItem.strokeWidth, 3.0f);
     EXPECT_EQ(strokeItem.cap, motion::LineCap::Round);
@@ -207,7 +207,7 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
 
 TEST(SceneEvaluatorTest, EllipseProducesFourVertexClosedPath) {
     RectScene scene;
-    auto* content = static_cast<ShapeContent*>(scene.layer->content.get());
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
     content->elements.clear();
     auto ellipse = std::make_unique<ShapeEllipse>();
     ellipse->position.setStaticValue(Vec2{0, 0});
@@ -217,7 +217,7 @@ TEST(SceneEvaluatorTest, EllipseProducesFourVertexClosedPath) {
 
     Expected<SceneState> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto& path = result->layers[0].shapeItems[0].path;
+    const auto &path = result->layers[0].shapeItems[0].path;
     ASSERT_EQ(path.vertices.size(), 4u);
     EXPECT_TRUE(path.closed);
     EXPECT_TRUE(motion::ApproxEqual(path.vertices[0].point, Vec2{10, 0}));
@@ -239,6 +239,6 @@ TEST(SceneEvaluatorTest, AnimatedTransformEvaluatedAtTime) {
 
     Expected<SceneState> mid = scene.Evaluate(5);
     ASSERT_TRUE(mid.hasValue());
-    const auto& item = mid->layers[0].shapeItems[0];
+    const auto &item = mid->layers[0].shapeItems[0];
     EXPECT_EQ(item.path.vertices[0].point, (Vec2{130, 40}));
 }

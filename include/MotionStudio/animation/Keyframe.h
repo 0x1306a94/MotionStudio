@@ -24,12 +24,14 @@ struct Keyframe {
     std::optional<Vec2> spatialInTangent;
     std::optional<Vec2> spatialOutTangent;
 
-    bool operator==(const Keyframe& other) const {
+    bool operator==(const Keyframe &other) const {
         return time == other.time && value == other.value && easing == other.easing &&
-               spatialInTangent == other.spatialInTangent &&
-               spatialOutTangent == other.spatialOutTangent;
+            spatialInTangent == other.spatialInTangent &&
+            spatialOutTangent == other.spatialOutTangent;
     }
-    bool operator!=(const Keyframe& other) const { return !(*this == other); }
+    bool operator!=(const Keyframe &other) const {
+        return !(*this == other);
+    }
 };
 
 }  // namespace motion

@@ -2,7 +2,9 @@
 
 namespace motion {
 
-LayerContent::LayerContent(LayerType type) : type_(type) {}
+LayerContent::LayerContent(LayerType type)
+    : type_(type) {
+}
 
 LayerContent::~LayerContent() = default;
 

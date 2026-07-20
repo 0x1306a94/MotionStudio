@@ -9,8 +9,8 @@ struct Color {
     float b = 0;
     float a = 1;
 
-    bool operator==(const Color& other) const;
-    bool operator!=(const Color& other) const;
+    bool operator==(const Color &other) const;
+    bool operator!=(const Color &other) const;
 };
 
 }  // namespace motion

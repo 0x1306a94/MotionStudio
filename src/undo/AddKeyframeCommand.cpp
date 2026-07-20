@@ -2,16 +2,18 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 AddKeyframeCommand::AddKeyframeCommand(PropertyPath property, KeyframeData keyframe)
-    : property_(std::move(property)), keyframe_(std::move(keyframe)) {}
+    : property_(std::move(property))
+    , keyframe_(std::move(keyframe)) {
+}
 
-void AddKeyframeCommand::execute(Document& document) {
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+void AddKeyframeCommand::execute(Document &document) {
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -22,11 +24,11 @@ void AddKeyframeCommand::execute(Document& document) {
     AddKeyframeAny(target, keyframe_);
 }
 
-void AddKeyframeCommand::undo(Document& document) {
+void AddKeyframeCommand::undo(Document &document) {
     if (!captured_) {
         return;
     }
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }

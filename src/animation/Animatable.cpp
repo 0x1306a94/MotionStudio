@@ -16,19 +16,21 @@ namespace {
 
 // Comparison functions for std::lower_bound / std::upper_bound (avoids lambdas).
 template <typename T>
-bool KeyframeBeforeTime(const Keyframe<T>& keyframe, FrameTime time) {
+bool KeyframeBeforeTime(const Keyframe<T> &keyframe, FrameTime time) {
     return keyframe.time < time;
 }
 
 template <typename T>
-bool TimeBeforeKeyframe(FrameTime time, const Keyframe<T>& keyframe) {
+bool TimeBeforeKeyframe(FrameTime time, const Keyframe<T> &keyframe) {
     return time < keyframe.time;
 }
 
 }  // namespace
 
 template <typename T>
-Animatable<T>::Animatable(T staticValue) : value_(std::move(staticValue)) {}
+Animatable<T>::Animatable(T staticValue)
+    : value_(std::move(staticValue)) {
+}
 
 template <typename T>
 void Animatable<T>::addKeyframe(Keyframe<T> keyframe) {
@@ -88,8 +90,8 @@ T Animatable<T>::evaluate(FrameTime time) const {
     }
 
     auto it = upperBound(time);
-    const Keyframe<T>& from = *(it - 1);
-    const Keyframe<T>& to = *it;
+    const Keyframe<T> &from = *(it - 1);
+    const Keyframe<T> &to = *it;
 
     const float progress = float(time - from.time) / float(to.time - from.time);
     const float easedProgress = ApplyEasing(from.easing, progress);
@@ -108,7 +110,7 @@ bool Animatable<T>::isAnimated() const {
 }
 
 template <typename T>
-const T& Animatable<T>::staticValue() const {
+const T &Animatable<T>::staticValue() const {
     return value_;
 }
 
@@ -118,7 +120,7 @@ void Animatable<T>::setStaticValue(T value) {
 }
 
 template <typename T>
-const std::vector<Keyframe<T>>& Animatable<T>::keyframes() const {
+const std::vector<Keyframe<T>> &Animatable<T>::keyframes() const {
     return keyframes_;
 }
 

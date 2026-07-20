@@ -10,7 +10,7 @@ namespace motion {
 
 // Layer content that holds an ordered list of shape elements.
 class ShapeContent : public LayerContent {
-public:
+  public:
     ShapeContent();
     ~ShapeContent() override;
 

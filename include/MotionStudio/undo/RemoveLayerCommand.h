@@ -13,17 +13,17 @@ namespace motion {
 // moves it back at the original index, restoring the whole subtree and
 // keyframes.
 class RemoveLayerCommand : public Command {
-public:
+  public:
     // compositionId: host composition of the layer.
     // layerId: id of the layer to remove.
     RemoveLayerCommand(EntityId compositionId, EntityId layerId);
 
-    void execute(Document& document) override;
-    void undo(Document& document) override;
+    void execute(Document &document) override;
+    void undo(Document &document) override;
     CommandKind kind() const override;
     std::string describe() const override;
 
-private:
+  private:
     EntityId compositionId_;
     EntityId layerId_;
     int index_ = -1;

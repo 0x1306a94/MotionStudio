@@ -2,16 +2,18 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 RemoveKeyframeCommand::RemoveKeyframeCommand(PropertyPath property, FrameTime time)
-    : property_(std::move(property)), time_(time) {}
+    : property_(std::move(property))
+    , time_(time) {
+}
 
-void RemoveKeyframeCommand::execute(Document& document) {
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+void RemoveKeyframeCommand::execute(Document &document) {
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -23,11 +25,11 @@ void RemoveKeyframeCommand::execute(Document& document) {
     }
 }
 
-void RemoveKeyframeCommand::undo(Document& document) {
+void RemoveKeyframeCommand::undo(Document &document) {
     if (!captured_ || !removed_) {
         return;
     }
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }

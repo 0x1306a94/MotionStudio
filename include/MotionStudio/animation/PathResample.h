@@ -13,6 +13,6 @@ namespace motion {
 // Returns the path unchanged when it has fewer than 2 vertices, already has
 // vertexCount vertices, vertexCount is less than 2, or the path is degenerate
 // (zero arc length).
-BezierPath ResamplePath(const BezierPath& path, size_t vertexCount);
+BezierPath ResamplePath(const BezierPath &path, size_t vertexCount);
 
 }  // namespace motion

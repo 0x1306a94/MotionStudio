@@ -2,7 +2,9 @@
 
 namespace motion {
 
-TextContent::TextContent() : LayerContent(LayerType::Text) {}
+TextContent::TextContent()
+    : LayerContent(LayerType::Text) {
+}
 
 TextContent::~TextContent() = default;
 

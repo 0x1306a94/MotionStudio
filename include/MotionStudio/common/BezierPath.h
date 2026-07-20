@@ -20,16 +20,16 @@ struct BezierPath {
         // Outgoing tangent offset (used when leaving towards the next vertex).
         Vec2 outTangent;
 
-        bool operator==(const Vertex& other) const;
-        bool operator!=(const Vertex& other) const;
+        bool operator==(const Vertex &other) const;
+        bool operator!=(const Vertex &other) const;
     };
 
     std::vector<Vertex> vertices;
     // True if the last vertex connects back to the first, forming a closed loop.
     bool closed = false;
 
-    bool operator==(const BezierPath& other) const;
-    bool operator!=(const BezierPath& other) const;
+    bool operator==(const BezierPath &other) const;
+    bool operator!=(const BezierPath &other) const;
 };
 
 }  // namespace motion

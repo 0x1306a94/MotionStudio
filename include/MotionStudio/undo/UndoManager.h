@@ -19,7 +19,7 @@ class Document;
 // drags) → otherwise pushes onto the undo stack and clears the redo stack →
 // drops the oldest entry when exceeding maxHistory.
 class UndoManager {
-public:
+  public:
     // maxHistory: maximum number of commands kept in the undo stack.
     // mergeWindow: time window within which consecutive commands may merge.
     explicit UndoManager(size_t maxHistory = 200,
@@ -29,9 +29,9 @@ public:
     // Executes a command and records it for undo.
     // document: the document to mutate.
     // command: takes ownership of the command.
-    void execute(Document& document, std::unique_ptr<Command> command);
-    void undo(Document& document);
-    void redo(Document& document);
+    void execute(Document &document, std::unique_ptr<Command> command);
+    void undo(Document &document);
+    void redo(Document &document);
 
     bool canUndo() const;
     bool canRedo() const;
@@ -43,7 +43,7 @@ public:
     // Clears all history (undo history is not persisted).
     void clear();
 
-private:
+  private:
     std::deque<std::unique_ptr<Command>> undoStack_;
     std::vector<std::unique_ptr<Command>> redoStack_;
     size_t maxHistory_;

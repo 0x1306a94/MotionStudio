@@ -17,13 +17,13 @@ using motion::ShapeGroup;
 
 namespace {
 
-Composition* AddComposition(Document& document, const char* name) {
+Composition *AddComposition(Document &document, const char *name) {
     auto composition = std::make_unique<Composition>();
     composition->name = name;
     return document.addComposition(std::move(composition));
 }
 
-Layer* AddShapeLayer(Document& document, motion::EntityId compositionId) {
+Layer *AddShapeLayer(Document &document, motion::EntityId compositionId) {
     return document.addLayer(compositionId, std::make_unique<Layer>(LayerType::Shape));
 }
 
@@ -31,7 +31,7 @@ Layer* AddShapeLayer(Document& document, motion::EntityId compositionId) {
 
 TEST(DocumentTest, AddCompositionRegistersInIndex) {
     Document document;
-    Composition* composition = AddComposition(document, "main");
+    Composition *composition = AddComposition(document, "main");
 
     ASSERT_NE(composition, nullptr);
     EXPECT_EQ(document.entityIndex().findComposition(composition->id), composition);
@@ -39,8 +39,8 @@ TEST(DocumentTest, AddCompositionRegistersInIndex) {
 
 TEST(DocumentTest, AddLayerRegistersInIndex) {
     Document document;
-    Composition* composition = AddComposition(document, "main");
-    Layer* layer = AddShapeLayer(document, composition->id);
+    Composition *composition = AddComposition(document, "main");
+    Layer *layer = AddShapeLayer(document, composition->id);
 
     EXPECT_EQ(document.entityIndex().findLayer(layer->id), layer);
     ASSERT_EQ(composition->layers.size(), 1u);
@@ -48,10 +48,10 @@ TEST(DocumentTest, AddLayerRegistersInIndex) {
 
 TEST(DocumentTest, AddLayerAtIndexInserts) {
     Document document;
-    Composition* composition = AddComposition(document, "main");
-    Layer* bottom = AddShapeLayer(document, composition->id);
-    Layer* top = AddShapeLayer(document, composition->id);
-    Layer* middle = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null), 1);
+    Composition *composition = AddComposition(document, "main");
+    Layer *bottom = AddShapeLayer(document, composition->id);
+    Layer *top = AddShapeLayer(document, composition->id);
+    Layer *middle = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null), 1);
 
     ASSERT_EQ(composition->layers.size(), 3u);
     EXPECT_EQ(composition->layers[0]->id, bottom->id);
@@ -61,16 +61,16 @@ TEST(DocumentTest, AddLayerAtIndexInserts) {
 
 TEST(DocumentTest, AddLayerToMissingCompositionReturnsNull) {
     Document document;
-    Layer* layer = document.addLayer(motion::EntityId{123}, std::make_unique<Layer>(LayerType::Shape));
+    Layer *layer = document.addLayer(motion::EntityId{123}, std::make_unique<Layer>(LayerType::Shape));
     EXPECT_EQ(layer, nullptr);
 }
 
 TEST(DocumentTest, TakeLayerUnregistersSubtree) {
     Document document;
-    Composition* composition = AddComposition(document, "main");
-    Layer* layer = AddShapeLayer(document, composition->id);
+    Composition *composition = AddComposition(document, "main");
+    Layer *layer = AddShapeLayer(document, composition->id);
 
-    auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
+    auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
     auto group = std::make_unique<ShapeGroup>();
     auto nestedFill = std::make_unique<ShapeFill>();
     const motion::EntityId nestedId = nestedFill->id;
@@ -89,8 +89,8 @@ TEST(DocumentTest, TakeLayerUnregistersSubtree) {
 
 TEST(DocumentTest, TakeCompositionRemovesWholeTree) {
     Document document;
-    Composition* composition = AddComposition(document, "main");
-    Layer* layer = AddShapeLayer(document, composition->id);
+    Composition *composition = AddComposition(document, "main");
+    Layer *layer = AddShapeLayer(document, composition->id);
 
     std::unique_ptr<Composition> taken = document.takeComposition(composition->id);
     ASSERT_NE(taken, nullptr);
@@ -101,10 +101,10 @@ TEST(DocumentTest, TakeCompositionRemovesWholeTree) {
 
 TEST(DocumentTest, MoveLayerReorders) {
     Document document;
-    Composition* composition = AddComposition(document, "main");
-    Layer* first = AddShapeLayer(document, composition->id);
-    Layer* second = AddShapeLayer(document, composition->id);
-    Layer* third = AddShapeLayer(document, composition->id);
+    Composition *composition = AddComposition(document, "main");
+    Layer *first = AddShapeLayer(document, composition->id);
+    Layer *second = AddShapeLayer(document, composition->id);
+    Layer *third = AddShapeLayer(document, composition->id);
 
     ASSERT_TRUE(document.moveLayer(composition->id, 0, 2));
     EXPECT_EQ(composition->layers[0]->id, second->id);

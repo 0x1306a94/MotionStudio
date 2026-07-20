@@ -2,7 +2,10 @@
 
 namespace motion {
 
-ShapeElement::ShapeElement(ShapeType type) : id(EntityId::Generate()), type_(type) {}
+ShapeElement::ShapeElement(ShapeType type)
+    : id(EntityId::Generate())
+    , type_(type) {
+}
 
 ShapeElement::~ShapeElement() = default;
 

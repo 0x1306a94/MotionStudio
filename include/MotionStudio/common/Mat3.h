@@ -9,8 +9,8 @@ namespace motion {
 //   local = T(position) * R(rotation) * S(scale) * T(-anchor),
 //   world = parentWorld * local.
 struct Mat3 {
-    float values[9] = {1, 0, 0,   //
-                       0, 1, 0,   //
+    float values[9] = {1, 0, 0,  //
+                       0, 1, 0,  //
                        0, 0, 1};
 
     // Returns the 3x3 identity matrix.
@@ -30,7 +30,7 @@ struct Mat3 {
 
     // Returns the matrix product (this * other).
     // other: right-hand operand.
-    Mat3 operator*(const Mat3& other) const;
+    Mat3 operator*(const Mat3 &other) const;
 
     // Transforms a point by this matrix: returns M * p.
     // point: the point to transform.
@@ -41,8 +41,8 @@ struct Mat3 {
     // vector: the direction vector to transform.
     Vec2 transformVector(Vec2 vector) const;
 
-    bool operator==(const Mat3& other) const;
-    bool operator!=(const Mat3& other) const;
+    bool operator==(const Mat3 &other) const;
+    bool operator!=(const Mat3 &other) const;
 };
 
 }  // namespace motion

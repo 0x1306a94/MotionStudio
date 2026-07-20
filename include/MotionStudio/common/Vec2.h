@@ -9,11 +9,11 @@ struct Vec2 {
 
     // Returns the component-wise sum.
     // other: vector to add.
-    Vec2 operator+(const Vec2& other) const;
+    Vec2 operator+(const Vec2 &other) const;
 
     // Returns the component-wise difference.
     // other: vector to subtract.
-    Vec2 operator-(const Vec2& other) const;
+    Vec2 operator-(const Vec2 &other) const;
 
     // Returns the vector scaled by scalar.
     // scalar: uniform scale factor.
@@ -22,8 +22,8 @@ struct Vec2 {
     // Returns the negated vector.
     Vec2 operator-() const;
 
-    bool operator==(const Vec2& other) const;
-    bool operator!=(const Vec2& other) const;
+    bool operator==(const Vec2 &other) const;
+    bool operator!=(const Vec2 &other) const;
 };
 
 // Returns true if left and right are within epsilon of each other.

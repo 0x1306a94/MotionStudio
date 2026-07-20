@@ -7,7 +7,7 @@ namespace motion {
 
 // Layer content that references a document-level image asset.
 class ImageContent : public LayerContent {
-public:
+  public:
     ImageContent();
     ~ImageContent() override;
 

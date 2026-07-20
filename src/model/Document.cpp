@@ -7,11 +7,11 @@ namespace motion {
 
 namespace {
 
-void RegisterShapeTree(EntityIndex& index, ShapeElement* element) {
+void RegisterShapeTree(EntityIndex &index, ShapeElement *element) {
     index.registerShape(element);
     if (element->type() == ShapeType::Group) {
-        auto* group = static_cast<ShapeGroup*>(element);
-        for (auto& child : group->elements) {
+        auto *group = static_cast<ShapeGroup *>(element);
+        for (auto &child : group->elements) {
             RegisterShapeTree(index, child.get());
         }
     }
@@ -21,13 +21,13 @@ void RegisterShapeTree(EntityIndex& index, ShapeElement* element) {
 
 void Document::refreshEntityIndex() {
     entityIndex_.clear();
-    for (auto& composition : compositions) {
+    for (auto &composition : compositions) {
         entityIndex_.registerComposition(composition.get());
-        for (auto& layer : composition->layers) {
+        for (auto &layer : composition->layers) {
             entityIndex_.registerLayer(layer.get());
             if (layer->content->type() == LayerType::Shape) {
-                auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
-                for (auto& element : shapeContent->elements) {
+                auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
+                for (auto &element : shapeContent->elements) {
                     RegisterShapeTree(entityIndex_, element.get());
                 }
             }
@@ -35,7 +35,7 @@ void Document::refreshEntityIndex() {
     }
 }
 
-Composition* Document::addComposition(std::unique_ptr<Composition> composition) {
+Composition *Document::addComposition(std::unique_ptr<Composition> composition) {
     if (!composition) {
         return nullptr;
     }
@@ -57,16 +57,16 @@ std::unique_ptr<Composition> Document::takeComposition(EntityId id) {
     return nullptr;
 }
 
-Layer* Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index) {
+Layer *Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index) {
     if (!layer) {
         return nullptr;
     }
-    Composition* composition = entityIndex_.findComposition(compositionId);
+    Composition *composition = entityIndex_.findComposition(compositionId);
     if (!composition) {
         return nullptr;
     }
 
-    Layer* raw = layer.get();
+    Layer *raw = layer.get();
     const int count = int(composition->layers.size());
     if (index < 0 || index >= count) {
         composition->layers.push_back(std::move(layer));
@@ -78,12 +78,12 @@ Layer* Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, 
 }
 
 std::unique_ptr<Layer> Document::takeLayer(EntityId compositionId, EntityId layerId) {
-    Composition* composition = entityIndex_.findComposition(compositionId);
+    Composition *composition = entityIndex_.findComposition(compositionId);
     if (!composition) {
         return nullptr;
     }
 
-    auto& layers = composition->layers;
+    auto &layers = composition->layers;
     for (size_t i = 0; i < layers.size(); ++i) {
         if (layers[i]->id != layerId) {
             continue;
@@ -97,12 +97,12 @@ std::unique_ptr<Layer> Document::takeLayer(EntityId compositionId, EntityId laye
 }
 
 bool Document::moveLayer(EntityId compositionId, int fromIndex, int toIndex) {
-    Composition* composition = entityIndex_.findComposition(compositionId);
+    Composition *composition = entityIndex_.findComposition(compositionId);
     if (!composition) {
         return false;
     }
 
-    auto& layers = composition->layers;
+    auto &layers = composition->layers;
     const int count = int(layers.size());
     if (fromIndex < 0 || fromIndex >= count || toIndex < 0 || toIndex >= count) {
         return false;
@@ -113,11 +113,11 @@ bool Document::moveLayer(EntityId compositionId, int fromIndex, int toIndex) {
     return true;
 }
 
-EntityIndex& Document::entityIndex() {
+EntityIndex &Document::entityIndex() {
     return entityIndex_;
 }
 
-const EntityIndex& Document::entityIndex() const {
+const EntityIndex &Document::entityIndex() const {
     return entityIndex_;
 }
 

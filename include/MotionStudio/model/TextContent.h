@@ -9,7 +9,7 @@ namespace motion {
 
 // Layer content for editable text with animatable string and size.
 class TextContent : public LayerContent {
-public:
+  public:
     TextContent();
     ~TextContent() override;
 

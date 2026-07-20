@@ -2,6 +2,8 @@
 
 namespace motion {
 
-const char* Version() { return "0.0.0"; }
+const char *Version() {
+    return "0.0.0";
+}
 
 }  // namespace motion

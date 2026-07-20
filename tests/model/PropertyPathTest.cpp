@@ -53,16 +53,16 @@ namespace {
 
 struct ShapeScene {
     Document document;
-    Composition* composition;
-    Layer* layer;
-    ShapeFill* fill = nullptr;
-    ShapeGroup* group = nullptr;
-    ShapeStroke* nestedStroke = nullptr;
+    Composition *composition;
+    Layer *layer;
+    ShapeFill *fill = nullptr;
+    ShapeGroup *group = nullptr;
+    ShapeStroke *nestedStroke = nullptr;
 
     ShapeScene() {
         composition = document.addComposition(std::make_unique<Composition>());
         layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
-        auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
+        auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
 
         auto fillElement = std::make_unique<ShapeFill>();
         fill = fillElement.get();
@@ -83,49 +83,49 @@ struct ShapeScene {
 
 TEST(ResolveAnimatableTest, ResolvesTransformProperty) {
     ShapeScene scene;
-    AnimatableBase* resolved =
+    AnimatableBase *resolved =
         ResolveAnimatable(scene.document, {scene.layer->id, "transform.position"});
     EXPECT_EQ(resolved,
-              static_cast<AnimatableBase*>(&scene.layer->transform.position));
+              static_cast<AnimatableBase *>(&scene.layer->transform.position));
 }
 
 TEST(ResolveAnimatableTest, ResolvesShapeById) {
     ShapeScene scene;
-    AnimatableBase* resolved = ResolveAnimatable(scene.document, {scene.fill->id, "color"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.fill->color));
+    AnimatableBase *resolved = ResolveAnimatable(scene.document, {scene.fill->id, "color"});
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.fill->color));
 }
 
 TEST(ResolveAnimatableTest, ResolvesLayerElementsPath) {
     ShapeScene scene;
-    AnimatableBase* resolved =
+    AnimatableBase *resolved =
         ResolveAnimatable(scene.document, {scene.layer->id, "elements[0].color"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.fill->color));
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.fill->color));
 }
 
 TEST(ResolveAnimatableTest, ResolvesNestedGroupPath) {
     ShapeScene scene;
-    AnimatableBase* resolved = ResolveAnimatable(
+    AnimatableBase *resolved = ResolveAnimatable(
         scene.document, {scene.layer->id, "elements[1].elements[0].width"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.nestedStroke->width));
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.nestedStroke->width));
 }
 
 TEST(ResolveAnimatableTest, ResolvesGroupTransform) {
     ShapeScene scene;
-    AnimatableBase* resolved = ResolveAnimatable(
+    AnimatableBase *resolved = ResolveAnimatable(
         scene.document, {scene.layer->id, "elements[1].transform.opacity"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.group->transform.opacity));
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.group->transform.opacity));
 }
 
 TEST(ResolveAnimatableTest, ResolvesTextContent) {
     Document document;
-    Composition* composition = document.addComposition(std::make_unique<Composition>());
-    Layer* textLayer =
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *textLayer =
         document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
-    auto* textContent = static_cast<motion::TextContent*>(textLayer->content.get());
+    auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
 
-    AnimatableBase* resolved =
+    AnimatableBase *resolved =
         ResolveAnimatable(document, {textLayer->id, "content.fontSize"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&textContent->fontSize));
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&textContent->fontSize));
 }
 
 TEST(ResolveAnimatableTest, ReturnsNullForMissingOrInvalid) {

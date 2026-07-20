@@ -7,9 +7,11 @@
 namespace motion {
 
 UndoManager::UndoManager(size_t maxHistory, std::chrono::milliseconds mergeWindow)
-    : maxHistory_(maxHistory), mergeWindow_(mergeWindow) {}
+    : maxHistory_(maxHistory)
+    , mergeWindow_(mergeWindow) {
+}
 
-void UndoManager::execute(Document& document, std::unique_ptr<Command> command) {
+void UndoManager::execute(Document &document, std::unique_ptr<Command> command) {
     command->execute(document);
 
     const auto now = std::chrono::steady_clock::now();
@@ -30,7 +32,7 @@ void UndoManager::execute(Document& document, std::unique_ptr<Command> command) 
     lastExecuteTime_ = now;
 }
 
-void UndoManager::undo(Document& document) {
+void UndoManager::undo(Document &document) {
     if (undoStack_.empty()) {
         return;
     }
@@ -41,7 +43,7 @@ void UndoManager::undo(Document& document) {
     redoStack_.push_back(std::move(command));
 }
 
-void UndoManager::redo(Document& document) {
+void UndoManager::redo(Document &document) {
     if (redoStack_.empty()) {
         return;
     }
@@ -68,7 +70,9 @@ std::string UndoManager::redoDescription() const {
     return redoStack_.empty() ? std::string{} : redoStack_.back()->describe();
 }
 
-void UndoManager::endMergeGroup() { mergeWindowOpen_ = false; }
+void UndoManager::endMergeGroup() {
+    mergeWindowOpen_ = false;
+}
 
 void UndoManager::clear() {
     undoStack_.clear();

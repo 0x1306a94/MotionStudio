@@ -9,7 +9,7 @@ namespace motion {
 // ShapeStroke, ShapeGroup, ShapeRect, ShapeEllipse, ShapeTrimPath.
 // Elements are rendered in the order they appear in their parent list.
 class ShapeElement {
-public:
+  public:
     // type: which shape element variant this instance represents.
     explicit ShapeElement(ShapeType type);
     virtual ~ShapeElement();
@@ -19,7 +19,7 @@ public:
 
     EntityId id;
 
-private:
+  private:
     ShapeType type_;
 };
 

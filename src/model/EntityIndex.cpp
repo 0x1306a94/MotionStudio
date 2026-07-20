@@ -6,30 +6,30 @@
 
 namespace motion {
 
-Layer* EntityIndex::findLayer(EntityId id) const {
+Layer *EntityIndex::findLayer(EntityId id) const {
     auto it = layers_.find(id);
     return it == layers_.end() ? nullptr : it->second;
 }
 
-Composition* EntityIndex::findComposition(EntityId id) const {
+Composition *EntityIndex::findComposition(EntityId id) const {
     auto it = compositions_.find(id);
     return it == compositions_.end() ? nullptr : it->second;
 }
 
-ShapeElement* EntityIndex::findShape(EntityId id) const {
+ShapeElement *EntityIndex::findShape(EntityId id) const {
     auto it = shapes_.find(id);
     return it == shapes_.end() ? nullptr : it->second;
 }
 
-void EntityIndex::registerLayer(Layer* layer) {
+void EntityIndex::registerLayer(Layer *layer) {
     layers_[layer->id] = layer;
 }
 
-void EntityIndex::registerComposition(Composition* composition) {
+void EntityIndex::registerComposition(Composition *composition) {
     compositions_[composition->id] = composition;
 }
 
-void EntityIndex::registerShape(ShapeElement* shape) {
+void EntityIndex::registerShape(ShapeElement *shape) {
     shapes_[shape->id] = shape;
 }
 

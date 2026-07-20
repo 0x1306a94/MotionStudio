@@ -7,7 +7,7 @@ namespace motion {
 
 // Trims preceding paths to a sub-range defined by start/end and offset.
 class ShapeTrimPath : public ShapeElement {
-public:
+  public:
     ShapeTrimPath();
     ~ShapeTrimPath() override;
 

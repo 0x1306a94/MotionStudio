@@ -2,16 +2,18 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 RemoveLayerCommand::RemoveLayerCommand(EntityId compositionId, EntityId layerId)
-    : compositionId_(compositionId), layerId_(layerId) {}
+    : compositionId_(compositionId)
+    , layerId_(layerId) {
+}
 
-void RemoveLayerCommand::execute(Document& document) {
-    Composition* composition = document.entityIndex().findComposition(compositionId_);
+void RemoveLayerCommand::execute(Document &document) {
+    Composition *composition = document.entityIndex().findComposition(compositionId_);
     if (!composition) {
         return;
     }
@@ -22,7 +24,7 @@ void RemoveLayerCommand::execute(Document& document) {
     layer_ = document.takeLayer(compositionId_, layerId_);
 }
 
-void RemoveLayerCommand::undo(Document& document) {
+void RemoveLayerCommand::undo(Document &document) {
     if (!layer_) {
         return;
     }

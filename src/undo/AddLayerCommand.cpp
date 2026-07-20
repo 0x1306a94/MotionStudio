@@ -2,21 +2,24 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 AddLayerCommand::AddLayerCommand(EntityId compositionId, std::unique_ptr<Layer> layer,
                                  int index)
-    : compositionId_(compositionId), layerId_(layer ? layer->id : EntityId{}),
-      index_(index), layer_(std::move(layer)) {}
+    : compositionId_(compositionId)
+    , layerId_(layer ? layer->id : EntityId{})
+    , index_(index)
+    , layer_(std::move(layer)) {
+}
 
-void AddLayerCommand::execute(Document& document) {
+void AddLayerCommand::execute(Document &document) {
     if (!layer_) {
         return;
     }
-    Composition* composition = document.entityIndex().findComposition(compositionId_);
+    Composition *composition = document.entityIndex().findComposition(compositionId_);
     if (!composition) {
         return;
     }
@@ -24,7 +27,7 @@ void AddLayerCommand::execute(Document& document) {
     index_ = IndexOfLayer(*composition, layerId_);
 }
 
-void AddLayerCommand::undo(Document& document) {
+void AddLayerCommand::undo(Document &document) {
     layer_ = document.takeLayer(compositionId_, layerId_);
 }
 

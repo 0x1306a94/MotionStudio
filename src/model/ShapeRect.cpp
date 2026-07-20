@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeRect::ShapeRect() : ShapeElement(ShapeType::Rect) {}
+ShapeRect::ShapeRect()
+    : ShapeElement(ShapeType::Rect) {
+}
 
 ShapeRect::~ShapeRect() = default;
 

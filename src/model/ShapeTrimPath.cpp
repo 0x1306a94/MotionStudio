@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeTrimPath::ShapeTrimPath() : ShapeElement(ShapeType::TrimPath) {}
+ShapeTrimPath::ShapeTrimPath()
+    : ShapeElement(ShapeType::TrimPath) {
+}
 
 ShapeTrimPath::~ShapeTrimPath() = default;
 

@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeFill::ShapeFill() : ShapeElement(ShapeType::Fill) {}
+ShapeFill::ShapeFill()
+    : ShapeElement(ShapeType::Fill) {
+}
 
 ShapeFill::~ShapeFill() = default;
 

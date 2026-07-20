@@ -2,16 +2,18 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 SetStaticValueCommand::SetStaticValueCommand(PropertyPath property, PropertyValue value)
-    : property_(std::move(property)), value_(std::move(value)) {}
+    : property_(std::move(property))
+    , value_(std::move(value)) {
+}
 
-void SetStaticValueCommand::execute(Document& document) {
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+void SetStaticValueCommand::execute(Document &document) {
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -25,11 +27,11 @@ void SetStaticValueCommand::execute(Document& document) {
     }
 }
 
-void SetStaticValueCommand::undo(Document& document) {
+void SetStaticValueCommand::undo(Document &document) {
     if (!captured_) {
         return;
     }
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -37,11 +39,11 @@ void SetStaticValueCommand::undo(Document& document) {
     ApplyStaticValueAny(target, *oldValue_, discarded);
 }
 
-bool SetStaticValueCommand::mergeWith(const Command& other) {
+bool SetStaticValueCommand::mergeWith(const Command &other) {
     if (other.kind() != CommandKind::SetStaticValue) {
         return false;
     }
-    const auto& typed = static_cast<const SetStaticValueCommand&>(other);
+    const auto &typed = static_cast<const SetStaticValueCommand &>(other);
     if (typed.property_ != property_) {
         return false;
     }

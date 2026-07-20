@@ -17,8 +17,8 @@ struct TimeRange {
     // time: the frame time to test.
     bool contains(FrameTime time) const;
 
-    bool operator==(const TimeRange& other) const;
-    bool operator!=(const TimeRange& other) const;
+    bool operator==(const TimeRange &other) const;
+    bool operator!=(const TimeRange &other) const;
 };
 
 // Frame rate expressed as num / den, supporting non-integer rates
@@ -35,8 +35,8 @@ struct FrameRate {
     // seconds: duration in seconds to convert.
     FrameTime fromSeconds(double seconds) const;
 
-    bool operator==(const FrameRate& other) const;
-    bool operator!=(const FrameRate& other) const;
+    bool operator==(const FrameRate &other) const;
+    bool operator!=(const FrameRate &other) const;
 };
 
 }  // namespace motion

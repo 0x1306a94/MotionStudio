@@ -9,7 +9,7 @@ namespace motion {
 
 // Fills the interior of preceding paths with an animatable color and opacity.
 class ShapeFill : public ShapeElement {
-public:
+  public:
     ShapeFill();
     ~ShapeFill() override;
 

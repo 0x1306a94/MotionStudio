@@ -3,6 +3,12 @@
 namespace motion {
 
 // The five content variants a layer can hold.
-enum class LayerType { Shape, Image, Text, Null, Precomp };
+enum class LayerType {
+    Shape,
+    Image,
+    Text,
+    Null,
+    Precomp
+};
 
 }  // namespace motion

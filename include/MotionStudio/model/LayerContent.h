@@ -7,7 +7,7 @@ namespace motion {
 // Polymorphic base for the five layer content variants
 // (Shape / Image / Text / Null / Precomp).
 class LayerContent {
-public:
+  public:
     // type: which content variant this instance represents.
     explicit LayerContent(LayerType type);
     virtual ~LayerContent();
@@ -15,7 +15,7 @@ public:
     // Returns the content variant tag.
     LayerType type() const;
 
-private:
+  private:
     LayerType type_;
 };
 

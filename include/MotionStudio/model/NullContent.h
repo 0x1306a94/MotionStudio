@@ -6,7 +6,7 @@ namespace motion {
 
 // Empty layer content used as a parent anchor or controller.
 class NullContent : public LayerContent {
-public:
+  public:
     NullContent();
     ~NullContent() override;
 };

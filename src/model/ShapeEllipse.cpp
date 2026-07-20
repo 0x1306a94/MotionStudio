@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeEllipse::ShapeEllipse() : ShapeElement(ShapeType::Ellipse) {}
+ShapeEllipse::ShapeEllipse()
+    : ShapeElement(ShapeType::Ellipse) {
+}
 
 ShapeEllipse::~ShapeEllipse() = default;
 

@@ -16,6 +16,7 @@ alwaysApply: true
 
 ## 提交
 
+- 提交前必须执行 `./codeformat.sh`：格式化产生的改动随本次提交入库，重跑脚本无 diff 后方可提交
 - **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
 
 ### 自动提交

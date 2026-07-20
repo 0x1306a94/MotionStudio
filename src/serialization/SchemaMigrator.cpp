@@ -4,7 +4,7 @@
 
 namespace motion {
 
-Expected<std::string> SchemaMigrator::migrate(const std::string& jsonText) {
+Expected<std::string> SchemaMigrator::migrate(const std::string &jsonText) {
     // Disable nlohmann parse exceptions; errors returned as discarded value.
     const nlohmann::json data = nlohmann::json::parse(jsonText, nullptr, false);
     if (data.is_discarded() || !data.is_object()) {

@@ -26,7 +26,7 @@ struct Mask {
 };
 
 class Layer {
-public:
+  public:
     // Constructs a layer with the matching LayerContent subtype.
     // type: content variant to create.
     explicit Layer(LayerType type);
@@ -40,14 +40,14 @@ public:
     // exist, true on success.
     // newParentId: id of the new parent (invalid id clears the parent).
     // document: used to look up the target parent entity.
-    bool setParent(EntityId newParentId, const Document& document);
+    bool setParent(EntityId newParentId, const Document &document);
 
     // Returns the local transform matrix at the given time.
     Mat3 localTransform(FrameTime time) const;
     // Returns the world transform matrix (accumulated through the parent chain).
     // time: evaluation time in frames.
     // document: used to resolve parent layers.
-    Mat3 worldTransform(FrameTime time, const Document& document) const;
+    Mat3 worldTransform(FrameTime time, const Document &document) const;
 
     EntityId id = EntityId::Generate();
     std::string name;
@@ -68,8 +68,8 @@ public:
     BlendMode blendMode = BlendMode::Normal;
     std::vector<Mask> masks;
 
-private:
-    Mat3 worldTransform(FrameTime time, const Document& document, int depth) const;
+  private:
+    Mat3 worldTransform(FrameTime time, const Document &document, int depth) const;
 
     LayerType type_;
 };

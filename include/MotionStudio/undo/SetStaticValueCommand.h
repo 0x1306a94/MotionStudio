@@ -13,18 +13,18 @@ namespace motion {
 // first execution; consecutive sets on the same target are merged (e.g.
 // dragging a numeric slider).
 class SetStaticValueCommand : public Command {
-public:
+  public:
     // property: path to the animatable property to set.
     // value: the new static value.
     SetStaticValueCommand(PropertyPath property, PropertyValue value);
 
-    void execute(Document& document) override;
-    void undo(Document& document) override;
-    bool mergeWith(const Command& other) override;
+    void execute(Document &document) override;
+    void undo(Document &document) override;
+    bool mergeWith(const Command &other) override;
     CommandKind kind() const override;
     std::string describe() const override;
 
-private:
+  private:
     PropertyPath property_;
     PropertyValue value_;
     std::optional<PropertyValue> oldValue_;

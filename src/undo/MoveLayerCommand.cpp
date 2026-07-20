@@ -5,21 +5,24 @@
 namespace motion {
 
 MoveLayerCommand::MoveLayerCommand(EntityId compositionId, int fromIndex, int toIndex)
-    : compositionId_(compositionId), fromIndex_(fromIndex), toIndex_(toIndex) {}
+    : compositionId_(compositionId)
+    , fromIndex_(fromIndex)
+    , toIndex_(toIndex) {
+}
 
-void MoveLayerCommand::execute(Document& document) {
+void MoveLayerCommand::execute(Document &document) {
     document.moveLayer(compositionId_, fromIndex_, toIndex_);
 }
 
-void MoveLayerCommand::undo(Document& document) {
+void MoveLayerCommand::undo(Document &document) {
     document.moveLayer(compositionId_, toIndex_, fromIndex_);
 }
 
-bool MoveLayerCommand::mergeWith(const Command& other) {
+bool MoveLayerCommand::mergeWith(const Command &other) {
     if (other.kind() != CommandKind::MoveLayer) {
         return false;
     }
-    const auto& typed = static_cast<const MoveLayerCommand&>(other);
+    const auto &typed = static_cast<const MoveLayerCommand &>(other);
     if (typed.compositionId_ != compositionId_) {
         return false;
     }

@@ -12,13 +12,15 @@ namespace motion {
 // Inputs and outputs are plain JSON text; the public header exposes no
 // third-party JSON types.
 class SchemaMigrator {
-public:
-    static constexpr int currentVersion() { return 1; }
+  public:
+    static constexpr int currentVersion() {
+        return 1;
+    }
 
     // Reads the embedded schemaVersion and migrates to the current version.
     // Returns Error on malformed JSON or unsupported version.
     // jsonText: the JSON text to migrate.
-    static Expected<std::string> migrate(const std::string& jsonText);
+    static Expected<std::string> migrate(const std::string &jsonText);
 };
 
 }  // namespace motion

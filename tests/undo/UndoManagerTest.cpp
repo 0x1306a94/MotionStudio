@@ -19,25 +19,34 @@ namespace {
 
 // Test command that adjusts a counter; merges when mergeKey is non-empty and matches.
 class AdjustCommand : public Command {
-public:
-    AdjustCommand(int* target, int delta, std::string mergeKey = {})
-        : target_(target), delta_(delta), mergeKey_(std::move(mergeKey)) {}
+  public:
+    AdjustCommand(int *target, int delta, std::string mergeKey = {})
+        : target_(target)
+        , delta_(delta)
+        , mergeKey_(std::move(mergeKey)) {
+    }
 
-    void execute(Document&) override { *target_ += delta_; }
-    void undo(Document&) override { *target_ -= delta_; }
+    void execute(Document &) override {
+        *target_ += delta_;
+    }
+    void undo(Document &) override {
+        *target_ -= delta_;
+    }
 
     // Test-only: borrow Composite as a type tag to identify same-kind commands in this test
     // (no real CompositeCommand appears in this test).
-    CommandKind kind() const override { return CommandKind::Composite; }
+    CommandKind kind() const override {
+        return CommandKind::Composite;
+    }
 
-    bool mergeWith(const Command& other) override {
+    bool mergeWith(const Command &other) override {
         if (mergeKey_.empty()) {
             return false;
         }
         if (other.kind() != kind()) {
             return false;
         }
-        const auto& typed = static_cast<const AdjustCommand&>(other);
+        const auto &typed = static_cast<const AdjustCommand &>(other);
         if (typed.mergeKey_ != mergeKey_) {
             return false;
         }
@@ -45,27 +54,39 @@ public:
         return true;
     }
 
-    std::string describe() const override { return "Adjust"; }
+    std::string describe() const override {
+        return "Adjust";
+    }
 
-private:
-    int* target_;
+  private:
+    int *target_;
     int delta_;
     std::string mergeKey_;
 };
 
 // Command that records execution order.
 class OrderCommand : public Command {
-public:
-    OrderCommand(std::vector<std::string>* log, std::string name)
-        : log_(log), name_(std::move(name)) {}
+  public:
+    OrderCommand(std::vector<std::string> *log, std::string name)
+        : log_(log)
+        , name_(std::move(name)) {
+    }
 
-    void execute(Document&) override { log_->push_back("do:" + name_); }
-    void undo(Document&) override { log_->push_back("undo:" + name_); }
-    CommandKind kind() const override { return CommandKind::Composite; }
-    std::string describe() const override { return name_; }
+    void execute(Document &) override {
+        log_->push_back("do:" + name_);
+    }
+    void undo(Document &) override {
+        log_->push_back("undo:" + name_);
+    }
+    CommandKind kind() const override {
+        return CommandKind::Composite;
+    }
+    std::string describe() const override {
+        return name_;
+    }
 
-private:
-    std::vector<std::string>* log_;
+  private:
+    std::vector<std::string> *log_;
     std::string name_;
 };
 

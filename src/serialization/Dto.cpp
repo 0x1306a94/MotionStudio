@@ -2,18 +2,28 @@
 
 namespace motion::dto {
 
-const char* ToString(LayerType type) {
+const char *ToString(LayerType type) {
     switch (type) {
-        case LayerType::Shape: return "shape";
-        case LayerType::Image: return "image";
-        case LayerType::Text: return "text";
-        case LayerType::Null: return "null";
-        case LayerType::Precomp: return "precomp";
+        case LayerType::Shape: {
+            return "shape";
+        }
+        case LayerType::Image: {
+            return "image";
+        }
+        case LayerType::Text: {
+            return "text";
+        }
+        case LayerType::Null: {
+            return "null";
+        }
+        case LayerType::Precomp: {
+            return "precomp";
+        }
     }
     return "unknown";
 }
 
-Expected<LayerType> layerTypeFromString(const std::string& text) {
+Expected<LayerType> layerTypeFromString(const std::string &text) {
     if (text == "shape") {
         return LayerType::Shape;
     }
@@ -32,20 +42,34 @@ Expected<LayerType> layerTypeFromString(const std::string& text) {
     return Error("unknown layer type: " + text);
 }
 
-const char* ToString(ShapeType type) {
+const char *ToString(ShapeType type) {
     switch (type) {
-        case ShapeType::Path: return "path";
-        case ShapeType::Fill: return "fill";
-        case ShapeType::Stroke: return "stroke";
-        case ShapeType::Group: return "group";
-        case ShapeType::Rect: return "rect";
-        case ShapeType::Ellipse: return "ellipse";
-        case ShapeType::TrimPath: return "trimPath";
+        case ShapeType::Path: {
+            return "path";
+        }
+        case ShapeType::Fill: {
+            return "fill";
+        }
+        case ShapeType::Stroke: {
+            return "stroke";
+        }
+        case ShapeType::Group: {
+            return "group";
+        }
+        case ShapeType::Rect: {
+            return "rect";
+        }
+        case ShapeType::Ellipse: {
+            return "ellipse";
+        }
+        case ShapeType::TrimPath: {
+            return "trimPath";
+        }
     }
     return "unknown";
 }
 
-Expected<ShapeType> shapeTypeFromString(const std::string& text) {
+Expected<ShapeType> shapeTypeFromString(const std::string &text) {
     if (text == "path") {
         return ShapeType::Path;
     }
@@ -70,11 +94,11 @@ Expected<ShapeType> shapeTypeFromString(const std::string& text) {
     return Error("unknown shape type: " + text);
 }
 
-const char* ToString(FillRule rule) {
+const char *ToString(FillRule rule) {
     return rule == FillRule::NonZero ? "nonZero" : "evenOdd";
 }
 
-Expected<FillRule> fillRuleFromString(const std::string& text) {
+Expected<FillRule> fillRuleFromString(const std::string &text) {
     if (text == "nonZero") {
         return FillRule::NonZero;
     }
@@ -84,16 +108,22 @@ Expected<FillRule> fillRuleFromString(const std::string& text) {
     return Error("unknown fill rule: " + text);
 }
 
-const char* ToString(LineCap cap) {
+const char *ToString(LineCap cap) {
     switch (cap) {
-        case LineCap::Butt: return "butt";
-        case LineCap::Round: return "round";
-        case LineCap::Square: return "square";
+        case LineCap::Butt: {
+            return "butt";
+        }
+        case LineCap::Round: {
+            return "round";
+        }
+        case LineCap::Square: {
+            return "square";
+        }
     }
     return "unknown";
 }
 
-Expected<LineCap> lineCapFromString(const std::string& text) {
+Expected<LineCap> lineCapFromString(const std::string &text) {
     if (text == "butt") {
         return LineCap::Butt;
     }
@@ -106,16 +136,22 @@ Expected<LineCap> lineCapFromString(const std::string& text) {
     return Error("unknown line cap: " + text);
 }
 
-const char* ToString(LineJoin join) {
+const char *ToString(LineJoin join) {
     switch (join) {
-        case LineJoin::Miter: return "miter";
-        case LineJoin::Round: return "round";
-        case LineJoin::Bevel: return "bevel";
+        case LineJoin::Miter: {
+            return "miter";
+        }
+        case LineJoin::Round: {
+            return "round";
+        }
+        case LineJoin::Bevel: {
+            return "bevel";
+        }
     }
     return "unknown";
 }
 
-Expected<LineJoin> lineJoinFromString(const std::string& text) {
+Expected<LineJoin> lineJoinFromString(const std::string &text) {
     if (text == "miter") {
         return LineJoin::Miter;
     }
@@ -128,17 +164,25 @@ Expected<LineJoin> lineJoinFromString(const std::string& text) {
     return Error("unknown line join: " + text);
 }
 
-const char* ToString(BlendMode mode) {
+const char *ToString(BlendMode mode) {
     switch (mode) {
-        case BlendMode::Normal: return "normal";
-        case BlendMode::Multiply: return "multiply";
-        case BlendMode::Screen: return "screen";
-        case BlendMode::Add: return "add";
+        case BlendMode::Normal: {
+            return "normal";
+        }
+        case BlendMode::Multiply: {
+            return "multiply";
+        }
+        case BlendMode::Screen: {
+            return "screen";
+        }
+        case BlendMode::Add: {
+            return "add";
+        }
     }
     return "unknown";
 }
 
-Expected<BlendMode> blendModeFromString(const std::string& text) {
+Expected<BlendMode> blendModeFromString(const std::string &text) {
     if (text == "normal") {
         return BlendMode::Normal;
     }
@@ -154,16 +198,22 @@ Expected<BlendMode> blendModeFromString(const std::string& text) {
     return Error("unknown blend mode: " + text);
 }
 
-const char* ToString(MaskMode mode) {
+const char *ToString(MaskMode mode) {
     switch (mode) {
-        case MaskMode::Add: return "add";
-        case MaskMode::Subtract: return "subtract";
-        case MaskMode::Intersect: return "intersect";
+        case MaskMode::Add: {
+            return "add";
+        }
+        case MaskMode::Subtract: {
+            return "subtract";
+        }
+        case MaskMode::Intersect: {
+            return "intersect";
+        }
     }
     return "unknown";
 }
 
-Expected<MaskMode> maskModeFromString(const std::string& text) {
+Expected<MaskMode> maskModeFromString(const std::string &text) {
     if (text == "add") {
         return MaskMode::Add;
     }
@@ -176,11 +226,11 @@ Expected<MaskMode> maskModeFromString(const std::string& text) {
     return Error("unknown mask mode: " + text);
 }
 
-const char* ToString(AssetType type) {
+const char *ToString(AssetType type) {
     return type == AssetType::Image ? "image" : "font";
 }
 
-Expected<AssetType> assetTypeFromString(const std::string& text) {
+Expected<AssetType> assetTypeFromString(const std::string &text) {
     if (text == "image") {
         return AssetType::Image;
     }
@@ -190,16 +240,22 @@ Expected<AssetType> assetTypeFromString(const std::string& text) {
     return Error("unknown asset type: " + text);
 }
 
-const char* ToString(Easing::Type type) {
+const char *ToString(Easing::Type type) {
     switch (type) {
-        case Easing::Type::Linear: return "linear";
-        case Easing::Type::Bezier: return "bezier";
-        case Easing::Type::Hold: return "hold";
+        case Easing::Type::Linear: {
+            return "linear";
+        }
+        case Easing::Type::Bezier: {
+            return "bezier";
+        }
+        case Easing::Type::Hold: {
+            return "hold";
+        }
     }
     return "unknown";
 }
 
-Expected<Easing::Type> easingTypeFromString(const std::string& text) {
+Expected<Easing::Type> easingTypeFromString(const std::string &text) {
     if (text == "linear") {
         return Easing::Type::Linear;
     }

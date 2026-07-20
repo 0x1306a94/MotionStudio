@@ -4,11 +4,11 @@
 
 namespace motion {
 
-bool EntityId::operator==(const EntityId& other) const {
+bool EntityId::operator==(const EntityId &other) const {
     return value == other.value;
 }
 
-bool EntityId::operator!=(const EntityId& other) const {
+bool EntityId::operator!=(const EntityId &other) const {
     return value != other.value;
 }
 

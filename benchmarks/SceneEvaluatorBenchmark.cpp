@@ -38,10 +38,10 @@ constexpr double kBudgetMs = 2.0;
 
 Document BuildScene() {
     Document document;
-    Composition* composition = document.addComposition(std::make_unique<Composition>());
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
     composition->duration = kFrameCount;
     for (int i = 0; i < kLayerCount; ++i) {
-        Layer* layer =
+        Layer *layer =
             document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
         layer->outPoint = kFrameCount;
         for (int k = 0; k < kKeyframesPerProperty; ++k) {
@@ -51,7 +51,7 @@ Document BuildScene() {
             keyframe.easing = Easing::EaseOut();
             layer->transform.position.addKeyframe(keyframe);
         }
-        auto* content = static_cast<ShapeContent*>(layer->content.get());
+        auto *content = static_cast<ShapeContent *>(layer->content.get());
         auto rect = std::make_unique<ShapeRect>();
         rect->position.setStaticValue(Vec2{0, float(i)});
         rect->size.setStaticValue(Vec2{50, 8});

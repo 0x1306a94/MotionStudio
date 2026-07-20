@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeStroke::ShapeStroke() : ShapeElement(ShapeType::Stroke) {}
+ShapeStroke::ShapeStroke()
+    : ShapeElement(ShapeType::Stroke) {
+}
 
 ShapeStroke::~ShapeStroke() = default;
 

@@ -14,16 +14,16 @@ class Document;
 // fields). Deserialization failures (malformed JSON, unknown enum,
 // unsupported version) are reported via Expected, never by throwing.
 class Serializer {
-public:
+  public:
     // Serializes a document to indented JSON suitable for writing to a file.
-    static std::string serialize(const Document& document);
+    static std::string serialize(const Document &document);
     // Deserializes a document from a JSON string.
     // jsonText: the full JSON text to parse.
-    static Expected<std::unique_ptr<Document>> deserialize(const std::string& jsonText);
+    static Expected<std::unique_ptr<Document>> deserialize(const std::string &jsonText);
 };
 
 // FNV-1a hash of the serialized document. Intended for debug/test assertions
 // (e.g. verifying round-trip consistency before and after undo).
-uint64_t DocumentFingerprint(const Document& document);
+uint64_t DocumentFingerprint(const Document &document);
 
 }  // namespace motion

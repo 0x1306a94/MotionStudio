@@ -22,8 +22,8 @@ using motion::Asset;
 using motion::AssetType;
 using motion::Color;
 using motion::Composition;
-using motion::DocumentFingerprint;
 using motion::Document;
+using motion::DocumentFingerprint;
 using motion::Easing;
 using motion::Expected;
 using motion::Keyframe;
@@ -94,7 +94,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     mask.inverted = true;
     shapeLayer->masks.push_back(mask);
 
-    auto* shapeContent = static_cast<ShapeContent*>(shapeLayer->content.get());
+    auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
 
     auto path = std::make_unique<ShapePath>();
     motion::BezierPath bezier;
@@ -133,17 +133,17 @@ std::unique_ptr<Document> BuildRichDocument() {
 
     auto textLayer = std::make_unique<Layer>(LayerType::Text);
     textLayer->parentId = nullId;
-    auto* textContent = static_cast<motion::TextContent*>(textLayer->content.get());
+    auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
     textContent->text.setStaticValue(std::string{"hello"});
     textContent->fontFamily = "PingFang SC";
     composition->layers.push_back(std::move(textLayer));
 
     auto imageLayer = std::make_unique<Layer>(LayerType::Image);
-    static_cast<motion::ImageContent*>(imageLayer->content.get())->assetId = asset.id;
+    static_cast<motion::ImageContent *>(imageLayer->content.get())->assetId = asset.id;
     composition->layers.push_back(std::move(imageLayer));
 
     auto precompLayer = std::make_unique<Layer>(LayerType::Precomp);
-    static_cast<PrecompContent*>(precompLayer->content.get())->compositionId =
+    static_cast<PrecompContent *>(precompLayer->content.get())->compositionId =
         precompTarget->id;
     composition->layers.push_back(std::move(precompLayer));
 
@@ -173,13 +173,13 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     ASSERT_TRUE(restored.hasValue());
 
     ASSERT_EQ((*restored)->compositions.size(), 2u);
-    const Composition& main = *(*restored)->compositions[1];
+    const Composition &main = *(*restored)->compositions[1];
     ASSERT_EQ(main.layers.size(), 5u);
     EXPECT_EQ(main.frameRate, (motion::FrameRate{30000, 1001}));
 
-    const Layer& shapes = *main.layers[0];
+    const Layer &shapes = *main.layers[0];
     // Keyframes + easing + spatial tangents restored: per-frame evaluation matches original.
-    const Layer& originalShapes = *document->compositions[1]->layers[0];
+    const Layer &originalShapes = *document->compositions[1]->layers[0];
     for (motion::FrameTime time : {0, 15, 30, 45, 60, 90}) {
         EXPECT_TRUE(motion::ApproxEqual(shapes.transform.position.evaluate(time),
                                         originalShapes.transform.position.evaluate(time)))
@@ -191,19 +191,19 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
 
     // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);
-    const auto* shapeContent = static_cast<const ShapeContent*>(shapes.content.get());
+    const auto *shapeContent = static_cast<const ShapeContent *>(shapes.content.get());
     EXPECT_NE((*restored)->entityIndex().findShape(shapeContent->elements[0]->id),
               nullptr);
 
     // Parent-child relationship preserved.
-    const Layer& textLayer = *main.layers[2];
+    const Layer &textLayer = *main.layers[2];
     EXPECT_EQ(textLayer.parentId, main.layers[1]->id);
 }
 
 TEST(SerializerTest, AnimatableJsonShape) {
     Document document;
-    Composition* composition = document.addComposition(std::make_unique<Composition>());
-    Layer* layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null));
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null));
     layer->transform.rotation.setStaticValue(30.0f);
     Keyframe<Vec2> keyframe;
     keyframe.time = 5;
@@ -211,7 +211,7 @@ TEST(SerializerTest, AnimatableJsonShape) {
     layer->transform.position.addKeyframe(keyframe);
 
     const auto json = nlohmann::json::parse(Serializer::serialize(document));
-    const auto& transform =
+    const auto &transform =
         json["compositions"][0]["layers"][0]["transform"];
     EXPECT_EQ(transform["rotation"]["static"], 30.0f);
     EXPECT_EQ(transform["position"]["keyframes"][0]["time"], 5);

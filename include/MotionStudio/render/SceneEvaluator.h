@@ -13,12 +13,12 @@ class Document;
 // world transforms, parent chains, opacity inheritance, in/outPoint clipping,
 // ShapeGroup expansion and precomp recursion with time remapping.
 class SceneEvaluator {
-public:
+  public:
     // Evaluates a composition into an immutable scene snapshot.
     // document: the owning document (provides the entity index).
     // compositionId: id of the composition to evaluate.
     // time: frame time in the composition timeline.
-    static Expected<SceneState> Evaluate(const Document& document,
+    static Expected<SceneState> Evaluate(const Document &document,
                                          EntityId compositionId, FrameTime time);
 };
 

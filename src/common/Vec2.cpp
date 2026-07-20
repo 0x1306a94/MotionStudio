@@ -4,11 +4,11 @@
 
 namespace motion {
 
-Vec2 Vec2::operator+(const Vec2& other) const {
+Vec2 Vec2::operator+(const Vec2 &other) const {
     return {x + other.x, y + other.y};
 }
 
-Vec2 Vec2::operator-(const Vec2& other) const {
+Vec2 Vec2::operator-(const Vec2 &other) const {
     return {x - other.x, y - other.y};
 }
 
@@ -20,11 +20,11 @@ Vec2 Vec2::operator-() const {
     return {-x, -y};
 }
 
-bool Vec2::operator==(const Vec2& other) const {
+bool Vec2::operator==(const Vec2 &other) const {
     return x == other.x && y == other.y;
 }
 
-bool Vec2::operator!=(const Vec2& other) const {
+bool Vec2::operator!=(const Vec2 &other) const {
     return !(*this == other);
 }
 

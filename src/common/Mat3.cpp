@@ -34,7 +34,7 @@ Mat3 Mat3::Scale(Vec2 factor) {
     return result;
 }
 
-Mat3 Mat3::operator*(const Mat3& other) const {
+Mat3 Mat3::operator*(const Mat3 &other) const {
     Mat3 result;
     for (int row = 0; row < 3; ++row) {
         for (int col = 0; col < 3; ++col) {
@@ -58,7 +58,7 @@ Vec2 Mat3::transformVector(Vec2 vector) const {
             values[3] * vector.x + values[4] * vector.y};
 }
 
-bool Mat3::operator==(const Mat3& other) const {
+bool Mat3::operator==(const Mat3 &other) const {
     for (int i = 0; i < 9; ++i) {
         if (values[i] != other.values[i]) {
             return false;
@@ -67,7 +67,7 @@ bool Mat3::operator==(const Mat3& other) const {
     return true;
 }
 
-bool Mat3::operator!=(const Mat3& other) const {
+bool Mat3::operator!=(const Mat3 &other) const {
     return !(*this == other);
 }
 

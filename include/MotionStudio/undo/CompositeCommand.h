@@ -11,7 +11,7 @@ namespace motion {
 // Composite command: groups multiple atomic operations into a single undo unit.
 // execute() runs children in order; undo() runs them in reverse.
 class CompositeCommand : public Command {
-public:
+  public:
     // description: human-readable label shown in the undo history.
     explicit CompositeCommand(std::string description);
 
@@ -21,12 +21,12 @@ public:
     // Returns the number of child commands.
     size_t size() const;
 
-    void execute(Document& document) override;
-    void undo(Document& document) override;
+    void execute(Document &document) override;
+    void undo(Document &document) override;
     CommandKind kind() const override;
     std::string describe() const override;
 
-private:
+  private:
     std::string description_;
     std::vector<std::unique_ptr<Command>> commands_;
 };

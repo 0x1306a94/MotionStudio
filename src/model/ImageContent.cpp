@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ImageContent::ImageContent() : LayerContent(LayerType::Image) {}
+ImageContent::ImageContent()
+    : LayerContent(LayerType::Image) {
+}
 
 ImageContent::~ImageContent() = default;
 

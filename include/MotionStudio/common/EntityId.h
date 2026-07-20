@@ -11,8 +11,8 @@ namespace motion {
 struct EntityId {
     uint64_t value = 0;
 
-    bool operator==(const EntityId& other) const;
-    bool operator!=(const EntityId& other) const;
+    bool operator==(const EntityId &other) const;
+    bool operator!=(const EntityId &other) const;
 
     // Returns true if this ID is not the invalid sentinel (0).
     bool isValid() const;
@@ -25,7 +25,7 @@ struct EntityId {
 
 template <>
 struct std::hash<motion::EntityId> {
-    size_t operator()(const motion::EntityId& id) const noexcept {
+    size_t operator()(const motion::EntityId &id) const noexcept {
         return std::hash<uint64_t>{}(id.value);
     }
 };

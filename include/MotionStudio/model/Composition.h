@@ -13,7 +13,7 @@ namespace motion {
 
 // A composition holds an ordered list of layers and timing/size metadata.
 class Composition {
-public:
+  public:
     EntityId id = EntityId::Generate();
     std::string name;
     FrameTime duration = 0;  // total frame count

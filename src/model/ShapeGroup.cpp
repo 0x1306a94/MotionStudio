@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeGroup::ShapeGroup() : ShapeElement(ShapeType::Group) {}
+ShapeGroup::ShapeGroup()
+    : ShapeElement(ShapeType::Group) {
+}
 
 ShapeGroup::~ShapeGroup() = default;
 

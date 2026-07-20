@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapePath::ShapePath() : ShapeElement(ShapeType::Path) {}
+ShapePath::ShapePath()
+    : ShapeElement(ShapeType::Path) {
+}
 
 ShapePath::~ShapePath() = default;
 

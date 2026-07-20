@@ -33,10 +33,10 @@ BezierPath makeSquare() {
 bool OnSquarePerimeter(Vec2 point) {
     const bool onHorizontal = (ApproxEqual(point.y, 0.0f, 1e-3f) ||
                                ApproxEqual(point.y, 1.0f, 1e-3f)) &&
-                              point.x >= -1e-3f && point.x <= 1.0f + 1e-3f;
+        point.x >= -1e-3f && point.x <= 1.0f + 1e-3f;
     const bool onVertical = (ApproxEqual(point.x, 0.0f, 1e-3f) ||
                              ApproxEqual(point.x, 1.0f, 1e-3f)) &&
-                            point.y >= -1e-3f && point.y <= 1.0f + 1e-3f;
+        point.y >= -1e-3f && point.y <= 1.0f + 1e-3f;
     return onHorizontal || onVertical;
 }
 

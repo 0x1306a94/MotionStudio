@@ -8,7 +8,7 @@ namespace motion {
 
 // A free-form bezier path shape element.
 class ShapePath : public ShapeElement {
-public:
+  public:
     ShapePath();
     ~ShapePath() override;
 

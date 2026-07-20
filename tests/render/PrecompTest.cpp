@@ -28,11 +28,11 @@ using motion::Vec2;
 namespace {
 
 // Adds a shape layer with a filled 10x10 rect at the given center.
-Layer* AddRectLayer(Document& document, EntityId compositionId, Vec2 center) {
-    Layer* layer =
+Layer *AddRectLayer(Document &document, EntityId compositionId, Vec2 center) {
+    Layer *layer =
         document.addLayer(compositionId, std::make_unique<Layer>(LayerType::Shape));
     layer->outPoint = 1000;
-    auto* content = static_cast<ShapeContent*>(layer->content.get());
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
     auto rect = std::make_unique<ShapeRect>();
     rect->position.setStaticValue(center);
     rect->size.setStaticValue(Vec2{10, 10});
@@ -41,11 +41,11 @@ Layer* AddRectLayer(Document& document, EntityId compositionId, Vec2 center) {
     return layer;
 }
 
-Layer* AddPrecompLayer(Document& document, EntityId hostId, EntityId sourceId) {
-    Layer* layer =
+Layer *AddPrecompLayer(Document &document, EntityId hostId, EntityId sourceId) {
+    Layer *layer =
         document.addLayer(hostId, std::make_unique<Layer>(LayerType::Precomp));
     layer->outPoint = 1000;
-    static_cast<PrecompContent*>(layer->content.get())->compositionId = sourceId;
+    static_cast<PrecompContent *>(layer->content.get())->compositionId = sourceId;
     return layer;
 }
 
@@ -53,10 +53,10 @@ Layer* AddPrecompLayer(Document& document, EntityId hostId, EntityId sourceId) {
 
 TEST(PrecompTest, FlattensSublayerKeepingItsId) {
     Document document;
-    Composition* inner = document.addComposition(std::make_unique<Composition>());
-    Layer* rectLayer = AddRectLayer(document, inner->id, Vec2{0, 0});
-    Composition* main = document.addComposition(std::make_unique<Composition>());
-    Layer* precomp = AddPrecompLayer(document, main->id, inner->id);
+    Composition *inner = document.addComposition(std::make_unique<Composition>());
+    Layer *rectLayer = AddRectLayer(document, inner->id, Vec2{0, 0});
+    Composition *main = document.addComposition(std::make_unique<Composition>());
+    Layer *precomp = AddPrecompLayer(document, main->id, inner->id);
     precomp->transform.position.setStaticValue(Vec2{100, 0});
 
     Expected<SceneState> result = SceneEvaluator::Evaluate(document, main->id, 0);
@@ -69,8 +69,8 @@ TEST(PrecompTest, FlattensSublayerKeepingItsId) {
 TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
     // innerTime = (outer - inPoint) * timeStretch + startTime
     Document document;
-    Composition* inner = document.addComposition(std::make_unique<Composition>());
-    Layer* rectLayer = AddRectLayer(document, inner->id, Vec2{0, 0});
+    Composition *inner = document.addComposition(std::make_unique<Composition>());
+    Layer *rectLayer = AddRectLayer(document, inner->id, Vec2{0, 0});
     Keyframe<Vec2> from;
     from.time = 0;
     from.value = Vec2{0, 0};
@@ -80,8 +80,8 @@ TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
     rectLayer->transform.position.addKeyframe(from);
     rectLayer->transform.position.addKeyframe(to);
 
-    Composition* main = document.addComposition(std::make_unique<Composition>());
-    Layer* precomp = AddPrecompLayer(document, main->id, inner->id);
+    Composition *main = document.addComposition(std::make_unique<Composition>());
+    Layer *precomp = AddPrecompLayer(document, main->id, inner->id);
     precomp->inPoint = 10;
     precomp->startTime = 5;
     precomp->timeStretch = 2;
@@ -95,16 +95,16 @@ TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
 
 TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
     Document document;
-    Composition* deep = document.addComposition(std::make_unique<Composition>());
+    Composition *deep = document.addComposition(std::make_unique<Composition>());
     AddRectLayer(document, deep->id, Vec2{0, 0});
 
-    Composition* mid = document.addComposition(std::make_unique<Composition>());
-    Layer* midPrecomp = AddPrecompLayer(document, mid->id, deep->id);
+    Composition *mid = document.addComposition(std::make_unique<Composition>());
+    Layer *midPrecomp = AddPrecompLayer(document, mid->id, deep->id);
     midPrecomp->transform.position.setStaticValue(Vec2{10, 0});
     midPrecomp->transform.opacity.setStaticValue(0.5f);
 
-    Composition* main = document.addComposition(std::make_unique<Composition>());
-    Layer* mainPrecomp = AddPrecompLayer(document, main->id, mid->id);
+    Composition *main = document.addComposition(std::make_unique<Composition>());
+    Layer *mainPrecomp = AddPrecompLayer(document, main->id, mid->id);
     mainPrecomp->transform.position.setStaticValue(Vec2{20, 0});
     mainPrecomp->transform.opacity.setStaticValue(0.5f);
 
@@ -118,7 +118,7 @@ TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
 
 TEST(PrecompTest, MissingTargetProducesNoLayers) {
     Document document;
-    Composition* main = document.addComposition(std::make_unique<Composition>());
+    Composition *main = document.addComposition(std::make_unique<Composition>());
     AddPrecompLayer(document, main->id, EntityId{999});
 
     Expected<SceneState> result = SceneEvaluator::Evaluate(document, main->id, 0);
@@ -128,7 +128,7 @@ TEST(PrecompTest, MissingTargetProducesNoLayers) {
 
 TEST(PrecompTest, SelfReferencingCycleTerminates) {
     Document document;
-    Composition* loop = document.addComposition(std::make_unique<Composition>());
+    Composition *loop = document.addComposition(std::make_unique<Composition>());
     AddPrecompLayer(document, loop->id, loop->id);
 
     Expected<SceneState> result = SceneEvaluator::Evaluate(document, loop->id, 0);
@@ -138,8 +138,8 @@ TEST(PrecompTest, SelfReferencingCycleTerminates) {
 
 TEST(PrecompTest, TwoCompositionCycleTerminates) {
     Document document;
-    Composition* a = document.addComposition(std::make_unique<Composition>());
-    Composition* b = document.addComposition(std::make_unique<Composition>());
+    Composition *a = document.addComposition(std::make_unique<Composition>());
+    Composition *b = document.addComposition(std::make_unique<Composition>());
     AddPrecompLayer(document, a->id, b->id);
     AddPrecompLayer(document, b->id, a->id);
 

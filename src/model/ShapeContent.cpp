@@ -2,7 +2,9 @@
 
 namespace motion {
 
-ShapeContent::ShapeContent() : LayerContent(LayerType::Shape) {}
+ShapeContent::ShapeContent()
+    : LayerContent(LayerType::Shape) {
+}
 
 ShapeContent::~ShapeContent() = default;
 

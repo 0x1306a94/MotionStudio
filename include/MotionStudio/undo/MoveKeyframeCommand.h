@@ -14,19 +14,19 @@ namespace motion {
 // destination and restores it on undo. Consecutive drags (other.oldTime ==
 // this command's newTime) are merged.
 class MoveKeyframeCommand : public Command {
-public:
+  public:
     // property: path to the animatable property.
     // oldTime: current frame time of the keyframe.
     // newTime: desired frame time after the move.
     MoveKeyframeCommand(PropertyPath property, FrameTime oldTime, FrameTime newTime);
 
-    void execute(Document& document) override;
-    void undo(Document& document) override;
-    bool mergeWith(const Command& other) override;
+    void execute(Document &document) override;
+    void undo(Document &document) override;
+    bool mergeWith(const Command &other) override;
     CommandKind kind() const override;
     std::string describe() const override;
 
-private:
+  private:
     PropertyPath property_;
     FrameTime oldTime_;
     FrameTime newTime_;

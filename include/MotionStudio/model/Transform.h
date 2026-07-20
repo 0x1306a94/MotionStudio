@@ -12,8 +12,8 @@ struct Transform {
     Animatable<Vec2> anchorPoint{Vec2{0, 0}};
     Animatable<Vec2> position{Vec2{0, 0}};
     Animatable<Vec2> scale{Vec2{1, 1}};
-    Animatable<float> rotation{0.0f};   // degrees
-    Animatable<float> opacity{1.0f};    // 0.0 ~ 1.0
+    Animatable<float> rotation{0.0f};  // degrees
+    Animatable<float> opacity{1.0f};   // 0.0 ~ 1.0
 };
 
 }  // namespace motion

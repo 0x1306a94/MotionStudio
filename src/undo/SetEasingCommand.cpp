@@ -2,16 +2,19 @@
 
 #include <utility>
 
-#include "MotionStudio/model/Document.h"
 #include "CommandHelpers.h"
+#include "MotionStudio/model/Document.h"
 
 namespace motion {
 
 SetEasingCommand::SetEasingCommand(PropertyPath property, FrameTime time, Easing easing)
-    : property_(std::move(property)), time_(time), easing_(easing) {}
+    : property_(std::move(property))
+    , time_(time)
+    , easing_(easing) {
+}
 
-void SetEasingCommand::execute(Document& document) {
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+void SetEasingCommand::execute(Document &document) {
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
@@ -27,22 +30,22 @@ void SetEasingCommand::execute(Document& document) {
     }
 }
 
-void SetEasingCommand::undo(Document& document) {
+void SetEasingCommand::undo(Document &document) {
     if (!captured_ || !found_) {
         return;
     }
-    AnimatableBase* target = ResolveAnimatable(document, property_);
+    AnimatableBase *target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     ApplyEasingAny(target, time_, *oldEasing_, nullptr);
 }
 
-bool SetEasingCommand::mergeWith(const Command& other) {
+bool SetEasingCommand::mergeWith(const Command &other) {
     if (other.kind() != CommandKind::SetEasing) {
         return false;
     }
-    const auto& typed = static_cast<const SetEasingCommand&>(other);
+    const auto &typed = static_cast<const SetEasingCommand &>(other);
     if (typed.property_ != property_ || typed.time_ != time_) {
         return false;
     }

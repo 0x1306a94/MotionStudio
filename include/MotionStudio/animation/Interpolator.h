@@ -14,7 +14,9 @@ namespace motion {
 // (The primary template must remain defined in the header as a generic fallback.)
 template <typename T>
 struct Interpolator {
-    static T Lerp(const T& from, const T& /*to*/, float /*t*/) { return from; }
+    static T Lerp(const T &from, const T & /*to*/, float /*t*/) {
+        return from;
+    }
 };
 
 // Specializations are implemented in src/animation/Interpolator.cpp.
@@ -31,7 +33,7 @@ struct Interpolator<Vec2> {
     // from: start vector.
     // to: end vector.
     // t: blend factor in [0,1].
-    static Vec2 Lerp(const Vec2& from, const Vec2& to, float t);
+    static Vec2 Lerp(const Vec2 &from, const Vec2 &to, float t);
 };
 
 template <>
@@ -39,7 +41,7 @@ struct Interpolator<Color> {
     // from: start color.
     // to: end color.
     // t: blend factor in [0,1].
-    static Color Lerp(const Color& from, const Color& to, float t);
+    static Color Lerp(const Color &from, const Color &to, float t);
 };
 
 template <>
@@ -51,7 +53,7 @@ struct Interpolator<BezierPath> {
     // from: start path.
     // to: end path.
     // t: blend factor in [0,1].
-    static BezierPath Lerp(const BezierPath& from, const BezierPath& to, float t);
+    static BezierPath Lerp(const BezierPath &from, const BezierPath &to, float t);
 };
 
 // Evaluates a point on a cubic bezier curve:
@@ -68,7 +70,7 @@ Vec2 CubicBezierPoint(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, float t);
 // from: start keyframe.
 // to: end keyframe.
 // easedProgress: eased blend factor in [0,1].
-Vec2 EvaluateSpatial(const Keyframe<Vec2>& from, const Keyframe<Vec2>& to,
+Vec2 EvaluateSpatial(const Keyframe<Vec2> &from, const Keyframe<Vec2> &to,
                      float easedProgress);
 
 }  // namespace motion

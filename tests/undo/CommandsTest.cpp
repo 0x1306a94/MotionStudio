@@ -46,8 +46,8 @@ namespace {
 struct Scene {
     Document document;
     UndoManager undo;
-    Composition* composition;
-    Layer* layer;
+    Composition *composition;
+    Layer *layer;
 
     Scene() {
         composition = document.addComposition(std::make_unique<Composition>());
@@ -55,7 +55,7 @@ struct Scene {
     }
 
     template <typename CommandType, typename... Args>
-    void execute(Args&&... args) {
+    void execute(Args &&...args) {
         undo.execute(document,
                      std::make_unique<CommandType>(std::forward<Args>(args)...));
     }
@@ -105,9 +105,9 @@ TEST(AddLayerCommandTest, InsertsAtIndex) {
 
 TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
     Scene scene;
-    auto* shapeContent = static_cast<ShapeContent*>(scene.layer->content.get());
+    auto *shapeContent = static_cast<ShapeContent *>(scene.layer->content.get());
     auto fill = std::make_unique<ShapeFill>();
-    auto* fillRaw = fill.get();
+    auto *fillRaw = fill.get();
     shapeContent->elements.push_back(std::move(fill));
     scene.document.refreshEntityIndex();
 
@@ -123,12 +123,12 @@ TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
 
     scene.undo.undo(scene.document);
     ASSERT_EQ(scene.composition->layers.size(), 1u);
-    auto* restoredFill = scene.document.entityIndex().findShape(fillRaw->id);
+    auto *restoredFill = scene.document.entityIndex().findShape(fillRaw->id);
     ASSERT_NE(restoredFill, nullptr);
     EXPECT_EQ(restoredFill->id, fillRaw->id);
-    auto* restoredLayer = scene.document.entityIndex().findLayer(layerId);
-    auto* restoredContent = static_cast<ShapeContent*>(restoredLayer->content.get());
-    auto* fill2 = static_cast<ShapeFill*>(restoredContent->elements[0].get());
+    auto *restoredLayer = scene.document.entityIndex().findLayer(layerId);
+    auto *restoredContent = static_cast<ShapeContent *>(restoredLayer->content.get());
+    auto *fill2 = static_cast<ShapeFill *>(restoredContent->elements[0].get());
     EXPECT_EQ(fill2->color.keyframes().size(), 1u);
     EXPECT_EQ(fill2->color.evaluate(10), (Color{1, 0, 0, 1}));
 }
@@ -143,9 +143,9 @@ TEST(RemoveLayerCommandTest, ExecuteSkipsMissingLayer) {
 
 TEST(MoveLayerCommandTest, MoveAndUndo) {
     Scene scene;
-    Layer* second =
+    Layer *second =
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
-    Layer* third =
+    Layer *third =
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
 
     scene.execute<MoveLayerCommand>(scene.composition->id, 0, 2);
@@ -243,7 +243,7 @@ TEST(RemoveKeyframeCommandTest, RemoveAndUndoRestoresExactly) {
 
     scene.undo.undo(scene.document);
     ASSERT_EQ(scene.layer->transform.position.keyframes().size(), 1u);
-    const Keyframe<Vec2>& restored = scene.layer->transform.position.keyframes()[0];
+    const Keyframe<Vec2> &restored = scene.layer->transform.position.keyframes()[0];
     EXPECT_EQ(restored.time, motion::FrameTime(10));
     EXPECT_EQ(restored.value, (Vec2{50, 0}));
     EXPECT_EQ(restored.easing, Easing::EaseOut());
@@ -276,7 +276,7 @@ TEST(MoveKeyframeCommandTest, MoveAndUndo) {
 TEST(MoveKeyframeCommandTest, UndoRestoresOverwrittenKeyframe) {
     Scene scene;
     PropertyPath path = TransformPosition(scene.layer->id);
-    auto& position = scene.layer->transform.position;
+    auto &position = scene.layer->transform.position;
     position.addKeyframe(PositionKeyframe(10, {10, 0}));
     position.addKeyframe(PositionKeyframe(30, {30, 0}));
 

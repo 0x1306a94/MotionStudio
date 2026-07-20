@@ -17,7 +17,7 @@ float Length(Vec2 v) {
 Vec2 CubicPoint(Vec2 p0, Vec2 c1, Vec2 c2, Vec2 p3, float t) {
     const float mt = 1 - t;
     return p0 * (mt * mt * mt) + c1 * (3 * mt * mt * t) + c2 * (3 * mt * t * t) +
-           p3 * (t * t * t);
+        p3 * (t * t * t);
 }
 
 // Flattened arc length of the curve portion [0, t].
@@ -51,7 +51,7 @@ BezierPath::Vertex SplitVertex(Vec2 p0, Vec2 outTangent0, Vec2 inTangent3, Vec2 
 
 }  // namespace
 
-BezierPath ResamplePath(const BezierPath& path, size_t vertexCount) {
+BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
     const size_t count = path.vertices.size();
     if (count < 2 || vertexCount < 2 || vertexCount == count) {
         return path;
@@ -63,8 +63,8 @@ BezierPath ResamplePath(const BezierPath& path, size_t vertexCount) {
     cumulative.reserve(segmentCount * kSamplesPerSegment + 1);
     cumulative.push_back(0);
     for (size_t segment = 0; segment < segmentCount; ++segment) {
-        const BezierPath::Vertex& from = path.vertices[segment];
-        const BezierPath::Vertex& to = path.vertices[(segment + 1) % count];
+        const BezierPath::Vertex &from = path.vertices[segment];
+        const BezierPath::Vertex &to = path.vertices[(segment + 1) % count];
         const Vec2 c1 = from.point + from.outTangent;
         const Vec2 c2 = to.point + to.inTangent;
         Vec2 previous = from.point;
@@ -90,8 +90,8 @@ BezierPath ResamplePath(const BezierPath& path, size_t vertexCount) {
         const size_t sampleIndex =
             std::clamp(size_t(it - cumulative.begin()), size_t(1), cumulative.size() - 1);
         const size_t segment = (sampleIndex - 1) / kSamplesPerSegment;
-        const BezierPath::Vertex& from = path.vertices[segment];
-        const BezierPath::Vertex& to = path.vertices[(segment + 1) % count];
+        const BezierPath::Vertex &from = path.vertices[segment];
+        const BezierPath::Vertex &to = path.vertices[(segment + 1) % count];
         const Vec2 c1 = from.point + from.outTangent;
         const Vec2 c2 = to.point + to.inTangent;
 
