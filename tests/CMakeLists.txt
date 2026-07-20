@@ -6,6 +6,9 @@ add_executable(core_tests
     common/EntityIdTest.cpp
     common/MathTest.cpp
     common/TimeTest.cpp
+    animation/AnimatableTest.cpp
+    animation/EasingTest.cpp
+    animation/InterpolatorTest.cpp
 )
 target_link_libraries(core_tests PRIVATE core GTest::gtest_main)
 gtest_discover_tests(core_tests)
