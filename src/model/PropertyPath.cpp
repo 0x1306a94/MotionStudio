@@ -1,0 +1,156 @@
+#include "MotionStudio/model/PropertyPath.h"
+
+#include <cctype>
+
+#include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerContent.h"
+#include "MotionStudio/model/ShapeElement.h"
+
+namespace motion {
+
+std::vector<PathSegment> parsePropertyPath(const std::string& path) {
+    std::vector<PathSegment> segments;
+    size_t position = 0;
+    while (position < path.size()) {
+        PathSegment segment;
+
+        const size_t nameStart = position;
+        while (position < path.size() && path[position] != '.' && path[position] != '[') {
+            ++position;
+        }
+        segment.name = path.substr(nameStart, position - nameStart);
+        if (segment.name.empty()) return {};
+
+        if (position < path.size() && path[position] == '[') {
+            ++position;
+            int index = 0;
+            bool hasDigit = false;
+            while (position < path.size() &&
+                   std::isdigit(static_cast<unsigned char>(path[position]))) {
+                index = index * 10 + (path[position] - '0');
+                hasDigit = true;
+                ++position;
+            }
+            if (!hasDigit || position >= path.size() || path[position] != ']') return {};
+            ++position;
+            segment.index = index;
+        }
+
+        segments.push_back(segment);
+        if (position >= path.size()) break;
+        if (path[position] != '.') return {};
+        ++position;
+        if (position >= path.size()) return {};  // 拒绝尾部 '.'
+    }
+    return segments;
+}
+
+namespace {
+
+AnimatableBase* resolveTransformProperty(Transform& transform, const std::string& name) {
+    if (name == "anchorPoint") return &transform.anchorPoint;
+    if (name == "position") return &transform.position;
+    if (name == "scale") return &transform.scale;
+    if (name == "rotation") return &transform.rotation;
+    if (name == "opacity") return &transform.opacity;
+    return nullptr;
+}
+
+// 具体形状类型上的终端属性。
+AnimatableBase* resolveShapeProperty(ShapeElement* element, const std::string& name) {
+    switch (element->type()) {
+        case ShapeType::Path:
+            if (name == "path") return &static_cast<ShapePath*>(element)->path;
+            break;
+        case ShapeType::Fill:
+            if (name == "color") return &static_cast<ShapeFill*>(element)->color;
+            if (name == "opacity") return &static_cast<ShapeFill*>(element)->opacity;
+            break;
+        case ShapeType::Stroke:
+            if (name == "color") return &static_cast<ShapeStroke*>(element)->color;
+            if (name == "width") return &static_cast<ShapeStroke*>(element)->width;
+            if (name == "opacity") return &static_cast<ShapeStroke*>(element)->opacity;
+            break;
+        case ShapeType::Rect:
+            if (name == "position") return &static_cast<ShapeRect*>(element)->position;
+            if (name == "size") return &static_cast<ShapeRect*>(element)->size;
+            if (name == "cornerRadius")
+                return &static_cast<ShapeRect*>(element)->cornerRadius;
+            break;
+        case ShapeType::Ellipse:
+            if (name == "position") return &static_cast<ShapeEllipse*>(element)->position;
+            if (name == "size") return &static_cast<ShapeEllipse*>(element)->size;
+            break;
+        case ShapeType::TrimPath:
+            if (name == "start") return &static_cast<ShapeTrimPath*>(element)->start;
+            if (name == "end") return &static_cast<ShapeTrimPath*>(element)->end;
+            if (name == "offset") return &static_cast<ShapeTrimPath*>(element)->offset;
+            break;
+        case ShapeType::Group:
+            break;
+    }
+    return nullptr;
+}
+
+// 从某个形状元素出发，按 segments[from..] 逐段下行，末段必须是属性名。
+AnimatableBase* resolveShapeSegments(ShapeElement* element,
+                                     const std::vector<PathSegment>& segments,
+                                     size_t from) {
+    ShapeElement* current = element;
+    for (size_t i = from; i < segments.size(); ++i) {
+        const PathSegment& segment = segments[i];
+
+        if (segment.name == "elements" && segment.index >= 0) {
+            auto* group = dynamic_cast<ShapeGroup*>(current);
+            if (!group || segment.index >= int(group->elements.size())) return nullptr;
+            current = group->elements[size_t(segment.index)].get();
+            continue;
+        }
+        if (segment.name == "transform") {
+            auto* group = dynamic_cast<ShapeGroup*>(current);
+            if (!group || i + 1 != segments.size() - 1) return nullptr;
+            return resolveTransformProperty(group->transform, segments[i + 1].name);
+        }
+        if (i != segments.size() - 1) return nullptr;
+        return resolveShapeProperty(current, segment.name);
+    }
+    return nullptr;
+}
+
+}  // namespace
+
+AnimatableBase* resolveAnimatable(Document& document, const PropertyPath& property) {
+    const std::vector<PathSegment> segments = parsePropertyPath(property.path);
+    if (segments.empty()) return nullptr;
+
+    if (Layer* layer = document.entityIndex().findLayer(property.entityId)) {
+        const PathSegment& first = segments[0];
+        if (first.name == "transform" && segments.size() == 2) {
+            return resolveTransformProperty(layer->transform, segments[1].name);
+        }
+        if (first.name == "elements" && first.index >= 0) {
+            auto* shapeContent = dynamic_cast<ShapeContent*>(layer->content.get());
+            if (!shapeContent || first.index >= int(shapeContent->elements.size())) {
+                return nullptr;
+            }
+            return resolveShapeSegments(shapeContent->elements[size_t(first.index)].get(),
+                                        segments, 1);
+        }
+        if (first.name == "content" && segments.size() == 2) {
+            auto* textContent = dynamic_cast<TextContent*>(layer->content.get());
+            if (!textContent) return nullptr;
+            if (segments[1].name == "text") return &textContent->text;
+            if (segments[1].name == "fontSize") return &textContent->fontSize;
+            return nullptr;
+        }
+        return nullptr;
+    }
+
+    if (ShapeElement* shape = document.entityIndex().findShape(property.entityId)) {
+        return resolveShapeSegments(shape, segments, 0);
+    }
+
+    return nullptr;
+}
+
+}  // namespace motion

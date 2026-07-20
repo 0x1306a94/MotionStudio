@@ -7,8 +7,11 @@
 namespace motion {
 
 // 插值策略 trait：Animatable<T> 不关心 T 的细节，插值方式经此注入。
+// 默认阶梯插值：离散类型（如 std::string 文本）保持前一关键帧的值直到下一关键帧。
 template <typename T>
-struct Interpolator;
+struct Interpolator {
+    static T lerp(const T& from, const T& /*to*/, float /*t*/) { return from; }
+};
 
 template <>
 struct Interpolator<float> {

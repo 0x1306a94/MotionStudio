@@ -3,6 +3,9 @@ add_library(core STATIC
     common/EntityId.cpp
     animation/Easing.cpp
     animation/Interpolator.cpp
+    model/Document.cpp
+    model/Layer.cpp
+    model/PropertyPath.cpp
 )
 target_include_directories(core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_compile_options(core PRIVATE -Wall -Wextra)

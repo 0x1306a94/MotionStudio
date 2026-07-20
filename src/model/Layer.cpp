@@ -1,0 +1,67 @@
+#include "MotionStudio/model/Layer.h"
+
+#include "MotionStudio/model/Document.h"
+
+namespace motion {
+
+namespace {
+
+std::unique_ptr<LayerContent> makeContent(LayerType type) {
+    switch (type) {
+        case LayerType::Shape:
+            return std::make_unique<ShapeContent>();
+        case LayerType::Image:
+            return std::make_unique<ImageContent>();
+        case LayerType::Text:
+            return std::make_unique<TextContent>();
+        case LayerType::Null:
+            return std::make_unique<NullContent>();
+        case LayerType::Precomp:
+            return std::make_unique<PrecompContent>();
+    }
+    return std::make_unique<NullContent>();
+}
+
+}  // namespace
+
+Layer::Layer(LayerType type)
+    : content(makeContent(type)), type_(type) {}
+
+bool Layer::setParent(EntityId newParentId, const Document& document) {
+    if (!newParentId.isValid()) {
+        parentId = newParentId;
+        return true;
+    }
+    // 沿目标父链上行，遇到自身则会形成环。
+    EntityId cursor = newParentId;
+    while (cursor.isValid()) {
+        if (cursor == id) return false;
+        const Layer* ancestor = document.entityIndex().findLayer(cursor);
+        if (!ancestor) return false;  // 父链悬空，拒绝
+        cursor = ancestor->parentId;
+    }
+    parentId = newParentId;
+    return true;
+}
+
+Mat3 Layer::localTransform(FrameTime time) const {
+    return Mat3::translate(transform.position.evaluate(time)) *
+           Mat3::rotate(transform.rotation.evaluate(time)) *
+           Mat3::scale(transform.scale.evaluate(time)) *
+           Mat3::translate(-transform.anchorPoint.evaluate(time));
+}
+
+Mat3 Layer::worldTransform(FrameTime time, const Document& document) const {
+    return worldTransform(time, document, 0);
+}
+
+Mat3 Layer::worldTransform(FrameTime time, const Document& document, int depth) const {
+    Mat3 local = localTransform(time);
+    // depth 兜底：正常路径由 setParent 防环，此处防反序列化产生的非法环。
+    if (!parentId.isValid() || depth >= 1024) return local;
+    const Layer* parent = document.entityIndex().findLayer(parentId);
+    if (!parent) return local;
+    return parent->worldTransform(time, document, depth + 1) * local;
+}
+
+}  // namespace motion

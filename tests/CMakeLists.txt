@@ -9,6 +9,9 @@ add_executable(core_tests
     animation/AnimatableTest.cpp
     animation/EasingTest.cpp
     animation/InterpolatorTest.cpp
+    model/DocumentTest.cpp
+    model/LayerTest.cpp
+    model/PropertyPathTest.cpp
 )
 target_link_libraries(core_tests PRIVATE core GTest::gtest_main)
 gtest_discover_tests(core_tests)

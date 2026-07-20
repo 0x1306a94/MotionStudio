@@ -24,7 +24,8 @@ template <typename T>
 class Animatable : public AnimatableBase {
 public:
     Animatable() = default;
-    explicit Animatable(T staticValue) : value_(std::move(staticValue)) {}
+    // 非 explicit：支持 `Animatable<float> opacity{1};` 式的成员初始化。
+    Animatable(T staticValue) : value_(std::move(staticValue)) {}
 
     // 按 time 有序插入；同 time 已存在则替换。
     void addKeyframe(Keyframe<T> keyframe) {
