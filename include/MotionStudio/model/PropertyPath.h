@@ -32,9 +32,9 @@ struct PathSegment {
 };
 
 // 解析 "a.b[2].c" → [{a,-1},{b,2},{c,-1}]；格式非法返回空。
-std::vector<PathSegment> parsePropertyPath(const std::string& path);
+std::vector<PathSegment> ParsePropertyPath(const std::string& path);
 
 // 解析属性路径到 Animatable；实体不存在 / 路径无效 / 类型不符返回 nullptr。
-AnimatableBase* resolveAnimatable(Document& document, const PropertyPath& property);
+AnimatableBase* ResolveAnimatable(Document& document, const PropertyPath& property);
 
 }  // namespace motion

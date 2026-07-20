@@ -21,7 +21,7 @@ void AddLayerCommand::execute(Document& document) {
         return;  // 合成已删除 → 跳过
     }
     document.addLayer(compositionId_, std::move(layer_), index_);
-    index_ = indexOfLayer(*composition, layerId_);  // 记录实际位置供 undo/redo
+    index_ = IndexOfLayer(*composition, layerId_);  // 记录实际位置供 undo/redo
 }
 
 void AddLayerCommand::undo(Document& document) {

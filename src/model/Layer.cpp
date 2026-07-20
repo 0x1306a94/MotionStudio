@@ -11,7 +11,7 @@ namespace motion {
 
 namespace {
 
-std::unique_ptr<LayerContent> makeContent(LayerType type) {
+std::unique_ptr<LayerContent> MakeContent(LayerType type) {
     switch (type) {
         case LayerType::Shape:
             return std::make_unique<ShapeContent>();
@@ -29,7 +29,7 @@ std::unique_ptr<LayerContent> makeContent(LayerType type) {
 
 }  // namespace
 
-Layer::Layer(LayerType type) : content(makeContent(type)), type_(type) {}
+Layer::Layer(LayerType type) : content(MakeContent(type)), type_(type) {}
 
 Layer::~Layer() = default;
 
@@ -59,10 +59,10 @@ bool Layer::setParent(EntityId newParentId, const Document& document) {
 }
 
 Mat3 Layer::localTransform(FrameTime time) const {
-    return Mat3::translate(transform.position.evaluate(time)) *
-           Mat3::rotate(transform.rotation.evaluate(time)) *
-           Mat3::scale(transform.scale.evaluate(time)) *
-           Mat3::translate(-transform.anchorPoint.evaluate(time));
+    return Mat3::Translate(transform.position.evaluate(time)) *
+           Mat3::Rotate(transform.rotation.evaluate(time)) *
+           Mat3::Scale(transform.scale.evaluate(time)) *
+           Mat3::Translate(-transform.anchorPoint.evaluate(time));
 }
 
 Mat3 Layer::worldTransform(FrameTime time, const Document& document) const {

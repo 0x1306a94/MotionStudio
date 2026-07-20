@@ -11,19 +11,19 @@ SetEasingCommand::SetEasingCommand(PropertyPath property, FrameTime time, Easing
     : property_(std::move(property)), time_(time), easing_(easing) {}
 
 void SetEasingCommand::execute(Document& document) {
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     if (!captured_) {
         Easing oldEasing;
-        found_ = applyEasingAny(target, time_, easing_, &oldEasing);
+        found_ = ApplyEasingAny(target, time_, easing_, &oldEasing);
         if (found_) {
             oldEasing_ = oldEasing;
         }
         captured_ = true;
     } else if (found_) {
-        applyEasingAny(target, time_, easing_, nullptr);
+        ApplyEasingAny(target, time_, easing_, nullptr);
     }
 }
 
@@ -31,11 +31,11 @@ void SetEasingCommand::undo(Document& document) {
     if (!captured_ || !found_) {
         return;
     }
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
-    applyEasingAny(target, time_, *oldEasing_, nullptr);
+    ApplyEasingAny(target, time_, *oldEasing_, nullptr);
 }
 
 bool SetEasingCommand::mergeWith(const Command& other) {

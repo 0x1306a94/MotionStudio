@@ -2,9 +2,9 @@
 
 #include "MotionStudio/animation/Easing.h"
 
-using motion::applyEasing;
+using motion::ApplyEasing;
 using motion::Easing;
-using motion::solveBezierEasing;
+using motion::SolveBezierEasing;
 
 TEST(EasingTest, Presets) {
     EXPECT_EQ(Easing::Linear().type, Easing::Type::Linear);
@@ -14,34 +14,34 @@ TEST(EasingTest, Presets) {
 }
 
 TEST(ApplyEasingTest, LinearIsIdentity) {
-    EXPECT_FLOAT_EQ(applyEasing(Easing::Linear(), 0.3f), 0.3f);
+    EXPECT_FLOAT_EQ(ApplyEasing(Easing::Linear(), 0.3f), 0.3f);
 }
 
 TEST(ApplyEasingTest, HoldStaysAtStartValue) {
-    EXPECT_FLOAT_EQ(applyEasing(Easing::Hold(), 0.9f), 0.0f);
+    EXPECT_FLOAT_EQ(ApplyEasing(Easing::Hold(), 0.9f), 0.0f);
 }
 
 TEST(SolveBezierEasingTest, ClampsAtEnds) {
-    EXPECT_FLOAT_EQ(solveBezierEasing(0.42f, 0, 1, 1, 0), 0);
-    EXPECT_FLOAT_EQ(solveBezierEasing(0.42f, 0, 1, 1, 1), 1);
+    EXPECT_FLOAT_EQ(SolveBezierEasing(0.42f, 0, 1, 1, 0), 0);
+    EXPECT_FLOAT_EQ(SolveBezierEasing(0.42f, 0, 1, 1, 1), 1);
 }
 
 TEST(SolveBezierEasingTest, LinearControlPointsGiveIdentity) {
     for (float x = 0.1f; x < 1.0f; x += 0.1f) {
-        EXPECT_NEAR(solveBezierEasing(0, 0, 1, 1, x), x, 1e-5f);
+        EXPECT_NEAR(SolveBezierEasing(0, 0, 1, 1, x), x, 1e-5f);
     }
 }
 
 TEST(SolveBezierEasingTest, SymmetricCurvePassesThroughCenter) {
     // cubic-bezier(0.5, 0, 0.5, 1) 关于 (0.5, 0.5) 中心对称。
-    EXPECT_NEAR(solveBezierEasing(0.5f, 0, 0.5f, 1, 0.5f), 0.5f, 1e-5f);
+    EXPECT_NEAR(SolveBezierEasing(0.5f, 0, 0.5f, 1, 0.5f), 0.5f, 1e-5f);
 }
 
 TEST(SolveBezierEasingTest, EaseInLagsBehindLinear) {
-    EXPECT_LT(solveBezierEasing(0.42f, 0, 1, 1, 0.5f), 0.5f);
+    EXPECT_LT(SolveBezierEasing(0.42f, 0, 1, 1, 0.5f), 0.5f);
 }
 
 TEST(SolveBezierEasingTest, YOvershootIsAllowed) {
     // y 控制点越界产生回弹：中段 y < 0。
-    EXPECT_LT(solveBezierEasing(0.5f, -0.5f, 0.5f, 1.5f, 0.25f), 0.0f);
+    EXPECT_LT(SolveBezierEasing(0.5f, -0.5f, 0.5f, 1.5f, 0.25f), 0.0f);
 }

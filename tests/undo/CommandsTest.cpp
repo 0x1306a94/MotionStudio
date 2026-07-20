@@ -61,11 +61,11 @@ struct Scene {
     }
 };
 
-PropertyPath transformPosition(EntityId layerId) {
+PropertyPath TransformPosition(EntityId layerId) {
     return {layerId, "transform.position"};
 }
 
-Keyframe<Vec2> positionKeyframe(motion::FrameTime time, Vec2 value,
+Keyframe<Vec2> PositionKeyframe(motion::FrameTime time, Vec2 value,
                                 Easing easing = Easing::Linear()) {
     Keyframe<Vec2> keyframe;
     keyframe.time = time;
@@ -176,7 +176,7 @@ TEST(MoveLayerCommandTest, ConsecutiveDragsMerge) {
 
 TEST(SetStaticValueCommandTest, SetAndUndo) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
     EXPECT_EQ(scene.layer->transform.position.staticValue(), (Vec2{0, 0}));
 
     scene.execute<SetStaticValueCommand>(path, PropertyValue{Vec2{100, 200}});
@@ -189,7 +189,7 @@ TEST(SetStaticValueCommandTest, SetAndUndo) {
 
 TEST(SetStaticValueCommandTest, MergesSameTargetKeepsOriginalValue) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
 
     scene.execute<SetStaticValueCommand>(path, PropertyValue{Vec2{10, 0}});
     scene.execute<SetStaticValueCommand>(path, PropertyValue{Vec2{20, 0}});
@@ -202,7 +202,7 @@ TEST(SetStaticValueCommandTest, MergesSameTargetKeepsOriginalValue) {
 
 TEST(SetStaticValueCommandTest, TypeMismatchIsNoOp) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
 
     scene.execute<SetStaticValueCommand>(path, PropertyValue{1.0f});  // position 是 Vec2
     EXPECT_EQ(scene.layer->transform.position.staticValue(), (Vec2{0, 0}));
@@ -210,9 +210,9 @@ TEST(SetStaticValueCommandTest, TypeMismatchIsNoOp) {
 
 TEST(AddKeyframeCommandTest, AddAndUndo) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
 
-    scene.execute<AddKeyframeCommand>(path, KeyframeData{positionKeyframe(10, {50, 0})});
+    scene.execute<AddKeyframeCommand>(path, KeyframeData{PositionKeyframe(10, {50, 0})});
     ASSERT_TRUE(scene.layer->transform.position.isAnimated());
     EXPECT_EQ(scene.layer->transform.position.evaluate(10), (Vec2{50, 0}));
 
@@ -222,10 +222,10 @@ TEST(AddKeyframeCommandTest, AddAndUndo) {
 
 TEST(AddKeyframeCommandTest, UndoRestoresReplacedKeyframe) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
-    scene.layer->transform.position.addKeyframe(positionKeyframe(10, {1, 1}));
+    PropertyPath path = TransformPosition(scene.layer->id);
+    scene.layer->transform.position.addKeyframe(PositionKeyframe(10, {1, 1}));
 
-    scene.execute<AddKeyframeCommand>(path, KeyframeData{positionKeyframe(10, {9, 9})});
+    scene.execute<AddKeyframeCommand>(path, KeyframeData{PositionKeyframe(10, {9, 9})});
     EXPECT_EQ(scene.layer->transform.position.evaluate(10), (Vec2{9, 9}));
 
     scene.undo.undo(scene.document);
@@ -235,9 +235,9 @@ TEST(AddKeyframeCommandTest, UndoRestoresReplacedKeyframe) {
 
 TEST(RemoveKeyframeCommandTest, RemoveAndUndoRestoresExactly) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
     scene.layer->transform.position.addKeyframe(
-        positionKeyframe(10, {50, 0}, Easing::EaseOut()));
+        PositionKeyframe(10, {50, 0}, Easing::EaseOut()));
 
     scene.execute<RemoveKeyframeCommand>(path, 10);
     EXPECT_FALSE(scene.layer->transform.position.isAnimated());
@@ -252,7 +252,7 @@ TEST(RemoveKeyframeCommandTest, RemoveAndUndoRestoresExactly) {
 
 TEST(RemoveKeyframeCommandTest, MissingFrameIsNoOp) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
 
     scene.execute<RemoveKeyframeCommand>(path, 42);
     scene.undo.undo(scene.document);  // 不应崩溃
@@ -261,8 +261,8 @@ TEST(RemoveKeyframeCommandTest, MissingFrameIsNoOp) {
 
 TEST(MoveKeyframeCommandTest, MoveAndUndo) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
-    scene.layer->transform.position.addKeyframe(positionKeyframe(10, {50, 0}));
+    PropertyPath path = TransformPosition(scene.layer->id);
+    scene.layer->transform.position.addKeyframe(PositionKeyframe(10, {50, 0}));
 
     scene.execute<MoveKeyframeCommand>(path, 10, 30);
     ASSERT_EQ(scene.layer->transform.position.keyframes().size(), 1u);
@@ -276,10 +276,10 @@ TEST(MoveKeyframeCommandTest, MoveAndUndo) {
 
 TEST(MoveKeyframeCommandTest, UndoRestoresOverwrittenKeyframe) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
     auto& position = scene.layer->transform.position;
-    position.addKeyframe(positionKeyframe(10, {10, 0}));
-    position.addKeyframe(positionKeyframe(30, {30, 0}));
+    position.addKeyframe(PositionKeyframe(10, {10, 0}));
+    position.addKeyframe(PositionKeyframe(30, {30, 0}));
 
     scene.execute<MoveKeyframeCommand>(path, 10, 30);  // 覆盖 30 帧
     ASSERT_EQ(position.keyframes().size(), 1u);
@@ -293,8 +293,8 @@ TEST(MoveKeyframeCommandTest, UndoRestoresOverwrittenKeyframe) {
 
 TEST(MoveKeyframeCommandTest, ConsecutiveDragsMerge) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
-    scene.layer->transform.position.addKeyframe(positionKeyframe(10, {10, 0}));
+    PropertyPath path = TransformPosition(scene.layer->id);
+    scene.layer->transform.position.addKeyframe(PositionKeyframe(10, {10, 0}));
 
     scene.execute<MoveKeyframeCommand>(path, 10, 11);
     scene.execute<MoveKeyframeCommand>(path, 11, 12);
@@ -308,8 +308,8 @@ TEST(MoveKeyframeCommandTest, ConsecutiveDragsMerge) {
 
 TEST(SetEasingCommandTest, SetAndUndo) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
-    scene.layer->transform.position.addKeyframe(positionKeyframe(10, {50, 0}));
+    PropertyPath path = TransformPosition(scene.layer->id);
+    scene.layer->transform.position.addKeyframe(PositionKeyframe(10, {50, 0}));
 
     scene.execute<SetEasingCommand>(path, 10, Easing::EaseIn());
     EXPECT_EQ(scene.layer->transform.position.keyframes()[0].easing, Easing::EaseIn());
@@ -320,7 +320,7 @@ TEST(SetEasingCommandTest, SetAndUndo) {
 
 TEST(SetEasingCommandTest, MissingFrameIsNoOp) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
 
     scene.execute<SetEasingCommand>(path, 99, Easing::EaseIn());
     scene.undo.undo(scene.document);  // 不应崩溃
@@ -329,9 +329,9 @@ TEST(SetEasingCommandTest, MissingFrameIsNoOp) {
 
 TEST(CommandsTest, SkipWhenTargetEntityDeleted) {
     Scene scene;
-    PropertyPath path = transformPosition(scene.layer->id);
+    PropertyPath path = TransformPosition(scene.layer->id);
 
-    scene.execute<AddKeyframeCommand>(path, KeyframeData{positionKeyframe(10, {50, 0})});
+    scene.execute<AddKeyframeCommand>(path, KeyframeData{PositionKeyframe(10, {50, 0})});
     scene.execute<RemoveLayerCommand>(scene.composition->id, scene.layer->id);
 
     // 图层已删除：新命令静默跳过，不崩溃。

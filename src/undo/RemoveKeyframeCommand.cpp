@@ -11,15 +11,15 @@ RemoveKeyframeCommand::RemoveKeyframeCommand(PropertyPath property, FrameTime ti
     : property_(std::move(property)), time_(time) {}
 
 void RemoveKeyframeCommand::execute(Document& document) {
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     if (!captured_) {
-        removed_ = takeKeyframeAny(target, time_);
+        removed_ = TakeKeyframeAny(target, time_);
         captured_ = true;
     } else {
-        takeKeyframeAny(target, time_);  // redo：再次移除
+        TakeKeyframeAny(target, time_);  // redo：再次移除
     }
 }
 
@@ -27,11 +27,11 @@ void RemoveKeyframeCommand::undo(Document& document) {
     if (!captured_ || !removed_) {
         return;
     }
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
-    addKeyframeAny(target, *removed_);
+    AddKeyframeAny(target, *removed_);
 }
 
 CommandKind RemoveKeyframeCommand::kind() const {

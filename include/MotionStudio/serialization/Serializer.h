@@ -19,6 +19,6 @@ public:
 };
 
 // 序列化结果的 FNV-1a 哈希。debug 测试用：undo 前后一致性断言。
-uint64_t documentFingerprint(const Document& document);
+uint64_t DocumentFingerprint(const Document& document);
 
 }  // namespace motion

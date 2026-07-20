@@ -28,7 +28,7 @@ bool PathSegment::operator==(const PathSegment& other) const {
     return name == other.name && index == other.index;
 }
 
-std::vector<PathSegment> parsePropertyPath(const std::string& path) {
+std::vector<PathSegment> ParsePropertyPath(const std::string& path) {
     std::vector<PathSegment> segments;
     size_t position = 0;
     while (position < path.size()) {
@@ -195,8 +195,8 @@ AnimatableBase* resolveShapeSegments(ShapeElement* element,
 
 }  // namespace
 
-AnimatableBase* resolveAnimatable(Document& document, const PropertyPath& property) {
-    const std::vector<PathSegment> segments = parsePropertyPath(property.path);
+AnimatableBase* ResolveAnimatable(Document& document, const PropertyPath& property) {
+    const std::vector<PathSegment> segments = ParsePropertyPath(property.path);
     if (segments.empty()) {
         return nullptr;
     }

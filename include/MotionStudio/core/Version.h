@@ -3,6 +3,6 @@
 namespace motion {
 
 // 返回 MotionStudio 核心库的版本号字符串。
-const char* version();
+const char* Version();
 
 }  // namespace motion

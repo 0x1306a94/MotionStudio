@@ -22,7 +22,7 @@ using motion::Asset;
 using motion::AssetType;
 using motion::Color;
 using motion::Composition;
-using motion::documentFingerprint;
+using motion::DocumentFingerprint;
 using motion::Document;
 using motion::Easing;
 using motion::Expected;
@@ -46,7 +46,7 @@ using motion::Vec2;
 namespace {
 
 // 覆盖全部类型与双态属性的文档。
-std::unique_ptr<Document> buildRichDocument() {
+std::unique_ptr<Document> BuildRichDocument() {
     auto document = std::make_unique<Document>();
     document->name = "rich";
 
@@ -156,7 +156,7 @@ std::unique_ptr<Document> buildRichDocument() {
 }  // namespace
 
 TEST(SerializerTest, RoundTripIsJsonStable) {
-    auto document = buildRichDocument();
+    auto document = BuildRichDocument();
     const std::string first = Serializer::serialize(*document);
 
     Expected<std::unique_ptr<Document>> restored = Serializer::deserialize(first);
@@ -167,7 +167,7 @@ TEST(SerializerTest, RoundTripIsJsonStable) {
 }
 
 TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
-    auto document = buildRichDocument();
+    auto document = BuildRichDocument();
     Expected<std::unique_ptr<Document>> restored =
         Serializer::deserialize(Serializer::serialize(*document));
     ASSERT_TRUE(restored.hasValue());
@@ -181,7 +181,7 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     // 关键帧 + 缓动 + 空间手柄恢复：逐帧求值与原文档一致。
     const Layer& originalShapes = *document->compositions[1]->layers[0];
     for (motion::FrameTime time : {0, 15, 30, 45, 60, 90}) {
-        EXPECT_TRUE(motion::approxEqual(shapes.transform.position.evaluate(time),
+        EXPECT_TRUE(motion::ApproxEqual(shapes.transform.position.evaluate(time),
                                         originalShapes.transform.position.evaluate(time)))
             << "time=" << time;
     }
@@ -235,7 +235,7 @@ TEST(SerializerTest, RejectsInvalidInput) {
     ASSERT_FALSE(badVersion.hasValue());
     EXPECT_NE(badVersion.errorMessage().find("schemaVersion"), std::string::npos);
 
-    auto document = buildRichDocument();
+    auto document = BuildRichDocument();
     std::string text = Serializer::serialize(*document);
     // 破坏 layer content 的类型字段。
     const std::string broken = text.replace(text.find("\"type\": \"shape\""), 15,
@@ -257,10 +257,10 @@ TEST(SchemaMigratorTest, RejectsUnknownVersions) {
 }
 
 TEST(FingerprintTest, StableAndSensitiveToChange) {
-    auto document = buildRichDocument();
-    const uint64_t before = documentFingerprint(*document);
-    EXPECT_EQ(documentFingerprint(*document), before);
+    auto document = BuildRichDocument();
+    const uint64_t before = DocumentFingerprint(*document);
+    EXPECT_EQ(DocumentFingerprint(*document), before);
 
     document->compositions[1]->layers[0]->transform.rotation.setStaticValue(90.0f);
-    EXPECT_NE(documentFingerprint(*document), before);
+    EXPECT_NE(DocumentFingerprint(*document), before);
 }

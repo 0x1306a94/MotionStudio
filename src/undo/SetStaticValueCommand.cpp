@@ -11,12 +11,12 @@ SetStaticValueCommand::SetStaticValueCommand(PropertyPath property, PropertyValu
     : property_(std::move(property)), value_(std::move(value)) {}
 
 void SetStaticValueCommand::execute(Document& document) {
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     PropertyValue oldValue;
-    if (!applyStaticValueAny(target, value_, oldValue)) {
+    if (!ApplyStaticValueAny(target, value_, oldValue)) {
         return;
     }
     if (!captured_) {
@@ -29,12 +29,12 @@ void SetStaticValueCommand::undo(Document& document) {
     if (!captured_) {
         return;
     }
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     PropertyValue discarded;
-    applyStaticValueAny(target, *oldValue_, discarded);
+    ApplyStaticValueAny(target, *oldValue_, discarded);
 }
 
 bool SetStaticValueCommand::mergeWith(const Command& other) {

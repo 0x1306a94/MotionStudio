@@ -17,7 +17,7 @@ struct EntityId {
     bool isValid() const;
 
     // 生成随机 ID（安全随机数源，不会返回无效值）。
-    static EntityId generate();
+    static EntityId Generate();
 };
 
 }  // namespace motion

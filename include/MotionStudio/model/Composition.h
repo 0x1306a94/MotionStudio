@@ -13,7 +13,7 @@ namespace motion {
 
 class Composition {
 public:
-    EntityId id = EntityId::generate();
+    EntityId id = EntityId::Generate();
     std::string name;
     FrameTime duration = 0;  // 帧数
     FrameRate frameRate;

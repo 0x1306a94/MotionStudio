@@ -4,18 +4,18 @@
 
 namespace motion {
 
-Mat3 Mat3::identity() {
+Mat3 Mat3::Identity() {
     return {};
 }
 
-Mat3 Mat3::translate(Vec2 offset) {
+Mat3 Mat3::Translate(Vec2 offset) {
     Mat3 result;
     result.values[2] = offset.x;
     result.values[5] = offset.y;
     return result;
 }
 
-Mat3 Mat3::rotate(float degrees) {
+Mat3 Mat3::Rotate(float degrees) {
     const float radians = degrees * 3.14159265358979323846f / 180.0f;
     const float cosValue = std::cos(radians);
     const float sinValue = std::sin(radians);
@@ -27,7 +27,7 @@ Mat3 Mat3::rotate(float degrees) {
     return result;
 }
 
-Mat3 Mat3::scale(Vec2 factor) {
+Mat3 Mat3::Scale(Vec2 factor) {
     Mat3 result;
     result.values[0] = factor.x;
     result.values[4] = factor.y;

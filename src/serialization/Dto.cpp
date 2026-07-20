@@ -2,7 +2,7 @@
 
 namespace motion::dto {
 
-const char* toString(LayerType type) {
+const char* ToString(LayerType type) {
     switch (type) {
         case LayerType::Shape: return "shape";
         case LayerType::Image: return "image";
@@ -32,7 +32,7 @@ Expected<LayerType> layerTypeFromString(const std::string& text) {
     return Error("未知 layer 类型: " + text);
 }
 
-const char* toString(ShapeType type) {
+const char* ToString(ShapeType type) {
     switch (type) {
         case ShapeType::Path: return "path";
         case ShapeType::Fill: return "fill";
@@ -70,7 +70,7 @@ Expected<ShapeType> shapeTypeFromString(const std::string& text) {
     return Error("未知 shape 类型: " + text);
 }
 
-const char* toString(FillRule rule) {
+const char* ToString(FillRule rule) {
     return rule == FillRule::NonZero ? "nonZero" : "evenOdd";
 }
 
@@ -84,7 +84,7 @@ Expected<FillRule> fillRuleFromString(const std::string& text) {
     return Error("未知 fillRule: " + text);
 }
 
-const char* toString(LineCap cap) {
+const char* ToString(LineCap cap) {
     switch (cap) {
         case LineCap::Butt: return "butt";
         case LineCap::Round: return "round";
@@ -106,7 +106,7 @@ Expected<LineCap> lineCapFromString(const std::string& text) {
     return Error("未知 lineCap: " + text);
 }
 
-const char* toString(LineJoin join) {
+const char* ToString(LineJoin join) {
     switch (join) {
         case LineJoin::Miter: return "miter";
         case LineJoin::Round: return "round";
@@ -128,7 +128,7 @@ Expected<LineJoin> lineJoinFromString(const std::string& text) {
     return Error("未知 lineJoin: " + text);
 }
 
-const char* toString(BlendMode mode) {
+const char* ToString(BlendMode mode) {
     switch (mode) {
         case BlendMode::Normal: return "normal";
         case BlendMode::Multiply: return "multiply";
@@ -154,7 +154,7 @@ Expected<BlendMode> blendModeFromString(const std::string& text) {
     return Error("未知 blendMode: " + text);
 }
 
-const char* toString(MaskMode mode) {
+const char* ToString(MaskMode mode) {
     switch (mode) {
         case MaskMode::Add: return "add";
         case MaskMode::Subtract: return "subtract";
@@ -176,7 +176,7 @@ Expected<MaskMode> maskModeFromString(const std::string& text) {
     return Error("未知 mask mode: " + text);
 }
 
-const char* toString(AssetType type) {
+const char* ToString(AssetType type) {
     return type == AssetType::Image ? "image" : "font";
 }
 
@@ -190,7 +190,7 @@ Expected<AssetType> assetTypeFromString(const std::string& text) {
     return Error("未知 asset 类型: " + text);
 }
 
-const char* toString(Easing::Type type) {
+const char* ToString(Easing::Type type) {
     switch (type) {
         case Easing::Type::Linear: return "linear";
         case Easing::Type::Bezier: return "bezier";

@@ -28,12 +28,12 @@ bool Vec2::operator!=(const Vec2& other) const {
     return !(*this == other);
 }
 
-bool approxEqual(float left, float right, float epsilon) {
+bool ApproxEqual(float left, float right, float epsilon) {
     return std::abs(left - right) <= epsilon;
 }
 
-bool approxEqual(Vec2 left, Vec2 right, float epsilon) {
-    return approxEqual(left.x, right.x, epsilon) && approxEqual(left.y, right.y, epsilon);
+bool ApproxEqual(Vec2 left, Vec2 right, float epsilon) {
+    return ApproxEqual(left.x, right.x, epsilon) && ApproxEqual(left.y, right.y, epsilon);
 }
 
 }  // namespace motion

@@ -11,28 +11,28 @@ AddKeyframeCommand::AddKeyframeCommand(PropertyPath property, KeyframeData keyfr
     : property_(std::move(property)), keyframe_(std::move(keyframe)) {}
 
 void AddKeyframeCommand::execute(Document& document) {
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     if (!captured_) {
-        replaced_ = takeKeyframeAny(target, keyframeTime(keyframe_));
+        replaced_ = TakeKeyframeAny(target, KeyframeTime(keyframe_));
         captured_ = true;
     }
-    addKeyframeAny(target, keyframe_);
+    AddKeyframeAny(target, keyframe_);
 }
 
 void AddKeyframeCommand::undo(Document& document) {
     if (!captured_) {
         return;
     }
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
-    takeKeyframeAny(target, keyframeTime(keyframe_));  // 移除本次加入的
+    TakeKeyframeAny(target, KeyframeTime(keyframe_));  // 移除本次加入的
     if (replaced_) {
-        addKeyframeAny(target, *replaced_);
+        AddKeyframeAny(target, *replaced_);
     }
 }
 

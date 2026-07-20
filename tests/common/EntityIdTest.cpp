@@ -15,7 +15,7 @@ TEST(EntityIdTest, DefaultIsInvalid) {
 TEST(EntityIdTest, GenerateReturnsValidUniqueIds) {
     std::unordered_set<EntityId> ids;
     for (int i = 0; i < 10000; ++i) {
-        EntityId id = EntityId::generate();
+        EntityId id = EntityId::Generate();
         ASSERT_TRUE(id.isValid());
         ids.insert(id);
     }

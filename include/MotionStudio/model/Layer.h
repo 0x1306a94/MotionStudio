@@ -40,7 +40,7 @@ public:
     Mat3 localTransform(FrameTime time) const;
     Mat3 worldTransform(FrameTime time, const Document& document) const;
 
-    EntityId id = EntityId::generate();
+    EntityId id = EntityId::Generate();
     std::string name;
 
     // 时间控制

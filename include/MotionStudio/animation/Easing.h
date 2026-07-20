@@ -25,10 +25,10 @@ struct Easing {
 };
 
 // 时间进度 progress ∈ [0,1] → 值进度 [0,1]（Bezier 时 y 可越界产生回弹效果）。
-float applyEasing(const Easing& easing, float progress);
+float ApplyEasing(const Easing& easing, float progress);
 
 // 贝塞尔缓动求解：给定 x 求曲线上的 y（牛顿迭代 + 二分兜底，与 CSS 引擎同策略）。
 // 要求 x1, x2 ∈ [0,1]（x 轴单调）；y1, y2 可越界。
-float solveBezierEasing(float x1, float y1, float x2, float y2, float x);
+float SolveBezierEasing(float x1, float y1, float x2, float y2, float x);
 
 }  // namespace motion

@@ -4,7 +4,7 @@
 
 #include "MotionStudio/model/Document.h"
 
-using motion::approxEqual;
+using motion::ApproxEqual;
 using motion::Composition;
 using motion::Document;
 using motion::EntityId;
@@ -90,7 +90,7 @@ TEST(LayerTransformTest, WorldAppliesParentChain) {
     scene.childLayer->transform.position.setStaticValue({0, 50});
 
     Mat3 world = scene.childLayer->worldTransform(0, scene.document);
-    EXPECT_TRUE(approxEqual(world.transformPoint({0, 0}), Vec2{100, 50}));
+    EXPECT_TRUE(ApproxEqual(world.transformPoint({0, 0}), Vec2{100, 50}));
 }
 
 TEST(LayerTransformTest, WorldFallsBackToLocalWithDanglingParent) {
@@ -100,7 +100,7 @@ TEST(LayerTransformTest, WorldFallsBackToLocalWithDanglingParent) {
     scene.childLayer->transform.position.setStaticValue({5, 5});
 
     Mat3 world = scene.childLayer->worldTransform(0, scene.document);
-    EXPECT_TRUE(approxEqual(world.transformPoint({0, 0}), Vec2{5, 5}));
+    EXPECT_TRUE(ApproxEqual(world.transformPoint({0, 0}), Vec2{5, 5}));
 }
 
 TEST(LayerTest, ConstructorCreatesMatchingContent) {

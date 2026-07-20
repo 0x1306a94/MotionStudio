@@ -60,7 +60,7 @@ public:
         return error->message();
     }
 
-    static Expected failure(std::string message) {
+    static Expected Failure(std::string message) {
         return Expected(Error(std::move(message)));
     }
 
@@ -83,7 +83,7 @@ public:
         return error_->message();
     }
 
-    static Expected failure(std::string message) {
+    static Expected Failure(std::string message) {
         return Expected(Error(std::move(message)));
     }
 

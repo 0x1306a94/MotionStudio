@@ -15,23 +15,23 @@ class AnimatableBase;
 class Composition;
 
 // 按值类型分发设置静态值；类型与属性不符返回 false。oldValue 输出设置前的值。
-bool applyStaticValueAny(AnimatableBase* target, const PropertyValue& newValue,
+bool ApplyStaticValueAny(AnimatableBase* target, const PropertyValue& newValue,
                          PropertyValue& oldValue);
 
 // 按 Animatable 实际类型取出关键帧；不存在 / 类型未知返回 nullopt。
-std::optional<KeyframeData> takeKeyframeAny(AnimatableBase* target, FrameTime time);
+std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase* target, FrameTime time);
 
 // 按关键帧实际类型插入。
-void addKeyframeAny(AnimatableBase* target, const KeyframeData& keyframe);
+void AddKeyframeAny(AnimatableBase* target, const KeyframeData& keyframe);
 
-FrameTime keyframeTime(const KeyframeData& keyframe);
-void setKeyframeTime(KeyframeData& keyframe, FrameTime time);
+FrameTime KeyframeTime(const KeyframeData& keyframe);
+void SetKeyframeTime(KeyframeData& keyframe, FrameTime time);
 
 // 设置关键帧缓动；time 处无关键帧返回 false。oldEasingOut 非空时输出旧缓动。
-bool applyEasingAny(AnimatableBase* target, FrameTime time, const Easing& easing,
+bool ApplyEasingAny(AnimatableBase* target, FrameTime time, const Easing& easing,
                     Easing* oldEasingOut);
 
 // 图层在合成中的下标；不存在返回 -1。
-int indexOfLayer(const Composition& composition, EntityId layerId);
+int IndexOfLayer(const Composition& composition, EntityId layerId);
 
 }  // namespace motion

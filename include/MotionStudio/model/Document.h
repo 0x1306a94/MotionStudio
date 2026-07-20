@@ -35,7 +35,7 @@ public:
     // 遍历整棵实体树重建索引。批量构造（如反序列化）后调用一次。
     void refreshEntityIndex();
 
-    EntityId id = EntityId::generate();
+    EntityId id = EntityId::Generate();
     std::string name;
     std::vector<std::unique_ptr<Composition>> compositions;
     std::vector<Asset> assets;  // 图片/字体等文档级资源

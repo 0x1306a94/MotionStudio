@@ -12,37 +12,37 @@ namespace motion {
 // （主模板为通用回退，须在头文件保留定义。）
 template <typename T>
 struct Interpolator {
-    static T lerp(const T& from, const T& /*to*/, float /*t*/) { return from; }
+    static T Lerp(const T& from, const T& /*to*/, float /*t*/) { return from; }
 };
 
 // 各特化的实现见 src/animation/Interpolator.cpp。
 template <>
 struct Interpolator<float> {
-    static float lerp(float from, float to, float t);
+    static float Lerp(float from, float to, float t);
 };
 
 template <>
 struct Interpolator<Vec2> {
-    static Vec2 lerp(const Vec2& from, const Vec2& to, float t);
+    static Vec2 Lerp(const Vec2& from, const Vec2& to, float t);
 };
 
 template <>
 struct Interpolator<Color> {
-    static Color lerp(const Color& from, const Color& to, float t);
+    static Color Lerp(const Color& from, const Color& to, float t);
 };
 
 template <>
 struct Interpolator<BezierPath> {
     // 逐顶点插值。M1 要求两路径顶点数一致：不一致属数据约定违例，
     // debug 下 assert 快速失败，release 降级返回 from。
-    static BezierPath lerp(const BezierPath& from, const BezierPath& to, float t);
+    static BezierPath Lerp(const BezierPath& from, const BezierPath& to, float t);
 };
 
 // 三次贝塞尔曲线取点：B(t) = (1-t)³P0 + 3(1-t)²t·P1 + 3(1-t)t²·P2 + t³·P3。
-Vec2 cubicBezierPoint(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, float t);
+Vec2 CubicBezierPoint(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, float t);
 
 // 空间插值：有空间手柄时沿贝塞尔弧线运动，否则退化为直线插值。
-Vec2 evaluateSpatial(const Keyframe<Vec2>& from, const Keyframe<Vec2>& to,
+Vec2 EvaluateSpatial(const Keyframe<Vec2>& from, const Keyframe<Vec2>& to,
                      float easedProgress);
 
 }  // namespace motion

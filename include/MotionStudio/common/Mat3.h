@@ -12,10 +12,10 @@ struct Mat3 {
                        0, 1, 0,   //
                        0, 0, 1};
 
-    static Mat3 identity();
-    static Mat3 translate(Vec2 offset);
-    static Mat3 rotate(float degrees);
-    static Mat3 scale(Vec2 factor);
+    static Mat3 Identity();
+    static Mat3 Translate(Vec2 offset);
+    static Mat3 Rotate(float degrees);
+    static Mat3 Scale(Vec2 factor);
 
     Mat3 operator*(const Mat3& other) const;
     Vec2 transformPoint(Vec2 point) const;

@@ -271,7 +271,7 @@ Expected<T> ParseField(const json& node, const char* key) {
 // ---- Easing ----
 
 json EasingToJson(const Easing& easing) {
-    json node{{"type", dto::toString(easing.type)}};
+    json node{{"type", dto::ToString(easing.type)}};
     if (easing.type == Easing::Type::Bezier) {
         node["inX"] = easing.inX;
         node["inY"] = easing.inY;
@@ -437,7 +437,7 @@ Expected<void> TransformFromJson(const json& node, Transform& transform) {
 
 json MaskToJson(const Mask& mask) {
     return {{"path", BezierPathToJson(mask.path)},
-            {"mode", dto::toString(mask.mode)},
+            {"mode", dto::ToString(mask.mode)},
             {"opacity", AnimatableToJson(mask.opacity)},
             {"inverted", mask.inverted}};
 }
@@ -479,7 +479,7 @@ Expected<Mask> MaskFromJson(const json& node) {
 json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>>& elements);
 
 json ShapeToJson(const ShapeElement& element) {
-    json node{{"id", IdToString(element.id)}, {"type", dto::toString(element.type())}};
+    json node{{"id", IdToString(element.id)}, {"type", dto::ToString(element.type())}};
     switch (element.type()) {
         case ShapeType::Path: {
             const auto& shape = static_cast<const ShapePath&>(element);
@@ -490,7 +490,7 @@ json ShapeToJson(const ShapeElement& element) {
             const auto& shape = static_cast<const ShapeFill&>(element);
             node["color"] = AnimatableToJson(shape.color);
             node["opacity"] = AnimatableToJson(shape.opacity);
-            node["fillRule"] = dto::toString(shape.fillRule);
+            node["fillRule"] = dto::ToString(shape.fillRule);
             break;
         }
         case ShapeType::Stroke: {
@@ -498,8 +498,8 @@ json ShapeToJson(const ShapeElement& element) {
             node["color"] = AnimatableToJson(shape.color);
             node["width"] = AnimatableToJson(shape.width);
             node["opacity"] = AnimatableToJson(shape.opacity);
-            node["cap"] = dto::toString(shape.cap);
-            node["join"] = dto::toString(shape.join);
+            node["cap"] = dto::ToString(shape.cap);
+            node["join"] = dto::ToString(shape.join);
             node["miterLimit"] = shape.miterLimit;
             break;
         }
@@ -759,7 +759,7 @@ Expected<std::unique_ptr<ShapeElement>> ShapeFromJson(const json& node) {
 // ---- LayerContent（判别字段 "type"）----
 
 json ContentToJson(const LayerContent& content) {
-    json node{{"type", dto::toString(content.type())}};
+    json node{{"type", dto::ToString(content.type())}};
     switch (content.type()) {
         case LayerType::Shape: {
             const auto& shape = static_cast<const ShapeContent&>(content);
@@ -868,14 +868,14 @@ Expected<std::unique_ptr<LayerContent>> ContentFromJson(const json& node) {
 json LayerToJson(const Layer& layer) {
     json node{{"id", IdToString(layer.id)},
               {"name", layer.name},
-              {"type", dto::toString(layer.type())},
+              {"type", dto::ToString(layer.type())},
               {"inPoint", layer.inPoint},
               {"outPoint", layer.outPoint},
               {"startTime", layer.startTime},
               {"timeStretch", layer.timeStretch},
               {"visible", layer.visible},
               {"locked", layer.locked},
-              {"blendMode", dto::toString(layer.blendMode)},
+              {"blendMode", dto::ToString(layer.blendMode)},
               {"transform", TransformToJson(layer.transform)},
               {"content", ContentToJson(*layer.content)}};
     if (layer.parentId.isValid()) {
@@ -1065,7 +1065,7 @@ Expected<std::unique_ptr<Composition>> CompositionFromJson(const json& node) {
 
 json AssetToJson(const Asset& asset) {
     return {{"id", IdToString(asset.id)},
-            {"type", dto::toString(asset.type)},
+            {"type", dto::ToString(asset.type)},
             {"name", asset.name},
             {"path", asset.path}};
 }
@@ -1105,7 +1105,7 @@ json DocumentToJson(const Document& document) {
     for (const Asset& asset : document.assets) {
         assets.push_back(AssetToJson(asset));
     }
-    return {{"schemaVersion", dto::kSchemaVersion},
+    return {{"schemaVersion", dto::SCHEMA_VERSION},
             {"id", IdToString(document.id)},
             {"name", document.name},
             {"assets", std::move(assets)},
@@ -1171,7 +1171,7 @@ Expected<std::unique_ptr<Document>> Serializer::deserialize(const std::string& j
     return document;
 }
 
-uint64_t documentFingerprint(const Document& document) {
+uint64_t DocumentFingerprint(const Document& document) {
     const std::string compact = DocumentToJson(document).dump();
     uint64_t hash = 14695981039346656037ull;  // FNV-1a 64
     for (const unsigned char byte : compact) {

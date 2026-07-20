@@ -15,37 +15,37 @@ void MoveKeyframeCommand::execute(Document& document) {
     if (oldTime_ == newTime_) {
         return;
     }
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
     if (!captured_) {
-        overwritten_ = takeKeyframeAny(target, newTime_);
+        overwritten_ = TakeKeyframeAny(target, newTime_);
         captured_ = true;
     }
-    std::optional<KeyframeData> moved = takeKeyframeAny(target, oldTime_);
+    std::optional<KeyframeData> moved = TakeKeyframeAny(target, oldTime_);
     if (!moved) {
         return;
     }
-    setKeyframeTime(*moved, newTime_);
-    addKeyframeAny(target, *moved);
+    SetKeyframeTime(*moved, newTime_);
+    AddKeyframeAny(target, *moved);
 }
 
 void MoveKeyframeCommand::undo(Document& document) {
     if (!captured_) {
         return;
     }
-    AnimatableBase* target = resolveAnimatable(document, property_);
+    AnimatableBase* target = ResolveAnimatable(document, property_);
     if (!target) {
         return;
     }
-    std::optional<KeyframeData> moved = takeKeyframeAny(target, newTime_);
+    std::optional<KeyframeData> moved = TakeKeyframeAny(target, newTime_);
     if (overwritten_) {
-        addKeyframeAny(target, *overwritten_);
+        AddKeyframeAny(target, *overwritten_);
     }
     if (moved) {
-        setKeyframeTime(*moved, oldTime_);
-        addKeyframeAny(target, *moved);
+        SetKeyframeTime(*moved, oldTime_);
+        AddKeyframeAny(target, *moved);
     }
 }
 

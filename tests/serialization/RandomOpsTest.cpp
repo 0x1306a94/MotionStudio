@@ -27,7 +27,7 @@ using motion::AddLayerCommand;
 using motion::Color;
 using motion::Command;
 using motion::Composition;
-using motion::documentFingerprint;
+using motion::DocumentFingerprint;
 using motion::Document;
 using motion::Easing;
 using motion::EntityId;
@@ -54,7 +54,7 @@ namespace {
 const char* kTransformProperties[] = {"transform.position", "transform.scale",
                                       "transform.anchorPoint"};
 
-Document makeRandomDocument(std::mt19937_64& rng) {
+Document MakeRandomDocument(std::mt19937_64& rng) {
     Document document;
     document.name = "fuzz";
     const int compositionCount = 1 + int(rng() % 2);
@@ -74,7 +74,7 @@ Document makeRandomDocument(std::mt19937_64& rng) {
     return document;
 }
 
-std::vector<Layer*> collectLayers(Document& document) {
+std::vector<Layer*> CollectLayers(Document& document) {
     std::vector<Layer*> layers;
     for (auto& composition : document.compositions) {
         for (auto& layer : composition->layers) {
@@ -84,13 +84,13 @@ std::vector<Layer*> collectLayers(Document& document) {
     return layers;
 }
 
-float randomFloat(std::mt19937_64& rng) { return float(rng() % 1000) - 500.0f; }
+float RandomFloat(std::mt19937_64& rng) { return float(rng() % 1000) - 500.0f; }
 
-Vec2 randomVec2(std::mt19937_64& rng) { return {randomFloat(rng), randomFloat(rng)}; }
+Vec2 RandomVec2(std::mt19937_64& rng) { return {RandomFloat(rng), RandomFloat(rng)}; }
 
 // 生成一条随机命令（目标可能不存在——命令必须安全跳过）。
-std::unique_ptr<Command> makeRandomCommand(std::mt19937_64& rng, Document& document) {
-    std::vector<Layer*> layers = collectLayers(document);
+std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64& rng, Document& document) {
+    std::vector<Layer*> layers = CollectLayers(document);
     EntityId compositionId =
         document.compositions.empty() ? EntityId{rng() % 100}
                                       : document.compositions[rng() %
@@ -111,11 +111,11 @@ std::unique_ptr<Command> makeRandomCommand(std::mt19937_64& rng, Document& docum
                                                       int(rng() % 6));
         case 3:
             return std::make_unique<SetStaticValueCommand>(
-                property, PropertyValue{randomVec2(rng)});
+                property, PropertyValue{RandomVec2(rng)});
         case 4: {
             Keyframe<Vec2> keyframe;
             keyframe.time = time;
-            keyframe.value = randomVec2(rng);
+            keyframe.value = RandomVec2(rng);
             keyframe.easing = rng() % 2 ? Easing::EaseOut() : Easing::Linear();
             return std::make_unique<AddKeyframeCommand>(
                 property, motion::KeyframeData{keyframe});
@@ -139,13 +139,13 @@ std::unique_ptr<Command> makeRandomCommand(std::mt19937_64& rng, Document& docum
 
 TEST(RandomOpsTest, ThousandRandomOpsNoCrashAndRoundTripStable) {
     std::mt19937_64 rng(20260720);
-    Document document = makeRandomDocument(rng);
+    Document document = MakeRandomDocument(rng);
     UndoManager undo;
 
     for (int iteration = 0; iteration < 1000; ++iteration) {
         const uint64_t choice = rng() % 10;
         if (choice <= 6) {
-            undo.execute(document, makeRandomCommand(rng, document));
+            undo.execute(document, MakeRandomCommand(rng, document));
         } else if (choice <= 8 && undo.canUndo()) {
             undo.undo(document);
         } else if (undo.canRedo()) {
@@ -161,13 +161,13 @@ TEST(RandomOpsTest, ThousandRandomOpsNoCrashAndRoundTripStable) {
 
 TEST(RandomOpsTest, UndoRestoresSerializationFingerprint) {
     std::mt19937_64 rng(42);
-    Document document = makeRandomDocument(rng);
+    Document document = MakeRandomDocument(rng);
     UndoManager undo;
 
     for (int iteration = 0; iteration < 200; ++iteration) {
-        const uint64_t before = documentFingerprint(document);
-        undo.execute(document, makeRandomCommand(rng, document));
+        const uint64_t before = DocumentFingerprint(document);
+        undo.execute(document, MakeRandomCommand(rng, document));
         undo.undo(document);
-        EXPECT_EQ(documentFingerprint(document), before) << "iteration " << iteration;
+        EXPECT_EQ(DocumentFingerprint(document), before) << "iteration " << iteration;
     }
 }

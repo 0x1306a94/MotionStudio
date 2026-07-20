@@ -54,7 +54,7 @@ float cubicBezierAxisDerivative(float p1, float p2, float t) {
 
 }  // namespace
 
-float solveBezierEasing(float x1, float y1, float x2, float y2, float x) {
+float SolveBezierEasing(float x1, float y1, float x2, float y2, float x) {
     if (x <= 0) {
         return 0;
     }
@@ -98,14 +98,14 @@ float solveBezierEasing(float x1, float y1, float x2, float y2, float x) {
     return cubicBezierAxis(y1, y2, t);
 }
 
-float applyEasing(const Easing& easing, float progress) {
+float ApplyEasing(const Easing& easing, float progress) {
     switch (easing.type) {
         case Easing::Type::Linear:
             return progress;
         case Easing::Type::Hold:
             return 0;
         case Easing::Type::Bezier:
-            return solveBezierEasing(easing.inX, easing.inY, easing.outX, easing.outY,
+            return SolveBezierEasing(easing.inX, easing.inY, easing.outX, easing.outY,
                                      progress);
     }
     return progress;

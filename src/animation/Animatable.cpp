@@ -92,14 +92,14 @@ T Animatable<T>::evaluate(FrameTime time) const {
     const Keyframe<T>& to = *it;
 
     const float progress = float(time - from.time) / float(to.time - from.time);
-    const float easedProgress = applyEasing(from.easing, progress);
+    const float easedProgress = ApplyEasing(from.easing, progress);
 
     if constexpr (std::is_same_v<T, Vec2>) {
         if (from.spatialOutTangent && to.spatialInTangent) {
-            return evaluateSpatial(from, to, easedProgress);
+            return EvaluateSpatial(from, to, easedProgress);
         }
     }
-    return Interpolator<T>::lerp(from.value, to.value, easedProgress);
+    return Interpolator<T>::Lerp(from.value, to.value, easedProgress);
 }
 
 template <typename T>

@@ -15,7 +15,7 @@ struct Vec2 {
     bool operator!=(const Vec2& other) const;
 };
 
-bool approxEqual(float left, float right, float epsilon = 1e-5f);
-bool approxEqual(Vec2 left, Vec2 right, float epsilon = 1e-5f);
+bool ApproxEqual(float left, float right, float epsilon = 1e-5f);
+bool ApproxEqual(Vec2 left, Vec2 right, float epsilon = 1e-5f);
 
 }  // namespace motion

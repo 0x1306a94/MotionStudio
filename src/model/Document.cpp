@@ -7,12 +7,12 @@ namespace motion {
 
 namespace {
 
-void registerShapeTree(EntityIndex& index, ShapeElement* element) {
+void RegisterShapeTree(EntityIndex& index, ShapeElement* element) {
     index.registerShape(element);
     if (element->type() == ShapeType::Group) {
         auto* group = static_cast<ShapeGroup*>(element);
         for (auto& child : group->elements) {
-            registerShapeTree(index, child.get());
+            RegisterShapeTree(index, child.get());
         }
     }
 }
@@ -28,7 +28,7 @@ void Document::refreshEntityIndex() {
             if (layer->content->type() == LayerType::Shape) {
                 auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
                 for (auto& element : shapeContent->elements) {
-                    registerShapeTree(entityIndex_, element.get());
+                    RegisterShapeTree(entityIndex_, element.get());
                 }
             }
         }

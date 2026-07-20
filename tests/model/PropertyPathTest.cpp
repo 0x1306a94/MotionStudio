@@ -18,35 +18,35 @@ using motion::Composition;
 using motion::Document;
 using motion::Layer;
 using motion::LayerType;
-using motion::parsePropertyPath;
+using motion::ParsePropertyPath;
 using motion::PropertyPath;
-using motion::resolveAnimatable;
+using motion::ResolveAnimatable;
 using motion::ShapeContent;
 using motion::ShapeFill;
 using motion::ShapeGroup;
 using motion::ShapeStroke;
 
 TEST(ParsePropertyPathTest, SimpleDottedPath) {
-    auto segments = parsePropertyPath("transform.position");
+    auto segments = ParsePropertyPath("transform.position");
     ASSERT_EQ(segments.size(), 2u);
     EXPECT_EQ(segments[0], (motion::PathSegment{"transform", -1}));
     EXPECT_EQ(segments[1], (motion::PathSegment{"position", -1}));
 }
 
 TEST(ParsePropertyPathTest, ArrayIndex) {
-    auto segments = parsePropertyPath("elements[12].color");
+    auto segments = ParsePropertyPath("elements[12].color");
     ASSERT_EQ(segments.size(), 2u);
     EXPECT_EQ(segments[0], (motion::PathSegment{"elements", 12}));
     EXPECT_EQ(segments[1], (motion::PathSegment{"color", -1}));
 }
 
 TEST(ParsePropertyPathTest, RejectsMalformed) {
-    EXPECT_TRUE(parsePropertyPath("").empty());
-    EXPECT_TRUE(parsePropertyPath(".a").empty());
-    EXPECT_TRUE(parsePropertyPath("a.").empty());
-    EXPECT_TRUE(parsePropertyPath("a[x]").empty());
-    EXPECT_TRUE(parsePropertyPath("a[1").empty());
-    EXPECT_TRUE(parsePropertyPath("a[]").empty());
+    EXPECT_TRUE(ParsePropertyPath("").empty());
+    EXPECT_TRUE(ParsePropertyPath(".a").empty());
+    EXPECT_TRUE(ParsePropertyPath("a.").empty());
+    EXPECT_TRUE(ParsePropertyPath("a[x]").empty());
+    EXPECT_TRUE(ParsePropertyPath("a[1").empty());
+    EXPECT_TRUE(ParsePropertyPath("a[]").empty());
 }
 
 namespace {
@@ -84,34 +84,34 @@ struct ShapeScene {
 TEST(ResolveAnimatableTest, ResolvesTransformProperty) {
     ShapeScene scene;
     AnimatableBase* resolved =
-        resolveAnimatable(scene.document, {scene.layer->id, "transform.position"});
+        ResolveAnimatable(scene.document, {scene.layer->id, "transform.position"});
     EXPECT_EQ(resolved,
               static_cast<AnimatableBase*>(&scene.layer->transform.position));
 }
 
 TEST(ResolveAnimatableTest, ResolvesShapeById) {
     ShapeScene scene;
-    AnimatableBase* resolved = resolveAnimatable(scene.document, {scene.fill->id, "color"});
+    AnimatableBase* resolved = ResolveAnimatable(scene.document, {scene.fill->id, "color"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.fill->color));
 }
 
 TEST(ResolveAnimatableTest, ResolvesLayerElementsPath) {
     ShapeScene scene;
     AnimatableBase* resolved =
-        resolveAnimatable(scene.document, {scene.layer->id, "elements[0].color"});
+        ResolveAnimatable(scene.document, {scene.layer->id, "elements[0].color"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.fill->color));
 }
 
 TEST(ResolveAnimatableTest, ResolvesNestedGroupPath) {
     ShapeScene scene;
-    AnimatableBase* resolved = resolveAnimatable(
+    AnimatableBase* resolved = ResolveAnimatable(
         scene.document, {scene.layer->id, "elements[1].elements[0].width"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.nestedStroke->width));
 }
 
 TEST(ResolveAnimatableTest, ResolvesGroupTransform) {
     ShapeScene scene;
-    AnimatableBase* resolved = resolveAnimatable(
+    AnimatableBase* resolved = ResolveAnimatable(
         scene.document, {scene.layer->id, "elements[1].transform.opacity"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&scene.group->transform.opacity));
 }
@@ -124,20 +124,20 @@ TEST(ResolveAnimatableTest, ResolvesTextContent) {
     auto* textContent = static_cast<motion::TextContent*>(textLayer->content.get());
 
     AnimatableBase* resolved =
-        resolveAnimatable(document, {textLayer->id, "content.fontSize"});
+        ResolveAnimatable(document, {textLayer->id, "content.fontSize"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase*>(&textContent->fontSize));
 }
 
 TEST(ResolveAnimatableTest, ReturnsNullForMissingOrInvalid) {
     ShapeScene scene;
-    EXPECT_EQ(resolveAnimatable(scene.document, {motion::EntityId{999}, "color"}), nullptr);
-    EXPECT_EQ(resolveAnimatable(scene.document, {scene.layer->id, "transform.bogus"}),
+    EXPECT_EQ(ResolveAnimatable(scene.document, {motion::EntityId{999}, "color"}), nullptr);
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "transform.bogus"}),
               nullptr);
-    EXPECT_EQ(resolveAnimatable(scene.document, {scene.layer->id, "elements[5].color"}),
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "elements[5].color"}),
               nullptr);
-    EXPECT_EQ(resolveAnimatable(scene.document, {scene.layer->id, "transform"}), nullptr);
-    EXPECT_EQ(resolveAnimatable(scene.document, {scene.layer->id, "elements[0].width"}),
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "transform"}), nullptr);
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "elements[0].width"}),
               nullptr);  // fill 没有 width
-    EXPECT_EQ(resolveAnimatable(scene.document, {scene.layer->id, "elements[-1].color"}),
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "elements[-1].color"}),
               nullptr);
 }
