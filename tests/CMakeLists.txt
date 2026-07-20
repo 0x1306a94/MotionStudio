@@ -14,6 +14,9 @@ add_executable(core_tests
     model/PropertyPathTest.cpp
     undo/CommandsTest.cpp
     undo/UndoManagerTest.cpp
+    serialization/RandomOpsTest.cpp
+    serialization/SerializerTest.cpp
 )
-target_link_libraries(core_tests PRIVATE core GTest::gtest_main)
+# nlohmann/json 仅测试用来校验 JSON 产物结构，非 core 公共依赖。
+target_link_libraries(core_tests PRIVATE core GTest::gtest_main nlohmann_json::nlohmann_json)
 gtest_discover_tests(core_tests)

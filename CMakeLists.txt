@@ -14,6 +14,10 @@ endif()
 
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/json EXCLUDE_FROM_ALL)
+
 add_subdirectory(src)
 
 enable_testing()
