@@ -1,5 +1,6 @@
 add_library(core STATIC
     core/Version.cpp
+    common/EntityId.cpp
 )
 target_include_directories(core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_compile_options(core PRIVATE -Wall -Wextra)
