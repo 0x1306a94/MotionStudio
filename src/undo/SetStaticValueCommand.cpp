@@ -38,12 +38,19 @@ void SetStaticValueCommand::undo(Document& document) {
 }
 
 bool SetStaticValueCommand::mergeWith(const Command& other) {
-    const auto* typed = dynamic_cast<const SetStaticValueCommand*>(&other);
-    if (!typed || typed->property_ != property_) {
+    if (other.kind() != CommandKind::SetStaticValue) {
         return false;
     }
-    value_ = typed->value_;  // 保留 oldValue_，吸收最终值
+    const auto& typed = static_cast<const SetStaticValueCommand&>(other);
+    if (typed.property_ != property_) {
+        return false;
+    }
+    value_ = typed.value_;  // 保留 oldValue_，吸收最终值
     return true;
+}
+
+CommandKind SetStaticValueCommand::kind() const {
+    return CommandKind::SetStaticValue;
 }
 
 std::string SetStaticValueCommand::describe() const {

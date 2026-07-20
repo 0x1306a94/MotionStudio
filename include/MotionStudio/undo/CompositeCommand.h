@@ -18,6 +18,7 @@ public:
 
     void execute(Document& document) override;
     void undo(Document& document) override;
+    CommandKind kind() const override;
     std::string describe() const override;
 
 private:

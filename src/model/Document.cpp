@@ -1,7 +1,5 @@
 #include "MotionStudio/model/Document.h"
 
-#include <algorithm>
-
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeGroup.h"
 
@@ -11,7 +9,8 @@ namespace {
 
 void registerShapeTree(EntityIndex& index, ShapeElement* element) {
     index.registerShape(element);
-    if (auto* group = dynamic_cast<ShapeGroup*>(element)) {
+    if (element->type() == ShapeType::Group) {
+        auto* group = static_cast<ShapeGroup*>(element);
         for (auto& child : group->elements) {
             registerShapeTree(index, child.get());
         }
@@ -26,7 +25,8 @@ void Document::refreshEntityIndex() {
         entityIndex_.registerComposition(composition.get());
         for (auto& layer : composition->layers) {
             entityIndex_.registerLayer(layer.get());
-            if (auto* shapeContent = dynamic_cast<ShapeContent*>(layer->content.get())) {
+            if (layer->content->type() == LayerType::Shape) {
+                auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
                 for (auto& element : shapeContent->elements) {
                     registerShapeTree(entityIndex_, element.get());
                 }
@@ -45,17 +45,16 @@ Composition* Document::addComposition(std::unique_ptr<Composition> composition) 
 }
 
 std::unique_ptr<Composition> Document::takeComposition(EntityId id) {
-    auto it = std::find_if(compositions.begin(), compositions.end(),
-                           [&](const std::unique_ptr<Composition>& composition) {
-                               return composition->id == id;
-                           });
-    if (it == compositions.end()) {
-        return nullptr;
+    for (size_t i = 0; i < compositions.size(); ++i) {
+        if (compositions[i]->id != id) {
+            continue;
+        }
+        std::unique_ptr<Composition> taken = std::move(compositions[i]);
+        compositions.erase(compositions.begin() + i);
+        refreshEntityIndex();
+        return taken;
     }
-    std::unique_ptr<Composition> taken = std::move(*it);
-    compositions.erase(it);
-    refreshEntityIndex();
-    return taken;
+    return nullptr;
 }
 
 Layer* Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, int index) {
@@ -85,17 +84,16 @@ std::unique_ptr<Layer> Document::takeLayer(EntityId compositionId, EntityId laye
     }
 
     auto& layers = composition->layers;
-    auto it = std::find_if(layers.begin(), layers.end(), [&](const std::unique_ptr<Layer>& entry) {
-        return entry->id == layerId;
-    });
-    if (it == layers.end()) {
-        return nullptr;
+    for (size_t i = 0; i < layers.size(); ++i) {
+        if (layers[i]->id != layerId) {
+            continue;
+        }
+        std::unique_ptr<Layer> taken = std::move(layers[i]);
+        layers.erase(layers.begin() + i);
+        refreshEntityIndex();
+        return taken;
     }
-
-    std::unique_ptr<Layer> taken = std::move(*it);
-    layers.erase(it);
-    refreshEntityIndex();
-    return taken;
+    return nullptr;
 }
 
 bool Document::moveLayer(EntityId compositionId, int fromIndex, int toIndex) {

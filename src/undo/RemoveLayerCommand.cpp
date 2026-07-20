@@ -29,6 +29,10 @@ void RemoveLayerCommand::undo(Document& document) {
     document.addLayer(compositionId_, std::move(layer_), index_);
 }
 
+CommandKind RemoveLayerCommand::kind() const {
+    return CommandKind::RemoveLayer;
+}
+
 std::string RemoveLayerCommand::describe() const {
     return "Remove Layer";
 }

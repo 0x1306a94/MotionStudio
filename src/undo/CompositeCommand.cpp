@@ -27,6 +27,10 @@ void CompositeCommand::undo(Document& document) {
     }
 }
 
+CommandKind CompositeCommand::kind() const {
+    return CommandKind::Composite;
+}
+
 std::string CompositeCommand::describe() const {
     return description_;
 }

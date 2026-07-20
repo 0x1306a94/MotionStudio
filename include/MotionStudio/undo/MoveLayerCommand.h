@@ -15,6 +15,7 @@ public:
     void execute(Document& document) override;
     void undo(Document& document) override;
     bool mergeWith(const Command& other) override;
+    CommandKind kind() const override;
     std::string describe() const override;
 
 private:

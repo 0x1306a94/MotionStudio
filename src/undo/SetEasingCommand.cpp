@@ -39,12 +39,19 @@ void SetEasingCommand::undo(Document& document) {
 }
 
 bool SetEasingCommand::mergeWith(const Command& other) {
-    const auto* typed = dynamic_cast<const SetEasingCommand*>(&other);
-    if (!typed || typed->property_ != property_ || typed->time_ != time_) {
+    if (other.kind() != CommandKind::SetEasing) {
         return false;
     }
-    easing_ = typed->easing_;
+    const auto& typed = static_cast<const SetEasingCommand&>(other);
+    if (typed.property_ != property_ || typed.time_ != time_) {
+        return false;
+    }
+    easing_ = typed.easing_;
     return true;
+}
+
+CommandKind SetEasingCommand::kind() const {
+    return CommandKind::SetEasing;
 }
 
 std::string SetEasingCommand::describe() const {

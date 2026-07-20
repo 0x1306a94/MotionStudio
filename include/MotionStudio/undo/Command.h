@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "MotionStudio/undo/CommandKind.h"
+
 namespace motion {
 
 class Document;
@@ -15,6 +17,10 @@ public:
 
     virtual void execute(Document& document) = 0;  // 首次执行 + redo
     virtual void undo(Document& document) = 0;
+
+    // Concrete type tag used by mergeWith to type-check `other` before
+    // downcasting (dynamic_cast is banned).
+    virtual CommandKind kind() const = 0;
 
     // 合并连续操作（如拖拽产生的几十次命令收敛为一个 undo 单元）。
     // 成功则吸收 other（修改自身状态），调用方丢弃 other。

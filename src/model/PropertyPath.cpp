@@ -168,18 +168,21 @@ AnimatableBase* resolveShapeSegments(ShapeElement* element,
         const PathSegment& segment = segments[i];
 
         if (segment.name == "elements" && segment.index >= 0) {
-            auto* group = dynamic_cast<ShapeGroup*>(current);
-            if (!group || segment.index >= int(group->elements.size())) {
+            if (current->type() != ShapeType::Group) {
+                return nullptr;
+            }
+            auto* group = static_cast<ShapeGroup*>(current);
+            if (segment.index >= int(group->elements.size())) {
                 return nullptr;
             }
             current = group->elements[size_t(segment.index)].get();
             continue;
         }
         if (segment.name == "transform") {
-            auto* group = dynamic_cast<ShapeGroup*>(current);
-            if (!group || i + 1 != segments.size() - 1) {
+            if (current->type() != ShapeType::Group || i + 1 != segments.size() - 1) {
                 return nullptr;
             }
+            auto* group = static_cast<ShapeGroup*>(current);
             return resolveTransformProperty(group->transform, segments[i + 1].name);
         }
         if (i != segments.size() - 1) {
@@ -204,18 +207,21 @@ AnimatableBase* resolveAnimatable(Document& document, const PropertyPath& proper
             return resolveTransformProperty(layer->transform, segments[1].name);
         }
         if (first.name == "elements" && first.index >= 0) {
-            auto* shapeContent = dynamic_cast<ShapeContent*>(layer->content.get());
-            if (!shapeContent || first.index >= int(shapeContent->elements.size())) {
+            if (layer->content->type() != LayerType::Shape) {
+                return nullptr;
+            }
+            auto* shapeContent = static_cast<ShapeContent*>(layer->content.get());
+            if (first.index >= int(shapeContent->elements.size())) {
                 return nullptr;
             }
             return resolveShapeSegments(shapeContent->elements[size_t(first.index)].get(),
                                         segments, 1);
         }
         if (first.name == "content" && segments.size() == 2) {
-            auto* textContent = dynamic_cast<TextContent*>(layer->content.get());
-            if (!textContent) {
+            if (layer->content->type() != LayerType::Text) {
                 return nullptr;
             }
+            auto* textContent = static_cast<TextContent*>(layer->content.get());
             if (segments[1].name == "text") {
                 return &textContent->text;
             }

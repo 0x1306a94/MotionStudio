@@ -36,6 +36,10 @@ void AddKeyframeCommand::undo(Document& document) {
     }
 }
 
+CommandKind AddKeyframeCommand::kind() const {
+    return CommandKind::AddKeyframe;
+}
+
 std::string AddKeyframeCommand::describe() const {
     return "Add Keyframe";
 }

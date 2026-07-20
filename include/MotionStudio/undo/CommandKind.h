@@ -1,0 +1,19 @@
+#pragma once
+
+namespace motion {
+
+// Identifies the concrete command type so mergeWith can type-check the other
+// command before downcasting (dynamic_cast is banned by the coding rules).
+enum class CommandKind {
+    AddLayer,
+    RemoveLayer,
+    MoveLayer,
+    SetStaticValue,
+    AddKeyframe,
+    RemoveKeyframe,
+    MoveKeyframe,
+    SetEasing,
+    Composite,
+};
+
+}  // namespace motion

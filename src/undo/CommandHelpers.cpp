@@ -1,6 +1,5 @@
 #include "CommandHelpers.h"
 
-#include <type_traits>
 #include <utility>
 
 #include "MotionStudio/animation/Animatable.h"
@@ -10,34 +9,31 @@ namespace motion {
 
 namespace {
 
+// 值类型与属性类型相符时设置静态值；oldValue 输出设置前的值。
 template <typename T>
-bool applyStaticValue(AnimatableBase* target, const PropertyValue& newValue,
+bool applyStaticValue(Animatable<T>* animatable, const PropertyValue& newValue,
                       PropertyValue& oldValue) {
-    auto* animatable = dynamic_cast<Animatable<T>*>(target);
-    if (!animatable) {
+    const T* typed = std::get_if<T>(&newValue);
+    if (!typed) {
         return false;
     }
     oldValue = animatable->staticValue();
-    return std::visit(
-        [&](const auto& typed) {
-            using ValueType = std::decay_t<decltype(typed)>;
-            if constexpr (std::is_same_v<ValueType, T>) {
-                animatable->setStaticValue(typed);
-                return true;
-            } else {
-                return false;  // 值类型与属性类型不符
-            }
-        },
-        newValue);
+    animatable->setStaticValue(*typed);
+    return true;
 }
 
 template <typename T>
-bool applyEasing(AnimatableBase* target, FrameTime time, const Easing& easing,
-                 Easing* oldEasingOut) {
-    auto* animatable = dynamic_cast<Animatable<T>*>(target);
-    if (!animatable) {
-        return false;
+std::optional<KeyframeData> takeKeyframeTyped(Animatable<T>* animatable, FrameTime time) {
+    auto keyframe = animatable->takeKeyframe(time);
+    if (!keyframe) {
+        return std::nullopt;
     }
+    return KeyframeData{std::move(*keyframe)};
+}
+
+template <typename T>
+bool applyEasing(Animatable<T>* animatable, FrameTime time, const Easing& easing,
+                 Easing* oldEasingOut) {
     for (const Keyframe<T>& keyframe : animatable->keyframes()) {
         if (keyframe.time != time) {
             continue;
@@ -56,96 +52,114 @@ bool applyEasing(AnimatableBase* target, FrameTime time, const Easing& easing,
 
 bool applyStaticValueAny(AnimatableBase* target, const PropertyValue& newValue,
                          PropertyValue& oldValue) {
-    if (applyStaticValue<float>(target, newValue, oldValue)) {
-        return true;
+    switch (target->valueType()) {
+        case AnimatableType::Float:
+            return applyStaticValue(static_cast<Animatable<float>*>(target), newValue,
+                                    oldValue);
+        case AnimatableType::Vec2:
+            return applyStaticValue(static_cast<Animatable<Vec2>*>(target), newValue,
+                                    oldValue);
+        case AnimatableType::Color:
+            return applyStaticValue(static_cast<Animatable<Color>*>(target), newValue,
+                                    oldValue);
+        case AnimatableType::BezierPath:
+            return applyStaticValue(static_cast<Animatable<BezierPath>*>(target),
+                                    newValue, oldValue);
+        case AnimatableType::String:
+            return applyStaticValue(static_cast<Animatable<std::string>*>(target),
+                                    newValue, oldValue);
     }
-    if (applyStaticValue<Vec2>(target, newValue, oldValue)) {
-        return true;
-    }
-    if (applyStaticValue<Color>(target, newValue, oldValue)) {
-        return true;
-    }
-    if (applyStaticValue<BezierPath>(target, newValue, oldValue)) {
-        return true;
-    }
-    return applyStaticValue<std::string>(target, newValue, oldValue);
+    return false;
 }
 
 std::optional<KeyframeData> takeKeyframeAny(AnimatableBase* target, FrameTime time) {
-    if (auto* animatable = dynamic_cast<Animatable<float>*>(target)) {
-        auto keyframe = animatable->takeKeyframe(time);
-        if (!keyframe) {
-            return std::nullopt;
-        }
-        return KeyframeData{std::move(*keyframe)};
-    }
-    if (auto* animatable = dynamic_cast<Animatable<Vec2>*>(target)) {
-        auto keyframe = animatable->takeKeyframe(time);
-        if (!keyframe) {
-            return std::nullopt;
-        }
-        return KeyframeData{std::move(*keyframe)};
-    }
-    if (auto* animatable = dynamic_cast<Animatable<Color>*>(target)) {
-        auto keyframe = animatable->takeKeyframe(time);
-        if (!keyframe) {
-            return std::nullopt;
-        }
-        return KeyframeData{std::move(*keyframe)};
-    }
-    if (auto* animatable = dynamic_cast<Animatable<BezierPath>*>(target)) {
-        auto keyframe = animatable->takeKeyframe(time);
-        if (!keyframe) {
-            return std::nullopt;
-        }
-        return KeyframeData{std::move(*keyframe)};
-    }
-    if (auto* animatable = dynamic_cast<Animatable<std::string>*>(target)) {
-        auto keyframe = animatable->takeKeyframe(time);
-        if (!keyframe) {
-            return std::nullopt;
-        }
-        return KeyframeData{std::move(*keyframe)};
+    switch (target->valueType()) {
+        case AnimatableType::Float:
+            return takeKeyframeTyped(static_cast<Animatable<float>*>(target), time);
+        case AnimatableType::Vec2:
+            return takeKeyframeTyped(static_cast<Animatable<Vec2>*>(target), time);
+        case AnimatableType::Color:
+            return takeKeyframeTyped(static_cast<Animatable<Color>*>(target), time);
+        case AnimatableType::BezierPath:
+            return takeKeyframeTyped(static_cast<Animatable<BezierPath>*>(target), time);
+        case AnimatableType::String:
+            return takeKeyframeTyped(static_cast<Animatable<std::string>*>(target), time);
     }
     return std::nullopt;
 }
 
 void addKeyframeAny(AnimatableBase* target, const KeyframeData& keyframe) {
-    std::visit(
-        [&](const auto& typed) {
-            using ValueType = std::decay_t<decltype(typed.value)>;
-            auto* animatable = dynamic_cast<Animatable<ValueType>*>(target);
-            if (animatable) {
-                animatable->addKeyframe(typed);
+    // variant 备选顺序：float / Vec2 / Color / BezierPath / std::string。
+    // 关键帧类型与属性类型不符时静默跳过。
+    switch (keyframe.index()) {
+        case 0:
+            if (target->valueType() == AnimatableType::Float) {
+                static_cast<Animatable<float>*>(target)->addKeyframe(std::get<0>(keyframe));
             }
-        },
-        keyframe);
+            break;
+        case 1:
+            if (target->valueType() == AnimatableType::Vec2) {
+                static_cast<Animatable<Vec2>*>(target)->addKeyframe(std::get<1>(keyframe));
+            }
+            break;
+        case 2:
+            if (target->valueType() == AnimatableType::Color) {
+                static_cast<Animatable<Color>*>(target)->addKeyframe(std::get<2>(keyframe));
+            }
+            break;
+        case 3:
+            if (target->valueType() == AnimatableType::BezierPath) {
+                static_cast<Animatable<BezierPath>*>(target)->addKeyframe(
+                    std::get<3>(keyframe));
+            }
+            break;
+        default:
+            if (target->valueType() == AnimatableType::String) {
+                static_cast<Animatable<std::string>*>(target)->addKeyframe(
+                    std::get<4>(keyframe));
+            }
+            break;
+    }
 }
 
 FrameTime keyframeTime(const KeyframeData& keyframe) {
-    return std::visit([](const auto& typed) { return typed.time; }, keyframe);
+    switch (keyframe.index()) {
+        case 0: return std::get<0>(keyframe).time;
+        case 1: return std::get<1>(keyframe).time;
+        case 2: return std::get<2>(keyframe).time;
+        case 3: return std::get<3>(keyframe).time;
+        default: return std::get<4>(keyframe).time;
+    }
 }
 
 void setKeyframeTime(KeyframeData& keyframe, FrameTime time) {
-    std::visit([&](auto& typed) { typed.time = time; }, keyframe);
+    switch (keyframe.index()) {
+        case 0: std::get<0>(keyframe).time = time; break;
+        case 1: std::get<1>(keyframe).time = time; break;
+        case 2: std::get<2>(keyframe).time = time; break;
+        case 3: std::get<3>(keyframe).time = time; break;
+        default: std::get<4>(keyframe).time = time; break;
+    }
 }
 
 bool applyEasingAny(AnimatableBase* target, FrameTime time, const Easing& easing,
                     Easing* oldEasingOut) {
-    if (auto* animatable = dynamic_cast<Animatable<float>*>(target)) {
-        return applyEasing<float>(animatable, time, easing, oldEasingOut);
-    }
-    if (auto* animatable = dynamic_cast<Animatable<Vec2>*>(target)) {
-        return applyEasing<Vec2>(animatable, time, easing, oldEasingOut);
-    }
-    if (auto* animatable = dynamic_cast<Animatable<Color>*>(target)) {
-        return applyEasing<Color>(animatable, time, easing, oldEasingOut);
-    }
-    if (auto* animatable = dynamic_cast<Animatable<BezierPath>*>(target)) {
-        return applyEasing<BezierPath>(animatable, time, easing, oldEasingOut);
-    }
-    if (auto* animatable = dynamic_cast<Animatable<std::string>*>(target)) {
-        return applyEasing<std::string>(animatable, time, easing, oldEasingOut);
+    switch (target->valueType()) {
+        case AnimatableType::Float:
+            return applyEasing(static_cast<Animatable<float>*>(target), time, easing,
+                               oldEasingOut);
+        case AnimatableType::Vec2:
+            return applyEasing(static_cast<Animatable<Vec2>*>(target), time, easing,
+                               oldEasingOut);
+        case AnimatableType::Color:
+            return applyEasing(static_cast<Animatable<Color>*>(target), time, easing,
+                               oldEasingOut);
+        case AnimatableType::BezierPath:
+            return applyEasing(static_cast<Animatable<BezierPath>*>(target), time,
+                               easing, oldEasingOut);
+        case AnimatableType::String:
+            return applyEasing(static_cast<Animatable<std::string>*>(target), time,
+                               easing, oldEasingOut);
     }
     return false;
 }

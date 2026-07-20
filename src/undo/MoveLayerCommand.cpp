@@ -16,15 +16,22 @@ void MoveLayerCommand::undo(Document& document) {
 }
 
 bool MoveLayerCommand::mergeWith(const Command& other) {
-    const auto* typed = dynamic_cast<const MoveLayerCommand*>(&other);
-    if (!typed || typed->compositionId_ != compositionId_) {
+    if (other.kind() != CommandKind::MoveLayer) {
         return false;
     }
-    if (typed->fromIndex_ != toIndex_) {
+    const auto& typed = static_cast<const MoveLayerCommand&>(other);
+    if (typed.compositionId_ != compositionId_) {
+        return false;
+    }
+    if (typed.fromIndex_ != toIndex_) {
         return false;  // 仅合并连续拖动
     }
-    toIndex_ = typed->toIndex_;
+    toIndex_ = typed.toIndex_;
     return true;
+}
+
+CommandKind MoveLayerCommand::kind() const {
+    return CommandKind::MoveLayer;
 }
 
 std::string MoveLayerCommand::describe() const {

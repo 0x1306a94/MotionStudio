@@ -50,15 +50,22 @@ void MoveKeyframeCommand::undo(Document& document) {
 }
 
 bool MoveKeyframeCommand::mergeWith(const Command& other) {
-    const auto* typed = dynamic_cast<const MoveKeyframeCommand*>(&other);
-    if (!typed || typed->property_ != property_) {
+    if (other.kind() != CommandKind::MoveKeyframe) {
         return false;
     }
-    if (typed->oldTime_ != newTime_) {
+    const auto& typed = static_cast<const MoveKeyframeCommand&>(other);
+    if (typed.property_ != property_) {
+        return false;
+    }
+    if (typed.oldTime_ != newTime_) {
         return false;  // 仅合并连续拖动
     }
-    newTime_ = typed->newTime_;
+    newTime_ = typed.newTime_;
     return true;
+}
+
+CommandKind MoveKeyframeCommand::kind() const {
+    return CommandKind::MoveKeyframe;
 }
 
 std::string MoveKeyframeCommand::describe() const {

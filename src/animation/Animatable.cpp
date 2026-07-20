@@ -132,6 +132,28 @@ typename std::vector<Keyframe<T>>::iterator Animatable<T>::find(FrameTime time) 
     return (it != keyframes_.end() && it->time == time) ? it : keyframes_.end();
 }
 
+// valueType() 按类型特化（须在显式实例化之前定义）。
+template <>
+AnimatableType Animatable<float>::valueType() const {
+    return AnimatableType::Float;
+}
+template <>
+AnimatableType Animatable<Vec2>::valueType() const {
+    return AnimatableType::Vec2;
+}
+template <>
+AnimatableType Animatable<Color>::valueType() const {
+    return AnimatableType::Color;
+}
+template <>
+AnimatableType Animatable<BezierPath>::valueType() const {
+    return AnimatableType::BezierPath;
+}
+template <>
+AnimatableType Animatable<std::string>::valueType() const {
+    return AnimatableType::String;
+}
+
 // 支持的可动画类型登记处。
 template class Animatable<float>;
 template class Animatable<Vec2>;

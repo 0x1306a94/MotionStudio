@@ -10,6 +10,7 @@
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::Command;
+using motion::CommandKind;
 using motion::CompositeCommand;
 using motion::Document;
 using motion::UndoManager;
@@ -25,15 +26,22 @@ public:
     void execute(Document&) override { *target_ += delta_; }
     void undo(Document&) override { *target_ -= delta_; }
 
+    // 测试专用命令：借用 Composite 作为类型标签，仅用于在本测试内识别同类命令
+    // （本测试不会出现真正的 CompositeCommand）。
+    CommandKind kind() const override { return CommandKind::Composite; }
+
     bool mergeWith(const Command& other) override {
         if (mergeKey_.empty()) {
             return false;
         }
-        const auto* typed = dynamic_cast<const AdjustCommand*>(&other);
-        if (!typed || typed->mergeKey_ != mergeKey_) {
+        if (other.kind() != kind()) {
             return false;
         }
-        delta_ += typed->delta_;
+        const auto& typed = static_cast<const AdjustCommand&>(other);
+        if (typed.mergeKey_ != mergeKey_) {
+            return false;
+        }
+        delta_ += typed.delta_;
         return true;
     }
 
@@ -53,6 +61,7 @@ public:
 
     void execute(Document&) override { log_->push_back("do:" + name_); }
     void undo(Document&) override { log_->push_back("undo:" + name_); }
+    CommandKind kind() const override { return CommandKind::Composite; }
     std::string describe() const override { return name_; }
 
 private:

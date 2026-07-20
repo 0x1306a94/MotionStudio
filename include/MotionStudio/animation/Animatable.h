@@ -3,15 +3,21 @@
 #include <optional>
 #include <vector>
 
+#include "MotionStudio/animation/AnimatableType.h"
 #include "MotionStudio/animation/Keyframe.h"
 #include "MotionStudio/common/Time.h"
 
 namespace motion {
 
-// 非模板基类：供 PropertyPath 解析返回，命令再 dynamic_cast 回具体 Animatable<T>。
+// Non-template base returned by PropertyPath resolution; consumers downcast
+// to the concrete Animatable<T> via valueType() (dynamic_cast is banned).
 class AnimatableBase {
 public:
     virtual ~AnimatableBase() = default;
+
+    // Value type of the concrete Animatable<T>. Per-type definitions live in
+    // src/animation/Animatable.cpp alongside the explicit instantiations.
+    virtual AnimatableType valueType() const = 0;
 };
 
 // 可动画属性：要么静态值，要么关键帧序列。
@@ -36,6 +42,8 @@ public:
 
     // 求值：无关键帧返回静态值；区间外钳制到首/末帧值（不外推）。
     T evaluate(FrameTime time) const;
+
+    AnimatableType valueType() const override;
 
     bool isAnimated() const;
 

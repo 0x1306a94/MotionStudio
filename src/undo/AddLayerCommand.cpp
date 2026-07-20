@@ -28,6 +28,10 @@ void AddLayerCommand::undo(Document& document) {
     layer_ = document.takeLayer(compositionId_, layerId_);
 }
 
+CommandKind AddLayerCommand::kind() const {
+    return CommandKind::AddLayer;
+}
+
 std::string AddLayerCommand::describe() const {
     return "Add Layer";
 }

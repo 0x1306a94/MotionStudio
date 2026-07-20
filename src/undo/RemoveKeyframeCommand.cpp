@@ -34,6 +34,10 @@ void RemoveKeyframeCommand::undo(Document& document) {
     addKeyframeAny(target, *removed_);
 }
 
+CommandKind RemoveKeyframeCommand::kind() const {
+    return CommandKind::RemoveKeyframe;
+}
+
 std::string RemoveKeyframeCommand::describe() const {
     return "Remove Keyframe";
 }
