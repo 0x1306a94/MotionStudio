@@ -36,6 +36,11 @@ struct Mat3 {
     // point: the point to transform.
     Vec2 transformPoint(Vec2 point) const;
 
+    // Transforms a direction or offset: applies the linear part only,
+    // ignoring translation.
+    // vector: the direction vector to transform.
+    Vec2 transformVector(Vec2 vector) const;
+
     bool operator==(const Mat3& other) const;
     bool operator!=(const Mat3& other) const;
 };

@@ -53,6 +53,11 @@ Vec2 Mat3::transformPoint(Vec2 point) const {
             values[3] * point.x + values[4] * point.y + values[5]};
 }
 
+Vec2 Mat3::transformVector(Vec2 vector) const {
+    return {values[0] * vector.x + values[1] * vector.y,
+            values[3] * vector.x + values[4] * vector.y};
+}
+
 bool Mat3::operator==(const Mat3& other) const {
     for (int i = 0; i < 9; ++i) {
         if (values[i] != other.values[i]) {

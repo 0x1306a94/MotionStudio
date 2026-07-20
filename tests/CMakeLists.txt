@@ -14,6 +14,7 @@ add_executable(core_tests
     model/DocumentTest.cpp
     model/LayerTest.cpp
     model/PropertyPathTest.cpp
+    render/SceneEvaluatorTest.cpp
     undo/CommandsTest.cpp
     undo/UndoManagerTest.cpp
     serialization/RandomOpsTest.cpp

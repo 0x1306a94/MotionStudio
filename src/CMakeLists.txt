@@ -28,6 +28,7 @@ add_library(core STATIC
     model/ShapeStroke.cpp
     model/ShapeTrimPath.cpp
     model/TextContent.cpp
+    render/SceneEvaluator.cpp
     undo/AddKeyframeCommand.cpp
     undo/AddLayerCommand.cpp
     undo/CommandHelpers.cpp
