@@ -39,61 +39,61 @@ const json *FindChild(const json &node, const char *key) {
     return it == node.end() ? nullptr : &*it;
 }
 
-Expected<const json *, ParseError> Child(const json &node, const char *key) {
+Expected<const json *, std::string> Child(const json &node, const char *key) {
     const json *child = FindChild(node, key);
     if (!child) {
-        return Unexpected(ParseError(std::string("missing field: ") + key));
+        return Unexpected(std::string(std::string("missing field: ") + key));
     }
     return child;
 }
 
-Expected<float, ParseError> AsFloat(const json &node) {
+Expected<float, std::string> AsFloat(const json &node) {
     if (!node.is_number()) {
-        return Unexpected(ParseError("field is not a number"));
+        return Unexpected(std::string("field is not a number"));
     }
     return node.get<float>();
 }
 
-Expected<double, ParseError> AsDouble(const json &node) {
+Expected<double, std::string> AsDouble(const json &node) {
     if (!node.is_number()) {
-        return Unexpected(ParseError("field is not a number"));
+        return Unexpected(std::string("field is not a number"));
     }
     return node.get<double>();
 }
 
-Expected<int64_t, ParseError> AsInt64(const json &node) {
+Expected<int64_t, std::string> AsInt64(const json &node) {
     if (!node.is_number_integer()) {
-        return Unexpected(ParseError("field is not an integer"));
+        return Unexpected(std::string("field is not an integer"));
     }
     return node.get<int64_t>();
 }
 
-Expected<int, ParseError> AsInt(const json &node) {
-    Expected<int64_t, ParseError> value = AsInt64(node);
+Expected<int, std::string> AsInt(const json &node) {
+    Expected<int64_t, std::string> value = AsInt64(node);
     if (!value) {
         return Unexpected(value.error());
     }
     return int(*value);
 }
 
-Expected<uint32_t, ParseError> AsUint32(const json &node) {
-    Expected<int64_t, ParseError> value = AsInt64(node);
+Expected<uint32_t, std::string> AsUint32(const json &node) {
+    Expected<int64_t, std::string> value = AsInt64(node);
     if (!value || *value < 0 || *value > int64_t(UINT32_MAX)) {
-        return Unexpected(ParseError("field is not a valid unsigned integer"));
+        return Unexpected(std::string("field is not a valid unsigned integer"));
     }
     return uint32_t(*value);
 }
 
-Expected<bool, ParseError> AsBool(const json &node) {
+Expected<bool, std::string> AsBool(const json &node) {
     if (!node.is_boolean()) {
-        return Unexpected(ParseError("field is not a boolean"));
+        return Unexpected(std::string("field is not a boolean"));
     }
     return node.get<bool>();
 }
 
-Expected<std::string, ParseError> AsString(const json &node) {
+Expected<std::string, std::string> AsString(const json &node) {
     if (!node.is_string()) {
-        return Unexpected(ParseError("field is not a string"));
+        return Unexpected(std::string("field is not a string"));
     }
     return node.get<std::string>();
 }
@@ -107,23 +107,23 @@ std::string IdToString(EntityId id) {
     return buffer;
 }
 
-Expected<EntityId, ParseError> IdFromString(const std::string &text) {
+Expected<EntityId, std::string> IdFromString(const std::string &text) {
     uint64_t value = 0;
     const char *begin = text.data();
     const char *end = begin + text.size();
     const auto result = std::from_chars(begin, end, value, 16);
     if (result.ec != std::errc() || result.ptr != end || value == 0) {
-        return Unexpected(ParseError("invalid entity id: " + text));
+        return Unexpected(std::string("invalid entity id: " + text));
     }
     return EntityId{value};
 }
 
-Expected<EntityId, ParseError> IdField(const json &node, const char *key) {
-    Expected<const json *, ParseError> child = Child(node, key);
+Expected<EntityId, std::string> IdField(const json &node, const char *key) {
+    Expected<const json *, std::string> child = Child(node, key);
     if (!child) {
         return Unexpected(child.error());
     }
-    Expected<std::string, ParseError> text = AsString(**child);
+    Expected<std::string, std::string> text = AsString(**child);
     if (!text) {
         return Unexpected(text.error());
     }
@@ -136,15 +136,15 @@ json Vec2ToJson(Vec2 value) {
     return json::array({value.x, value.y});
 }
 
-Expected<Vec2, ParseError> Vec2FromJson(const json &node) {
+Expected<Vec2, std::string> Vec2FromJson(const json &node) {
     if (!node.is_array() || node.size() != 2) {
-        return Unexpected(ParseError("Vec2 must be a 2-element array"));
+        return Unexpected(std::string("Vec2 must be a 2-element array"));
     }
-    Expected<float, ParseError> x = AsFloat(node[0]);
+    Expected<float, std::string> x = AsFloat(node[0]);
     if (!x) {
         return Unexpected(x.error());
     }
-    Expected<float, ParseError> y = AsFloat(node[1]);
+    Expected<float, std::string> y = AsFloat(node[1]);
     if (!y) {
         return Unexpected(y.error());
     }
@@ -155,16 +155,16 @@ json ColorToJson(Color value) {
     return json::array({value.r, value.g, value.b, value.a});
 }
 
-Expected<Color, ParseError> ColorFromJson(const json &node) {
+Expected<Color, std::string> ColorFromJson(const json &node) {
     if (!node.is_array() || node.size() != 4) {
-        return Unexpected(ParseError("Color must be a 4-element array"));
+        return Unexpected(std::string("Color must be a 4-element array"));
     }
-    Expected<float, ParseError> r = AsFloat(node[0]);
-    Expected<float, ParseError> g = AsFloat(node[1]);
-    Expected<float, ParseError> b = AsFloat(node[2]);
-    Expected<float, ParseError> a = AsFloat(node[3]);
+    Expected<float, std::string> r = AsFloat(node[0]);
+    Expected<float, std::string> g = AsFloat(node[1]);
+    Expected<float, std::string> b = AsFloat(node[2]);
+    Expected<float, std::string> a = AsFloat(node[3]);
     if (!r || !g || !b || !a) {
-        return Unexpected(ParseError("Color component is not a number"));
+        return Unexpected(std::string("Color component is not a number"));
     }
     return Color{*r, *g, *b, *a};
 }
@@ -179,33 +179,33 @@ json BezierPathToJson(const BezierPath &path) {
     return {{"closed", path.closed}, {"vertices", vertices}};
 }
 
-Expected<BezierPath, ParseError> BezierPathFromJson(const json &node) {
-    Expected<const json *, ParseError> closedNode = Child(node, "closed");
+Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
+    Expected<const json *, std::string> closedNode = Child(node, "closed");
     if (!closedNode) {
         return Unexpected(closedNode.error());
     }
-    Expected<bool, ParseError> closed = AsBool(**closedNode);
+    Expected<bool, std::string> closed = AsBool(**closedNode);
     if (!closed) {
         return Unexpected(closed.error());
     }
     const json *verticesNode = FindChild(node, "vertices");
     if (!verticesNode || !verticesNode->is_array()) {
-        return Unexpected(ParseError("missing the vertices array"));
+        return Unexpected(std::string("missing the vertices array"));
     }
     BezierPath path;
     path.closed = *closed;
     for (const json &vertexNode : *verticesNode) {
-        Expected<const json *, ParseError> pointNode = Child(vertexNode, "point");
-        Expected<const json *, ParseError> inNode = Child(vertexNode, "inTangent");
-        Expected<const json *, ParseError> outNode = Child(vertexNode, "outTangent");
+        Expected<const json *, std::string> pointNode = Child(vertexNode, "point");
+        Expected<const json *, std::string> inNode = Child(vertexNode, "inTangent");
+        Expected<const json *, std::string> outNode = Child(vertexNode, "outTangent");
         if (!pointNode || !inNode || !outNode) {
-            return Unexpected(ParseError("vertex is missing a tangent field"));
+            return Unexpected(std::string("vertex is missing a tangent field"));
         }
-        Expected<Vec2, ParseError> point = Vec2FromJson(**pointNode);
-        Expected<Vec2, ParseError> inTangent = Vec2FromJson(**inNode);
-        Expected<Vec2, ParseError> outTangent = Vec2FromJson(**outNode);
+        Expected<Vec2, std::string> point = Vec2FromJson(**pointNode);
+        Expected<Vec2, std::string> inTangent = Vec2FromJson(**inNode);
+        Expected<Vec2, std::string> outTangent = Vec2FromJson(**outNode);
         if (!point || !inTangent || !outTangent) {
-            return Unexpected(ParseError("invalid vertex coordinates"));
+            return Unexpected(std::string("invalid vertex coordinates"));
         }
         path.vertices.push_back({*point, *inTangent, *outTangent});
     }
@@ -213,52 +213,52 @@ Expected<BezierPath, ParseError> BezierPathFromJson(const json &node) {
 }
 
 template <typename T>
-Expected<T, ParseError> FromJson(const json &node);
+Expected<T, std::string> FromJson(const json &node);
 
 template <>
-Expected<float, ParseError> FromJson<float>(const json &node) {
+Expected<float, std::string> FromJson<float>(const json &node) {
     return AsFloat(node);
 }
 template <>
-Expected<double, ParseError> FromJson<double>(const json &node) {
+Expected<double, std::string> FromJson<double>(const json &node) {
     return AsDouble(node);
 }
 template <>
-Expected<int, ParseError> FromJson<int>(const json &node) {
+Expected<int, std::string> FromJson<int>(const json &node) {
     return AsInt(node);
 }
 template <>
-Expected<int64_t, ParseError> FromJson<int64_t>(const json &node) {
+Expected<int64_t, std::string> FromJson<int64_t>(const json &node) {
     return AsInt64(node);
 }
 template <>
-Expected<uint32_t, ParseError> FromJson<uint32_t>(const json &node) {
+Expected<uint32_t, std::string> FromJson<uint32_t>(const json &node) {
     return AsUint32(node);
 }
 template <>
-Expected<bool, ParseError> FromJson<bool>(const json &node) {
+Expected<bool, std::string> FromJson<bool>(const json &node) {
     return AsBool(node);
 }
 template <>
-Expected<std::string, ParseError> FromJson<std::string>(const json &node) {
+Expected<std::string, std::string> FromJson<std::string>(const json &node) {
     return AsString(node);
 }
 template <>
-Expected<Vec2, ParseError> FromJson<Vec2>(const json &node) {
+Expected<Vec2, std::string> FromJson<Vec2>(const json &node) {
     return Vec2FromJson(node);
 }
 template <>
-Expected<Color, ParseError> FromJson<Color>(const json &node) {
+Expected<Color, std::string> FromJson<Color>(const json &node) {
     return ColorFromJson(node);
 }
 template <>
-Expected<BezierPath, ParseError> FromJson<BezierPath>(const json &node) {
+Expected<BezierPath, std::string> FromJson<BezierPath>(const json &node) {
     return BezierPathFromJson(node);
 }
 
 template <typename T>
-Expected<T, ParseError> ParseField(const json &node, const char *key) {
-    Expected<const json *, ParseError> child = Child(node, key);
+Expected<T, std::string> ParseField(const json &node, const char *key) {
+    Expected<const json *, std::string> child = Child(node, key);
     if (!child) {
         return Unexpected(child.error());
     }
@@ -278,24 +278,24 @@ json EasingToJson(const Easing &easing) {
     return node;
 }
 
-Expected<Easing, ParseError> EasingFromJson(const json &node) {
-    Expected<std::string, ParseError> typeText = ParseField<std::string>(node, "type");
+Expected<Easing, std::string> EasingFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
     if (!typeText) {
         return Unexpected(typeText.error());
     }
-    Expected<Easing::Type, ParseError> type = dto::easingTypeFromString(*typeText);
+    Expected<Easing::Type, std::string> type = dto::easingTypeFromString(*typeText);
     if (!type) {
         return Unexpected(type.error());
     }
     if (*type != Easing::Type::Bezier) {
         return *type == Easing::Type::Hold ? Easing::Hold() : Easing::Linear();
     }
-    Expected<float, ParseError> inX = ParseField<float>(node, "inX");
-    Expected<float, ParseError> inY = ParseField<float>(node, "inY");
-    Expected<float, ParseError> outX = ParseField<float>(node, "outX");
-    Expected<float, ParseError> outY = ParseField<float>(node, "outY");
+    Expected<float, std::string> inX = ParseField<float>(node, "inX");
+    Expected<float, std::string> inY = ParseField<float>(node, "inY");
+    Expected<float, std::string> outX = ParseField<float>(node, "outX");
+    Expected<float, std::string> outY = ParseField<float>(node, "outY");
     if (!inX || !inY || !outX || !outY) {
-        return Unexpected(ParseError("Bezier easing is missing control point fields"));
+        return Unexpected(std::string("Bezier easing is missing control point fields"));
     }
     return Easing::Bezier(*inX, *inY, *outX, *outY);
 }
@@ -340,20 +340,20 @@ json AnimatableToJson(const Animatable<T> &animatable) {
 }
 
 template <typename T>
-Expected<Keyframe<T>, ParseError> KeyframeFromJson(const json &node) {
-    Expected<int64_t, ParseError> time = ParseField<int64_t>(node, "time");
+Expected<Keyframe<T>, std::string> KeyframeFromJson(const json &node) {
+    Expected<int64_t, std::string> time = ParseField<int64_t>(node, "time");
     if (!time) {
         return Unexpected(time.error());
     }
-    Expected<T, ParseError> value = ParseField<T>(node, "value");
+    Expected<T, std::string> value = ParseField<T>(node, "value");
     if (!value) {
         return Unexpected(value.error());
     }
-    Expected<const json *, ParseError> easingNode = Child(node, "easing");
+    Expected<const json *, std::string> easingNode = Child(node, "easing");
     if (!easingNode) {
         return Unexpected(easingNode.error());
     }
-    Expected<Easing, ParseError> easing = EasingFromJson(**easingNode);
+    Expected<Easing, std::string> easing = EasingFromJson(**easingNode);
     if (!easing) {
         return Unexpected(easing.error());
     }
@@ -362,14 +362,14 @@ Expected<Keyframe<T>, ParseError> KeyframeFromJson(const json &node) {
     keyframe.value = std::move(*value);
     keyframe.easing = *easing;
     if (const json *tangentNode = FindChild(node, "spatialInTangent")) {
-        Expected<Vec2, ParseError> tangent = Vec2FromJson(*tangentNode);
+        Expected<Vec2, std::string> tangent = Vec2FromJson(*tangentNode);
         if (!tangent) {
             return Unexpected(tangent.error());
         }
         keyframe.spatialInTangent = *tangent;
     }
     if (const json *tangentNode = FindChild(node, "spatialOutTangent")) {
-        Expected<Vec2, ParseError> tangent = Vec2FromJson(*tangentNode);
+        Expected<Vec2, std::string> tangent = Vec2FromJson(*tangentNode);
         if (!tangent) {
             return Unexpected(tangent.error());
         }
@@ -379,9 +379,9 @@ Expected<Keyframe<T>, ParseError> KeyframeFromJson(const json &node) {
 }
 
 template <typename T>
-Expected<void, ParseError> AnimatableFromJson(const json &node, Animatable<T> &animatable) {
+Expected<void, std::string> AnimatableFromJson(const json &node, Animatable<T> &animatable) {
     if (const json *staticNode = FindChild(node, "static")) {
-        Expected<T, ParseError> value = FromJson<T>(*staticNode);
+        Expected<T, std::string> value = FromJson<T>(*staticNode);
         if (!value) {
             return Unexpected(value.error());
         }
@@ -389,10 +389,10 @@ Expected<void, ParseError> AnimatableFromJson(const json &node, Animatable<T> &a
     }
     if (const json *keyframesNode = FindChild(node, "keyframes")) {
         if (!keyframesNode->is_array()) {
-            return Unexpected(ParseError("keyframes must be an array"));
+            return Unexpected(std::string("keyframes must be an array"));
         }
         for (const json &keyframeNode : *keyframesNode) {
-            Expected<Keyframe<T>, ParseError> keyframe = KeyframeFromJson<T>(keyframeNode);
+            Expected<Keyframe<T>, std::string> keyframe = KeyframeFromJson<T>(keyframeNode);
             if (!keyframe) {
                 return Unexpected(keyframe.error());
             }
@@ -412,29 +412,29 @@ json TransformToJson(const Transform &transform) {
             {"opacity", AnimatableToJson(transform.opacity)}};
 }
 
-Expected<void, ParseError> TransformFromJson(const json &node, Transform &transform) {
+Expected<void, std::string> TransformFromJson(const json &node, Transform &transform) {
     const char *fields[] = {"anchorPoint", "position", "scale", "rotation", "opacity"};
     Animatable<Vec2> *vec2Targets[] = {&transform.anchorPoint, &transform.position,
                                        &transform.scale};
     for (int i = 0; i < 3; ++i) {
-        Expected<const json *, ParseError> child = Child(node, fields[i]);
+        Expected<const json *, std::string> child = Child(node, fields[i]);
         if (!child) {
             return Unexpected(child.error());
         }
-        Expected<void, ParseError> result = AnimatableFromJson(**child, *vec2Targets[i]);
+        Expected<void, std::string> result = AnimatableFromJson(**child, *vec2Targets[i]);
         if (!result) {
             return Unexpected(result.error());
         }
     }
-    Expected<const json *, ParseError> rotationNode = Child(node, fields[3]);
+    Expected<const json *, std::string> rotationNode = Child(node, fields[3]);
     if (!rotationNode) {
         return Unexpected(rotationNode.error());
     }
-    Expected<void, ParseError> result = AnimatableFromJson(**rotationNode, transform.rotation);
+    Expected<void, std::string> result = AnimatableFromJson(**rotationNode, transform.rotation);
     if (!result) {
         return Unexpected(result.error());
     }
-    Expected<const json *, ParseError> opacityNode = Child(node, fields[4]);
+    Expected<const json *, std::string> opacityNode = Child(node, fields[4]);
     if (!opacityNode) {
         return Unexpected(opacityNode.error());
     }
@@ -448,31 +448,31 @@ json MaskToJson(const Mask &mask) {
             {"inverted", mask.inverted}};
 }
 
-Expected<Mask, ParseError> MaskFromJson(const json &node) {
-    Expected<BezierPath, ParseError> path = ParseField<BezierPath>(node, "path");
+Expected<Mask, std::string> MaskFromJson(const json &node) {
+    Expected<BezierPath, std::string> path = ParseField<BezierPath>(node, "path");
     if (!path) {
         return Unexpected(path.error());
     }
-    Expected<std::string, ParseError> modeText = ParseField<std::string>(node, "mode");
+    Expected<std::string, std::string> modeText = ParseField<std::string>(node, "mode");
     if (!modeText) {
         return Unexpected(modeText.error());
     }
-    Expected<MaskMode, ParseError> mode = dto::maskModeFromString(*modeText);
+    Expected<MaskMode, std::string> mode = dto::maskModeFromString(*modeText);
     if (!mode) {
         return Unexpected(mode.error());
     }
     Mask mask;
     mask.path = std::move(*path);
     mask.mode = *mode;
-    Expected<const json *, ParseError> opacityNode = Child(node, "opacity");
+    Expected<const json *, std::string> opacityNode = Child(node, "opacity");
     if (!opacityNode) {
         return Unexpected(opacityNode.error());
     }
-    Expected<void, ParseError> result = AnimatableFromJson(**opacityNode, mask.opacity);
+    Expected<void, std::string> result = AnimatableFromJson(**opacityNode, mask.opacity);
     if (!result) {
         return Unexpected(result.error());
     }
-    Expected<bool, ParseError> inverted = ParseField<bool>(node, "inverted");
+    Expected<bool, std::string> inverted = ParseField<bool>(node, "inverted");
     if (!inverted) {
         return Unexpected(inverted.error());
     }
@@ -547,12 +547,12 @@ json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>> &elements) {
     return nodes;
 }
 
-Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &node) {
-    Expected<std::string, ParseError> typeText = ParseField<std::string>(node, "type");
+Expected<std::unique_ptr<ShapeElement>, std::string> ShapeFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
     if (!typeText) {
         return Unexpected(typeText.error());
     }
-    Expected<ShapeType, ParseError> type = dto::shapeTypeFromString(*typeText);
+    Expected<ShapeType, std::string> type = dto::shapeTypeFromString(*typeText);
     if (!type) {
         return Unexpected(type.error());
     }
@@ -560,11 +560,11 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
     switch (*type) {
         case ShapeType::Path: {
             auto shape = std::make_unique<ShapePath>();
-            Expected<const json *, ParseError> pathNode = Child(node, "path");
+            Expected<const json *, std::string> pathNode = Child(node, "path");
             if (!pathNode) {
                 return Unexpected(pathNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**pathNode, shape->path);
+            Expected<void, std::string> result = AnimatableFromJson(**pathNode, shape->path);
             if (!result) {
                 return Unexpected(result.error());
             }
@@ -573,15 +573,15 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
         }
         case ShapeType::Fill: {
             auto shape = std::make_unique<ShapeFill>();
-            Expected<const json *, ParseError> colorNode = Child(node, "color");
+            Expected<const json *, std::string> colorNode = Child(node, "color");
             if (!colorNode) {
                 return Unexpected(colorNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**colorNode, shape->color);
+            Expected<void, std::string> result = AnimatableFromJson(**colorNode, shape->color);
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> opacityNode = Child(node, "opacity");
+            Expected<const json *, std::string> opacityNode = Child(node, "opacity");
             if (!opacityNode) {
                 return Unexpected(opacityNode.error());
             }
@@ -589,11 +589,11 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<std::string, ParseError> ruleText = ParseField<std::string>(node, "fillRule");
+            Expected<std::string, std::string> ruleText = ParseField<std::string>(node, "fillRule");
             if (!ruleText) {
                 return Unexpected(ruleText.error());
             }
-            Expected<FillRule, ParseError> fillRule = dto::fillRuleFromString(*ruleText);
+            Expected<FillRule, std::string> fillRule = dto::fillRuleFromString(*ruleText);
             if (!fillRule) {
                 return Unexpected(fillRule.error());
             }
@@ -605,15 +605,15 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             auto shape = std::make_unique<ShapeStroke>();
             const char *animatableFields[] = {"color", "width", "opacity"};
             Animatable<Color> *colorTarget = &shape->color;
-            Expected<const json *, ParseError> colorNode = Child(node, animatableFields[0]);
+            Expected<const json *, std::string> colorNode = Child(node, animatableFields[0]);
             if (!colorNode) {
                 return Unexpected(colorNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**colorNode, *colorTarget);
+            Expected<void, std::string> result = AnimatableFromJson(**colorNode, *colorTarget);
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> widthNode = Child(node, animatableFields[1]);
+            Expected<const json *, std::string> widthNode = Child(node, animatableFields[1]);
             if (!widthNode) {
                 return Unexpected(widthNode.error());
             }
@@ -621,7 +621,7 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> opacityNode = Child(node, animatableFields[2]);
+            Expected<const json *, std::string> opacityNode = Child(node, animatableFields[2]);
             if (!opacityNode) {
                 return Unexpected(opacityNode.error());
             }
@@ -629,17 +629,17 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<std::string, ParseError> capText = ParseField<std::string>(node, "cap");
-            Expected<std::string, ParseError> joinText = ParseField<std::string>(node, "join");
-            Expected<float, ParseError> miterLimit = ParseField<float>(node, "miterLimit");
+            Expected<std::string, std::string> capText = ParseField<std::string>(node, "cap");
+            Expected<std::string, std::string> joinText = ParseField<std::string>(node, "join");
+            Expected<float, std::string> miterLimit = ParseField<float>(node, "miterLimit");
             if (!capText || !joinText || !miterLimit) {
-                return Unexpected(ParseError("Stroke is missing the cap/join/miterLimit fields"));
+                return Unexpected(std::string("Stroke is missing the cap/join/miterLimit fields"));
             }
-            Expected<LineCap, ParseError> cap = dto::lineCapFromString(*capText);
+            Expected<LineCap, std::string> cap = dto::lineCapFromString(*capText);
             if (!cap) {
                 return Unexpected(cap.error());
             }
-            Expected<LineJoin, ParseError> join = dto::lineJoinFromString(*joinText);
+            Expected<LineJoin, std::string> join = dto::lineJoinFromString(*joinText);
             if (!join) {
                 return Unexpected(join.error());
             }
@@ -651,20 +651,20 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
         }
         case ShapeType::Group: {
             auto shape = std::make_unique<ShapeGroup>();
-            Expected<const json *, ParseError> transformNode = Child(node, "transform");
+            Expected<const json *, std::string> transformNode = Child(node, "transform");
             if (!transformNode) {
                 return Unexpected(transformNode.error());
             }
-            Expected<void, ParseError> result = TransformFromJson(**transformNode, shape->transform);
+            Expected<void, std::string> result = TransformFromJson(**transformNode, shape->transform);
             if (!result) {
                 return Unexpected(result.error());
             }
             const json *elementsNode = FindChild(node, "elements");
             if (!elementsNode || !elementsNode->is_array()) {
-                return Unexpected(ParseError("Group is missing the elements array"));
+                return Unexpected(std::string("Group is missing the elements array"));
             }
             for (const json &childNode : *elementsNode) {
-                Expected<std::unique_ptr<ShapeElement>, ParseError> child = ShapeFromJson(childNode);
+                Expected<std::unique_ptr<ShapeElement>, std::string> child = ShapeFromJson(childNode);
                 if (!child) {
                     return Unexpected(child.error());
                 }
@@ -675,15 +675,15 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
         }
         case ShapeType::Rect: {
             auto shape = std::make_unique<ShapeRect>();
-            Expected<const json *, ParseError> positionNode = Child(node, "position");
+            Expected<const json *, std::string> positionNode = Child(node, "position");
             if (!positionNode) {
                 return Unexpected(positionNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**positionNode, shape->position);
+            Expected<void, std::string> result = AnimatableFromJson(**positionNode, shape->position);
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> sizeNode = Child(node, "size");
+            Expected<const json *, std::string> sizeNode = Child(node, "size");
             if (!sizeNode) {
                 return Unexpected(sizeNode.error());
             }
@@ -691,7 +691,7 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> radiusNode = Child(node, "cornerRadius");
+            Expected<const json *, std::string> radiusNode = Child(node, "cornerRadius");
             if (!radiusNode) {
                 return Unexpected(radiusNode.error());
             }
@@ -704,15 +704,15 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
         }
         case ShapeType::Ellipse: {
             auto shape = std::make_unique<ShapeEllipse>();
-            Expected<const json *, ParseError> positionNode = Child(node, "position");
+            Expected<const json *, std::string> positionNode = Child(node, "position");
             if (!positionNode) {
                 return Unexpected(positionNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**positionNode, shape->position);
+            Expected<void, std::string> result = AnimatableFromJson(**positionNode, shape->position);
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> sizeNode = Child(node, "size");
+            Expected<const json *, std::string> sizeNode = Child(node, "size");
             if (!sizeNode) {
                 return Unexpected(sizeNode.error());
             }
@@ -726,15 +726,15 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
         case ShapeType::TrimPath: {
             auto shape = std::make_unique<ShapeTrimPath>();
             const char *trimFields[] = {"start", "end", "offset"};
-            Expected<const json *, ParseError> startNode = Child(node, trimFields[0]);
+            Expected<const json *, std::string> startNode = Child(node, trimFields[0]);
             if (!startNode) {
                 return Unexpected(startNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**startNode, shape->start);
+            Expected<void, std::string> result = AnimatableFromJson(**startNode, shape->start);
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> endNode = Child(node, trimFields[1]);
+            Expected<const json *, std::string> endNode = Child(node, trimFields[1]);
             if (!endNode) {
                 return Unexpected(endNode.error());
             }
@@ -742,7 +742,7 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<const json *, ParseError> offsetNode = Child(node, trimFields[2]);
+            Expected<const json *, std::string> offsetNode = Child(node, trimFields[2]);
             if (!offsetNode) {
                 return Unexpected(offsetNode.error());
             }
@@ -754,7 +754,7 @@ Expected<std::unique_ptr<ShapeElement>, ParseError> ShapeFromJson(const json &no
             break;
         }
     }
-    Expected<EntityId, ParseError> id = IdField(node, "id");
+    Expected<EntityId, std::string> id = IdField(node, "id");
     if (!id) {
         return Unexpected(id.error());
     }
@@ -796,12 +796,12 @@ json ContentToJson(const LayerContent &content) {
     return node;
 }
 
-Expected<std::unique_ptr<LayerContent>, ParseError> ContentFromJson(const json &node) {
-    Expected<std::string, ParseError> typeText = ParseField<std::string>(node, "type");
+Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
     if (!typeText) {
         return Unexpected(typeText.error());
     }
-    Expected<LayerType, ParseError> type = dto::layerTypeFromString(*typeText);
+    Expected<LayerType, std::string> type = dto::layerTypeFromString(*typeText);
     if (!type) {
         return Unexpected(type.error());
     }
@@ -810,10 +810,10 @@ Expected<std::unique_ptr<LayerContent>, ParseError> ContentFromJson(const json &
             auto content = std::make_unique<ShapeContent>();
             const json *elementsNode = FindChild(node, "elements");
             if (!elementsNode || !elementsNode->is_array()) {
-                return Unexpected(ParseError("Shape content is missing the elements array"));
+                return Unexpected(std::string("Shape content is missing the elements array"));
             }
             for (const json &elementNode : *elementsNode) {
-                Expected<std::unique_ptr<ShapeElement>, ParseError> element = ShapeFromJson(elementNode);
+                Expected<std::unique_ptr<ShapeElement>, std::string> element = ShapeFromJson(elementNode);
                 if (!element) {
                     return Unexpected(element.error());
                 }
@@ -823,7 +823,7 @@ Expected<std::unique_ptr<LayerContent>, ParseError> ContentFromJson(const json &
         }
         case LayerType::Image: {
             auto content = std::make_unique<ImageContent>();
-            Expected<EntityId, ParseError> assetId = IdField(node, "assetId");
+            Expected<EntityId, std::string> assetId = IdField(node, "assetId");
             if (!assetId) {
                 return Unexpected(assetId.error());
             }
@@ -832,20 +832,20 @@ Expected<std::unique_ptr<LayerContent>, ParseError> ContentFromJson(const json &
         }
         case LayerType::Text: {
             auto content = std::make_unique<TextContent>();
-            Expected<const json *, ParseError> textNode = Child(node, "text");
+            Expected<const json *, std::string> textNode = Child(node, "text");
             if (!textNode) {
                 return Unexpected(textNode.error());
             }
-            Expected<void, ParseError> result = AnimatableFromJson(**textNode, content->text);
+            Expected<void, std::string> result = AnimatableFromJson(**textNode, content->text);
             if (!result) {
                 return Unexpected(result.error());
             }
-            Expected<std::string, ParseError> fontFamily = ParseField<std::string>(node, "fontFamily");
+            Expected<std::string, std::string> fontFamily = ParseField<std::string>(node, "fontFamily");
             if (!fontFamily) {
                 return Unexpected(fontFamily.error());
             }
             content->fontFamily = std::move(*fontFamily);
-            Expected<const json *, ParseError> fontSizeNode = Child(node, "fontSize");
+            Expected<const json *, std::string> fontSizeNode = Child(node, "fontSize");
             if (!fontSizeNode) {
                 return Unexpected(fontSizeNode.error());
             }
@@ -860,7 +860,7 @@ Expected<std::unique_ptr<LayerContent>, ParseError> ContentFromJson(const json &
         }
         case LayerType::Precomp: {
             auto content = std::make_unique<PrecompContent>();
-            Expected<EntityId, ParseError> compositionId = IdField(node, "compositionId");
+            Expected<EntityId, std::string> compositionId = IdField(node, "compositionId");
             if (!compositionId) {
                 return Unexpected(compositionId.error());
             }
@@ -868,7 +868,7 @@ Expected<std::unique_ptr<LayerContent>, ParseError> ContentFromJson(const json &
             return std::unique_ptr<LayerContent>(std::move(content));
         }
     }
-    return Unexpected(ParseError("unknown layer content type"));
+    return Unexpected(std::string("unknown layer content type"));
 }
 
 // ---- Layer / Composition / Asset / Document ----
@@ -899,37 +899,37 @@ json LayerToJson(const Layer &layer) {
     return node;
 }
 
-Expected<std::unique_ptr<Layer>, ParseError> LayerFromJson(const json &node) {
-    Expected<std::string, ParseError> typeText = ParseField<std::string>(node, "type");
+Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
     if (!typeText) {
         return Unexpected(typeText.error());
     }
-    Expected<LayerType, ParseError> type = dto::layerTypeFromString(*typeText);
+    Expected<LayerType, std::string> type = dto::layerTypeFromString(*typeText);
     if (!type) {
         return Unexpected(type.error());
     }
     auto layer = std::make_unique<Layer>(*type);
 
-    Expected<EntityId, ParseError> id = IdField(node, "id");
+    Expected<EntityId, std::string> id = IdField(node, "id");
     if (!id) {
         return Unexpected(id.error());
     }
     layer->id = *id;
 
-    Expected<std::string, ParseError> name = ParseField<std::string>(node, "name");
+    Expected<std::string, std::string> name = ParseField<std::string>(node, "name");
     if (!name) {
         return Unexpected(name.error());
     }
     layer->name = std::move(*name);
 
-    Expected<int64_t, ParseError> inPoint = ParseField<int64_t>(node, "inPoint");
-    Expected<int64_t, ParseError> outPoint = ParseField<int64_t>(node, "outPoint");
-    Expected<int64_t, ParseError> startTime = ParseField<int64_t>(node, "startTime");
-    Expected<double, ParseError> timeStretch = ParseField<double>(node, "timeStretch");
-    Expected<bool, ParseError> visible = ParseField<bool>(node, "visible");
-    Expected<bool, ParseError> locked = ParseField<bool>(node, "locked");
+    Expected<int64_t, std::string> inPoint = ParseField<int64_t>(node, "inPoint");
+    Expected<int64_t, std::string> outPoint = ParseField<int64_t>(node, "outPoint");
+    Expected<int64_t, std::string> startTime = ParseField<int64_t>(node, "startTime");
+    Expected<double, std::string> timeStretch = ParseField<double>(node, "timeStretch");
+    Expected<bool, std::string> visible = ParseField<bool>(node, "visible");
+    Expected<bool, std::string> locked = ParseField<bool>(node, "locked");
     if (!inPoint || !outPoint || !startTime || !timeStretch || !visible || !locked) {
-        return Unexpected(ParseError("Layer is missing the time/visibility fields"));
+        return Unexpected(std::string("Layer is missing the time/visibility fields"));
     }
     layer->inPoint = *inPoint;
     layer->outPoint = *outPoint;
@@ -938,30 +938,30 @@ Expected<std::unique_ptr<Layer>, ParseError> LayerFromJson(const json &node) {
     layer->visible = *visible;
     layer->locked = *locked;
 
-    Expected<std::string, ParseError> blendText = ParseField<std::string>(node, "blendMode");
+    Expected<std::string, std::string> blendText = ParseField<std::string>(node, "blendMode");
     if (!blendText) {
         return Unexpected(blendText.error());
     }
-    Expected<BlendMode, ParseError> blendMode = dto::blendModeFromString(*blendText);
+    Expected<BlendMode, std::string> blendMode = dto::blendModeFromString(*blendText);
     if (!blendMode) {
         return Unexpected(blendMode.error());
     }
     layer->blendMode = *blendMode;
 
-    Expected<const json *, ParseError> transformNode = Child(node, "transform");
+    Expected<const json *, std::string> transformNode = Child(node, "transform");
     if (!transformNode) {
         return Unexpected(transformNode.error());
     }
-    Expected<void, ParseError> result = TransformFromJson(**transformNode, layer->transform);
+    Expected<void, std::string> result = TransformFromJson(**transformNode, layer->transform);
     if (!result) {
         return Unexpected(result.error());
     }
 
-    Expected<const json *, ParseError> contentNode = Child(node, "content");
+    Expected<const json *, std::string> contentNode = Child(node, "content");
     if (!contentNode) {
         return Unexpected(contentNode.error());
     }
-    Expected<std::unique_ptr<LayerContent>, ParseError> content = ContentFromJson(**contentNode);
+    Expected<std::unique_ptr<LayerContent>, std::string> content = ContentFromJson(**contentNode);
     if (!content) {
         return Unexpected(content.error());
     }
@@ -969,11 +969,11 @@ Expected<std::unique_ptr<Layer>, ParseError> LayerFromJson(const json &node) {
 
     const json *parentNode = FindChild(node, "parentId");
     if (parentNode && !parentNode->is_null()) {
-        Expected<std::string, ParseError> parentText = AsString(*parentNode);
+        Expected<std::string, std::string> parentText = AsString(*parentNode);
         if (!parentText) {
             return Unexpected(parentText.error());
         }
-        Expected<EntityId, ParseError> parentId = IdFromString(*parentText);
+        Expected<EntityId, std::string> parentId = IdFromString(*parentText);
         if (!parentId) {
             return Unexpected(parentId.error());
         }
@@ -982,10 +982,10 @@ Expected<std::unique_ptr<Layer>, ParseError> LayerFromJson(const json &node) {
 
     if (const json *masksNode = FindChild(node, "masks")) {
         if (!masksNode->is_array()) {
-            return Unexpected(ParseError("masks must be an array"));
+            return Unexpected(std::string("masks must be an array"));
         }
         for (const json &maskNode : *masksNode) {
-            Expected<Mask, ParseError> mask = MaskFromJson(maskNode);
+            Expected<Mask, std::string> mask = MaskFromJson(maskNode);
             if (!mask) {
                 return Unexpected(mask.error());
             }
@@ -1011,47 +1011,47 @@ json CompositionToJson(const Composition &composition) {
             {"layers", std::move(layers)}};
 }
 
-Expected<std::unique_ptr<Composition>, ParseError> CompositionFromJson(const json &node) {
+Expected<std::unique_ptr<Composition>, std::string> CompositionFromJson(const json &node) {
     auto composition = std::make_unique<Composition>();
 
-    Expected<EntityId, ParseError> id = IdField(node, "id");
+    Expected<EntityId, std::string> id = IdField(node, "id");
     if (!id) {
         return Unexpected(id.error());
     }
     composition->id = *id;
 
-    Expected<std::string, ParseError> name = ParseField<std::string>(node, "name");
+    Expected<std::string, std::string> name = ParseField<std::string>(node, "name");
     if (!name) {
         return Unexpected(name.error());
     }
     composition->name = std::move(*name);
 
-    Expected<int64_t, ParseError> duration = ParseField<int64_t>(node, "duration");
+    Expected<int64_t, std::string> duration = ParseField<int64_t>(node, "duration");
     if (!duration) {
         return Unexpected(duration.error());
     }
     composition->duration = *duration;
 
-    Expected<const json *, ParseError> frameRateNode = Child(node, "frameRate");
+    Expected<const json *, std::string> frameRateNode = Child(node, "frameRate");
     if (!frameRateNode) {
         return Unexpected(frameRateNode.error());
     }
-    Expected<uint32_t, ParseError> num = ParseField<uint32_t>(**frameRateNode, "num");
-    Expected<uint32_t, ParseError> den = ParseField<uint32_t>(**frameRateNode, "den");
+    Expected<uint32_t, std::string> num = ParseField<uint32_t>(**frameRateNode, "num");
+    Expected<uint32_t, std::string> den = ParseField<uint32_t>(**frameRateNode, "den");
     if (!num || !den) {
-        return Unexpected(ParseError("frameRate is missing the num/den fields"));
+        return Unexpected(std::string("frameRate is missing the num/den fields"));
     }
     composition->frameRate = {*num, *den};
 
-    Expected<int, ParseError> width = ParseField<int>(node, "width");
-    Expected<int, ParseError> height = ParseField<int>(node, "height");
+    Expected<int, std::string> width = ParseField<int>(node, "width");
+    Expected<int, std::string> height = ParseField<int>(node, "height");
     if (!width || !height) {
-        return Unexpected(ParseError("Composition is missing the width/height fields"));
+        return Unexpected(std::string("Composition is missing the width/height fields"));
     }
     composition->width = *width;
     composition->height = *height;
 
-    Expected<Color, ParseError> backgroundColor = ParseField<Color>(node, "backgroundColor");
+    Expected<Color, std::string> backgroundColor = ParseField<Color>(node, "backgroundColor");
     if (!backgroundColor) {
         return Unexpected(backgroundColor.error());
     }
@@ -1059,10 +1059,10 @@ Expected<std::unique_ptr<Composition>, ParseError> CompositionFromJson(const jso
 
     const json *layersNode = FindChild(node, "layers");
     if (!layersNode || !layersNode->is_array()) {
-        return Unexpected(ParseError("Composition is missing the layers array"));
+        return Unexpected(std::string("Composition is missing the layers array"));
     }
     for (const json &layerNode : *layersNode) {
-        Expected<std::unique_ptr<Layer>, ParseError> layer = LayerFromJson(layerNode);
+        Expected<std::unique_ptr<Layer>, std::string> layer = LayerFromJson(layerNode);
         if (!layer) {
             return Unexpected(layer.error());
         }
@@ -1078,26 +1078,26 @@ json AssetToJson(const Asset &asset) {
             {"path", asset.path}};
 }
 
-Expected<Asset, ParseError> AssetFromJson(const json &node) {
+Expected<Asset, std::string> AssetFromJson(const json &node) {
     Asset asset;
-    Expected<EntityId, ParseError> id = IdField(node, "id");
+    Expected<EntityId, std::string> id = IdField(node, "id");
     if (!id) {
         return Unexpected(id.error());
     }
     asset.id = *id;
-    Expected<std::string, ParseError> typeText = ParseField<std::string>(node, "type");
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
     if (!typeText) {
         return Unexpected(typeText.error());
     }
-    Expected<AssetType, ParseError> type = dto::assetTypeFromString(*typeText);
+    Expected<AssetType, std::string> type = dto::assetTypeFromString(*typeText);
     if (!type) {
         return Unexpected(type.error());
     }
     asset.type = *type;
-    Expected<std::string, ParseError> name = ParseField<std::string>(node, "name");
-    Expected<std::string, ParseError> path = ParseField<std::string>(node, "path");
+    Expected<std::string, std::string> name = ParseField<std::string>(node, "name");
+    Expected<std::string, std::string> path = ParseField<std::string>(node, "path");
     if (!name || !path) {
-        return Unexpected(ParseError("Asset is missing the name/path fields"));
+        return Unexpected(std::string("Asset is missing the name/path fields"));
     }
     asset.name = std::move(*name);
     asset.path = std::move(*path);
@@ -1126,25 +1126,25 @@ std::string Serializer::serialize(const Document &document) {
     return DocumentToJson(document).dump(2);
 }
 
-Expected<std::unique_ptr<Document>, ParseError> Serializer::deserialize(const std::string &jsonText) {
-    Expected<std::string, ParseError> migrated = SchemaMigrator::migrate(jsonText);
+Expected<std::unique_ptr<Document>, std::string> Serializer::deserialize(const std::string &jsonText) {
+    Expected<std::string, std::string> migrated = SchemaMigrator::migrate(jsonText);
     if (!migrated) {
         return Unexpected(migrated.error());
     }
     const json data = json::parse(*migrated, nullptr, false);
     if (data.is_discarded() || !data.is_object()) {
-        return Unexpected(ParseError("failed to parse the document JSON"));
+        return Unexpected(std::string("failed to parse the document JSON"));
     }
 
     auto document = std::make_unique<Document>();
 
-    Expected<EntityId, ParseError> id = IdField(data, "id");
+    Expected<EntityId, std::string> id = IdField(data, "id");
     if (!id) {
         return Unexpected(id.error());
     }
     document->id = *id;
 
-    Expected<std::string, ParseError> name = ParseField<std::string>(data, "name");
+    Expected<std::string, std::string> name = ParseField<std::string>(data, "name");
     if (!name) {
         return Unexpected(name.error());
     }
@@ -1152,10 +1152,10 @@ Expected<std::unique_ptr<Document>, ParseError> Serializer::deserialize(const st
 
     const json *assetsNode = FindChild(data, "assets");
     if (!assetsNode || !assetsNode->is_array()) {
-        return Unexpected(ParseError("missing the assets array"));
+        return Unexpected(std::string("missing the assets array"));
     }
     for (const json &assetNode : *assetsNode) {
-        Expected<Asset, ParseError> asset = AssetFromJson(assetNode);
+        Expected<Asset, std::string> asset = AssetFromJson(assetNode);
         if (!asset) {
             return Unexpected(asset.error());
         }
@@ -1164,10 +1164,10 @@ Expected<std::unique_ptr<Document>, ParseError> Serializer::deserialize(const st
 
     const json *compositionsNode = FindChild(data, "compositions");
     if (!compositionsNode || !compositionsNode->is_array()) {
-        return Unexpected(ParseError("missing the compositions array"));
+        return Unexpected(std::string("missing the compositions array"));
     }
     for (const json &compositionNode : *compositionsNode) {
-        Expected<std::unique_ptr<Composition>, ParseError> composition =
+        Expected<std::unique_ptr<Composition>, std::string> composition =
             CompositionFromJson(compositionNode);
         if (!composition) {
             return Unexpected(composition.error());

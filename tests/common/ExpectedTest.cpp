@@ -1,5 +1,4 @@
 #include <string>
-#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -22,8 +21,8 @@ Expected<int, std::string> DivideByTwo(int value) {
     return value / 2;
 }
 
-double NumberToDouble(int value) {
-    return value * 2.0;
+std::string NumberToText(int value) {
+    return std::to_string(value);
 }
 
 void ConsumeNumber(int) {
@@ -45,8 +44,8 @@ Expected<void, std::string> RecoverVoid(const std::string &) {
     return {};
 }
 
-int ConstantNumber() {
-    return 42;
+std::string ConstantText() {
+    return "ok";
 }
 
 void DoNothing() {
@@ -69,8 +68,8 @@ TEST(ExpectedTest, ErrorConstructionHoldsError) {
 }
 
 TEST(ExpectedTest, DereferenceOperatorsExposeValue) {
-    Expected<std::vector<int>, std::string> result(std::vector<int>{1, 2, 3, 4});
-    EXPECT_EQ((*result).size(), 4u);
+    Expected<std::string, std::string> result(std::string("text"));
+    EXPECT_EQ(*result, "text");
     EXPECT_EQ(result->size(), 4u);
 }
 
@@ -89,6 +88,16 @@ TEST(ExpectedTest, CustomErrorTypeIsSupported) {
     Expected<int, ErrorCode> result(unexpected);
     EXPECT_FALSE(result.hasValue());
     EXPECT_EQ(result.error(), ErrorCode::NotFound);
+}
+
+TEST(ExpectedTest, ValueAndErrorMayShareTheSameType) {
+    Expected<std::string, std::string> value(std::string("ok"));
+    ASSERT_TRUE(value.hasValue());
+    EXPECT_EQ(value.value(), "ok");
+
+    Expected<std::string, std::string> error(Unexpected(std::string("boom")));
+    ASSERT_FALSE(error.hasValue());
+    EXPECT_EQ(error.error(), "boom");
 }
 
 TEST(ExpectedTest, VoidDefaultIsSuccess) {
@@ -115,14 +124,14 @@ TEST(ExpectedTest, AndThenPropagatesError) {
 }
 
 TEST(ExpectedTest, TransformMapsValue) {
-    Expected<double, std::string> result = Expected<int, std::string>(21).transform(NumberToDouble);
+    Expected<std::string, std::string> result = Expected<int, std::string>(21).transform(NumberToText);
     ASSERT_TRUE(result.hasValue());
-    EXPECT_EQ(result.value(), 42.0);
+    EXPECT_EQ(result.value(), "21");
 }
 
 TEST(ExpectedTest, TransformPropagatesError) {
-    Expected<double, std::string> result =
-        Expected<int, std::string>(Unexpected(std::string("boom"))).transform(NumberToDouble);
+    Expected<std::string, std::string> result =
+        Expected<int, std::string>(Unexpected(std::string("boom"))).transform(NumberToText);
     ASSERT_FALSE(result.hasValue());
     EXPECT_EQ(result.error(), "boom");
 }
@@ -169,9 +178,9 @@ TEST(ExpectedTest, VoidAndThenPropagatesError) {
 }
 
 TEST(ExpectedTest, VoidTransformMapsToValue) {
-    Expected<int, std::string> result = Expected<void, std::string>().transform(ConstantNumber);
+    Expected<std::string, std::string> result = Expected<void, std::string>().transform(ConstantText);
     ASSERT_TRUE(result.hasValue());
-    EXPECT_EQ(result.value(), 42);
+    EXPECT_EQ(result.value(), "ok");
 }
 
 TEST(ExpectedTest, VoidTransformStaysVoid) {

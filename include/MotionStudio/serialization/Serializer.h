@@ -5,7 +5,6 @@
 #include <string>
 
 #include "MotionStudio/common/Expected.h"
-#include "MotionStudio/serialization/ParseError.h"
 
 namespace motion {
 
@@ -20,7 +19,7 @@ class Serializer {
     static std::string serialize(const Document &document);
     // Deserializes a document from a JSON string.
     // jsonText: the full JSON text to parse.
-    static Expected<std::unique_ptr<Document>, ParseError> deserialize(const std::string &jsonText);
+    static Expected<std::unique_ptr<Document>, std::string> deserialize(const std::string &jsonText);
 };
 
 // FNV-1a hash of the serialized document. Intended for debug/test assertions

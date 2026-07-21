@@ -65,28 +65,26 @@ struct ExpectedValue<Expected<T, E>> {
 // assertion: the project does not use exceptions, so misuse fails fast instead.
 template <typename T, typename E>
 class Expected {
-    static_assert(!std::is_same_v<T, E>, "T and E must be different types");
-
   public:
     // value: payload of the success state.
     Expected(const T &value)
-        : storage_(value) {
+        : storage_(ValueBox{value}) {
     }
     Expected(T &&value)
-        : storage_(std::move(value)) {
+        : storage_(ValueBox{std::move(value)}) {
     }
 
     // unexpected: payload of the failure state.
     Expected(const Unexpected<E> &unexpected)
-        : storage_(unexpected.error()) {
+        : storage_(ErrorBox{unexpected.error()}) {
     }
     Expected(Unexpected<E> &&unexpected)
-        : storage_(std::move(unexpected).error()) {
+        : storage_(ErrorBox{std::move(unexpected).error()}) {
     }
 
     // Returns true if the Expected holds a value rather than an error.
     bool hasValue() const {
-        return std::holds_alternative<T>(storage_);
+        return std::holds_alternative<ValueBox>(storage_);
     }
     explicit operator bool() const {
         return hasValue();
@@ -94,24 +92,24 @@ class Expected {
 
     // Returns the contained value. Asserts if the Expected is in the error state.
     T &value() & {
-        return *checkedValue();
+        return checkedValue()->value;
     }
     const T &value() const & {
-        return *checkedValue();
+        return checkedValue()->value;
     }
     T &&value() && {
-        return std::move(*checkedValue());
+        return std::move(checkedValue()->value);
     }
 
     // Returns the contained error. Asserts if the Expected is in the value state.
     E &error() & {
-        return *checkedError();
+        return checkedError()->error;
     }
     const E &error() const & {
-        return *checkedError();
+        return checkedError()->error;
     }
     E &&error() && {
-        return std::move(*checkedError());
+        return std::move(checkedError()->error);
     }
 
     T &operator*() & {
@@ -262,29 +260,38 @@ class Expected {
         return Expected<T, G>(Unexpected<G>(std::invoke(std::forward<F>(f), std::forward<Self>(self).error())));
     }
 
-    T *checkedValue() {
-        T *pointer = std::get_if<T>(&storage_);
+    // Tagged boxes keep the two alternatives distinct even when T == E, which
+    // std::expected permits but a plain std::variant<E, T> cannot represent.
+    struct ValueBox {
+        T value;
+    };
+    struct ErrorBox {
+        E error;
+    };
+
+    ValueBox *checkedValue() {
+        ValueBox *pointer = std::get_if<ValueBox>(&storage_);
         assert(pointer != nullptr && "Expected is in error state");
         return pointer;
     }
-    const T *checkedValue() const {
-        const T *pointer = std::get_if<T>(&storage_);
+    const ValueBox *checkedValue() const {
+        const ValueBox *pointer = std::get_if<ValueBox>(&storage_);
         assert(pointer != nullptr && "Expected is in error state");
         return pointer;
     }
 
-    E *checkedError() {
-        E *pointer = std::get_if<E>(&storage_);
+    ErrorBox *checkedError() {
+        ErrorBox *pointer = std::get_if<ErrorBox>(&storage_);
         assert(pointer != nullptr && "Expected is in value state");
         return pointer;
     }
-    const E *checkedError() const {
-        const E *pointer = std::get_if<E>(&storage_);
+    const ErrorBox *checkedError() const {
+        const ErrorBox *pointer = std::get_if<ErrorBox>(&storage_);
         assert(pointer != nullptr && "Expected is in value state");
         return pointer;
     }
 
-    std::variant<E, T> storage_;
+    std::variant<ErrorBox, ValueBox> storage_;
 };
 
 // void specialization: signals success or failure without carrying a value.

@@ -23,7 +23,7 @@ const char *ToString(LayerType type) {
     return "unknown";
 }
 
-Expected<LayerType, ParseError> layerTypeFromString(const std::string &text) {
+Expected<LayerType, std::string> layerTypeFromString(const std::string &text) {
     if (text == "shape") {
         return LayerType::Shape;
     }
@@ -39,7 +39,7 @@ Expected<LayerType, ParseError> layerTypeFromString(const std::string &text) {
     if (text == "precomp") {
         return LayerType::Precomp;
     }
-    return Unexpected(ParseError("unknown layer type: " + text));
+    return Unexpected(std::string("unknown layer type: " + text));
 }
 
 const char *ToString(ShapeType type) {
@@ -69,7 +69,7 @@ const char *ToString(ShapeType type) {
     return "unknown";
 }
 
-Expected<ShapeType, ParseError> shapeTypeFromString(const std::string &text) {
+Expected<ShapeType, std::string> shapeTypeFromString(const std::string &text) {
     if (text == "path") {
         return ShapeType::Path;
     }
@@ -91,21 +91,21 @@ Expected<ShapeType, ParseError> shapeTypeFromString(const std::string &text) {
     if (text == "trimPath") {
         return ShapeType::TrimPath;
     }
-    return Unexpected(ParseError("unknown shape type: " + text));
+    return Unexpected(std::string("unknown shape type: " + text));
 }
 
 const char *ToString(FillRule rule) {
     return rule == FillRule::NonZero ? "nonZero" : "evenOdd";
 }
 
-Expected<FillRule, ParseError> fillRuleFromString(const std::string &text) {
+Expected<FillRule, std::string> fillRuleFromString(const std::string &text) {
     if (text == "nonZero") {
         return FillRule::NonZero;
     }
     if (text == "evenOdd") {
         return FillRule::EvenOdd;
     }
-    return Unexpected(ParseError("unknown fill rule: " + text));
+    return Unexpected(std::string("unknown fill rule: " + text));
 }
 
 const char *ToString(LineCap cap) {
@@ -123,7 +123,7 @@ const char *ToString(LineCap cap) {
     return "unknown";
 }
 
-Expected<LineCap, ParseError> lineCapFromString(const std::string &text) {
+Expected<LineCap, std::string> lineCapFromString(const std::string &text) {
     if (text == "butt") {
         return LineCap::Butt;
     }
@@ -133,7 +133,7 @@ Expected<LineCap, ParseError> lineCapFromString(const std::string &text) {
     if (text == "square") {
         return LineCap::Square;
     }
-    return Unexpected(ParseError("unknown line cap: " + text));
+    return Unexpected(std::string("unknown line cap: " + text));
 }
 
 const char *ToString(LineJoin join) {
@@ -151,7 +151,7 @@ const char *ToString(LineJoin join) {
     return "unknown";
 }
 
-Expected<LineJoin, ParseError> lineJoinFromString(const std::string &text) {
+Expected<LineJoin, std::string> lineJoinFromString(const std::string &text) {
     if (text == "miter") {
         return LineJoin::Miter;
     }
@@ -161,7 +161,7 @@ Expected<LineJoin, ParseError> lineJoinFromString(const std::string &text) {
     if (text == "bevel") {
         return LineJoin::Bevel;
     }
-    return Unexpected(ParseError("unknown line join: " + text));
+    return Unexpected(std::string("unknown line join: " + text));
 }
 
 const char *ToString(BlendMode mode) {
@@ -182,7 +182,7 @@ const char *ToString(BlendMode mode) {
     return "unknown";
 }
 
-Expected<BlendMode, ParseError> blendModeFromString(const std::string &text) {
+Expected<BlendMode, std::string> blendModeFromString(const std::string &text) {
     if (text == "normal") {
         return BlendMode::Normal;
     }
@@ -195,7 +195,7 @@ Expected<BlendMode, ParseError> blendModeFromString(const std::string &text) {
     if (text == "add") {
         return BlendMode::Add;
     }
-    return Unexpected(ParseError("unknown blend mode: " + text));
+    return Unexpected(std::string("unknown blend mode: " + text));
 }
 
 const char *ToString(MaskMode mode) {
@@ -213,7 +213,7 @@ const char *ToString(MaskMode mode) {
     return "unknown";
 }
 
-Expected<MaskMode, ParseError> maskModeFromString(const std::string &text) {
+Expected<MaskMode, std::string> maskModeFromString(const std::string &text) {
     if (text == "add") {
         return MaskMode::Add;
     }
@@ -223,21 +223,21 @@ Expected<MaskMode, ParseError> maskModeFromString(const std::string &text) {
     if (text == "intersect") {
         return MaskMode::Intersect;
     }
-    return Unexpected(ParseError("unknown mask mode: " + text));
+    return Unexpected(std::string("unknown mask mode: " + text));
 }
 
 const char *ToString(AssetType type) {
     return type == AssetType::Image ? "image" : "font";
 }
 
-Expected<AssetType, ParseError> assetTypeFromString(const std::string &text) {
+Expected<AssetType, std::string> assetTypeFromString(const std::string &text) {
     if (text == "image") {
         return AssetType::Image;
     }
     if (text == "font") {
         return AssetType::Font;
     }
-    return Unexpected(ParseError("unknown asset type: " + text));
+    return Unexpected(std::string("unknown asset type: " + text));
 }
 
 const char *ToString(Easing::Type type) {
@@ -255,7 +255,7 @@ const char *ToString(Easing::Type type) {
     return "unknown";
 }
 
-Expected<Easing::Type, ParseError> easingTypeFromString(const std::string &text) {
+Expected<Easing::Type, std::string> easingTypeFromString(const std::string &text) {
     if (text == "linear") {
         return Easing::Type::Linear;
     }
@@ -265,7 +265,7 @@ Expected<Easing::Type, ParseError> easingTypeFromString(const std::string &text)
     if (text == "hold") {
         return Easing::Type::Hold;
     }
-    return Unexpected(ParseError("unknown easing type: " + text));
+    return Unexpected(std::string("unknown easing type: " + text));
 }
 
 }  // namespace motion::dto
