@@ -113,13 +113,22 @@ target_link_libraries(motionstudio_tgfx_adapter
                       "-framework Metal"
                       "-framework MetalKit"
                       "-framework Foundation"
-                      "-framework ApplicationServices"
                       "-framework QuartzCore"
-                      "-framework Cocoa"
                       "-framework CoreMedia"
                       "-framework CoreVideo"
                       "-framework ImageIO"
                       iconv)
+
+if(CMAKE_GENERATOR MATCHES "Xcode")
+  set_target_properties(motionstudio_tgfx_adapter PROPERTIES
+      XCODE_ATTRIBUTE_OTHER_LDFLAGS[sdk=macosx*]
+          "-framework ApplicationServices -framework Cocoa")
+else()
+  target_link_libraries(motionstudio_tgfx_adapter
+                        PUBLIC
+                        "-framework ApplicationServices"
+                        "-framework Cocoa")
+endif()
 
 motionstudio_add_tgfx_prebuild(motionstudio_tgfx_adapter)
 motionstudio_link_prebuilt_tgfx(motionstudio_tgfx_adapter)
