@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "MotionStudio/animation/Animatable.h"
@@ -48,12 +49,29 @@ using motion::ShapeRect;
 using motion::UndoManager;
 using motion::Vec2;
 
+// The document model is only safe for single-threaded use, but callers reach
+// it from multiple threads: UI edits on the main actor and document
+// serialization on a background actor (ReferenceFileDocument snapshots run
+// off the main actor). The mutex serializes every entry point.
 struct MSDocument {
+    std::mutex mutex;
     std::unique_ptr<Document> document;
     UndoManager undoManager;
 };
 
 namespace {
+
+// Locks the document's mutex for the duration of one C API call. A null
+// handle leaves the lock unheld; callers still null-check afterwards.
+struct DocumentLock {
+    std::unique_lock<std::mutex> lock;
+
+    explicit DocumentLock(MSDocument *handle) {
+        if (handle != nullptr) {
+            lock = std::unique_lock<std::mutex>(handle->mutex);
+        }
+    }
+};
 
 Document *Doc(MSDocument *handle) {
     return handle != nullptr ? handle->document.get() : nullptr;
@@ -217,10 +235,12 @@ MSDocument *ms_document_load(const char *jsonText, size_t length, char **errorOu
 }
 
 void ms_document_destroy(MSDocument *document) {
+    // No lock: destroying implies unique ownership of the handle.
     delete document;
 }
 
 char *ms_document_save(MSDocument *document) {
+    DocumentLock guard(document);
     if (document == nullptr) {
         return nullptr;
     }
@@ -234,6 +254,7 @@ void ms_string_free(char *string) {
 /* ============================ undo / redo ============================ */
 
 bool ms_document_undo(MSDocument *document) {
+    DocumentLock guard(document);
     if (document == nullptr || !document->undoManager.canUndo()) {
         return false;
     }
@@ -242,6 +263,7 @@ bool ms_document_undo(MSDocument *document) {
 }
 
 bool ms_document_redo(MSDocument *document) {
+    DocumentLock guard(document);
     if (document == nullptr || !document->undoManager.canRedo()) {
         return false;
     }
@@ -250,14 +272,17 @@ bool ms_document_redo(MSDocument *document) {
 }
 
 bool ms_document_can_undo(MSDocument *document) {
+    DocumentLock guard(document);
     return document != nullptr && document->undoManager.canUndo();
 }
 
 bool ms_document_can_redo(MSDocument *document) {
+    DocumentLock guard(document);
     return document != nullptr && document->undoManager.canRedo();
 }
 
 char *ms_document_undo_description(MSDocument *document) {
+    DocumentLock guard(document);
     if (document == nullptr || !document->undoManager.canUndo()) {
         return nullptr;
     }
@@ -265,6 +290,7 @@ char *ms_document_undo_description(MSDocument *document) {
 }
 
 char *ms_document_redo_description(MSDocument *document) {
+    DocumentLock guard(document);
     if (document == nullptr || !document->undoManager.canRedo()) {
         return nullptr;
     }
@@ -272,6 +298,7 @@ char *ms_document_redo_description(MSDocument *document) {
 }
 
 void ms_document_end_merge_group(MSDocument *document) {
+    DocumentLock guard(document);
     if (document != nullptr) {
         document->undoManager.endMergeGroup();
     }
@@ -280,11 +307,13 @@ void ms_document_end_merge_group(MSDocument *document) {
 /* ============================ composition queries ============================ */
 
 int ms_document_composition_count(MSDocument *document) {
+    DocumentLock guard(document);
     Document *doc = Doc(document);
     return doc != nullptr ? int(doc->compositions.size()) : 0;
 }
 
 uint64_t ms_document_composition_id_at(MSDocument *document, int index) {
+    DocumentLock guard(document);
     Document *doc = Doc(document);
     if (doc == nullptr || index < 0 || size_t(index) >= doc->compositions.size()) {
         return 0;
@@ -293,31 +322,37 @@ uint64_t ms_document_composition_id_at(MSDocument *document, int index) {
 }
 
 int64_t ms_composition_duration(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? composition->duration : 0;
 }
 
 int ms_composition_width(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? composition->width : 0;
 }
 
 int ms_composition_height(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? composition->height : 0;
 }
 
 int ms_composition_frame_rate_num(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? int(composition->frameRate.num) : 0;
 }
 
 int ms_composition_frame_rate_den(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? int(composition->frameRate.den) : 0;
 }
 
 int ms_composition_layer_count(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? int(composition->layers.size()) : 0;
 }
@@ -325,6 +360,7 @@ int ms_composition_layer_count(MSDocument *document, uint64_t compositionId) {
 /* ============================ layer queries ============================ */
 
 uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index) {
+    DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     if (composition == nullptr || index < 0 || size_t(index) >= composition->layers.size()) {
         return 0;
@@ -333,11 +369,13 @@ uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index)
 }
 
 char *ms_layer_name(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr ? strdup(layer->name.c_str()) : nullptr;
 }
 
 int ms_layer_type(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     if (layer == nullptr) {
         return -1;
@@ -346,21 +384,25 @@ int ms_layer_type(MSDocument *document, uint64_t layerId) {
 }
 
 int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr ? layer->inPoint : 0;
 }
 
 int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr ? layer->outPoint : 0;
 }
 
 uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr ? layer->parentId.value : 0;
 }
 
 bool ms_layer_visible(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr && layer->visible;
 }
@@ -368,11 +410,13 @@ bool ms_layer_visible(MSDocument *document, uint64_t layerId) {
 /* ============================ property queries ============================ */
 
 int ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
+    DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     return property != nullptr ? int(property->valueType()) : -1;
 }
 
 bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char *path) {
+    DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     if (property == nullptr) {
         return false;
@@ -398,12 +442,14 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
 }
 
 float ms_property_static_float(MSDocument *document, uint64_t entityId, const char *path) {
+    DocumentLock guard(document);
     const Animatable<float> *property = AsFloat(FindProperty(document, entityId, path));
     return property != nullptr ? property->staticValue() : 0.0f;
 }
 
 void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x,
                              float *y) {
+    DocumentLock guard(document);
     const Animatable<Vec2> *property = AsVec2(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return;
@@ -419,6 +465,7 @@ void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char
 
 void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r,
                               float *g, float *b, float *a) {
+    DocumentLock guard(document);
     const Animatable<Color> *property = AsColor(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return;
@@ -439,6 +486,7 @@ void ms_property_static_color(MSDocument *document, uint64_t entityId, const cha
 }
 
 int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path) {
+    DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     if (property == nullptr) {
         return 0;
@@ -476,6 +524,7 @@ const Keyframe<T> *KeyframeAt(const Animatable<T> *property, int index) {
 
 int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path,
                                      int index) {
+    DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     const Keyframe<float> *floatKey = KeyframeAt(AsFloat(property), index);
     if (floatKey != nullptr) {
@@ -494,6 +543,7 @@ int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, co
 
 float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, const char *path,
                                     int index) {
+    DocumentLock guard(document);
     const Keyframe<float> *keyframe =
         KeyframeAt(AsFloat(FindProperty(document, entityId, path)), index);
     return keyframe != nullptr ? keyframe->value : 0.0f;
@@ -501,6 +551,7 @@ float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, con
 
 void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path,
                                   int index, float *x, float *y) {
+    DocumentLock guard(document);
     const Keyframe<Vec2> *keyframe =
         KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
     if (keyframe == nullptr) {
@@ -516,6 +567,7 @@ void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const
 
 int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path,
                                    int index, float *inX, float *inY, float *outX, float *outY) {
+    DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     const Easing *easing = nullptr;
     const Keyframe<float> *floatKey = KeyframeAt(AsFloat(property), index);
@@ -550,12 +602,14 @@ int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, cons
 
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path,
                                  int64_t frame) {
+    DocumentLock guard(document);
     const Animatable<float> *property = AsFloat(FindProperty(document, entityId, path));
     return property != nullptr ? property->evaluate(FrameTime(frame)) : 0.0f;
 }
 
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path,
                                int64_t frame, float *x, float *y) {
+    DocumentLock guard(document);
     const Animatable<Vec2> *property = AsVec2(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return;
@@ -573,24 +627,28 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
 
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path,
                                  float value) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(
                           MakePath(entityId, path), motion::PropertyValue(value)));
 }
 
 void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path,
                                 float x, float y) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(
                           MakePath(entityId, path), motion::PropertyValue(Vec2{x, y})));
 }
 
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path,
                                  float r, float g, float b, float a) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(
                           MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
 }
 
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path,
                                    int64_t frame, float value) {
+    DocumentLock guard(document);
     Execute(document,
             std::make_unique<motion::AddKeyframeCommand>(
                 MakePath(entityId, path),
@@ -599,6 +657,7 @@ void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, cons
 
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path,
                                   int64_t frame, float x, float y) {
+    DocumentLock guard(document);
     Execute(document,
             std::make_unique<motion::AddKeyframeCommand>(
                 MakePath(entityId, path),
@@ -607,12 +666,14 @@ void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path,
                                 int64_t frame) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path),
                                                                       FrameTime(frame)));
 }
 
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path,
                               int64_t oldFrame, int64_t newFrame) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveKeyframeCommand>(
                           MakePath(entityId, path), FrameTime(oldFrame), FrameTime(newFrame)));
 }
@@ -620,26 +681,31 @@ void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const cha
 void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path,
                            int64_t frame, int easingType, float inX, float inY, float outX,
                            float outY) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetEasingCommand>(
                           MakePath(entityId, path), FrameTime(frame),
                           MakeEasing(easingType, inX, inY, outX, outY)));
 }
 
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     return AddShapeLayer(document, compositionId, false);
 }
 
 uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
     return AddShapeLayer(document, compositionId, true);
 }
 
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::RemoveLayerCommand>(EntityId{compositionId},
                                                                    EntityId{layerId}));
 }
 
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex,
                            int toIndex) {
+    DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId},
                                                                  fromIndex, toIndex));
 }
@@ -654,6 +720,7 @@ void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fro
 
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
                           int64_t frame) {
+    DocumentLock guard(document);
     if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr) {
         return;
     }

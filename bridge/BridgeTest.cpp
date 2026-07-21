@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstring>
 #include <string>
+#include <thread>
 
 #include "motionstudio_bridge.h"
 
@@ -205,6 +208,41 @@ TEST(BridgeCommandTest, MissingPropertyIsSafe) {
     EXPECT_EQ(ms_property_keyframe_count(document, layerId, "no.such.property"), 0);
     EXPECT_FALSE(ms_property_is_animated(document, layerId, "no.such.property"));
 
+    ms_document_destroy(document);
+}
+
+// Mirrors the app's threading: edits on the main actor while
+// ReferenceFileDocument serializes on a background actor.
+void SaveLoop(MSDocument *document, const std::atomic<bool> *stop) {
+    while (!stop->load()) {
+        char *json = ms_document_save(document);
+        ms_string_free(json);
+    }
+}
+
+void EditLoop(MSDocument *document, uint64_t layerId, const std::atomic<bool> *stop) {
+    float value = 0;
+    while (!stop->load()) {
+        ms_command_set_static_float(document, layerId, "transform.rotation", value);
+        value += 1;
+    }
+}
+
+TEST(BridgeConcurrencyTest, SerializeWhileEditingIsSerialized) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+
+    std::atomic<bool> stop{false};
+    std::thread saver(SaveLoop, document, &stop);
+    std::thread editor(EditLoop, document, layerId, &stop);
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    stop.store(true);
+    saver.join();
+    editor.join();
+
+    // The document remains consistent after concurrent access.
+    EXPECT_EQ(ms_composition_layer_count(document, compositionId), 1);
     ms_document_destroy(document);
 }
 

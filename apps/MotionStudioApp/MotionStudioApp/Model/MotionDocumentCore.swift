@@ -79,7 +79,10 @@ final class MotionDocumentCore {
 
     // MARK: - Serialization
 
-    func serialize() throws -> Data {
+    /// Serializes off the main actor: ReferenceFileDocument snapshots run in
+    /// a background isolation domain. Thread safety is provided by the bridge
+    /// (every C API call locks the document mutex).
+    nonisolated func serialize() throws -> Data {
         guard let cString = ms_document_save(handle) else {
             throw NSError(domain: "MotionStudio", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "serialization failed"])

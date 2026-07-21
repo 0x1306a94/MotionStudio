@@ -17,9 +17,11 @@ extension UTType {
 /// the model is never copied on edit, and undo is handled by the core's
 /// command stack (registered with the system UndoManager by the editor UI).
 ///
-/// The protocol requirements are nonisolated while the core is MainActor;
-/// SwiftUI invokes init/snapshot on the main thread, so the conformances
-/// bridge with MainActor.assumeIsolated.
+/// SwiftUI calls the protocol methods from non-main isolation domains (per
+/// the ReferenceFileDocument contract, serialization must not run on the
+/// MainActor), so the conformances are nonisolated. Concurrent access between
+/// background snapshots and main-actor edits is serialized by the bridge's
+/// document mutex.
 @MainActor
 final class MotionDocument: ReferenceFileDocument {
     nonisolated static var readableContentTypes: [UTType] { [.motionStudioDocument] }
@@ -43,11 +45,9 @@ final class MotionDocument: ReferenceFileDocument {
         core = try MotionDocumentCore(json: data)
     }
 
-    // Captures the snapshot synchronously on the main thread.
+    // Captures the snapshot off the main actor (bridge provides the lock).
     nonisolated func snapshot(contentType: UTType) throws -> Data {
-        try MainActor.assumeIsolated {
-            try core.serialize()
-        }
+        try core.serialize()
     }
 
     // Runs in the background with the snapshot taken above.
