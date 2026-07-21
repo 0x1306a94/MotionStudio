@@ -38,6 +38,9 @@ struct TimelineView: View {
 
 private let pixelsPerFrame: CGFloat = 6
 private let laneHeight: CGFloat = 44
+// Keeps the playhead and edge keyframes clear of the window borders, where
+// macOS window-resize hot zones would steal the drag.
+private let laneGutter: CGFloat = 14
 
 private struct TimelineControls: View {
     @Bindable var editorState: EditorState
@@ -92,6 +95,7 @@ private struct TimelineRuler: View {
                 }
             }
             .frame(width: CGFloat(duration) * pixelsPerFrame, height: 24)
+            .padding(.horizontal, laneGutter)
         }
     }
 }
@@ -152,6 +156,9 @@ private struct TimelineKeyframeLane: View {
                         editorState.playheadFrame = min(max(frame, 0), duration)
                     }
             )
+            // Applied after the gesture: the gutter stays outside the scrub
+            // area while the drag mapping stays lane-relative.
+            .padding(.horizontal, laneGutter)
         }
     }
 }
