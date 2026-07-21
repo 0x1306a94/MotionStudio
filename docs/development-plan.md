@@ -72,11 +72,11 @@ cmake -B build -G Ninja && cmake --build build && cd build && ctest   # 全绿
 
 **交付物**（首版已落地，端到端验证待补齐）
 - 文档基建：`MotionDocument`（`ReferenceFileDocument`）+ `MotionDocumentCore`（桥接层的 Swift facade），.mjson 文档读写；`DocumentGroup` 多文档窗口，iPadOS 文档浏览器
-- 四区布局（SwiftUI，macOS/iPadOS 共享视图代码，仅布局容器分平台）：图层面板 / 画布 / 属性检查器 / 时间轴
+- 四区布局（SwiftUI，macOS/iPadOS 共享视图代码，仅布局容器分平台）：项目面板 / 画布 / 属性检查器 / 时间轴（含图层栈）
 - 画布：`MTKView` + `TgfxOnScreenAdapter` 直渲；`CADisplayLink` 按合成帧率播放，暂停时按需重绘
 - 时间轴：刻度尺 + 播放头（拖拽 scrub）、关键帧菱形拖拽移动（core 合并窗口 + 系统 undo 单次注册）、右键菜单切缓动预设/删关键帧
 - 检查器：Transform 属性编辑（position X/Y、rotation、opacity），播放头处加关键帧
-- 图层面板：列表 + 选择 + 创建矩形/椭圆 + 删除
+- 项目面板：素材空状态 + 合成列表 + 建层工具栏（创建矩形/椭圆/删除）；图层栈（名称 + 可见性/锁定开关）移入时间轴左列
 - Undo：core 命令栈镜像到系统 `UndoManager`（⌘Z / ⇧⌘Z / 三指扫动），拖拽结束 `endDrag` 关合并窗口
 - 桥接层：extern "C"（文档 / undo / 查询 / 命令 / 画布），Swift 经桥接头导入；`apps/MotionStudio.xcworkspace` 组合 CMake 生成的 `gen_xcode` 与应用工程
 - XCUITest 端到端：⌘N 新建 → 加形状 → undo 移除

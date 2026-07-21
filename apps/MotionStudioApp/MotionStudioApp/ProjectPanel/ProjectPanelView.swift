@@ -30,6 +30,7 @@ struct ProjectPanelView: View {
                 } label: {
                     Image(systemName: "rectangle.badge.plus")
                 }
+                .accessibilityLabel("Add Rectangle")
                 Button {
                     perform("Add Ellipse") {
                         editorState.selectedLayerID = core.addEllipseLayer(compositionID: compositionID)
@@ -37,6 +38,7 @@ struct ProjectPanelView: View {
                 } label: {
                     Image(systemName: "circle.badge.plus")
                 }
+                .accessibilityLabel("Add Ellipse")
                 Button(role: .destructive) {
                     guard let selected = editorState.selectedLayerID else { return }
                     perform("Delete Layer") {
@@ -46,6 +48,7 @@ struct ProjectPanelView: View {
                 } label: {
                     Image(systemName: "trash")
                 }
+                .accessibilityLabel("Delete Layer")
                 .disabled(editorState.selectedLayerID == nil)
             }
             .buttonStyle(.plain)

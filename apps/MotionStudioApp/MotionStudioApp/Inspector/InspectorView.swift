@@ -14,6 +14,7 @@ struct InspectorView: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
+        @Bindable var editorState = editorState
         let core = document.core
         if let layerID = editorState.selectedLayerID {
             let _ = core.revision
@@ -21,6 +22,12 @@ struct InspectorView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(core.layerName(layerID))
                         .font(.headline)
+                    Picker("Timeline lane", selection: $editorState.timelineProperty) {
+                        ForEach(TimelineProperty.allCases, id: \.self) { property in
+                            Text(property.label).tag(property)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                     Text("Transform")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

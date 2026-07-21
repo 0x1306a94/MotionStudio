@@ -91,9 +91,9 @@ motionstudio/
 │           ├── Document/           # MotionDocument（ReferenceFileDocument）
 │           ├── Model/              # MotionDocumentCore / EditorState
 │           ├── Canvas/             # CanvasView（MTKView + CADisplayLink 播放）
-│           ├── Timeline/           # TimelineView（标尺 / 关键帧 / 播放头）
+│           ├── Timeline/           # TimelineView（左图层栈 + 右关键帧轨道，垂直滚动）
 │           ├── Inspector/          # InspectorView（Transform 属性编辑）
-│           ├── LayerPanel/         # LayerPanelView（图层列表 / 建形状）
+│           ├── ProjectPanel/       # ProjectPanelView（素材 / 合成 / 建层工具栏）
 │           └── EditorRootView.swift
 ├── third_party/                    # depctl 按 DEPS 同步，不入库
 └── docs/                           # 本目录

@@ -10,17 +10,24 @@
 //
 
 import SwiftUI
+#if os(macOS)
+    import AppKit
+#endif
 
 private let pixelsPerFrame: CGFloat = 6
 private let rowHeight: CGFloat = 28
-private let layerColumnWidth: CGFloat = 200
 private let rulerHeight: CGFloat = 24
+private let splitDividerWidth: CGFloat = 5
+private let minLayerColumnWidth: CGFloat = 120
+private let maxLayerColumnWidth: CGFloat = 480
 
 struct TimelineView: View {
     let document: MotionDocument
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
+
+    @State private var layerColumnWidth: CGFloat = 200
 
     var body: some View {
         let core = document.core
@@ -31,20 +38,30 @@ struct TimelineView: View {
         let frameRate = core.frameRate(compositionID: compositionID)
         let layerIDs = Array(core.layerIDs(compositionID: compositionID).reversed())
         let trackWidth = max(CGFloat(duration) * pixelsPerFrame, 1)
-        let totalHeight = max(CGFloat(layerIDs.count) * rowHeight, rowHeight)
 
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             TimelineControls(editorState: editorState, duration: duration)
             Divider()
             // Pinned header: layer-column header + ruler (scrubbable).
             HStack(alignment: .top, spacing: 0) {
                 LayerColumnHeader()
                     .frame(width: layerColumnWidth, height: rulerHeight)
-                RulerCanvas(duration: duration, frameRate: frameRate)
-                    .frame(width: trackWidth, height: rulerHeight)
-                    .contentShape(Rectangle())
-                    .gesture(scrubGesture(duration: duration))
+                HorizontalSplitDivider(width: splitDividerWidth,
+                                       columnWidth: $layerColumnWidth)
+                    .frame(height: rulerHeight)
+                ZStack(alignment: .topLeading) {
+                    RulerCanvas(duration: duration, frameRate: frameRate)
+                    Rectangle()
+                        .fill(.red)
+                        .frame(width: 1.5, height: rulerHeight)
+                        .offset(x: CGFloat(editorState.playheadFrame) * pixelsPerFrame)
+                        .allowsHitTesting(false)
+                }
+                .frame(width: trackWidth, height: rulerHeight)
+                .contentShape(Rectangle())
+                .gesture(scrubGesture(duration: duration))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Divider()
             // Vertically scrolling body: layer stack + graph in lockstep.
             ScrollView(.vertical) {
@@ -52,7 +69,10 @@ struct TimelineView: View {
                     LayerColumn(core: core, layerIDs: layerIDs, editorState: editorState,
                                 perform: perform)
                         .frame(width: layerColumnWidth)
-                        .frame(minHeight: totalHeight, alignment: .top)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    HorizontalSplitDivider(width: splitDividerWidth,
+                                           columnWidth: $layerColumnWidth)
+                        .frame(maxHeight: .infinity)
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
                             ForEach(layerIDs, id: \.self) { id in
@@ -68,14 +88,32 @@ struct TimelineView: View {
                         // Playhead spans every row.
                         Rectangle()
                             .fill(.red)
-                            .frame(width: 1.5, height: totalHeight)
+                            .frame(width: 1.5)
+                            .frame(maxHeight: .infinity)
                             .offset(x: CGFloat(editorState.playheadFrame) * pixelsPerFrame)
                             .allowsHitTesting(false)
+                        // Narrow grab strip so the playhead itself is draggable
+                        // without stealing vertical scroll from the rest of the lane.
+                        Rectangle()
+                            .fill(Color.clear)
+                            .contentShape(Rectangle())
+                            .frame(width: 12)
+                            .frame(maxHeight: .infinity)
+                            .offset(x: CGFloat(editorState.playheadFrame) * pixelsPerFrame - 6)
+                            .gesture(playheadDrag(duration: duration))
                     }
-                    .frame(width: trackWidth, height: totalHeight)
+                    .frame(width: trackWidth)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .coordinateSpace(name: "tracks")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
+            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Faint panel tint so empty lane areas read as a filled panel flush to
+        // the window edges rather than as gaps.
+        .background(Color.primary.opacity(0.04))
     }
 
     private func scrubGesture(duration: Int64) -> some Gesture {
@@ -84,6 +122,58 @@ struct TimelineView: View {
                 let frame = Int64((value.location.x / pixelsPerFrame).rounded())
                 editorState.playheadFrame = min(max(frame, 0), duration)
             }
+    }
+
+    /// Drags the playhead by reading the touch position in the (horizontally
+    /// stable) tracks coordinate space, so vertical scrolling doesn't drift it.
+    private func playheadDrag(duration: Int64) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("tracks"))
+            .onChanged { value in
+                let frame = Int64((value.location.x / pixelsPerFrame).rounded())
+                editorState.playheadFrame = min(max(frame, 0), duration)
+            }
+    }
+}
+
+// MARK: - Horizontal split divider
+
+/// Draggable vertical divider that resizes the layer column. Placed in both the
+/// pinned header and the scrolling body so it reads as one continuous handle. A
+/// literal HSplitView can't be used here: it would force the body into two
+/// scroll views and break the vertical lockstep between layer rows and tracks.
+private struct HorizontalSplitDivider: View {
+    let width: CGFloat
+    @Binding var columnWidth: CGFloat
+    @GestureState private var startWidth: CGFloat?
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.2))
+            .overlay(Rectangle().fill(.separator).frame(width: 1))
+            .frame(width: width)
+            .contentShape(Rectangle())
+        #if os(macOS)
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+        #endif
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .updating($startWidth) { _, state, _ in
+                        if state == nil {
+                            state = columnWidth
+                        }
+                    }
+                    .onChanged { value in
+                        guard let start = startWidth else { return }
+                        let next = start + value.translation.width
+                        columnWidth = min(max(next, minLayerColumnWidth), maxLayerColumnWidth)
+                    }
+            )
     }
 }
 
@@ -289,13 +379,6 @@ private struct TimelineControls: View {
             Text("\(editorState.playheadFrame) / \(duration)")
                 .monospacedDigit()
                 .font(.callout)
-            Picker("Property", selection: $editorState.timelineProperty) {
-                ForEach(TimelineProperty.allCases, id: \.self) { property in
-                    Text(property.label).tag(property)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 320)
             Spacer()
         }
         .padding(.horizontal, 8)

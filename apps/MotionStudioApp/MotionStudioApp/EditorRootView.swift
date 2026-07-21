@@ -8,6 +8,30 @@
 //
 
 import SwiftUI
+#if os(macOS)
+    import AppKit
+#endif
+
+private let handleHeight: CGFloat = 6
+
+#if os(macOS)
+    /// Pins the editor window's min/max size to the screen it is on (40% x 30% up
+    /// to the full visible screen). SwiftUI exposes no scene modifier for this, so
+    /// it is applied through the underlying NSWindow once the view is on screen.
+    private struct WindowSizeConfigurator: NSViewRepresentable {
+        func makeNSView(context _: Context) -> NSView {
+            NSView()
+        }
+
+        func updateNSView(_ nsView: NSView, context _: Context) {
+            guard let window = nsView.window, let screen = window.screen else { return }
+            let visible = screen.visibleFrame
+            window.contentMinSize = NSSize(width: visible.width * 0.4,
+                                           height: visible.height * 0.3)
+            window.contentMaxSize = NSSize(width: visible.width, height: visible.height)
+        }
+    }
+#endif
 
 struct EditorRootView: View {
     let document: MotionDocument
@@ -26,9 +50,13 @@ struct EditorRootView: View {
         GeometryReader { proxy in
             let minHeight: CGFloat = 140
             let maxHeight = max(minHeight, proxy.size.height * 0.7)
-            VStack(spacing: 0) {
-                topColumns
-                    .frame(maxHeight: .infinity)
+            let clampedTimeline = min(max(timelineHeight, minHeight), maxHeight)
+            // HSplitView sizes to its content's ideal height, so give the top
+            // region an explicit height or the three columns collapse and float.
+            let topHeight = max(0, proxy.size.height - handleHeight - clampedTimeline)
+            VStack(alignment: .leading, spacing: 0) {
+                topColumns(height: topHeight)
+                    .frame(maxWidth: .infinity)
                 TimelineResizeHandle(height: $timelineHeight,
                                      minHeight: minHeight,
                                      maxHeight: maxHeight)
@@ -36,7 +64,8 @@ struct EditorRootView: View {
                              editorState: editorState,
                              perform: perform,
                              registerEdit: registerEdit)
-                    .frame(height: min(max(timelineHeight, minHeight), maxHeight))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: clampedTimeline)
             }
         }
         #if os(iOS)
@@ -71,34 +100,51 @@ struct EditorRootView: View {
             }
         }
         #endif
+        #if os(macOS)
+        .background(WindowSizeConfigurator())
+        #endif
     }
 
+    /// HSplitView/HStack size vertically to their columns' content height and
+    /// ignore an outer height frame, so each column is pinned to the region's
+    /// height here; that forces the container to fill it (otherwise the columns
+    /// collapse and float centered, which is what produced the empty bands).
     @ViewBuilder
-    private var topColumns: some View {
+    private func topColumns(height: CGFloat) -> some View {
         #if os(macOS)
+            // HSplitView lays its panes at the split view's own height, so pin
+            // that height here and let the panes fill it (maxHeight: .infinity).
+            // Pinning each pane's height instead left a white band, because the
+            // split view then sized itself to the panes' content, not the region.
             HSplitView {
                 ProjectPanelView(document: document, editorState: editorState, perform: perform)
-                    .frame(minWidth: 180, idealWidth: 220)
+                    .frame(minWidth: 220, maxWidth: 300)
+                    .frame(maxHeight: .infinity)
                 CanvasContainer(document: document, editorState: editorState)
-                    .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 320, maxWidth: .infinity)
+                    .frame(maxHeight: .infinity)
                 InspectorView(document: document, editorState: editorState, perform: perform)
-                    .frame(minWidth: 230, idealWidth: 270)
+                    .frame(minWidth: 220, maxWidth: 300)
+                    .frame(maxHeight: .infinity)
             }
+            .frame(height: height)
         #else
             if horizontalSizeClass == .regular {
-                HStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 0) {
                     ProjectPanelView(document: document, editorState: editorState, perform: perform)
-                        .frame(width: 220)
-                    Divider()
+                        .frame(width: 220, height: height)
+                    Divider().frame(height: height)
                     CanvasContainer(document: document, editorState: editorState)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    Divider()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: height)
+                    Divider().frame(height: height)
                     InspectorView(document: document, editorState: editorState, perform: perform)
-                        .frame(width: 280)
+                        .frame(width: 280, height: height)
                 }
             } else {
                 CanvasContainer(document: document, editorState: editorState)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
             }
         #endif
     }
@@ -149,7 +195,7 @@ private struct TimelineResizeHandle: View {
             Rectangle().fill(Color.secondary.opacity(0.15))
             Rectangle().fill(.separator).frame(height: 1)
         }
-        .frame(height: 6)
+        .frame(height: handleHeight)
         .contentShape(Rectangle())
         #if os(macOS)
             .onHover { hovering in
