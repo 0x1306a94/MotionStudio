@@ -10,8 +10,21 @@
 
 
 PRODUCT_BUNDLE_IDENTIFIER = com.0x1306a94.MotionStudio
-LIBRARY_SEARCH_PATHS = $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)
-HEADER_SEARCH_PATHS = $(SRCROOT)/../../include
 MOTION_DOCUMENT_IDENTIFIER = com.0x1306a94.motion
+
+// C++ core headers + C ABI bridge headers (imported via the bridging header).
+HEADER_SEARCH_PATHS = $(inherited) $(SRCROOT)/../../include $(SRCROOT)/../../bridge/include
+SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/MotionStudioApp/Bridge/MotionStudio-Bridging-Header.h
+
+// Static libraries built by apps/gen_mac into gen_xcode (per SDK).
+LIBRARY_SEARCH_PATHS = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION) $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/mac/arm64
+LIBRARY_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)-iphoneos $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64
+LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)-iphonesimulator $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64-simulator
+
+// Core + bridge + tgfx adapter + prebuilt tgfx, and their framework deps.
+CORE_LINK_FLAGS = -lmotionstudio_bridge -lmotionstudio_core -lmotionstudio_tgfx_adapter -ltgfx -lc++ -liconv -framework Metal -framework MetalKit -framework Foundation -framework QuartzCore -framework CoreMedia -framework CoreVideo -framework ImageIO
+OTHER_LDFLAGS = $(inherited) $(CORE_LINK_FLAGS) -framework Cocoa -framework ApplicationServices
+OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) $(CORE_LINK_FLAGS) -framework UIKit -framework CoreGraphics
+OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) $(CORE_LINK_FLAGS) -framework UIKit -framework CoreGraphics
 
 #include? "Developer.xcconfig"

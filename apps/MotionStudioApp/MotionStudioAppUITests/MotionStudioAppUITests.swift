@@ -2,7 +2,8 @@
 //  MotionStudioAppUITests.swift
 //  MotionStudioAppUITests
 //
-//  Created by king on 2026/7/21.
+//  End-to-end smoke test: document creation, editor window (canvas render
+//  path), shape creation command, and undo wiring.
 //
 
 import XCTest
@@ -10,34 +11,28 @@ import XCTest
 final class MotionStudioAppUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testNewDocumentAddShapeAndUndo() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
-    }
+        // Create a new document; this opens the editor and instantiates the
+        // Metal canvas (ms_canvas_create + first frame draw).
+        app.typeKey("n", modifierFlags: .command)
 
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+        let addButton = app.buttons["Add Rectangle"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 15),
+                      "editor window did not appear")
+        addButton.click()
+
+        let row = app.staticTexts["Rectangle 1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "shape layer was not added")
+
+        // Undo removes the layer (core command stack + system UndoManager).
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(row.waitForNonExistence(timeout: 5), "undo did not remove the layer")
     }
 }

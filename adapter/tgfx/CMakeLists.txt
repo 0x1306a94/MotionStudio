@@ -99,7 +99,10 @@ else()
   endfunction()
 endif()
 
-add_library(motionstudio_tgfx_adapter STATIC TgfxRenderAdapter.mm)
+add_library(motionstudio_tgfx_adapter STATIC
+            TgfxCanvasAdapter.mm
+            TgfxRenderAdapter.mm
+            TgfxOnScreenAdapter.mm)
 target_include_directories(motionstudio_tgfx_adapter
                            PUBLIC
                            "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -108,6 +111,7 @@ target_link_libraries(motionstudio_tgfx_adapter
                       PUBLIC
                       core
                       "-framework Metal"
+                      "-framework MetalKit"
                       "-framework Foundation"
                       "-framework ApplicationServices"
                       "-framework QuartzCore"

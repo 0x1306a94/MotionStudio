@@ -37,3 +37,7 @@ add_subdirectory(benchmarks)
 if (APPLE)
     add_subdirectory(adapter/tgfx)
 endif()
+
+# C ABI bridge for platform UI shells; must come after adapter/tgfx on Apple
+# (the canvas API links the tgfx adapter).
+add_subdirectory(bridge)
