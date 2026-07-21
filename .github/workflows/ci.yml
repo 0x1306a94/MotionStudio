@@ -11,6 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install depsync
+        # build_tgfx invokes `depsync` (https://github.com/domchen/depsync)
+        run: npm install -g depsync
+
       - name: Install ccache
         run: brew install ccache
 
@@ -25,6 +34,15 @@ jobs:
       - name: Sync dependencies
         run: ./sync_deps.sh
 
+      # After sync so third_party/tgfx/DEPS exists for hashFiles.
+      # Ninja skips rebuild when build/tgfx_prebuilt/.../tgfx.a is already present.
+      - name: Cache tgfx prebuilt
+        id: tgfx-cache
+        uses: actions/cache@v4
+        with:
+          path: build/tgfx_prebuilt
+          key: tgfx-${{ runner.os }}-arm64-Release-${{ hashFiles('DEPS', 'third_party/tgfx/DEPS', 'adapter/tgfx/CMakeLists.txt', 'cmake/BuildTgfx.cmake') }}
+
       - name: Configure
         run: >
           cmake -B build -G Ninja
@@ -32,7 +50,14 @@ jobs:
           -DMOTIONSTUDIO_ENABLE_ASAN=ON
 
       - name: Build
-        run: cmake --build build
+        run: |
+          if [ "${{ steps.tgfx-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "tgfx prebuilt cache hit — Ninja should skip tgfx compile (no compile logs expected)"
+            ls -la build/tgfx_prebuilt/Release/mac/arm64/ || true
+          else
+            echo "tgfx prebuilt cache miss — Prebuild tgfx logs should stream live (USES_TERMINAL)"
+          fi
+          cmake --build build
 
       - name: Test
         run: ctest --test-dir build --output-on-failure

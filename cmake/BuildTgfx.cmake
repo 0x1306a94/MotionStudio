@@ -66,6 +66,8 @@ endif()
 
 set(_out_root "${TGFX_OUT_DIR}/${CMAKE_BUILD_TYPE}/${_tgfx_out_subdir}")
 set(_arch_dir "${_out_root}/${_tgfx_arch}")
+# build_tgfx -i skips when this stamp matches, even if tgfx.a was deleted.
+set(_arch_stamp "${_out_root}/.tgfx.${_tgfx_arch}.md5")
 
 set(_cmake_args "")
 if(TGFX_CMAKE_ARGS)
@@ -77,7 +79,16 @@ list(APPEND _cmake_args
      "-DCMAKE_OSX_DEPLOYMENT_TARGET=${_deploy_target}"
      "-DDEPLOYMENT_TARGET=${_deploy_target}")
 
+if(NOT EXISTS "${_arch_dir}/tgfx.a")
+  if(EXISTS "${_arch_stamp}")
+    message(STATUS "BuildTgfx: ${_arch_dir}/tgfx.a missing; clearing ${_arch_stamp} to force rebuild")
+    file(REMOVE "${_arch_stamp}")
+  endif()
+endif()
+
+message(STATUS "======== BuildTgfx BEGIN ========")
 message(STATUS "BuildTgfx: platform=${_platform_name} CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -> -p ${_tgfx_platform} -a ${_tgfx_arch} -o ${_out_root} deploy=${_deploy_target}")
+message(STATUS "BuildTgfx: node=${NODE_EXECUTABLE} cwd=${TGFX_SOURCE_DIR}")
 
 execute_process(
   COMMAND
@@ -89,11 +100,13 @@ execute_process(
     ${_debug_flag}
     ${_cmake_args}
   WORKING_DIRECTORY "${TGFX_SOURCE_DIR}"
+  COMMAND_ECHO STDOUT
   RESULT_VARIABLE _tgfx_build_result
 )
 if(NOT _tgfx_build_result EQUAL 0)
   message(FATAL_ERROR "BuildTgfx: build_tgfx failed with code ${_tgfx_build_result}")
 endif()
+message(STATUS "======== BuildTgfx END ========")
 
 if(NOT EXISTS "${_arch_dir}/tgfx.a")
   message(FATAL_ERROR "BuildTgfx: expected library missing: ${_arch_dir}/tgfx.a")
