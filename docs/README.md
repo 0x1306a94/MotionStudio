@@ -1,6 +1,6 @@
 # Motion Studio 文档
 
-Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图层 + Transform + 形状 + 关键帧动画，核心层 C++17，第一阶段应用层为 macOS（Swift + AppKit + Metal）。
+Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图层 + Transform + 形状 + 关键帧动画，核心层 C++17，第一阶段应用层为 macOS + iPadOS（SwiftUI + MetalKit，tgfx 渲染）。
 
 ## 文档索引
 

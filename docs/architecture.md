@@ -7,8 +7,8 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具，定�
 ```
 ┌────────────────────────────────────────────────────┐
 │  App 层（平台相关）                                  │
-│  第一阶段：macOS（Swift + AppKit + Metal）           │
-│  职责：UI 交互、渲染目标（CAMetalLayer）、播放控制      │
+│  第一阶段：macOS + iPadOS（SwiftUI + MetalKit）      │
+│  职责：UI 交互、渲染目标（MTKView）、播放控制          │
 └───────────────────────┬────────────────────────────┘
                         │ extern "C"（bridge/）
 ┌───────────────────────┴────────────────────────────┐
@@ -19,7 +19,8 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具，定�
                         │ RenderAdapter 接口
 ┌───────────────────────┴────────────────────────────┐
 │  适配器（平台相关）                                    │
-│  MetalRenderAdapter（macOS）/ LottieExporter / 序列帧 │
+│  TgfxRenderAdapter（离屏）/ TgfxOnScreenAdapter      │
+│  （MTKView 直渲）/ LottieExporter / 序列帧            │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -71,23 +72,34 @@ motionstudio/
 ├── tests/                          # GoogleTest 单元测试（与 src/ 同构）
 │   ├── CMakeLists.txt              # core_tests + gtest_discover_tests
 │   └── core/ ...
+├── adapter/tgfx/                   # tgfx（Metal 后端）渲染适配器
+│   ├── TgfxCanvasAdapter.mm        # 公共基类（tgfx 画布操作 + 转换）
+│   ├── TgfxRenderAdapter.mm        # 离屏（快照测试 / 序列帧导出）
+│   └── TgfxOnScreenAdapter.mm      # MTKView 直渲（编辑器画布）
 ├── bridge/                         # C++ ↔ Swift 桥接层（extern "C"）
 │   ├── include/motionstudio_bridge.h
-│   └── src/bridge.cpp
-├── app/
-│   └── macos/                      # macOS 应用层
-│       ├── MotionStudio.xcodeproj
-│       ├── Sources/
-│       │   ├── AppDelegate.swift
-│       │   ├── Document/           # DocumentController.swift
-│       │   ├── Timeline/           # TimelineView.swift KeyframeEditor.swift
-│       │   ├── Canvas/             # CanvasView.swift（NSView + CAMetalLayer）
-│       │   │                       # MetalRenderAdapter.swift
-│       │   └── Inspector/          # PropertyInspector.swift
-│       └── Resources/Shaders.metal
+│   ├── src/motionstudio_bridge.cpp          # 文档/undo/查询/命令（跨平台）
+│   └── src/motionstudio_bridge_canvas.mm    # 画布 API（仅 Apple）
+├── apps/
+│   ├── gen_mac                     # 生成 gen_xcode（CMake Xcode 工程）的脚本
+│   ├── gen_xcode/                  # CMake 生成的 Xcode 工程，产物在 Products/
+│   ├── MotionStudio.xcworkspace    # 组合 gen_xcode + MotionStudioApp
+│   └── MotionStudioApp/            # macOS + iPadOS 应用层（SwiftUI）
+│       ├── Configurations/         # Base/Developer.xcconfig（搜索路径、链接）
+│       └── MotionStudioApp/
+│           ├── Bridge/             # Swift 桥接头（导入 motionstudio_bridge.h）
+│           ├── Document/           # MotionDocument（ReferenceFileDocument）
+│           ├── Model/              # MotionDocumentCore / EditorState
+│           ├── Canvas/             # CanvasView（MTKView + CADisplayLink 播放）
+│           ├── Timeline/           # TimelineView（标尺 / 关键帧 / 播放头）
+│           ├── Inspector/          # InspectorView（Transform 属性编辑）
+│           ├── LayerPanel/         # LayerPanelView（图层列表 / 建形状）
+│           └── EditorRootView.swift
 ├── third_party/                    # depctl 按 DEPS 同步，不入库
 └── docs/                           # 本目录
 ```
+
+应用构建依赖 `gen_xcode/Products/$(CONFIGURATION)` 下的静态库（core / bridge / tgfx 适配器）与 `gen_xcode/tgfx_prebuilt/` 下的 tgfx 预编译库，搜索路径与链接标志在 `Base.xcconfig` 中按 SDK 配置。
 
 ## 桥接层设计
 
@@ -98,49 +110,53 @@ Swift 与 C++ 核心之间通过 **extern "C" 薄桥接层**通信，而非 Swif
 - C ABI 边界清晰、调试简单，未来 Web（WASM）/ 移动端壳可直接复用
 - 代价是需要手写桥接函数（约 50–80 个），但桥接层保持极薄：只做类型转换和指针传递，不含业务逻辑
 
-接口约定（详见 `bridge/include/motionstudio_bridge.h`）：
+接口约定（完整定义见 `bridge/include/motionstudio_bridge.h`）：
 
 ```c
-// 不透明句柄
-typedef void* MSDocumentRef;
-typedef void* MSSceneStateRef;
+// 不透明句柄（Swift 导入为 OpaquePointer）
+typedef struct MSDocument MSDocument;
+typedef struct MSCanvas MSCanvas;
 
 // 文档生命周期
-MSDocumentRef ms_document_create(void);
-void          ms_document_destroy(MSDocumentRef doc);
-MSDocumentRef ms_document_load(const char* json, int jsonLen);
-const char*   ms_document_save(MSDocumentRef doc);   // 调用方须 ms_free_string 释放
+MSDocument *ms_document_create(void);   // 含一个默认合成
+MSDocument *ms_document_load(const char *jsonText, size_t length, char **errorOut);
+void        ms_document_destroy(MSDocument *document);
+char       *ms_document_save(MSDocument *document);  // 调用方须 ms_string_free 释放
+void        ms_string_free(char *string);
 
 // Undo / Redo
-void ms_document_undo(MSDocumentRef doc);
-void ms_document_redo(MSDocumentRef doc);
-int  ms_document_can_undo(MSDocumentRef doc);
+bool ms_document_undo(MSDocument *document);
+bool ms_document_redo(MSDocument *document);
+bool ms_document_can_undo(MSDocument *document);
+void ms_document_end_merge_group(MSDocument *document);  // 拖拽结束时关闭合并窗口
 
-// 命令执行（UI 的每次编辑对应一个命令）
-void ms_command_add_keyframe(MSDocumentRef doc, const char* layerId,
-                             const char* propertyPath, int64_t time);
-void ms_command_move_keyframe(MSDocumentRef doc, const char* layerId,
-                              const char* propertyPath,
-                              int64_t oldTime, int64_t newTime);
-void ms_command_set_static_value_float(MSDocumentRef doc, const char* layerId,
-                                       const char* propertyPath, float value);
+// 查询（合成 / 图层 / 属性 / 关键帧，全部 null-safe）
+int      ms_composition_layer_count(MSDocument *document, uint64_t compositionId);
+uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index);
+int      ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path);
+float    ms_property_evaluate_float(MSDocument *document, uint64_t entityId,
+                                    const char *path, int64_t frame);
 
-// 求值 → 绘制命令
-MSSceneStateRef ms_document_evaluate(MSDocumentRef doc, int64_t frameTime);
-int             ms_scene_get_command_count(MSSceneStateRef state);
-MSDrawCommand   ms_scene_get_command(MSSceneStateRef state, int index);
-void            ms_scene_state_destroy(MSSceneStateRef state);
+// 命令执行（UI 的每次编辑对应一个命令，全部可撤销）
+void ms_command_set_static_float(MSDocument *document, uint64_t entityId,
+                                 const char *path, float value);
+void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId,
+                                   const char *path, int64_t frame, float value);
+void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path,
+                              int64_t oldFrame, int64_t newFrame);
+uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId);
 
-// 变更通知（命令执行/undo 后触发 UI 刷新）
-typedef void (*MSDocumentChangedCallback)(void* context);
-void ms_document_set_changed_callback(MSDocumentRef doc,
-                                      MSDocumentChangedCallback cb, void* context);
-
-// 跨边界内存释放
-void ms_free_string(const char* str);
+// 画布（仅 Apple 平台）：内部完成 evaluate → BuildCommands → PlayCommands，
+// DrawCommand 不越过 C ABI 边界
+MSCanvas *ms_canvas_create(void *mtkView);
+void      ms_canvas_destroy(MSCanvas *canvas);
+void      ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document,
+                               uint64_t compositionId, int64_t frame);
 ```
 
-**内存约定**：所有由 C ABI 返回的字符串/缓冲区，必须提供对应的 `ms_free_*` 释放函数，由分配方释放。
+**内存约定**：所有由 C ABI 返回的字符串，一律经 `ms_string_free` 释放。
+
+**变更通知**：无回调机制——Swift 侧 `MotionDocumentCore` 在每次命令后自增 `revision`（`@Observable`），视图读取它来订阅模型变化。
 
 ## 第三方依赖
 
@@ -148,10 +164,11 @@ void ms_free_string(const char* str);
 
 | 库 | 用途 | DEPS 声明 |
 |---|---|---|
-| [GoogleTest](https://github.com/google/googletest) | Core 层单元测试 | `third_party/googletest`（已声明） |
-| [nlohmann/json](https://github.com/nlohmann/json) | JSON 序列化/解析 | M1 引入序列化时加入 DEPS（header-only） |
+| [GoogleTest](https://github.com/google/googletest) | Core 层单元测试 | `third_party/googletest` |
+| [nlohmann/json](https://github.com/nlohmann/json) | JSON 序列化/解析 | `third_party/json` |
+| [tgfx](https://github.com/libpag/tgfx) | 2D 渲染引擎（Metal 后端） | `third_party/tgfx` |
 
-Core 层除此之外零第三方依赖。
+Core 库本身仅依赖 nlohmann/json（私有链接，不经公共头暴露）。
 
 同步命令：
 
@@ -161,10 +178,22 @@ Core 层除此之外零第三方依赖。
 
 ## 构建
 
-- 先执行 `./sync_deps.sh` 同步 `third_party/` 依赖
-- CMake，`CXX_STANDARD 17`，`POSITION_INDEPENDENT_CODE ON`
-- 产物：`libmotionstudio_core.a`（静态库）+ bridge 库
-- macOS 应用：Xcode 工程链接上述两个库（或 SwiftPM C target 封装）
+**Core / bridge / 适配器**（CMake，`CXX_STANDARD 17`，`POSITION_INDEPENDENT_CODE ON`）：
+
+```bash
+./sync_deps.sh                          # 同步 third_party/
+cmake -B build -G Ninja && cmake --build build && ctest --test-dir build
+```
+
+**应用层**：
+
+```bash
+apps/gen_mac                            # 生成 apps/gen_xcode（CMake Xcode 工程）
+xcodebuild -project apps/gen_xcode/MotionStudio.xcodeproj -target bridge \
+    -configuration Debug -sdk macosx    # 构建静态库到 gen_xcode/Products/
+# 之后用 apps/MotionStudio.xcworkspace 构建 / 运行 MotionStudioApp
+```
+
 - CI：GitHub Actions，macOS runner 上 `sync_deps.sh` → 编译 → ctest
 
 ## 相关文档

@@ -112,15 +112,16 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 `adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
 
-## 4. Metal 适配器（macOS 应用层）
+## 4. 上屏适配器（应用层预览）
 
-`MetalRenderAdapter` 位于 `app/macos/`，**不属于 Core 层**：
+`TgfxOnScreenAdapter`（`adapter/tgfx/`，与离屏适配器同基类 `TgfxCanvasAdapter`）**不属于 Core 层**，基于 tgfx 的 `MetalWindow`：
 
-- 渲染目标：`CanvasView`（NSView）内嵌 `CAMetalLayer`，由 `CVDisplayLink`（macOS 14+ 可用 `CADisplayLink`）驱动渲染循环
-- 每帧流程：播放头时间 → `ms_document_evaluate` → DrawCommandList → `MetalRenderAdapter` 转 Metal draw call → `present(drawable)`
-- **路径渲染**：Metal 不能直接画贝塞尔。第一版采用 **CPU 细分为三角形**（耳切/单调多边形剖分 + 描边转轮廓）；GPU 细分着色器是后续性能优化项，不在首版范围
+- 渲染目标：SwiftUI 画布里的 `MTKView`；`tgfx::MetalWindow::MakeFrom(MTKView*)` 包装其 drawable，`beginFrame` 取 window surface，`endFrame` 提交并 present
+- 每帧流程：播放头时间 → `ms_canvas_draw_frame`（桥接层内部完成 `SceneEvaluator::Evaluate` → `BuildCommands` → `PlayCommands`）→ tgfx 光栅化 → present。**DrawCommand 不越过 C ABI 边界**
+- **路径渲染**：由 tgfx 直接光栅化贝塞尔路径（GPU），应用层无需自行细分三角形
+- 播放驱动：`CADisplayLink`（macOS 14+ / iOS 均支持）按合成帧率推进播放头；暂停时仅在播放头/模型变化时按需重绘（MTKView paused + setNeedsDisplay）
 
-桥接层为此提供 `ms_scene_get_command*` 系列 C ABI 函数（见 [architecture.md](architecture.md)）。
+桥接层为此提供 `ms_canvas_create` / `ms_canvas_draw_frame` / `ms_canvas_destroy` 三个函数（见 [architecture.md](architecture.md)）。
 
 ## 5. 导出器边界
 
