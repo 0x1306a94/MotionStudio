@@ -21,6 +21,8 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
   protected:
     bool acquireTarget(int width, int height) override;
     void presentTarget() override;
+    // Fits the scene viewport into the drawable (letterboxed, centered).
+    void onFrameReady(int sceneWidth, int sceneHeight) override;
 
   private:
     TgfxOnScreenAdapter();

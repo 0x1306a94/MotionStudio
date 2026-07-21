@@ -2,6 +2,10 @@
 
 #import <MetalKit/MetalKit.h>
 
+#include <algorithm>
+
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Matrix.h>
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/ImageOrigin.h>
@@ -52,6 +56,25 @@ bool TgfxOnScreenAdapter::acquireTarget(int /*width*/, int /*height*/) {
     }
     impl_->context = context;
     return true;
+}
+
+void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight) {
+    if (sceneWidth <= 0 || sceneHeight <= 0 || !surface_) {
+        return;
+    }
+    const float targetWidth = float(surface_->width());
+    const float targetHeight = float(surface_->height());
+    const float scale = std::min(targetWidth / float(sceneWidth),
+                                 targetHeight / float(sceneHeight));
+    if (scale <= 0.0f) {
+        return;
+    }
+    const float offsetX = (targetWidth - float(sceneWidth) * scale) * 0.5f;
+    const float offsetY = (targetHeight - float(sceneHeight) * scale) * 0.5f;
+    tgfx::Matrix fit;
+    fit.setTranslate(offsetX, offsetY);
+    fit.preScale(scale, scale);
+    surface_->getCanvas()->concat(fit);
 }
 
 void TgfxOnScreenAdapter::presentTarget() {

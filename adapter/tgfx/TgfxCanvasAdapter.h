@@ -21,6 +21,10 @@ class TgfxCanvasAdapter : public RenderAdapter {
   public:
     ~TgfxCanvasAdapter() override;
 
+    // width/height semantics is adapter-defined: the offscreen adapter treats
+    // them as the target texture size; the on-screen adapter treats them as
+    // the scene viewport size (the drawable size is authoritative and the
+    // scene is fit-transformed into it).
     void beginFrame(int width, int height, Color clearColor) final;
     void endFrame() final;
 
@@ -45,6 +49,15 @@ class TgfxCanvasAdapter : public RenderAdapter {
 
     // Flushes pending drawing, presents the frame and unlocks the context.
     virtual void presentTarget() = 0;
+
+    // Called after the clear, before any draw command. Lets subclasses map
+    // scene coordinates onto the target (the on-screen adapter applies a fit
+    // transform; the offscreen target is created at scene size so it is a
+    // no-op there).
+    virtual void onFrameReady(int sceneWidth, int sceneHeight) {
+        (void)sceneWidth;
+        (void)sceneHeight;
+    }
 
     std::shared_ptr<tgfx::Device> device_;
     std::shared_ptr<tgfx::Surface> surface_;

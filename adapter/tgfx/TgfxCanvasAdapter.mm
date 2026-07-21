@@ -124,6 +124,7 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color clearColor) {
         return;
     }
     surface_->getCanvas()->clear(ToTgfxColor(clearColor));
+    onFrameReady(width, height);
     opacity_ = 1;
     blendMode_ = BlendMode::Normal;
     opacityStack_.clear();
