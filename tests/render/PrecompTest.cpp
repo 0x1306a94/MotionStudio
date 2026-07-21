@@ -59,7 +59,7 @@ TEST(PrecompTest, FlattensSublayerKeepingItsId) {
     Layer *precomp = AddPrecompLayer(document, main->id, inner->id);
     precomp->transform.position.setStaticValue(Vec2{100, 0});
 
-    Expected<SceneState> result = SceneEvaluator::Evaluate(document, main->id, 0);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
     EXPECT_EQ(result->layers[0].id, rectLayer->id);  // sublayer id preserved
@@ -87,7 +87,7 @@ TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
     precomp->timeStretch = 2;
 
     // outer 15 -> inner (15-10)*2+5 = 15 -> position x = 75 -> rect left = 70.
-    Expected<SceneState> result = SceneEvaluator::Evaluate(document, main->id, 15);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 15);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
     EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{70, -5}));
@@ -108,7 +108,7 @@ TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
     mainPrecomp->transform.position.setStaticValue(Vec2{20, 0});
     mainPrecomp->transform.opacity.setStaticValue(0.5f);
 
-    Expected<SceneState> result = SceneEvaluator::Evaluate(document, main->id, 0);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
     // rect left = 0 + 10 + 20 - 5
@@ -121,7 +121,7 @@ TEST(PrecompTest, MissingTargetProducesNoLayers) {
     Composition *main = document.addComposition(std::make_unique<Composition>());
     AddPrecompLayer(document, main->id, EntityId{999});
 
-    Expected<SceneState> result = SceneEvaluator::Evaluate(document, main->id, 0);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
     EXPECT_TRUE(result->layers.empty());
 }
@@ -131,7 +131,7 @@ TEST(PrecompTest, SelfReferencingCycleTerminates) {
     Composition *loop = document.addComposition(std::make_unique<Composition>());
     AddPrecompLayer(document, loop->id, loop->id);
 
-    Expected<SceneState> result = SceneEvaluator::Evaluate(document, loop->id, 0);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, loop->id, 0);
     ASSERT_TRUE(result.hasValue());
     EXPECT_TRUE(result->layers.empty());
 }
@@ -143,7 +143,7 @@ TEST(PrecompTest, TwoCompositionCycleTerminates) {
     AddPrecompLayer(document, a->id, b->id);
     AddPrecompLayer(document, b->id, a->id);
 
-    Expected<SceneState> result = SceneEvaluator::Evaluate(document, a->id, 0);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, a->id, 0);
     ASSERT_TRUE(result.hasValue());
     EXPECT_TRUE(result->layers.empty());
 }

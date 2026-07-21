@@ -18,8 +18,8 @@ class SceneEvaluator {
     // document: the owning document (provides the entity index).
     // compositionId: id of the composition to evaluate.
     // time: frame time in the composition timeline.
-    static Expected<SceneState> Evaluate(const Document &document,
-                                         EntityId compositionId, FrameTime time);
+    static Expected<SceneState, std::string> Evaluate(const Document &document,
+                                                      EntityId compositionId, FrameTime time);
 };
 
 }  // namespace motion

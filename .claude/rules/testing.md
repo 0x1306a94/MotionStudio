@@ -24,7 +24,7 @@ CI（macOS runner）执行相同流程且 ASan+UBSan 开启。
 
 ## 断言约定
 
-- **不使用 `EXPECT_THROW`**（项目无异常）：`Expected` 结果用 `hasValue()` / `errorMessage()` 断言。
+- **不使用 `EXPECT_THROW`**（项目无异常）：`Expected` 结果用 `hasValue()` / `error()` 断言。
 - debug assert 的失败行为用 `EXPECT_DEATH(expr, "断言关键词")` 验证。
 - 浮点比较用 `approxEqual`；`Vec2` 等聚合体作为宏参数时整体加括号或先赋值临时变量（避免宏参数歧义）。
 

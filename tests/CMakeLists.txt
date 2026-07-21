@@ -4,6 +4,7 @@ add_executable(core_tests
     core/VersionTest.cpp
     common/BezierPathTest.cpp
     common/EntityIdTest.cpp
+    common/ExpectedTest.cpp
     common/MathTest.cpp
     common/TimeTest.cpp
     animation/AnimatableTest.cpp

@@ -3,6 +3,7 @@
 #include <string>
 
 #include "MotionStudio/common/Expected.h"
+#include "MotionStudio/serialization/ParseError.h"
 
 namespace motion {
 
@@ -18,9 +19,9 @@ class SchemaMigrator {
     }
 
     // Reads the embedded schemaVersion and migrates to the current version.
-    // Returns Error on malformed JSON or unsupported version.
+    // Returns an error string on malformed JSON or unsupported version.
     // jsonText: the JSON text to migrate.
-    static Expected<std::string> migrate(const std::string &jsonText);
+    static Expected<std::string, ParseError> migrate(const std::string &jsonText);
 };
 
 }  // namespace motion

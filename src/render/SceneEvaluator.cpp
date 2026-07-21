@@ -265,12 +265,12 @@ void EvaluateComposition(const Document &document, const Composition &compositio
 
 }  // namespace
 
-Expected<SceneState> SceneEvaluator::Evaluate(const Document &document,
-                                              EntityId compositionId, FrameTime time) {
+Expected<SceneState, std::string> SceneEvaluator::Evaluate(const Document &document,
+                                                           EntityId compositionId, FrameTime time) {
     const Composition *composition =
         document.entityIndex().findComposition(compositionId);
     if (!composition) {
-        return Error("composition not found");
+        return Unexpected(std::string("composition not found"));
     }
     SceneState state;
     state.viewportWidth = composition->width;

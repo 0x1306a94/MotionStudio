@@ -30,6 +30,7 @@ using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
 using motion::MaskMode;
+using motion::ParseError;
 using motion::PrecompContent;
 using motion::SchemaMigrator;
 using motion::Serializer;
@@ -159,7 +160,7 @@ TEST(SerializerTest, RoundTripIsJsonStable) {
     auto document = BuildRichDocument();
     const std::string first = Serializer::serialize(*document);
 
-    Expected<std::unique_ptr<Document>> restored = Serializer::deserialize(first);
+    Expected<std::unique_ptr<Document>, ParseError> restored = Serializer::deserialize(first);
     ASSERT_TRUE(restored.hasValue());
     const std::string second = Serializer::serialize(**restored);
 
@@ -168,7 +169,7 @@ TEST(SerializerTest, RoundTripIsJsonStable) {
 
 TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     auto document = BuildRichDocument();
-    Expected<std::unique_ptr<Document>> restored =
+    Expected<std::unique_ptr<Document>, ParseError> restored =
         Serializer::deserialize(Serializer::serialize(*document));
     ASSERT_TRUE(restored.hasValue());
 
@@ -230,10 +231,10 @@ TEST(SerializerTest, RejectsInvalidInput) {
     EXPECT_FALSE(Serializer::deserialize("not json").hasValue());
     EXPECT_FALSE(Serializer::deserialize("{}").hasValue());
 
-    Expected<std::unique_ptr<Document>> badVersion =
+    Expected<std::unique_ptr<Document>, ParseError> badVersion =
         Serializer::deserialize(R"({"schemaVersion": 99})");
     ASSERT_FALSE(badVersion.hasValue());
-    EXPECT_NE(badVersion.errorMessage().find("schemaVersion"), std::string::npos);
+    EXPECT_NE(badVersion.error().message.find("schemaVersion"), std::string::npos);
 
     auto document = BuildRichDocument();
     std::string text = Serializer::serialize(*document);
@@ -244,7 +245,7 @@ TEST(SerializerTest, RejectsInvalidInput) {
 
 TEST(SchemaMigratorTest, CurrentVersionPassesThrough) {
     const std::string text = R"({"schemaVersion": 1, "name": "x"})";
-    Expected<std::string> migrated = SchemaMigrator::migrate(text);
+    Expected<std::string, ParseError> migrated = SchemaMigrator::migrate(text);
     ASSERT_TRUE(migrated.hasValue());
     EXPECT_EQ(nlohmann::json::parse(*migrated), nlohmann::json::parse(text));
 }
