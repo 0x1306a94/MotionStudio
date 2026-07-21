@@ -6,6 +6,11 @@
   "repos": {
     "common": [
       {
+        "url": "${GITHUB_BASE_URL}/libpag/tgfx.git",
+        "commit": "64c8597101809078bc71499c13fe850553fbfa1e",
+        "dir": "third_party/tgfx"
+      },
+      {
         "url": "${GITHUB_BASE_URL}/google/googletest.git",
         "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
         "dir": "third_party/googletest"
@@ -21,6 +26,10 @@
     "common": [
       {
         "command": "depctl --clean",
+        "dir": "third_party"
+      },
+      {
+        "command": "python3 tgfx/third_party/shaderc/utils/git-sync-deps",
         "dir": "third_party"
       }
     ]

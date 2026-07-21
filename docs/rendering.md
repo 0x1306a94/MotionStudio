@@ -108,6 +108,10 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 **为什么是 immediate-mode 而非 retained（场景图）**：动画工具每帧内容都在变，retained 模式的缓存价值很低；栈式接口与 Metal / CoreGraphics / Skia 的 API 形态天然对齐。Rive 的 Renderer 接口同此思路，已验证可行。
 
+### 3.3 已实现后端：tgfx（Metal）
+
+`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
+
 ## 4. Metal 适配器（macOS 应用层）
 
 `MetalRenderAdapter` 位于 `app/macos/`，**不属于 Core 层**：

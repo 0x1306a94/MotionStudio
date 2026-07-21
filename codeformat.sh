@@ -55,14 +55,15 @@ format_cpp_files "include" &
 format_cpp_files "src" &
 format_cpp_files "tests" &
 format_cpp_files "benchmarks" &
+format_cpp_files "adapter" &
 wait
 
 format_swift_files "src" &
 wait
 
 # 只检查格式化覆盖的目录，避免被其他进行中的改动干扰
-git diff -- include/ src/ tests/ benchmarks/
-result=`git diff -- include/ src/ tests/ benchmarks/`
+git diff -- include/ src/ tests/ benchmarks/ adapter/
+result=`git diff -- include/ src/ tests/ benchmarks/ adapter/`
 if [[ $result =~ "diff" ]]
 then
     echo "----Failed to pass the code format check----"
