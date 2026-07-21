@@ -21,18 +21,18 @@ final class EditorState {
     var isPlaying = false
 
     /// The property currently shown in the timeline keyframe lane.
-    var timelineProperty = TimelineProperty.positionX
+    var timelineProperty = TimelineProperty.position
 }
 
 /// Properties editable as timeline keyframe lanes.
 enum TimelineProperty: String, CaseIterable, Equatable {
-    case positionX = "transform.position"
+    case position = "transform.position"
     case rotation = "transform.rotation"
     case opacity = "transform.opacity"
 
     var label: String {
         switch self {
-        case .positionX:
+        case .position:
             return "Position"
         case .rotation:
             return "Rotation"

@@ -95,6 +95,8 @@ int ms_composition_height(MSDocument *document, uint64_t compositionId);
 int ms_composition_frame_rate_num(MSDocument *document, uint64_t compositionId);
 int ms_composition_frame_rate_den(MSDocument *document, uint64_t compositionId);
 int ms_composition_layer_count(MSDocument *document, uint64_t compositionId);
+// Composition name (malloc'd).
+char *ms_composition_name(MSDocument *document, uint64_t compositionId);
 
 /* ============================ layer queries ============================ */
 
@@ -111,6 +113,7 @@ int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId);
 // Parent layer ID, 0 when the layer has no parent or does not exist.
 uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId);
 bool ms_layer_visible(MSDocument *document, uint64_t layerId);
+bool ms_layer_locked(MSDocument *document, uint64_t layerId);
 
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
@@ -182,6 +185,8 @@ uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t composition
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex,
                            int toIndex);
+void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);
+void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked);
 
 /* ============================ canvas (Apple platforms) ============================ */
 

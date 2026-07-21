@@ -10,9 +10,9 @@ import MetalKit
 import SwiftUI
 
 #if os(macOS)
-typealias CanvasViewRepresentable = NSViewRepresentable
+    typealias CanvasViewRepresentable = NSViewRepresentable
 #else
-typealias CanvasViewRepresentable = UIViewRepresentable
+    typealias CanvasViewRepresentable = UIViewRepresentable
 #endif
 
 struct CanvasView: CanvasViewRepresentable {
@@ -33,27 +33,27 @@ struct CanvasView: CanvasViewRepresentable {
     }
 
     #if os(macOS)
-    func makeNSView(context: Context) -> MTKView {
-        context.coordinator.makeCanvasView()
-    }
+        func makeNSView(context: Context) -> MTKView {
+            context.coordinator.makeCanvasView()
+        }
 
-    func updateNSView(_ view: MTKView, context: Context) {
-        context.coordinator.sync(playheadFrame: playheadFrame,
-                                 isPlaying: isPlaying,
-                                 duration: duration,
-                                 view: view)
-    }
+        func updateNSView(_ view: MTKView, context: Context) {
+            context.coordinator.sync(playheadFrame: playheadFrame,
+                                     isPlaying: isPlaying,
+                                     duration: duration,
+                                     view: view)
+        }
     #else
-    func makeUIView(context: Context) -> MTKView {
-        context.coordinator.makeCanvasView()
-    }
+        func makeUIView(context: Context) -> MTKView {
+            context.coordinator.makeCanvasView()
+        }
 
-    func updateUIView(_ view: MTKView, context: Context) {
-        context.coordinator.sync(playheadFrame: playheadFrame,
-                                 isPlaying: isPlaying,
-                                 duration: duration,
-                                 view: view)
-    }
+        func updateUIView(_ view: MTKView, context: Context) {
+            context.coordinator.sync(playheadFrame: playheadFrame,
+                                     isPlaying: isPlaying,
+                                     duration: duration,
+                                     view: view)
+        }
     #endif
 
     /// Drives the MTKView and the bridge canvas. MTKView delegate callbacks
@@ -76,7 +76,8 @@ struct CanvasView: CanvasViewRepresentable {
              compositionID: UInt64,
              duration: Int64,
              frameRate: Double,
-             onAdvancePlayhead: @escaping @MainActor (Int64) -> Void) {
+             onAdvancePlayhead: @escaping @MainActor (Int64) -> Void)
+        {
             self.core = core
             self.compositionID = compositionID
             self.duration = max(duration, 1)
@@ -112,8 +113,7 @@ struct CanvasView: CanvasViewRepresentable {
 
         // MARK: - MTKViewDelegate
 
-        func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        }
+        func mtkView(_: MTKView, drawableSizeWillChange _: CGSize) {}
 
         func draw(in view: MTKView) {
             if canvas == nil {
@@ -133,12 +133,12 @@ struct CanvasView: CanvasViewRepresentable {
             if playing {
                 carrySeconds = 0
                 #if os(macOS)
-                // macOS: the target-selector init is unavailable; the view
-                // provides the display link instead.
-                guard let canvasView else { return }
-                let link = canvasView.displayLink(target: self, selector: #selector(tick(_:)))
+                    // macOS: the target-selector init is unavailable; the view
+                    // provides the display link instead.
+                    guard let canvasView else { return }
+                    let link = canvasView.displayLink(target: self, selector: #selector(tick(_:)))
                 #else
-                let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
+                    let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
                 #endif
                 link.add(to: .main, forMode: .common)
                 displayLink = link
@@ -161,9 +161,9 @@ struct CanvasView: CanvasViewRepresentable {
 
         private func requestDraw(view: MTKView) {
             #if os(macOS)
-            view.setNeedsDisplay(view.bounds)
+                view.setNeedsDisplay(view.bounds)
             #else
-            view.setNeedsDisplay()
+                view.setNeedsDisplay()
             #endif
         }
     }

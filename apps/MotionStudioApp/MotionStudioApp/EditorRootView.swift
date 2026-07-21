@@ -2,8 +2,9 @@
 //  EditorRootView.swift
 //  MotionStudioApp
 //
-//  Top-level editor: layer panel / canvas / inspector / timeline, plus the
-//  system UndoManager integration for the core command stack.
+//  After-Effects-style four-region layout: project panel (left), composition
+//  preview (center), inspector (right) and a vertically resizable timeline
+//  (bottom). On compact width the side panels move to sheets.
 //
 
 import SwiftUI
@@ -12,72 +13,98 @@ struct EditorRootView: View {
     let document: MotionDocument
 
     @State private var editorState = EditorState()
+    @State private var timelineHeight: CGFloat = 220
     @Environment(\.undoManager) private var undoManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    var body: some View {
-        layout
-    }
+    #if os(iOS)
+        @State private var showProject = false
+        @State private var showInspector = false
+    #endif
 
-    #if os(macOS)
-    private var layout: some View {
-        VStack(spacing: 0) {
-            HSplitView {
-                LayerPanelView(document: document,
-                               editorState: editorState,
-                               perform: perform)
-                    .frame(minWidth: 170, idealWidth: 210)
-                CanvasContainer(document: document, editorState: editorState)
-                    .frame(minWidth: 320)
-                InspectorView(document: document,
-                              editorState: editorState,
-                              perform: perform)
-                    .frame(minWidth: 230, idealWidth: 270)
-            }
-            Divider()
-            TimelineView(document: document,
-                         editorState: editorState,
-                         perform: perform,
-                         registerEdit: registerEdit)
-                .frame(minHeight: 150, idealHeight: 210)
-        }
-    }
-    #else
-    private var layout: some View {
-        NavigationSplitView {
-            LayerPanelView(document: document,
-                           editorState: editorState,
-                           perform: perform)
-                .navigationTitle("Layers")
-        } detail: {
+    var body: some View {
+        GeometryReader { proxy in
+            let minHeight: CGFloat = 140
+            let maxHeight = max(minHeight, proxy.size.height * 0.7)
             VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    CanvasContainer(document: document, editorState: editorState)
-                    if horizontalSizeClass == .regular {
-                        Divider()
-                        InspectorView(document: document,
-                                      editorState: editorState,
-                                      perform: perform)
-                            .frame(width: 280)
-                    }
-                }
-                Divider()
+                topColumns
+                    .frame(maxHeight: .infinity)
+                TimelineResizeHandle(height: $timelineHeight,
+                                     minHeight: minHeight,
+                                     maxHeight: maxHeight)
                 TimelineView(document: document,
                              editorState: editorState,
                              perform: perform,
                              registerEdit: registerEdit)
-                    .frame(height: 200)
+                    .frame(height: min(max(timelineHeight, minHeight), maxHeight))
             }
-            .inspector(isPresented: .constant(horizontalSizeClass != .regular)) {
+        }
+        #if os(iOS)
+        .toolbar {
+            if horizontalSizeClass == .compact {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showProject = true } label: {
+                        Image(systemName: "folder")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showInspector = true } label: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showProject) {
+            NavigationStack {
+                ProjectPanelView(document: document,
+                                 editorState: editorState,
+                                 perform: perform)
+                    .navigationTitle("Project")
+            }
+        }
+        .sheet(isPresented: $showInspector) {
+            NavigationStack {
                 InspectorView(document: document,
                               editorState: editorState,
                               perform: perform)
+                    .navigationTitle("Inspector")
             }
         }
+        #endif
     }
-    #endif
+
+    @ViewBuilder
+    private var topColumns: some View {
+        #if os(macOS)
+            HSplitView {
+                ProjectPanelView(document: document, editorState: editorState, perform: perform)
+                    .frame(minWidth: 180, idealWidth: 220)
+                CanvasContainer(document: document, editorState: editorState)
+                    .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+                InspectorView(document: document, editorState: editorState, perform: perform)
+                    .frame(minWidth: 230, idealWidth: 270)
+            }
+        #else
+            if horizontalSizeClass == .regular {
+                HStack(spacing: 0) {
+                    ProjectPanelView(document: document, editorState: editorState, perform: perform)
+                        .frame(width: 220)
+                    Divider()
+                    CanvasContainer(document: document, editorState: editorState)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Divider()
+                    InspectorView(document: document, editorState: editorState, perform: perform)
+                        .frame(width: 280)
+                }
+            } else {
+                CanvasContainer(document: document, editorState: editorState)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        #endif
+    }
 
     // MARK: - Undo integration
+
     //
     // The core keeps its own undo stack; the system UndoManager mirrors it so
     // ⌘Z / three-finger swipe and the document's "unsaved changes" tracking
@@ -110,6 +137,46 @@ struct EditorRootView: View {
     }
 }
 
+/// Drag handle that resizes the timeline panel, clamped to [min, max].
+private struct TimelineResizeHandle: View {
+    @Binding var height: CGFloat
+    let minHeight: CGFloat
+    let maxHeight: CGFloat
+    @GestureState private var startHeight: CGFloat?
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(Color.secondary.opacity(0.15))
+            Rectangle().fill(.separator).frame(height: 1)
+        }
+        .frame(height: 6)
+        .contentShape(Rectangle())
+        #if os(macOS)
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeUpDown.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+        #endif
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .updating($startHeight) { _, state, _ in
+                        if state == nil {
+                            state = height
+                        }
+                    }
+                    .onChanged { value in
+                        guard let start = startHeight else { return }
+                        // Dragging up (negative translation) grows the panel.
+                        let next = start - value.translation.height
+                        height = min(max(next, minHeight), maxHeight)
+                    }
+            )
+    }
+}
+
 /// Wires the canvas to the document with a stable composition ID.
 private struct CanvasContainer: View {
     let document: MotionDocument
@@ -123,7 +190,8 @@ private struct CanvasContainer: View {
                    playheadFrame: editorState.playheadFrame,
                    isPlaying: editorState.isPlaying,
                    duration: core.duration(compositionID: compositionID),
-                   frameRate: core.frameRate(compositionID: compositionID)) { frame in
+                   frameRate: core.frameRate(compositionID: compositionID))
+        { frame in
             editorState.playheadFrame = frame
         }
     }

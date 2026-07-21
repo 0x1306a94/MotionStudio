@@ -50,7 +50,8 @@ private struct TransformInspector: View {
 
         NumberPropertyRow(label: "Position X",
                           value: Float(position.dx),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.position")) { newValue in
+                          hasKeyframeAtPlayhead: hasKeyframe("transform.position"))
+        { newValue in
             perform("Set Position") {
                 core.setStaticVec2(entityID: layerID, path: "transform.position",
                                    value: CGVector(dx: CGFloat(newValue), dy: position.dy))
@@ -61,7 +62,8 @@ private struct TransformInspector: View {
 
         NumberPropertyRow(label: "Position Y",
                           value: Float(position.dy),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.position")) { newValue in
+                          hasKeyframeAtPlayhead: hasKeyframe("transform.position"))
+        { newValue in
             perform("Set Position") {
                 core.setStaticVec2(entityID: layerID, path: "transform.position",
                                    value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
@@ -72,7 +74,8 @@ private struct TransformInspector: View {
 
         NumberPropertyRow(label: "Rotation",
                           value: core.staticFloat(entityID: layerID, path: "transform.rotation"),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.rotation")) { newValue in
+                          hasKeyframeAtPlayhead: hasKeyframe("transform.rotation"))
+        { newValue in
             perform("Set Rotation") {
                 core.setStaticFloat(entityID: layerID, path: "transform.rotation", value: newValue)
             }
@@ -82,7 +85,8 @@ private struct TransformInspector: View {
 
         NumberPropertyRow(label: "Opacity",
                           value: core.staticFloat(entityID: layerID, path: "transform.opacity"),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.opacity")) { newValue in
+                          hasKeyframeAtPlayhead: hasKeyframe("transform.opacity"))
+        { newValue in
             perform("Set Opacity") {
                 core.setStaticFloat(entityID: layerID, path: "transform.opacity", value: newValue)
             }
@@ -127,7 +131,7 @@ private struct NumberPropertyRow: View {
             Text(label)
                 .font(.callout)
                 .frame(width: 78, alignment: .leading)
-            TextField("", value: $draft, format: .number.precision(.fractionLength(0...2)))
+            TextField("", value: $draft, format: .number.precision(.fractionLength(0 ... 2)))
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
                     if draft != value {

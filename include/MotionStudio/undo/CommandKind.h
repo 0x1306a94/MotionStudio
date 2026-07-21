@@ -13,6 +13,8 @@ enum class CommandKind {
     RemoveKeyframe,
     MoveKeyframe,
     SetEasing,
+    SetLayerVisible,
+    SetLayerLocked,
     Composite,
 };
 

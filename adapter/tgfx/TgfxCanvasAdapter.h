@@ -9,7 +9,7 @@
 namespace tgfx {
 class Device;
 class Surface;
-}
+}  // namespace tgfx
 
 namespace motion {
 

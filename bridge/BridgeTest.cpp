@@ -122,6 +122,30 @@ TEST(BridgeCommandTest, SetStaticValueUndoRedo) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, LayerVisibleAndLockedUndo) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+
+    EXPECT_TRUE(ms_layer_visible(document, layerId));
+    EXPECT_FALSE(ms_layer_locked(document, layerId));
+
+    ms_command_set_layer_visible(document, layerId, false);
+    ms_command_set_layer_locked(document, layerId, true);
+    EXPECT_FALSE(ms_layer_visible(document, layerId));
+    EXPECT_TRUE(ms_layer_locked(document, layerId));
+
+    EXPECT_TRUE(ms_document_undo(document));  // undo lock
+    EXPECT_FALSE(ms_layer_locked(document, layerId));
+    EXPECT_TRUE(ms_document_undo(document));  // undo hide
+    EXPECT_TRUE(ms_layer_visible(document, layerId));
+    EXPECT_TRUE(ms_document_redo(document));
+    EXPECT_FALSE(ms_layer_visible(document, layerId));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, Vec2AndColorProperties) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

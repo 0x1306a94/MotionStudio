@@ -14,7 +14,9 @@ struct KeyframeInfo: Equatable, Identifiable {
     let value: Float
     let easing: EasingInfo
 
-    var id: Int64 { frame }
+    var id: Int64 {
+        frame
+    }
 }
 
 /// Easing curve descriptor mirroring the bridge MS_EASING_* tags.
@@ -51,8 +53,8 @@ final class MotionDocumentCore {
 
     private let handle: OpaquePointer
 
-    // Construction is main-actor independent (plain C calls), so document
-    // creation works from @Sendable contexts like DocumentGroup.makeDocument.
+    /// Construction is main-actor independent (plain C calls), so document
+    /// creation works from @Sendable contexts like DocumentGroup.makeDocument.
     nonisolated init() {
         guard let handle = ms_document_create() else {
             fatalError("ms_document_create returned null")
@@ -93,8 +95,13 @@ final class MotionDocumentCore {
 
     // MARK: - Undo / redo
 
-    var canUndo: Bool { ms_document_can_undo(handle) }
-    var canRedo: Bool { ms_document_can_redo(handle) }
+    var canUndo: Bool {
+        ms_document_can_undo(handle)
+    }
+
+    var canRedo: Bool {
+        ms_document_can_redo(handle)
+    }
 
     /// Executes one undo step. Call from the system UndoManager registration.
     func performUndo() {
@@ -121,6 +128,15 @@ final class MotionDocumentCore {
         ms_document_composition_id_at(handle, 0)
     }
 
+    func compositionIDs() -> [UInt64] {
+        let count = ms_document_composition_count(handle)
+        return (0 ..< Int(count)).map { ms_document_composition_id_at(handle, Int32($0)) }
+    }
+
+    func compositionName(_ compositionID: UInt64) -> String {
+        Self.takeString(ms_composition_name(handle, compositionID)) ?? ""
+    }
+
     func duration(compositionID: UInt64) -> Int64 {
         ms_composition_duration(handle, compositionID)
     }
@@ -141,7 +157,7 @@ final class MotionDocumentCore {
 
     func layerIDs(compositionID: UInt64) -> [UInt64] {
         let count = ms_composition_layer_count(handle, compositionID)
-        return (0..<Int(count)).map { ms_layer_id_at(handle, compositionID, Int32($0)) }
+        return (0 ..< Int(count)).map { ms_layer_id_at(handle, compositionID, Int32($0)) }
     }
 
     func layerName(_ layerID: UInt64) -> String {
@@ -150,6 +166,10 @@ final class MotionDocumentCore {
 
     func layerIsVisible(_ layerID: UInt64) -> Bool {
         ms_layer_visible(handle, layerID)
+    }
+
+    func layerIsLocked(_ layerID: UInt64) -> Bool {
+        ms_layer_locked(handle, layerID)
     }
 
     // MARK: - Property queries
@@ -173,7 +193,7 @@ final class MotionDocumentCore {
         let count = ms_property_keyframe_count(handle, entityID, path)
         var result: [KeyframeInfo] = []
         result.reserveCapacity(Int(count))
-        for index in 0..<Int(count) {
+        for index in 0 ..< Int(count) {
             let i = Int32(index)
             let frame = Int64(ms_property_keyframe_time_at(handle, entityID, path, i))
             let value = ms_property_keyframe_float_at(handle, entityID, path, i)
@@ -203,6 +223,7 @@ final class MotionDocumentCore {
     }
 
     // MARK: - Undoable edits
+
     // Every method below runs a command through the core undo manager and
     // bumps `revision`. Callers additionally register with the system
     // UndoManager (see EditorRootView.perform).
@@ -260,6 +281,16 @@ final class MotionDocumentCore {
 
     func removeLayer(compositionID: UInt64, layerID: UInt64) {
         ms_command_remove_layer(handle, compositionID, layerID)
+        changed()
+    }
+
+    func setLayerVisible(_ layerID: UInt64, visible: Bool) {
+        ms_command_set_layer_visible(handle, layerID, visible)
+        changed()
+    }
+
+    func setLayerLocked(_ layerID: UInt64, locked: Bool) {
+        ms_command_set_layer_locked(handle, layerID, locked)
         changed()
     }
 

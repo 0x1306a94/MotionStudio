@@ -40,6 +40,8 @@ add_library(core STATIC
     undo/RemoveKeyframeCommand.cpp
     undo/RemoveLayerCommand.cpp
     undo/SetEasingCommand.cpp
+    undo/SetLayerLockedCommand.cpp
+    undo/SetLayerVisibleCommand.cpp
     undo/SetStaticValueCommand.cpp
     undo/UndoManager.cpp
     serialization/Dto.cpp

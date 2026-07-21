@@ -24,13 +24,17 @@ extension UTType {
 /// document mutex.
 @MainActor
 final class MotionDocument: ReferenceFileDocument {
-    nonisolated static var readableContentTypes: [UTType] { [.motionStudioDocument] }
+    nonisolated static var readableContentTypes: [UTType] {
+        [.motionStudioDocument]
+    }
 
     // Explicit nonisolated witness: with MainActor default isolation, the
     // synthesized ObservableObject witness would be main-actor isolated and
     // cannot satisfy the protocol's nonisolated requirement.
     private nonisolated let publisher = ObservableObjectPublisher()
-    nonisolated var objectWillChange: ObservableObjectPublisher { publisher }
+    nonisolated var objectWillChange: ObservableObjectPublisher {
+        publisher
+    }
 
     let core: MotionDocumentCore
 
@@ -45,14 +49,15 @@ final class MotionDocument: ReferenceFileDocument {
         core = try MotionDocumentCore(json: data)
     }
 
-    // Captures the snapshot off the main actor (bridge provides the lock).
-    nonisolated func snapshot(contentType: UTType) throws -> Data {
+    /// Captures the snapshot off the main actor (bridge provides the lock).
+    nonisolated func snapshot(contentType _: UTType) throws -> Data {
         try core.serialize()
     }
 
-    // Runs in the background with the snapshot taken above.
+    /// Runs in the background with the snapshot taken above.
     nonisolated func fileWrapper(snapshot: Data,
-                                 configuration: WriteConfiguration) throws -> FileWrapper {
+                                 configuration _: WriteConfiguration) throws -> FileWrapper
+    {
         FileWrapper(regularFileWithContents: snapshot)
     }
 }

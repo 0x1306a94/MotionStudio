@@ -24,6 +24,8 @@
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetLayerLockedCommand.h"
+#include "MotionStudio/undo/SetLayerVisibleCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
@@ -357,6 +359,12 @@ int ms_composition_layer_count(MSDocument *document, uint64_t compositionId) {
     return composition != nullptr ? int(composition->layers.size()) : 0;
 }
 
+char *ms_composition_name(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    return composition != nullptr ? strdup(composition->name.c_str()) : nullptr;
+}
+
 /* ============================ layer queries ============================ */
 
 uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index) {
@@ -405,6 +413,12 @@ bool ms_layer_visible(MSDocument *document, uint64_t layerId) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr && layer->visible;
+}
+
+bool ms_layer_locked(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr && layer->locked;
 }
 
 /* ============================ property queries ============================ */
@@ -628,22 +642,19 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path,
                                  float value) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
-                          MakePath(entityId, path), motion::PropertyValue(value)));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value)));
 }
 
 void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path,
                                 float x, float y) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
-                          MakePath(entityId, path), motion::PropertyValue(Vec2{x, y})));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Vec2{x, y})));
 }
 
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path,
                                  float r, float g, float b, float a) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
-                          MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
 }
 
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path,
@@ -667,24 +678,20 @@ void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path,
                                 int64_t frame) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path),
-                                                                      FrameTime(frame)));
+    Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path), FrameTime(frame)));
 }
 
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path,
                               int64_t oldFrame, int64_t newFrame) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::MoveKeyframeCommand>(
-                          MakePath(entityId, path), FrameTime(oldFrame), FrameTime(newFrame)));
+    Execute(document, std::make_unique<motion::MoveKeyframeCommand>(MakePath(entityId, path), FrameTime(oldFrame), FrameTime(newFrame)));
 }
 
 void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path,
                            int64_t frame, int easingType, float inX, float inY, float outX,
                            float outY) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetEasingCommand>(
-                          MakePath(entityId, path), FrameTime(frame),
-                          MakeEasing(easingType, inX, inY, outX, outY)));
+    Execute(document, std::make_unique<motion::SetEasingCommand>(MakePath(entityId, path), FrameTime(frame), MakeEasing(easingType, inX, inY, outX, outY)));
 }
 
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId) {
@@ -699,15 +706,23 @@ uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t composition
 
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::RemoveLayerCommand>(EntityId{compositionId},
-                                                                   EntityId{layerId}));
+    Execute(document, std::make_unique<motion::RemoveLayerCommand>(EntityId{compositionId}, EntityId{layerId}));
 }
 
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex,
                            int toIndex) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId},
-                                                                 fromIndex, toIndex));
+    Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, fromIndex, toIndex));
+}
+
+void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerVisibleCommand>(EntityId{layerId}, visible));
+}
+
+void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerLockedCommand>(EntityId{layerId}, locked));
 }
 
 /* ============================ canvas ============================ */

@@ -9,13 +9,12 @@
 import XCTest
 
 final class MotionStudioAppUITests: XCTestCase {
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
     @MainActor
-    func testNewDocumentAddShapeAndUndo() throws {
+    func testNewDocumentAddShapeAndUndo() {
         let app = XCUIApplication()
         app.launch()
 

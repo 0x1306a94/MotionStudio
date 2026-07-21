@@ -56,14 +56,17 @@ format_cpp_files "src" &
 format_cpp_files "tests" &
 format_cpp_files "benchmarks" &
 format_cpp_files "adapter" &
+format_cpp_files "bridge" &
 wait
 
 format_swift_files "src" &
+format_swift_files "apps/MotionStudioApp/MotionStudioApp" &
+format_swift_files "apps/MotionStudioApp/MotionStudioAppTests" &
+format_swift_files "apps/MotionStudioApp/MotionStudioAppUITests" &
 wait
 
-# 只检查格式化覆盖的目录，避免被其他进行中的改动干扰
-git diff -- include/ src/ tests/ benchmarks/ adapter/
-result=`git diff -- include/ src/ tests/ benchmarks/ adapter/`
+git diff
+result=`git diff`
 if [[ $result =~ "diff" ]]
 then
     echo "----Failed to pass the code format check----"
