@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
+
 # tgfx 适配器需要 Objective-C++（Metal 后端），Apple 平台一并启用。
 if (APPLE)
     project(MotionStudio LANGUAGES C CXX OBJC OBJCXX)
 else()
     project(MotionStudio LANGUAGES C CXX)
+endif()
+
+if(CMAKE_GENERATOR MATCHES "Xcode")
+  include("${CMAKE_SOURCE_DIR}/cmake/apple_xcode.cmake")
 endif()
 
 set(CMAKE_CXX_STANDARD 17)

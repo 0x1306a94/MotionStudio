@@ -1,0 +1,17 @@
+//
+//  Base.xcconfig
+//  MotionStudioApp
+//
+//  Created by king on 2026/7/21.
+//
+
+// Configuration settings file format documentation can be found at:
+// https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project
+
+
+PRODUCT_BUNDLE_IDENTIFIER = com.0x1306a94.MotionStudio
+LIBRARY_SEARCH_PATHS = $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)
+HEADER_SEARCH_PATHS = $(SRCROOT)/../../include
+MOTION_DOCUMENT_IDENTIFIER = com.0x1306a94.motion
+
+#include? "Developer.xcconfig"

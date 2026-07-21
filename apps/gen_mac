@@ -1,0 +1,34 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(realpath $(dirname $0))
+PROJECT_DIR=$(realpath $SCRIPT_DIR/..)
+GEN_XCODE_PROJEC_DIR=$SCRIPT_DIR/gen_xcode
+GEN_XCODE_PROJEC_FILE=$GEN_XCODE_PROJEC_DIR/MotionStudio.xcodeproj/project.pbxproj
+HOMEBREW_PATH="/opt/homebrew/bin"
+
+echo "[*] SCRIPT_DIR: ${SCRIPT_DIR}"
+
+rm -rf $GEN_XCODE_PROJEC_DIR/CMakeFiles
+rm -rf $GEN_XCODE_PROJEC_DIR/CMakeScripts
+rm -rf $GEN_XCODE_PROJEC_DIR/CMakeCache.txt
+rm -rf $GEN_XCODE_PROJEC_DIR/cmake_install.cmake
+
+echo "[*] Generating Xcode (SDKROOT=auto, arm64 only) ..."
+
+cmake -G Xcode \
+-B $GEN_XCODE_PROJEC_DIR \
+-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+-DMOTIONSTUDIO_SUPPORTED_PLATFORMS="macosx iphoneos iphonesimulator" \
+-DMOTIONSTUDIO_MACOSX_DEPLOYMENT_TARGET=15.0 \
+-DMOTIONSTUDIO_IPHONEOS_DEPLOYMENT_TARGET=18.0 \
+-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+${@} \
+-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$GEN_XCODE_PROJEC_DIR/Products \
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$GEN_XCODE_PROJEC_DIR/Products \
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$GEN_XCODE_PROJEC_DIR/Products \
+-S $PROJECT_DIR
+
+
+echo "[*] patch xcode project file PATH environment"
+sed -i '' "s#shellScript = \"#shellScript = \"export PATH=${HOMEBREW_PATH}:\\\$PATH\\n#" "$GEN_XCODE_PROJEC_FILE"
+echo "[*] Patch done."
