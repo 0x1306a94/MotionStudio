@@ -78,71 +78,71 @@ struct TimelineView: View {
         VStack(alignment: .leading, spacing: 0) {
             TimelineControls(editorState: editorState, duration: duration)
             Divider()
-            // Pinned header: layer-column header + ruler (scrubbable).
-            HStack(alignment: .top, spacing: 0) {
-                LayerColumnHeader()
-                    .frame(width: layerColumnWidth, height: rulerHeight)
-                HorizontalSplitDivider(width: splitDividerWidth,
-                                       columnWidth: $layerColumnWidth)
-                    .frame(height: rulerHeight)
-                ZStack(alignment: .topLeading) {
-                    RulerCanvas(duration: duration, frameRate: frameRate)
-                    PlayheadHead()
-                        .frame(height: rulerHeight)
-                        .offset(x: playheadX - 4)
-                        .allowsHitTesting(false)
-                }
-                .frame(width: trackWidth, height: rulerHeight)
-                .contentShape(Rectangle())
-                .gesture(scrubGesture(duration: duration))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Divider()
-            // Vertically scrolling body: layer tree + graph in lockstep.
-            ScrollView(.vertical) {
-                HStack(alignment: .top, spacing: 0) {
-                    LayerColumn(core: core, rows: rows, editorState: editorState,
-                                perform: perform)
-                        .frame(width: layerColumnWidth)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                    HorizontalSplitDivider(width: splitDividerWidth,
-                                           columnWidth: $layerColumnWidth)
-                        .frame(maxHeight: .infinity)
-                    ZStack(alignment: .topLeading) {
-                        VStack(spacing: 0) {
-                            ForEach(rows) { row in
-                                TrackRow(core: core,
-                                         row: row,
-                                         duration: duration,
-                                         perform: perform,
-                                         registerEdit: registerEdit)
-                                    .frame(height: row.height)
-                            }
+            // Header + body share one overlay playhead so the vertical line
+            // stays continuous across the header/body divider instead of
+            // appearing split into two segments.
+            ZStack(alignment: .topLeading) {
+                VStack(spacing: 0) {
+                    // Pinned header: layer-column header + ruler (scrubbable).
+                    HStack(alignment: .top, spacing: 0) {
+                        LayerColumnHeader()
+                            .frame(width: layerColumnWidth, height: rulerHeight)
+                        HorizontalSplitDivider(width: splitDividerWidth,
+                                               columnWidth: $layerColumnWidth)
+                            .frame(height: rulerHeight)
+                        ZStack(alignment: .topLeading) {
+                            RulerCanvas(duration: duration, frameRate: frameRate)
                         }
-                        // Playhead spans every row.
-                        Rectangle()
-                            .fill(.blue)
-                            .frame(width: 1.5)
-                            .frame(maxHeight: .infinity)
-                            .offset(x: playheadX - 0.75)
-                            .allowsHitTesting(false)
-                        // Narrow grab strip so the playhead itself is draggable
-                        // without stealing vertical scroll from the rest of the lane.
-                        Rectangle()
-                            .fill(Color.clear)
-                            .contentShape(Rectangle())
-                            .frame(width: 12)
-                            .frame(maxHeight: .infinity)
-                            .offset(x: playheadX - 6)
-                            .gesture(playheadDrag(duration: duration))
+                        .frame(width: trackWidth, height: rulerHeight)
+                        .contentShape(Rectangle())
+                        .gesture(scrubGesture(duration: duration))
                     }
-                    .frame(width: trackWidth)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .coordinateSpace(name: "tracks")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Divider()
+                    // Vertically scrolling body: layer tree + graph in lockstep.
+                    ScrollView(.vertical) {
+                        HStack(alignment: .top, spacing: 0) {
+                            LayerColumn(core: core, rows: rows, editorState: editorState,
+                                        perform: perform)
+                                .frame(width: layerColumnWidth)
+                                .frame(maxHeight: .infinity, alignment: .top)
+                            HorizontalSplitDivider(width: splitDividerWidth,
+                                                   columnWidth: $layerColumnWidth)
+                                .frame(maxHeight: .infinity)
+                            ZStack(alignment: .topLeading) {
+                                VStack(spacing: 0) {
+                                    ForEach(rows) { row in
+                                        TrackRow(core: core,
+                                                 row: row,
+                                                 duration: duration,
+                                                 perform: perform,
+                                                 registerEdit: registerEdit)
+                                            .frame(height: row.height)
+                                    }
+                                }
+                                // Narrow grab strip so the playhead itself is
+                                // draggable without stealing vertical scroll.
+                                Rectangle()
+                                    .fill(Color.clear)
+                                    .contentShape(Rectangle())
+                                    .frame(width: 12)
+                                    .frame(maxHeight: .infinity)
+                                    .offset(x: playheadX - 6)
+                                    .gesture(playheadDrag(duration: duration))
+                            }
+                            .frame(width: trackWidth)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                            .coordinateSpace(name: "tracks")
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .topLeading)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                PlayheadLine(x: layerColumnWidth + splitDividerWidth + playheadX)
+                    .allowsHitTesting(false)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Faint panel tint so empty lane areas read as a filled panel flush to
@@ -508,21 +508,28 @@ private struct RulerCanvas: View {
     }
 }
 
-// MARK: - Playhead head
+// MARK: - Playhead
 
-/// Blue downward triangle that caps the playhead in the ruler, matching the
-/// Figma-Motion style. Centered over the playhead x by the caller's offset.
-private struct PlayheadHead: View {
+/// Continuous playhead drawn as a single overlay above the header/body divider:
+/// a blue triangle capping the ruler plus one blue line that runs unbroken from
+/// the ruler top down to the bottom of the visible track area. `x` is the
+/// playhead's horizontal center in the overlay's coordinate space.
+private struct PlayheadLine: View {
+    let x: CGFloat
+
     var body: some View {
         VStack(spacing: 0) {
             Image(systemName: "arrowtriangle.down.fill")
                 .foregroundStyle(.blue)
                 .font(.system(size: 9))
-                .frame(height: 8)
+                .frame(width: 9, height: 8)
             Rectangle()
                 .fill(.blue)
                 .frame(width: 1.5)
         }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .fixedSize(horizontal: true, vertical: false)
+        .offset(x: x - 4.5)
     }
 }
 
