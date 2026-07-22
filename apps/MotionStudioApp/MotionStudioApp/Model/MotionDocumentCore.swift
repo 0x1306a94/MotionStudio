@@ -52,7 +52,7 @@ final class MotionDocumentCore {
     private(set) var revision: Int = 0
 
     @ObservationIgnored
-    nonisolated(unsafe) private let handle: OpaquePointer
+    private nonisolated(unsafe) let handle: OpaquePointer
 
     /// Invoked after every mutation, on the main actor. The document wires this
     /// to its objectWillChange publisher so the system tracks the edited state

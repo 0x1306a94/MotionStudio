@@ -109,7 +109,8 @@ struct EditorRootView: View {
         .fileExporter(isPresented: $isSaveAsPresented,
                       document: exportDocument,
                       contentType: .motionStudioDocument,
-                      defaultFilename: defaultExportFilename) { result in
+                      defaultFilename: defaultExportFilename)
+        { result in
             switch result {
             case let .success(url):
                 currentFileURL = url
@@ -218,7 +219,7 @@ struct EditorRootView: View {
 
     private func prepareSaveAs() {
         do {
-            exportDocument = MotionDocumentExport(data: try document.snapshot(contentType: .motionStudioDocument))
+            exportDocument = try MotionDocumentExport(data: document.snapshot(contentType: .motionStudioDocument))
             isSaveAsPresented = true
         } catch {
             saveError = MotionDocumentSaveError(message: error.localizedDescription)

@@ -49,8 +49,8 @@ struct CanvasView: UIViewRepresentable {
         private let compositionID: UInt64
         private let onAdvancePlayhead: @MainActor (Int64) -> Void
 
-        nonisolated(unsafe) private var canvas: OpaquePointer?
-        nonisolated(unsafe) private var displayLink: CADisplayLink?
+        private nonisolated(unsafe) var canvas: OpaquePointer?
+        private nonisolated(unsafe) var displayLink: CADisplayLink?
         private weak var canvasView: MTKView?
         private var playheadFrame: Int64 = 0
         private var duration: Int64 = 0

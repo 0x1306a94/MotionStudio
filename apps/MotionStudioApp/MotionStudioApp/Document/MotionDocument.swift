@@ -33,7 +33,7 @@ final class MotionDocument: ReferenceFileDocument {
     // Explicit nonisolated witness: with MainActor default isolation, the
     // synthesized ObservableObject witness would be main-actor isolated and
     // cannot satisfy the protocol's nonisolated requirement.
-    nonisolated(unsafe) private let publisher = ObservableObjectPublisher()
+    private nonisolated(unsafe) let publisher = ObservableObjectPublisher()
     nonisolated var objectWillChange: ObservableObjectPublisher {
         publisher
     }

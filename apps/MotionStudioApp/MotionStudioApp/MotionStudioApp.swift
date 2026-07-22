@@ -12,21 +12,21 @@ struct MotionStudioApp: App {
     var body: some Scene {
         DocumentGroup(newDocument: { MotionDocument() }) { file in
             EditorRootView(document: file.document, fileURL: file.fileURL)
-#if targetEnvironment(macCatalyst)
+            #if targetEnvironment(macCatalyst)
                 .background(
                     WindowSizeConfigurator(
                         minimumWidthRatio: WindowSizeConfiguration.minimumWidthRatio,
                         minimumHeightRatio: WindowSizeConfiguration.minimumHeightRatio
                     )
                 )
-#endif
+            #endif
         }
-#if targetEnvironment(macCatalyst)
+        #if targetEnvironment(macCatalyst)
         .defaultSize(
             width: WindowSizeConfiguration.defaultSize.width,
             height: WindowSizeConfiguration.defaultSize.height
         )
-#endif
+        #endif
         .commands {
             MotionStudioDocumentCommands()
         }
