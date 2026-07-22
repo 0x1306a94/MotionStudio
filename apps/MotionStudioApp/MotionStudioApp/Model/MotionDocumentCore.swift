@@ -51,7 +51,8 @@ final class MotionDocumentCore {
     /// Bumped after every mutation; views read it to subscribe to changes.
     private(set) var revision: Int = 0
 
-    private let handle: OpaquePointer
+    @ObservationIgnored
+    nonisolated(unsafe) private let handle: OpaquePointer
 
     /// Invoked after every mutation, on the main actor. The document wires this
     /// to its objectWillChange publisher so the system tracks the edited state
