@@ -27,10 +27,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
                           isEditable: isEditable)
         { newValue in
-            performSet(.position) {
-                core.setStaticVec2(entityID: layerID, path: TransformProperty.position.path,
-                                   value: CGVector(dx: CGFloat(newValue), dy: position.dy))
-            }
+            setVec2Property(.position, value: CGVector(dx: CGFloat(newValue), dy: position.dy))
         } onToggleKeyframe: { _ in
             toggleVec2Keyframe(.position)
         }
@@ -40,10 +37,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
                           isEditable: isEditable)
         { newValue in
-            performSet(.position) {
-                core.setStaticVec2(entityID: layerID, path: TransformProperty.position.path,
-                                   value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
-            }
+            setVec2Property(.position, value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
             toggleVec2Keyframe(.position)
         }
@@ -53,10 +47,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.scale),
                           isEditable: isEditable)
         { newValue in
-            performSet(.scale) {
-                core.setStaticVec2(entityID: layerID, path: TransformProperty.scale.path,
-                                   value: CGVector(dx: CGFloat(newValue), dy: scale.dy))
-            }
+            setVec2Property(.scale, value: CGVector(dx: CGFloat(newValue), dy: scale.dy))
         } onToggleKeyframe: { _ in
             toggleVec2Keyframe(.scale)
         }
@@ -66,10 +57,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.scale),
                           isEditable: isEditable)
         { newValue in
-            performSet(.scale) {
-                core.setStaticVec2(entityID: layerID, path: TransformProperty.scale.path,
-                                   value: CGVector(dx: scale.dx, dy: CGFloat(newValue)))
-            }
+            setVec2Property(.scale, value: CGVector(dx: scale.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
             toggleVec2Keyframe(.scale)
         }
@@ -81,9 +69,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.rotation),
                           isEditable: isEditable)
         { newValue in
-            performSet(.rotation) {
-                core.setStaticFloat(entityID: layerID, path: TransformProperty.rotation.path, value: newValue)
-            }
+            setFloatProperty(.rotation, value: newValue)
         } onToggleKeyframe: { value in
             toggleFloatKeyframe(.rotation, value: value)
         }
@@ -95,9 +81,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.opacity),
                           isEditable: isEditable)
         { newValue in
-            performSet(.opacity) {
-                core.setStaticFloat(entityID: layerID, path: TransformProperty.opacity.path, value: newValue)
-            }
+            setFloatProperty(.opacity, value: newValue)
         } onToggleKeyframe: { value in
             toggleFloatKeyframe(.opacity, value: value)
         }
@@ -105,6 +89,28 @@ struct TransformInspector: View {
 
     private func hasKeyframe(_ property: TransformProperty) -> Bool {
         core.keyframes(entityID: layerID, path: property.path).contains { $0.frame == playheadFrame }
+    }
+
+    private func setFloatProperty(_ property: TransformProperty, value: Float) {
+        performSet(property) {
+            if hasKeyframe(property) {
+                core.addKeyframeFloat(entityID: layerID, path: property.path,
+                                      frame: playheadFrame, value: value)
+            } else {
+                core.setStaticFloat(entityID: layerID, path: property.path, value: value)
+            }
+        }
+    }
+
+    private func setVec2Property(_ property: TransformProperty, value: CGVector) {
+        performSet(property) {
+            if hasKeyframe(property) {
+                core.addKeyframeVec2(entityID: layerID, path: property.path,
+                                     frame: playheadFrame, value: value)
+            } else {
+                core.setStaticVec2(entityID: layerID, path: property.path, value: value)
+            }
+        }
     }
 
     private func performSet(_ property: TransformProperty, action: () -> Void) {

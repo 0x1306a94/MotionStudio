@@ -26,10 +26,7 @@ struct ShapeSizeInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(),
                           isEditable: isEditable)
         { newValue in
-            performSet {
-                core.setStaticVec2(entityID: layerID, path: shapeSizePath,
-                                   value: CGVector(dx: CGFloat(newValue), dy: size.dy))
-            }
+            setSize(value: CGVector(dx: CGFloat(newValue), dy: size.dy))
         } onToggleKeyframe: { _ in
             toggleSizeKeyframe()
         }
@@ -39,10 +36,7 @@ struct ShapeSizeInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(),
                           isEditable: isEditable)
         { newValue in
-            performSet {
-                core.setStaticVec2(entityID: layerID, path: shapeSizePath,
-                                   value: CGVector(dx: size.dx, dy: CGFloat(newValue)))
-            }
+            setSize(value: CGVector(dx: size.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
             toggleSizeKeyframe()
         }
@@ -50,6 +44,17 @@ struct ShapeSizeInspector: View {
 
     private func hasKeyframe() -> Bool {
         core.keyframes(entityID: layerID, path: shapeSizePath).contains { $0.frame == playheadFrame }
+    }
+
+    private func setSize(value: CGVector) {
+        performSet {
+            if hasKeyframe() {
+                core.addKeyframeVec2(entityID: layerID, path: shapeSizePath,
+                                     frame: playheadFrame, value: value)
+            } else {
+                core.setStaticVec2(entityID: layerID, path: shapeSizePath, value: value)
+            }
+        }
     }
 
     private func performSet(_ action: () -> Void) {
