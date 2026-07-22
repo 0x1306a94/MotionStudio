@@ -6,12 +6,6 @@
 
 namespace motion {
 
-// Preview chrome behind / around the composition in the live canvas.
-enum class PreviewBackdrop {
-    Black,        // Solid black (AE-like default).
-    Transparent,  // Checkerboard indicating transparency.
-};
-
 // RenderAdapter backed by tgfx on the Metal GPU backend, rendering directly
 // into an MTKView's drawable. The window surface is reused across frames and
 // recreated only when the drawable size changes; endFrame presents the
@@ -25,8 +19,8 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
 
     ~TgfxOnScreenAdapter() override;
 
-    void setPreviewBackdrop(PreviewBackdrop backdrop);
-    PreviewBackdrop previewBackdrop() const;
+    void setPreviewBackdrop(PreviewBackdrop backdrop) override;
+    PreviewBackdrop previewBackdrop() const override;
 
   protected:
     bool acquireTarget(int width, int height) override;

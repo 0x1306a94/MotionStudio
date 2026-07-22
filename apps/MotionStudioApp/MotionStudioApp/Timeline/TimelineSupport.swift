@@ -31,7 +31,8 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
 }
 
 func timelineUsesManualKeyframeTrack(core: MotionDocumentCore, layerID: UInt64,
-                                     path: String) -> Bool {
+                                     path: String) -> Bool
+{
     core.keyframes(entityID: layerID, path: path).count > 1
 }
 

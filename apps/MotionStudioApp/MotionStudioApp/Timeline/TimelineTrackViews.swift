@@ -27,7 +27,7 @@ struct TrackRow: View {
                               path: path,
                               label: label,
                               isSelected: isLayerSelected || editorState.selectedTimelineProperty == TimelinePropertySelection(layerID: row.layerID,
-                                                                                                                              path: path),
+                                                                                                                               path: path),
                               editorState: editorState)
         case let .keyframeTrack(path, _):
             ManualKeyframeTrackView(core: core,
@@ -109,7 +109,7 @@ private struct PropertyTrackView: View {
         .onTapGesture {
             editorState.selectedLayerID = layerID
             editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: layerID,
-                                                                            path: path)
+                                                                             path: path)
             editorState.selectedTimelineSegment = nil
         }
     }
@@ -204,7 +204,8 @@ private struct ManualKeyframeTrackView: View {
             ForEach(keyframes) { keyframe in
                 KeyframeDiamond(keyframe: keyframe,
                                 duration: duration,
-                                isSelected: isKeyframeSelected(keyframe.frame)) { from, to in
+                                isSelected: isKeyframeSelected(keyframe.frame))
+                { from, to in
                     core.moveKeyframe(entityID: layerID, path: path, from: from, to: to)
                 } onMoveEnded: {
                     core.endDrag()
@@ -230,7 +231,8 @@ private struct ManualKeyframeTrackView: View {
         }
         guard let selection = editorState.selectedTimelineSegment,
               selection.layerID == layerID,
-              selection.path == path else {
+              selection.path == path
+        else {
             return false
         }
         return frame == selection.startFrame || frame == selection.endFrame
@@ -275,20 +277,20 @@ private struct KeyframeConnectionSegment: View {
         .onTapGesture {
             editorState.selectedLayerID = layerID
             editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: layerID,
-                                                                            path: path)
+                                                                             path: path)
             editorState.selectedTimelineSegment = TimelineSegmentSelection(layerID: layerID,
-                                                                          path: path,
-                                                                          startFrame: segment.start.frame,
-                                                                          endFrame: segment.end.frame)
+                                                                           path: path,
+                                                                           startFrame: segment.start.frame,
+                                                                           endFrame: segment.end.frame)
         }
         .position(x: startX + width / 2, y: centerY)
     }
 
     private var isSelected: Bool {
         editorState.selectedTimelineSegment == TimelineSegmentSelection(layerID: layerID,
-                                                                       path: path,
-                                                                       startFrame: segment.start.frame,
-                                                                       endFrame: segment.end.frame)
+                                                                        path: path,
+                                                                        startFrame: segment.start.frame,
+                                                                        endFrame: segment.end.frame)
     }
 }
 

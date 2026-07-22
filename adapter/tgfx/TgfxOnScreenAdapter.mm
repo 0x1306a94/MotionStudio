@@ -55,7 +55,7 @@ PreviewBackdrop TgfxOnScreenAdapter::previewBackdrop() const {
 }
 
 bool TgfxOnScreenAdapter::compositionBackgroundSrcOver() const {
-    return previewBackdrop_ == PreviewBackdrop::Transparent;
+    return previewBackdrop() == PreviewBackdrop::Transparent;
 }
 
 bool TgfxOnScreenAdapter::acquireTarget(int /*width*/, int /*height*/) {
@@ -90,7 +90,7 @@ void TgfxOnScreenAdapter::drawPreviewBackdrop() {
         return;
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
-    if (previewBackdrop_ == PreviewBackdrop::Black) {
+    if (previewBackdrop() == PreviewBackdrop::Black) {
         canvas->clear(tgfx::Color::Black());
         return;
     }

@@ -9,7 +9,8 @@ import SwiftUI
 
 extension Color {
     static func premnitiplyColor(red: CGFloat, green: CGFloat, blue: CGFloat,
-                                 alpha: CGFloat) -> Color {
+                                 alpha: CGFloat) -> Color
+    {
         let clampedAlpha = alpha.clamped(to: 0 ... 1)
         let redComponent = premultipliedComponent(red, alpha: clampedAlpha)
         let greenComponent = premultipliedComponent(green, alpha: clampedAlpha)
@@ -22,7 +23,8 @@ extension Color {
     }
 
     static func premnitiplyColor(red: UInt8, green: UInt8, blue: UInt8,
-                                 alpha: UInt8) -> Color {
+                                 alpha: UInt8) -> Color
+    {
         premnitiplyColor(red: normalizedUInt8(red),
                          green: normalizedUInt8(green),
                          blue: normalizedUInt8(blue),
@@ -34,7 +36,8 @@ extension Color {
     }
 
     static func premnitiplyColor(red: Int8, green: Int8, blue: Int8,
-                                 alpha: Int8) -> Color {
+                                 alpha: Int8) -> Color
+    {
         premnitiplyColor(red: normalizedInt8(red),
                          green: normalizedInt8(green),
                          blue: normalizedInt8(blue),
@@ -46,7 +49,8 @@ extension Color {
     }
 
     private static func premultipliedComponent(_ component: CGFloat,
-                                               alpha: CGFloat) -> CGFloat {
+                                               alpha: CGFloat) -> CGFloat
+    {
         component.clamped(to: 0 ... 1) * alpha
     }
 

@@ -118,7 +118,8 @@ struct TimelineView: View {
     }
 
     private func buildRows(core: MotionDocumentCore, layerIDs: [UInt64],
-                           editorState: EditorState) -> [TimelineRow] {
+                           editorState _: EditorState) -> [TimelineRow]
+    {
         var rows: [TimelineRow] = []
         for layerID in layerIDs {
             rows.append(TimelineRow(id: .layer(layerID), layerID: layerID, kind: .layer))
@@ -140,7 +141,8 @@ struct TimelineView: View {
     }
 
     private func propertyRow(core: MotionDocumentCore, layerID: UInt64, path: String,
-                             label: String) -> TimelineRow {
+                             label: String) -> TimelineRow
+    {
         if timelineUsesManualKeyframeTrack(core: core, layerID: layerID, path: path) {
             return TimelineRow(id: .keyframeTrack(layerID, path), layerID: layerID,
                                kind: .keyframeTrack(path: path, label: label))

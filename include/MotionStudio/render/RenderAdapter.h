@@ -9,6 +9,7 @@
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/render/DrawCommand.h"
 #include "MotionStudio/render/Paint.h"
+#include "MotionStudio/render/PreviewBackdrop.h"
 
 namespace motion {
 
@@ -61,6 +62,17 @@ class RenderAdapter {
     // path: clip path.
     // rule: fill rule used to interpret the path.
     virtual void clipPath(const BezierPath &path, FillRule rule) = 0;
+
+    // Sets live-preview chrome behind the composition. Default is a no-op;
+    // on-screen adapters override this. Offscreen adapters ignore it.
+    // backdrop: solid black or transparency checkerboard.
+    virtual void setPreviewBackdrop(PreviewBackdrop) {
+    }
+
+    // Returns the current live-preview chrome mode. Default is Black.
+    virtual PreviewBackdrop previewBackdrop() const {
+        return PreviewBackdrop::Black;
+    }
 };
 
 // Replays a command list against an adapter.
