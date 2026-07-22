@@ -22,10 +22,10 @@ final class MotionStudioAppUITests: XCTestCase {
         // Metal canvas (ms_canvas_create + first frame draw).
         app.typeKey("n", modifierFlags: .command)
 
-        let addButton = app.buttons["Add Rectangle"]
-        XCTAssertTrue(addButton.waitForExistence(timeout: 15),
+        let timeline = app.staticTexts["0 / 240"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 15),
                       "editor window did not appear")
-        addButton.click()
+        app.typeKey("r", modifierFlags: [.command, .shift])
 
         let row = app.staticTexts["Rectangle 1"]
         XCTAssertTrue(row.waitForExistence(timeout: 5), "shape layer was not added")

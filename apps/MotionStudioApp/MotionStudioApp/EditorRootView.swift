@@ -47,7 +47,8 @@ struct EditorRootView: View {
                 TimelineView(document: document,
                              editorState: editorState,
                              perform: perform,
-                             registerEdit: registerEdit)
+                             registerEdit: registerEdit,
+                             clearSelection: clearSelection)
                     .frame(maxWidth: .infinity)
                     .frame(height: clampedTimeline)
             }
@@ -71,9 +72,7 @@ struct EditorRootView: View {
         }
         .sheet(isPresented: $showProject) {
             NavigationStack {
-                ProjectPanelView(document: document,
-                                 editorState: editorState,
-                                 perform: perform)
+                ProjectPanelView(document: document, clearSelection: clearSelection)
                     .navigationTitle("Project")
             }
         }
@@ -93,6 +92,9 @@ struct EditorRootView: View {
             MotionDocumentCommandRegistry.shared.unregister(id: commandRegistrationID)
         }
         .onChange(of: document.core.revision) { _, _ in
+            registerDocumentCommands()
+        }
+        .onChange(of: editorState.selectedLayerID) { _, _ in
             registerDocumentCommands()
         }
         .onChange(of: fileURL) { _, newURL in
@@ -157,10 +159,12 @@ struct EditorRootView: View {
     private func topColumns(height: CGFloat) -> some View {
         if horizontalSizeClass == .regular {
             HStack(alignment: .top, spacing: 0) {
-                ProjectPanelView(document: document, editorState: editorState, perform: perform)
+                ProjectPanelView(document: document, clearSelection: clearSelection)
                     .frame(width: 220, height: height)
                 Divider().frame(height: height)
-                CanvasContainer(document: document, editorState: editorState)
+                CanvasContainer(document: document,
+                                editorState: editorState,
+                                clearSelection: clearSelection)
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
                 Divider().frame(height: height)
@@ -168,7 +172,9 @@ struct EditorRootView: View {
                     .frame(width: 280, height: height)
             }
         } else {
-            CanvasContainer(document: document, editorState: editorState)
+            CanvasContainer(document: document,
+                            editorState: editorState,
+                            clearSelection: clearSelection)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
         }
@@ -186,8 +192,12 @@ struct EditorRootView: View {
         MotionDocumentCommandRegistry.shared.register(
             id: commandRegistrationID,
             handlers: MotionDocumentCommandHandlers(canSave: canSaveDocument,
+                                                    canDeleteLayer: editorState.selectedLayerID != nil,
                                                     save: saveDocument,
-                                                    saveAs: prepareSaveAs)
+                                                    saveAs: prepareSaveAs,
+                                                    addRectangle: addRectangleLayer,
+                                                    addEllipse: addEllipseLayer,
+                                                    deleteLayer: deleteSelectedLayer)
         )
     }
 
@@ -213,6 +223,33 @@ struct EditorRootView: View {
         } catch {
             saveError = MotionDocumentSaveError(message: error.localizedDescription)
         }
+    }
+
+    private func addRectangleLayer() {
+        let compositionID = document.core.firstCompositionID
+        perform("Add Rectangle") {
+            editorState.selectedLayerID = document.core.addRectLayer(compositionID: compositionID)
+        }
+    }
+
+    private func addEllipseLayer() {
+        let compositionID = document.core.firstCompositionID
+        perform("Add Ellipse") {
+            editorState.selectedLayerID = document.core.addEllipseLayer(compositionID: compositionID)
+        }
+    }
+
+    private func deleteSelectedLayer() {
+        guard let selected = editorState.selectedLayerID else { return }
+        let compositionID = document.core.firstCompositionID
+        perform("Delete Layer") {
+            document.core.removeLayer(compositionID: compositionID, layerID: selected)
+        }
+        editorState.selectedLayerID = nil
+    }
+
+    private func clearSelection() {
+        editorState.selectedLayerID = nil
     }
 
     private func markSaved() {
@@ -325,6 +362,7 @@ private struct TimelineResizeHandle: View {
 private struct CanvasContainer: View {
     let document: MotionDocument
     let editorState: EditorState
+    let clearSelection: () -> Void
 
     var body: some View {
         let core = document.core
@@ -342,5 +380,7 @@ private struct CanvasContainer: View {
         { frame in
             editorState.playheadFrame = frame
         }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: clearSelection)
     }
 }

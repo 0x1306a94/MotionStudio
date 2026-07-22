@@ -12,8 +12,12 @@ import UniformTypeIdentifiers
 
 struct MotionDocumentCommandHandlers {
     let canSave: Bool
+    let canDeleteLayer: Bool
     let save: @MainActor () -> Void
     let saveAs: @MainActor () -> Void
+    let addRectangle: @MainActor () -> Void
+    let addEllipse: @MainActor () -> Void
+    let deleteLayer: @MainActor () -> Void
 }
 
 @MainActor
@@ -77,6 +81,28 @@ struct MotionStudioDocumentCommands: Commands {
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .disabled(registry.handlers == nil)
+        }
+
+        CommandMenu("Layer") {
+            Button("Add Rectangle") {
+                registry.handlers?.addRectangle()
+            }
+            .keyboardShortcut("r", modifiers: [.command, .shift])
+            .disabled(registry.handlers == nil)
+
+            Button("Add Ellipse") {
+                registry.handlers?.addEllipse()
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+            .disabled(registry.handlers == nil)
+
+            Divider()
+
+            Button("Delete Layer", role: .destructive) {
+                registry.handlers?.deleteLayer()
+            }
+            .keyboardShortcut(.delete, modifiers: [])
+            .disabled(!(registry.handlers?.canDeleteLayer ?? false))
         }
     }
 }

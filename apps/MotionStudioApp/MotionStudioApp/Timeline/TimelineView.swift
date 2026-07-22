@@ -20,6 +20,8 @@ private let rulerHeight: CGFloat = 24
 private let splitDividerWidth: CGFloat = 5
 private let minLayerColumnWidth: CGFloat = 120
 private let maxLayerColumnWidth: CGFloat = 480
+private let layerActionIconSize: CGFloat = 16
+private let layerActionButtonSize: CGFloat = 22
 
 /// Animated properties offered as timeline sub-rows, in display order.
 private struct PropertySpec {
@@ -60,6 +62,7 @@ struct TimelineView: View {
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
+    let clearSelection: () -> Void
 
     @State private var layerColumnWidth: CGFloat = 200
 
@@ -103,13 +106,16 @@ struct TimelineView: View {
                     ScrollView(.vertical) {
                         HStack(alignment: .top, spacing: 0) {
                             LayerColumn(core: core, rows: rows, editorState: editorState,
-                                        perform: perform)
+                                        perform: perform, clearSelection: clearSelection)
                                 .frame(width: layerColumnWidth)
                                 .frame(maxHeight: .infinity, alignment: .top)
                             HorizontalSplitDivider(width: splitDividerWidth,
                                                    columnWidth: $layerColumnWidth)
                                 .frame(maxHeight: .infinity)
                             ZStack(alignment: .topLeading) {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture(perform: clearSelection)
                                 VStack(spacing: 0) {
                                     ForEach(rows) { row in
                                         TrackRow(core: core,
@@ -241,22 +247,29 @@ private struct LayerColumn: View {
     let rows: [TimelineRow]
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
+    let clearSelection: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            ForEach(rows) { row in
-                if row.isLayer {
-                    LayerRow(core: core, layerID: row.layerID,
-                             editorState: editorState, perform: perform)
-                        .frame(height: row.height)
-                } else {
-                    PropertySubRow(core: core, layerID: row.layerID,
-                                   label: row.label ?? "", path: row.path ?? "",
-                                   editorState: editorState)
-                        .frame(height: row.height)
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: clearSelection)
+            VStack(spacing: 0) {
+                ForEach(rows) { row in
+                    if row.isLayer {
+                        LayerRow(core: core, layerID: row.layerID,
+                                 editorState: editorState, perform: perform)
+                            .frame(height: row.height)
+                    } else {
+                        PropertySubRow(core: core, layerID: row.layerID,
+                                       label: row.label ?? "", path: row.path ?? "",
+                                       editorState: editorState)
+                            .frame(height: row.height)
+                    }
                 }
             }
         }
+        .frame(maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -285,7 +298,11 @@ private struct LayerRow: View {
             } label: {
                 Image(systemName: visible ? "eye.fill" : "eye.slash")
                     .foregroundStyle(.secondary)
+                    .font(.system(size: layerActionIconSize))
+                    .frame(width: layerActionIconSize, height: layerActionIconSize)
             }
+            .frame(width: layerActionButtonSize, height: layerActionButtonSize)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
             Button {
                 perform(locked ? "Unlock Layer" : "Lock Layer") {
@@ -294,7 +311,11 @@ private struct LayerRow: View {
             } label: {
                 Image(systemName: locked ? "lock.fill" : "lock.open")
                     .foregroundStyle(.secondary)
+                    .font(.system(size: layerActionIconSize))
+                    .frame(width: layerActionIconSize, height: layerActionIconSize)
             }
+            .frame(width: layerActionButtonSize, height: layerActionButtonSize)
+            .contentShape(Rectangle())
             .buttonStyle(.plain)
         }
         .font(.callout)

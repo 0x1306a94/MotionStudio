@@ -2,56 +2,26 @@
 //  ProjectPanelView.swift
 //  MotionStudioApp
 //
-//  Left panel: project assets (empty for now) plus the composition list and
-//  the layer-creation toolbar. The layer stack itself lives in the timeline.
+//  Left panel: project assets (empty for now) plus the composition list. The
+//  layer stack itself lives in the timeline.
 //
 
 import SwiftUI
 
 struct ProjectPanelView: View {
     let document: MotionDocument
-    let editorState: EditorState
-    let perform: (String, () -> Void) -> Void
+    let clearSelection: () -> Void
 
     var body: some View {
         let core = document.core
         let _ = core.revision
-        let compositionID = core.firstCompositionID
 
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Text("Project")
                     .font(.headline)
                 Spacer()
-                Button {
-                    perform("Add Rectangle") {
-                        editorState.selectedLayerID = core.addRectLayer(compositionID: compositionID)
-                    }
-                } label: {
-                    Image(systemName: "rectangle.badge.plus")
-                }
-                .accessibilityLabel("Add Rectangle")
-                Button {
-                    perform("Add Ellipse") {
-                        editorState.selectedLayerID = core.addEllipseLayer(compositionID: compositionID)
-                    }
-                } label: {
-                    Image(systemName: "circle.badge.plus")
-                }
-                .accessibilityLabel("Add Ellipse")
-                Button(role: .destructive) {
-                    guard let selected = editorState.selectedLayerID else { return }
-                    perform("Delete Layer") {
-                        core.removeLayer(compositionID: compositionID, layerID: selected)
-                    }
-                    editorState.selectedLayerID = nil
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .accessibilityLabel("Delete Layer")
-                .disabled(editorState.selectedLayerID == nil)
             }
-            .buttonStyle(.plain)
             .padding(8)
 
             Divider()
@@ -78,5 +48,7 @@ struct ProjectPanelView: View {
             }
             .listStyle(.sidebar)
         }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: clearSelection)
     }
 }
