@@ -1,0 +1,19 @@
+{
+    "include": [
+        "include/**",
+        "src/**",
+        "bridge/**",
+        "adapter/**",
+        "apps/MotionStudioApp/**",
+        "src/**",
+        "tests/**",
+        "third_party/tgfx/include/**",
+        "third_party/tgfx/ios/**",
+        "third_party/tgfx/mac/**",
+        "third_party/tgfx/src/**",
+        "third_party/tgfx/test/**"
+    ],
+    "exclude": [
+        "third_party/tgfx/third_party/**"
+    ]
+}
