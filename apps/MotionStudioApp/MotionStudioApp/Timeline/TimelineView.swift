@@ -267,6 +267,8 @@ private struct LayerRow: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
         let selected = editorState.selectedLayerID == layerID
         let visible = core.layerIsVisible(layerID)
         let locked = core.layerIsLocked(layerID)
@@ -615,6 +617,11 @@ private struct TimelineControls: View {
             } label: {
                 Image(systemName: editorState.isPlaying ? "pause.fill" : "play.fill")
             }
+            // Global space-to-play/pause; a window-level key equivalent so it
+            // fires regardless of which panel holds focus (the canvas
+            // included). A text field being edited consumes the space first.
+            .keyboardShortcut(.space, modifiers: [])
+
             Text("\(editorState.playheadFrame) / \(duration)")
                 .monospacedDigit()
                 .font(.callout)

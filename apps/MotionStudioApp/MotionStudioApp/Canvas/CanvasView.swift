@@ -17,6 +17,9 @@ struct CanvasView: UIViewRepresentable {
     let isPlaying: Bool
     let duration: Int64
     let frameRate: Double
+    /// Document revision; read so any model mutation (not just playhead moves)
+    /// re-evaluates this view and triggers updateUIView to redraw the canvas.
+    let revision: Int
     let onAdvancePlayhead: @MainActor (Int64) -> Void
 
     func makeCoordinator() -> Coordinator {

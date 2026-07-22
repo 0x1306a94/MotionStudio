@@ -57,7 +57,10 @@ private struct TransformInspector: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
         let position = core.staticVec2(entityID: layerID, path: "transform.position")
+        let scale = core.staticVec2(entityID: layerID, path: "transform.scale")
 
         NumberPropertyRow(label: "Position X",
                           value: Float(position.dx),
@@ -81,6 +84,30 @@ private struct TransformInspector: View {
             }
         } onAddKeyframe: { _ in
             addVec2Keyframe("transform.position")
+        }
+
+        NumberPropertyRow(label: "Scale X",
+                          value: Float(scale.dx),
+                          hasKeyframeAtPlayhead: hasKeyframe("transform.scale"))
+        { newValue in
+            perform("Set Scale") {
+                core.setStaticVec2(entityID: layerID, path: "transform.scale",
+                                   value: CGVector(dx: CGFloat(newValue), dy: scale.dy))
+            }
+        } onAddKeyframe: { _ in
+            addVec2Keyframe("transform.scale")
+        }
+
+        NumberPropertyRow(label: "Scale Y",
+                          value: Float(scale.dy),
+                          hasKeyframeAtPlayhead: hasKeyframe("transform.scale"))
+        { newValue in
+            perform("Set Scale") {
+                core.setStaticVec2(entityID: layerID, path: "transform.scale",
+                                   value: CGVector(dx: scale.dx, dy: CGFloat(newValue)))
+            }
+        } onAddKeyframe: { _ in
+            addVec2Keyframe("transform.scale")
         }
 
         NumberPropertyRow(label: "Rotation",
@@ -135,6 +162,8 @@ private struct ShapeSizeInspector: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
         let size = core.staticVec2(entityID: layerID, path: shapeSizePath)
 
         NumberPropertyRow(label: "Width",
@@ -191,8 +220,14 @@ private struct NumberPropertyRow: View {
             Text(label)
                 .font(.callout)
                 .frame(width: 78, alignment: .leading)
+            // Plain style + explicit border/background: the roundedBorder style
+            // renders too faintly to read as a field on Mac Catalyst.
             TextField("", value: $draft, format: .number.precision(.fractionLength(0 ... 2)))
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 5))
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.secondary.opacity(0.4)))
                 .onSubmit {
                     if draft != value {
                         onCommit(draft)

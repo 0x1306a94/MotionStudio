@@ -189,13 +189,17 @@ private struct CanvasContainer: View {
 
     var body: some View {
         let core = document.core
+        // Subscribe to the document revision so the canvas redraws on any model
+        // mutation (edits, keyframes, visibility), not only on playhead moves.
+        let revision = core.revision
         let compositionID = core.firstCompositionID
         CanvasView(core: core,
                    compositionID: compositionID,
                    playheadFrame: editorState.playheadFrame,
                    isPlaying: editorState.isPlaying,
                    duration: core.duration(compositionID: compositionID),
-                   frameRate: core.frameRate(compositionID: compositionID))
+                   frameRate: core.frameRate(compositionID: compositionID),
+                   revision: revision)
         { frame in
             editorState.playheadFrame = frame
         }

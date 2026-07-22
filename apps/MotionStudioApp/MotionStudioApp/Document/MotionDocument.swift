@@ -40,6 +40,7 @@ final class MotionDocument: ReferenceFileDocument {
 
     nonisolated init() {
         core = MotionDocumentCore()
+        bindChangeTracking()
     }
 
     nonisolated init(configuration: ReadConfiguration) throws {
@@ -47,6 +48,19 @@ final class MotionDocument: ReferenceFileDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
         core = try MotionDocumentCore(json: data)
+        bindChangeTracking()
+    }
+
+    /// Forwards every core mutation to objectWillChange so the document system
+    /// marks the document edited (title-bar dot, close prompt, Save enabling).
+    /// nonisolated so it can run from the nonisolated inits; the closure only
+    /// touches the nonisolated publisher and is invoked on the main actor.
+    private nonisolated func bindChangeTracking() {
+        core.onDidChange = { [weak self] in
+            Task { @MainActor in
+                self?.publisher.send()
+            }
+        }
     }
 
     /// Captures the snapshot off the main actor (bridge provides the lock).
@@ -55,9 +69,7 @@ final class MotionDocument: ReferenceFileDocument {
     }
 
     /// Runs in the background with the snapshot taken above.
-    nonisolated func fileWrapper(snapshot: Data,
-                                 configuration _: WriteConfiguration) throws -> FileWrapper
-    {
+    nonisolated func fileWrapper(snapshot: Data, configuration _: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: snapshot)
     }
 }
