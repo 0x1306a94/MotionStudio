@@ -518,22 +518,37 @@ private struct PlayheadLine: View {
     let x: CGFloat
 
     var body: some View {
-        // ZStack (not VStack) so the line starts at y=0 and the triangle is
-        // painted on top of it: the glyph's built-in bottom padding otherwise
-        // leaves a visible gap between the triangle tip and the line.
+        // The triangle is a hand-drawn shape (not an SF Symbol) so its top edge
+        // sits exactly at y=0, flush with the line top: a symbol glyph carries
+        // built-in top padding that made the line poke above the triangle. The
+        // triangle is drawn after the line so it covers the line's top, keeping
+        // the join seamless while their tops align.
         ZStack(alignment: .top) {
             Rectangle()
                 .fill(.blue)
                 .frame(width: 1.5)
                 .frame(maxHeight: .infinity, alignment: .top)
-            Image(systemName: "arrowtriangle.down.fill")
-                .foregroundStyle(.blue)
-                .font(.system(size: 9))
-                .frame(width: 9, height: 8)
+            PlayheadTriangle()
+                .fill(.blue)
+                .frame(width: 9, height: 7)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .fixedSize(horizontal: true, vertical: false)
         .offset(x: x - 4.5)
+    }
+}
+
+/// Downward triangle whose top edge spans the full frame width at y=0 and whose
+/// apex is centered at the bottom, so it can cap the playhead line with its top
+/// exactly flush to the line top.
+private struct PlayheadTriangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
