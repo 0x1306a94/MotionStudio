@@ -8,47 +8,36 @@
     import UIKit
 
     struct WindowSizeConfigurator: View {
-        let minimumWidthRatio: CGFloat
-        let minimumHeightRatio: CGFloat
-
         var body: some View {
-            WindowSizeRepresentable(
-                minimumWidthRatio: minimumWidthRatio,
-                minimumHeightRatio: minimumHeightRatio,
-            )
+            WindowSizeRepresentable()
         }
     }
 
     private struct WindowSizeRepresentable: UIViewRepresentable {
-        let minimumWidthRatio: CGFloat
-        let minimumHeightRatio: CGFloat
-
         func makeUIView(context _: Context) -> WindowSizeView {
-            let view = WindowSizeView()
-            view.minimumWidthRatio = minimumWidthRatio
-            view.minimumHeightRatio = minimumHeightRatio
-            return view
+            WindowSizeView()
         }
 
         func updateUIView(_ view: WindowSizeView, context _: Context) {
-            view.minimumWidthRatio = minimumWidthRatio
-            view.minimumHeightRatio = minimumHeightRatio
             view.applyWindowSizing()
         }
     }
 
     private final class WindowSizeView: UIView {
-        var minimumWidthRatio: CGFloat = 0
-        var minimumHeightRatio: CGFloat = 0
-
         private var canPersistWindowSize = false
+        private var initialWindowSize: CGSize?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
             applyWindowSizing()
 
             DispatchQueue.main.async { [weak self] in
-                self?.canPersistWindowSize = true
+                guard let self else {
+                    return
+                }
+
+                initialWindowSize = window?.bounds.size
+                canPersistWindowSize = true
             }
         }
 
@@ -58,22 +47,39 @@
         }
 
         func applyWindowSizing() {
-            guard let windowScene = window?.windowScene else { return }
+            guard let windowScene = window?.windowScene else {
+                return
+            }
 
             let screenSize = windowScene.screen.bounds.size
-            windowScene.sizeRestrictions?.minimumSize = CGSize(
-                width: screenSize.width * minimumWidthRatio,
-                height: screenSize.height * minimumHeightRatio,
+            windowScene.sizeRestrictions?.minimumSize = WindowSizeConfiguration.minimumSize(
+                for: screenSize,
             )
         }
 
         private func persistCurrentWindowSize() {
-            guard canPersistWindowSize, let window else { return }
+            guard canPersistWindowSize, let window else {
+                return
+            }
 
             let size = window.bounds.size
-            guard size.width > 0, size.height > 0 else { return }
+            guard size.width > 0, size.height > 0 else {
+                return
+            }
+            guard !matchesInitialWindowSize(size) else {
+                return
+            }
 
             WindowSizePersistence.save(size: size)
+        }
+
+        private func matchesInitialWindowSize(_ size: CGSize) -> Bool {
+            guard let initialWindowSize else {
+                return false
+            }
+
+            return abs(size.width - initialWindowSize.width) < 0.5
+                && abs(size.height - initialWindowSize.height) < 0.5
         }
     }
 

@@ -13,12 +13,7 @@ struct MotionStudioApp: App {
         DocumentGroup(newDocument: { MotionDocument() }) { file in
             EditorRootView(document: file.document, fileURL: file.fileURL)
             #if targetEnvironment(macCatalyst)
-                .background(
-                    WindowSizeConfigurator(
-                        minimumWidthRatio: WindowSizeConfiguration.minimumWidthRatio,
-                        minimumHeightRatio: WindowSizeConfiguration.minimumHeightRatio,
-                    ),
-                )
+                .background(WindowSizeConfigurator())
             #endif
         }
         #if targetEnvironment(macCatalyst)
