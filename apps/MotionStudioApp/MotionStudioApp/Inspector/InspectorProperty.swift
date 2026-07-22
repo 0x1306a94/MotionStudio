@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum TransformProperty: String {
+enum TransformProperty: String, CaseIterable {
     case position = "transform.position"
     case scale = "transform.scale"
     case rotation = "transform.rotation"

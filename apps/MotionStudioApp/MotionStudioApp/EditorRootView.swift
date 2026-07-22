@@ -251,6 +251,8 @@ struct EditorRootView: View {
 
     private func clearSelection() {
         editorState.selectedLayerID = nil
+        editorState.selectedTimelineProperty = nil
+        editorState.selectedTimelineSegment = nil
     }
 
     private func markSaved() {
@@ -377,6 +379,7 @@ private struct CanvasContainer: View {
                    isPlaying: editorState.isPlaying,
                    duration: core.duration(compositionID: compositionID),
                    frameRate: core.frameRate(compositionID: compositionID),
+                   previewBackdrop: editorState.previewBackdrop,
                    revision: revision)
         { frame in
             editorState.playheadFrame = frame

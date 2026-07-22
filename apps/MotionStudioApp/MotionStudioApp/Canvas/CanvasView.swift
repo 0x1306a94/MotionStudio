@@ -17,6 +17,7 @@ struct CanvasView: UIViewRepresentable {
     let isPlaying: Bool
     let duration: Int64
     let frameRate: Double
+    let previewBackdrop: PreviewBackdrop
     /// Document revision; read so any model mutation (not just playhead moves)
     /// re-evaluates this view and triggers updateUIView to redraw the canvas.
     let revision: Int
@@ -38,6 +39,7 @@ struct CanvasView: UIViewRepresentable {
         context.coordinator.sync(playheadFrame: playheadFrame,
                                  isPlaying: isPlaying,
                                  duration: duration,
+                                 previewBackdrop: previewBackdrop,
                                  view: view)
     }
 
@@ -54,6 +56,7 @@ struct CanvasView: UIViewRepresentable {
         private weak var canvasView: MTKView?
         private var playheadFrame: Int64 = 0
         private var duration: Int64 = 0
+        private var previewBackdrop: PreviewBackdrop = .transparent
         private var frameRate: Double
         private var carrySeconds: Double = 0
 
@@ -88,9 +91,15 @@ struct CanvasView: UIViewRepresentable {
             return view
         }
 
-        func sync(playheadFrame: Int64, isPlaying: Bool, duration: Int64, view: MTKView) {
+        func sync(playheadFrame: Int64,
+                  isPlaying: Bool,
+                  duration: Int64,
+                  previewBackdrop: PreviewBackdrop,
+                  view: MTKView)
+        {
             self.playheadFrame = playheadFrame
             self.duration = max(duration, 1)
+            self.previewBackdrop = previewBackdrop
             canvasView = view
             setPlaying(isPlaying)
             requestDraw(view: view)
@@ -111,6 +120,7 @@ struct CanvasView: UIViewRepresentable {
             guard let canvas else {
                 return
             }
+            ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
             core.drawFrame(canvas: canvas, compositionID: compositionID, frame: playheadFrame)
         }
 
