@@ -53,6 +53,8 @@ private struct TimeRangeTrackView: View {
     let editorState: EditorState
 
     var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
         let frames = timelineAnimatedPropertyPaths(core: core, layerID: layerID)
             .flatMap { core.keyframes(entityID: layerID, path: $0).map(\.frame) }
         let firstFrame = frames.min()
@@ -61,7 +63,7 @@ private struct TimeRangeTrackView: View {
         let centerY = layerRowHeight / 2
 
         ZStack(alignment: .topLeading) {
-            if let firstFrame, let lastFrame {
+            if let firstFrame, let lastFrame, firstFrame < lastFrame {
                 let startX = timelineX(for: firstFrame)
                 let endX = timelineX(for: lastFrame)
                 let spanWidth = max(endX - startX, 2)
@@ -89,13 +91,14 @@ private struct PropertyTrackView: View {
     let editorState: EditorState
 
     var body: some View {
-        let keyframes = core.keyframes(entityID: layerID, path: path)
-        let frames = keyframes.map(\.frame)
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
+        let frames = core.keyframes(entityID: layerID, path: path).map(\.frame)
         let firstFrame = frames.min()
         let lastFrame = frames.max()
 
         ZStack(alignment: .topLeading) {
-            if let firstFrame, let lastFrame {
+            if let firstFrame, let lastFrame, firstFrame < lastFrame {
                 let startX = timelineX(for: firstFrame)
                 let endX = timelineX(for: lastFrame)
                 let spanWidth = max(endX - startX, 2)
@@ -189,6 +192,8 @@ private struct ManualKeyframeTrackView: View {
     let registerEdit: (String) -> Void
 
     var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
         let keyframes = core.keyframes(entityID: layerID, path: path).sorted { $0.frame < $1.frame }
         let segments = zip(keyframes, keyframes.dropFirst()).map(KeyframeSegment.init)
 

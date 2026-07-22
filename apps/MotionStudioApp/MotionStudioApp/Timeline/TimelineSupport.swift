@@ -23,8 +23,8 @@ let timelineShapeSizePath = "elements[0].size"
 func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) -> [String] {
     var paths = TransformProperty.allCases
         .map(\.path)
-        .filter { core.isAnimated(entityID: layerID, path: $0) }
-    if core.isAnimated(entityID: layerID, path: timelineShapeSizePath) {
+        .filter { !core.keyframes(entityID: layerID, path: $0).isEmpty }
+    if !core.keyframes(entityID: layerID, path: timelineShapeSizePath).isEmpty {
         paths.append(timelineShapeSizePath)
     }
     return paths
@@ -33,7 +33,7 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
 func timelineUsesManualKeyframeTrack(core: MotionDocumentCore, layerID: UInt64,
                                      path: String) -> Bool
 {
-    core.keyframes(entityID: layerID, path: path).count > 1
+    !core.keyframes(entityID: layerID, path: path).isEmpty
 }
 
 func timelineX(for frame: Int64) -> CGFloat {
