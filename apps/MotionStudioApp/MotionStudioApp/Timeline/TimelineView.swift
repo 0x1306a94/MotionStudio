@@ -518,14 +518,18 @@ private struct PlayheadLine: View {
     let x: CGFloat
 
     var body: some View {
-        VStack(spacing: 0) {
+        // ZStack (not VStack) so the line starts at y=0 and the triangle is
+        // painted on top of it: the glyph's built-in bottom padding otherwise
+        // leaves a visible gap between the triangle tip and the line.
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(.blue)
+                .frame(width: 1.5)
+                .frame(maxHeight: .infinity, alignment: .top)
             Image(systemName: "arrowtriangle.down.fill")
                 .foregroundStyle(.blue)
                 .font(.system(size: 9))
                 .frame(width: 9, height: 8)
-            Rectangle()
-                .fill(.blue)
-                .frame(width: 1.5)
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .fixedSize(horizontal: true, vertical: false)

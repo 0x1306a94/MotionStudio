@@ -25,7 +25,7 @@ struct EditorRootView: View {
     var body: some View {
         GeometryReader { proxy in
             let minHeight: CGFloat = 140
-            let maxHeight = max(minHeight, proxy.size.height * 0.7)
+            let maxHeight = max(minHeight, ceil(proxy.size.height * 0.35))
             let clampedTimeline = min(max(timelineHeight, minHeight), maxHeight)
             // HSplitView sizes to its content's ideal height, so give the top
             // region an explicit height or the three columns collapse and float.
@@ -141,14 +141,30 @@ private struct TimelineResizeHandle: View {
     let minHeight: CGFloat
     let maxHeight: CGFloat
     @GestureState private var startHeight: CGFloat?
+    @State private var isHovering = false
+
+    private var isDragging: Bool {
+        startHeight != nil
+    }
+
+    private var isActive: Bool {
+        isHovering || isDragging
+    }
 
     var body: some View {
         ZStack {
-            Rectangle().fill(Color.secondary.opacity(0.15))
+            Rectangle()
+                .fill(isActive ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.15))
             Rectangle().fill(.separator).frame(height: 1)
+            // Grabber pill: the visual affordance that the strip is a draggable
+            // resize handle. Brightens on hover/drag so the interaction reads.
+            Capsule()
+                .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.5))
+                .frame(width: 36, height: 3)
         }
         .frame(height: handleHeight)
         .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
         .gesture(
             DragGesture(minimumDistance: 0)
                 .updating($startHeight) { _, state, _ in
