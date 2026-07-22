@@ -65,6 +65,7 @@ private struct PlayheadTriangle: Shape {
 struct KeyframeDiamond: View {
     let keyframe: KeyframeInfo
     let duration: Int64
+    let pointsPerFrame: CGFloat
     let isSelected: Bool
     let onMove: (Int64, Int64) -> Void
     let onMoveEnded: () -> Void
@@ -83,7 +84,7 @@ struct KeyframeDiamond: View {
             .frame(width: 20, height: propertyRowHeight)
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }
-            .position(x: timelineX(for: keyframe.frame), y: propertyRowHeight / 2)
+            .position(x: timelineX(for: keyframe.frame, pointsPerFrame: pointsPerFrame), y: propertyRowHeight / 2)
             .gesture(
                 DragGesture()
                     .onChanged { value in
@@ -92,7 +93,7 @@ struct KeyframeDiamond: View {
                         }
                         guard let start = dragStartFrame else { return }
                         let target = Int64(
-                            (CGFloat(start) + value.translation.width / pixelsPerFrame).rounded(),
+                            (CGFloat(start) + value.translation.width / pointsPerFrame).rounded(),
                         )
                         let clamped = min(max(target, 0), duration)
                         if clamped != keyframe.frame {

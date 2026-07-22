@@ -11,6 +11,7 @@ struct TrackRow: View {
     let core: MotionDocumentCore
     let row: TimelineRow
     let duration: Int64
+    let pointsPerFrame: CGFloat
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
@@ -19,6 +20,7 @@ struct TrackRow: View {
         switch row.kind {
         case .layer:
             TimeRangeTrackView(core: core, layerID: row.layerID,
+                               pointsPerFrame: pointsPerFrame,
                                isSelected: editorState.selectedLayerID == row.layerID,
                                editorState: editorState)
 
@@ -27,6 +29,7 @@ struct TrackRow: View {
                               layerID: row.layerID,
                               path: path,
                               label: label,
+                              pointsPerFrame: pointsPerFrame,
                               isSelected: isLayerSelected || editorState.selectedTimelineProperty == TimelinePropertySelection(layerID: row.layerID, path: path),
                               editorState: editorState)
 
@@ -35,6 +38,7 @@ struct TrackRow: View {
                                     layerID: row.layerID,
                                     path: path,
                                     duration: duration,
+                                    pointsPerFrame: pointsPerFrame,
                                     isTrackSelected: isLayerSelected,
                                     editorState: editorState,
                                     perform: perform,
@@ -50,6 +54,7 @@ struct TrackRow: View {
 private struct TimeRangeTrackView: View {
     let core: MotionDocumentCore
     let layerID: UInt64
+    let pointsPerFrame: CGFloat
     let isSelected: Bool
     let editorState: EditorState
 
@@ -65,8 +70,8 @@ private struct TimeRangeTrackView: View {
 
         ZStack(alignment: .topLeading) {
             if let firstFrame, let lastFrame, firstFrame < lastFrame {
-                let startX = timelineX(for: firstFrame)
-                let endX = timelineX(for: lastFrame)
+                let startX = timelineX(for: firstFrame, pointsPerFrame: pointsPerFrame)
+                let endX = timelineX(for: lastFrame, pointsPerFrame: pointsPerFrame)
                 let spanWidth = max(endX - startX, 2)
                 TimeRangeBarBody(isSelected: isSelected)
                     .frame(width: spanWidth, height: barHeight)
@@ -88,6 +93,7 @@ private struct PropertyTrackView: View {
     let layerID: UInt64
     let path: String
     let label: String
+    let pointsPerFrame: CGFloat
     let isSelected: Bool
     let editorState: EditorState
 
@@ -100,8 +106,8 @@ private struct PropertyTrackView: View {
 
         ZStack(alignment: .topLeading) {
             if let firstFrame, let lastFrame, firstFrame < lastFrame {
-                let startX = timelineX(for: firstFrame)
-                let endX = timelineX(for: lastFrame)
+                let startX = timelineX(for: firstFrame, pointsPerFrame: pointsPerFrame)
+                let endX = timelineX(for: lastFrame, pointsPerFrame: pointsPerFrame)
                 let spanWidth = max(endX - startX, 2)
                 PropertyTrackBar(label: label, isSelected: isSelected)
                     .frame(width: spanWidth, height: propertyRowHeight - 8)
@@ -187,6 +193,7 @@ private struct ManualKeyframeTrackView: View {
     let layerID: UInt64
     let path: String
     let duration: Int64
+    let pointsPerFrame: CGFloat
     let isTrackSelected: Bool
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
@@ -204,12 +211,14 @@ private struct ManualKeyframeTrackView: View {
                 KeyframeConnectionSegment(layerID: layerID,
                                           path: path,
                                           segment: segment,
+                                          pointsPerFrame: pointsPerFrame,
                                           isTrackSelected: isTrackSelected,
                                           editorState: editorState)
             }
             ForEach(keyframes) { keyframe in
                 KeyframeDiamond(keyframe: keyframe,
                                 duration: duration,
+                                pointsPerFrame: pointsPerFrame,
                                 isSelected: isKeyframeSelected(keyframe.frame))
                 { from, to in
                     core.moveKeyframe(entityID: layerID, path: path, from: from, to: to)
@@ -258,13 +267,14 @@ private struct KeyframeConnectionSegment: View {
     let layerID: UInt64
     let path: String
     let segment: KeyframeSegment
+    let pointsPerFrame: CGFloat
     let isTrackSelected: Bool
     let editorState: EditorState
     @State private var isHovering = false
 
     var body: some View {
-        let startX = timelineX(for: segment.start.frame)
-        let endX = timelineX(for: segment.end.frame)
+        let startX = timelineX(for: segment.start.frame, pointsPerFrame: pointsPerFrame)
+        let endX = timelineX(for: segment.end.frame, pointsPerFrame: pointsPerFrame)
         let width = max(endX - startX, 2)
         let centerY = propertyRowHeight / 2
         let selected = isSelected || isTrackSelected
@@ -322,6 +332,7 @@ private struct EasingSegmentBadge: View {
 struct RulerCanvas: View {
     let duration: Int64
     let frameRate: Double
+    let pointsPerFrame: CGFloat
 
     var body: some View {
         Canvas { context, _ in
@@ -329,7 +340,7 @@ struct RulerCanvas: View {
             let second = max(Int(frameRate.rounded()), 1)
             let step = max(second / 2, 1)
             for frame in stride(from: 0, through: total, by: step) {
-                let x = timelineX(for: Int64(frame))
+                let x = timelineX(for: Int64(frame), pointsPerFrame: pointsPerFrame)
                 let isSecond = frame % second == 0
                 var tick = Path()
                 tick.move(to: CGPoint(x: x, y: isSecond ? 8 : 14))

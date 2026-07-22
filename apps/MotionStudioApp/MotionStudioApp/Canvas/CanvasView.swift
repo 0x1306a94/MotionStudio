@@ -105,6 +105,7 @@ struct CanvasView: UIViewRepresentable {
             view.isPaused = true
             view.enableSetNeedsDisplay = true
             view.framebufferOnly = true
+            view.autoResizeDrawable = true
             view.preferredFramesPerSecond = max(1, Int(frameRate.rounded()))
             view.delegate = self
             return view
@@ -138,7 +139,10 @@ struct CanvasView: UIViewRepresentable {
 
         // MARK: - MTKViewDelegate
 
-        func mtkView(_: MTKView, drawableSizeWillChange _: CGSize) {}
+        func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+            guard size.width > 0, size.height > 0 else { return }
+            requestDraw(view: view)
+        }
 
         func draw(in view: MTKView) {
             let drawStartTime = CACurrentMediaTime()

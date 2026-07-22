@@ -36,12 +36,12 @@ func timelineUsesManualKeyframeTrack(core: MotionDocumentCore, layerID: UInt64,
     !core.keyframes(entityID: layerID, path: path).isEmpty
 }
 
-func timelineX(for frame: Int64) -> CGFloat {
-    CGFloat(frame) * pixelsPerFrame
+func timelineX(for frame: Int64, pointsPerFrame: CGFloat = pixelsPerFrame) -> CGFloat {
+    CGFloat(frame) * pointsPerFrame
 }
 
-func timelineX(for frame: CGFloat) -> CGFloat {
-    frame * pixelsPerFrame
+func timelineX(for frame: CGFloat, pointsPerFrame: CGFloat = pixelsPerFrame) -> CGFloat {
+    frame * pointsPerFrame
 }
 
 /// One row of the flattened timeline model. Both the left tree and the right

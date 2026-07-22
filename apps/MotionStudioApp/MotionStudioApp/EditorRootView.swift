@@ -2,9 +2,8 @@
 //  EditorRootView.swift
 //  MotionStudioApp
 //
-//  After-Effects-style four-region layout: project panel (left), composition
-//  preview (center), inspector (right) and a vertically resizable timeline
-//  (bottom). On compact width the side panels move to sheets.
+//  Editor workspace layout. Mac Catalyst keeps the desktop-style three-column
+//  arrangement; iPadOS keeps the canvas primary and opens side tools as panels.
 //
 
 import SwiftUI
@@ -24,7 +23,6 @@ struct EditorRootView: View {
     @State private var currentFileURL: URL?
     @State private var savedRevision: Int?
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var showProject = false
@@ -35,58 +33,57 @@ struct EditorRootView: View {
             let minHeight: CGFloat = 140
             let maxHeight = max(minHeight, ceil(proxy.size.height * 0.35))
             let clampedTimeline = min(max(timelineHeight, minHeight), maxHeight)
-            // HSplitView sizes to its content's ideal height, so give the top
-            // region an explicit height or the three columns collapse and float.
             let topHeight = max(0, proxy.size.height - handleHeight - clampedTimeline)
-            VStack(alignment: .leading, spacing: 0) {
-                topColumns(height: topHeight)
-                    .frame(maxWidth: .infinity)
-                TimelineResizeHandle(height: $timelineHeight,
-                                     minHeight: minHeight,
-                                     maxHeight: maxHeight)
-                TimelineView(document: document,
-                             editorState: editorState,
-                             perform: perform,
-                             registerEdit: registerEdit,
-                             clearSelection: clearSelection)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: clampedTimeline)
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    topWorkspace(height: topHeight)
+                        .frame(maxWidth: .infinity)
+                    TimelineResizeHandle(height: $timelineHeight,
+                                         minHeight: minHeight,
+                                         maxHeight: maxHeight)
+                    TimelineView(document: document,
+                                 editorState: editorState,
+                                 perform: perform,
+                                 registerEdit: registerEdit,
+                                 clearSelection: clearSelection)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: clampedTimeline)
+                }
+                .zIndex(0)
+
+                floatingPanelOverlay(size: proxy.size)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .zIndex(1)
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .toolbar {
-            if horizontalSizeClass == .compact {
+            #if !targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { showProject = true } label: {
+                    Button {
+                        showInspector = false
+                        showProject.toggle()
+                    } label: {
                         Label("Project", systemImage: "folder")
                     }
+                    .accessibilityLabel("Toggle Project Panel")
                 }
-            }
+            #endif
             ToolbarItemGroup(placement: .topBarTrailing) {
                 #if !targetEnvironment(macCatalyst)
                     layerCreationMenu
                     saveButton
                 #endif
-                if horizontalSizeClass == .compact {
-                    Button { showInspector = true } label: {
+                #if !targetEnvironment(macCatalyst)
+                    Button {
+                        showProject = false
+                        showInspector.toggle()
+                    } label: {
                         Label("Inspector", systemImage: "slider.horizontal.3")
                     }
-                }
+                    .accessibilityLabel("Toggle Inspector Panel")
+                #endif
                 UnsavedChangesIndicator(isVisible: hasUnsavedChanges)
-            }
-        }
-        .sheet(isPresented: $showProject) {
-            NavigationStack {
-                ProjectPanelView(document: document, clearSelection: clearSelection)
-                    .navigationTitle("Project")
-            }
-        }
-        .sheet(isPresented: $showInspector) {
-            NavigationStack {
-                InspectorView(document: document,
-                              editorState: editorState,
-                              perform: perform)
-                    .navigationTitle("Inspector")
             }
         }
         .onAppear {
@@ -186,13 +183,9 @@ struct EditorRootView: View {
         .accessibilityLabel("Save")
     }
 
-    /// HSplitView/HStack size vertically to their columns' content height and
-    /// ignore an outer height frame, so each column is pinned to the region's
-    /// height here; that forces the container to fill it (otherwise the columns
-    /// collapse and float centered, which is what produced the empty bands).
     @ViewBuilder
-    private func topColumns(height: CGFloat) -> some View {
-        if horizontalSizeClass == .regular {
+    private func topWorkspace(height: CGFloat) -> some View {
+        #if targetEnvironment(macCatalyst)
             HStack(alignment: .top, spacing: 0) {
                 ProjectPanelView(document: document, clearSelection: clearSelection)
                     .frame(width: 220, height: height)
@@ -206,13 +199,59 @@ struct EditorRootView: View {
                 InspectorView(document: document, editorState: editorState, perform: perform)
                     .frame(width: 280, height: height)
             }
-        } else {
+        #else
             CanvasContainer(document: document,
                             editorState: editorState,
                             clearSelection: clearSelection)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
-        }
+        #endif
+    }
+
+    @ViewBuilder
+    private func floatingPanelOverlay(size: CGSize) -> some View {
+        #if !targetEnvironment(macCatalyst)
+            if showProject || showInspector {
+                ZStack(alignment: showProject ? .leading : .trailing) {
+                    Color.black.opacity(0.18)
+                        .onTapGesture {
+                            showProject = false
+                            showInspector = false
+                        }
+
+                    if showProject {
+                        FloatingEditorPanel(title: "Project",
+                                            systemImage: "folder",
+                                            dismiss: { showProject = false })
+                        {
+                            ProjectPanelView(document: document, clearSelection: clearSelection)
+                        }
+                        .frame(width: floatingPanelWidth(for: size, preferred: 300), height: size.height)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+
+                    if showInspector {
+                        FloatingEditorPanel(title: "Inspector",
+                                            systemImage: "slider.horizontal.3",
+                                            dismiss: { showInspector = false })
+                        {
+                            InspectorView(document: document,
+                                          editorState: editorState,
+                                          perform: perform)
+                        }
+                        .frame(width: floatingPanelWidth(for: size, preferred: 340), height: size.height)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                }
+                .frame(width: size.width, height: size.height)
+                .animation(.easeInOut(duration: 0.18), value: showProject)
+                .animation(.easeInOut(duration: 0.18), value: showInspector)
+            }
+        #endif
+    }
+
+    private func floatingPanelWidth(for size: CGSize, preferred: CGFloat) -> CGFloat {
+        min(preferred, max(260, floor(size.width * 0.82)))
     }
 
     // MARK: - Saving
@@ -325,6 +364,42 @@ struct EditorRootView: View {
             }
             registerInverse(redo: !redo, undoManager: undoManager)
         }
+    }
+}
+
+private struct FloatingEditorPanel<Content: View>: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let dismiss: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Label(title, systemImage: systemImage)
+                    .font(.headline)
+                Spacer()
+                Button(action: dismiss) {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Close")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(.regularMaterial)
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(.separator)
+                .frame(width: 1)
+        }
+        .shadow(color: .black.opacity(0.22), radius: 18, x: 0, y: 8)
     }
 }
 

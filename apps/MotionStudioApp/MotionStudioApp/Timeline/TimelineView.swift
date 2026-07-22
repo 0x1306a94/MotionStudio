@@ -34,86 +34,99 @@ struct TimelineView: View {
         let frameRate = core.frameRate(compositionID: compositionID)
         let layerIDs = Array(core.layerIDs(compositionID: compositionID).reversed())
         let rows = buildRows(core: core, layerIDs: layerIDs, editorState: editorState)
-        let trackWidth = max(CGFloat(duration) * pixelsPerFrame, 1)
-        let playheadX = timelineX(for: editorState.playheadFrame)
 
-        VStack(alignment: .leading, spacing: 0) {
-            TimelineControls(editorState: editorState, duration: duration)
-            Divider()
-            // Header + body share overlay handles so vertical markers stay
-            // continuous instead of appearing split across the pinned header and
-            // scrolling body.
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: 0) {
-                    HStack(alignment: .top, spacing: 0) {
-                        LayerColumnHeader()
-                            .frame(width: layerColumnWidth, height: rulerHeight)
-                        splitDividerHitArea(height: rulerHeight)
-                        Color.clear
-                            .frame(width: trackLeadingInset, height: rulerHeight)
-                        RulerCanvas(duration: duration, frameRate: frameRate)
-                            .frame(width: trackWidth, height: rulerHeight)
-                            .contentShape(Rectangle())
-                            .gesture(scrubGesture(duration: duration))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Divider()
-                    GeometryReader { scrollProxy in
-                        ScrollView(.vertical) {
-                            HStack(alignment: .top, spacing: 0) {
-                                LayerColumn(core: core, rows: rows, editorState: editorState,
-                                            perform: perform, clearSelection: clearSelection)
-                                    .frame(width: layerColumnWidth)
-                                    .frame(maxHeight: .infinity, alignment: .top)
-                                splitDividerHitArea()
-                                Color.clear
-                                    .frame(width: trackLeadingInset)
-                                ZStack(alignment: .topLeading) {
-                                    Color.clear
-                                        .contentShape(Rectangle())
-                                        .onTapGesture(perform: clearSelection)
-                                    VStack(spacing: 0) {
-                                        ForEach(rows) { row in
-                                            TrackRow(core: core,
-                                                     row: row,
-                                                     duration: duration,
-                                                     editorState: editorState,
-                                                     perform: perform,
-                                                     registerEdit: registerEdit)
-                                                .frame(height: row.height)
-                                        }
-                                    }
-                                    Rectangle()
-                                        .fill(Color.clear)
-                                        .contentShape(Rectangle())
-                                        .frame(width: 12)
-                                        .frame(maxHeight: .infinity)
-                                        .offset(x: playheadX - 6)
-                                        .onHover { isPlayheadHovering = $0 }
-                                        .gesture(playheadDrag(duration: duration))
-                                }
-                                .frame(width: trackWidth)
-                                .frame(maxHeight: .infinity, alignment: .top)
-                                .coordinateSpace(name: "tracks")
-                            }
-                            .frame(maxWidth: .infinity, minHeight: scrollProxy.size.height,
-                                   alignment: .topLeading)
+        GeometryReader { proxy in
+            let trackViewportWidth = max(1, proxy.size.width - layerColumnWidth - splitDividerWidth - trackLeadingInset)
+            let pointsPerFrame = pointsPerFrame(duration: duration, availableWidth: trackViewportWidth)
+            let trackWidth = max(CGFloat(duration) * pointsPerFrame, trackViewportWidth)
+            let playheadX = timelineX(for: editorState.playheadFrame, pointsPerFrame: pointsPerFrame)
+
+            VStack(alignment: .leading, spacing: 0) {
+                TimelineControls(editorState: editorState, duration: duration)
+                Divider()
+                // Header + body share overlay handles so vertical markers stay
+                // continuous instead of appearing split across the pinned header and
+                // scrolling body.
+                ZStack(alignment: .topLeading) {
+                    VStack(spacing: 0) {
+                        HStack(alignment: .top, spacing: 0) {
+                            LayerColumnHeader()
+                                .frame(width: layerColumnWidth, height: rulerHeight)
+                            splitDividerHitArea(height: rulerHeight)
+                            Color.clear
+                                .frame(width: trackLeadingInset, height: rulerHeight)
+                            RulerCanvas(duration: duration,
+                                        frameRate: frameRate,
+                                        pointsPerFrame: pointsPerFrame)
+                                .frame(width: trackWidth, height: rulerHeight)
+                                .contentShape(Rectangle())
+                                .gesture(scrubGesture(duration: duration,
+                                                      pointsPerFrame: pointsPerFrame))
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .clipped()
+                        Divider()
+                        GeometryReader { scrollProxy in
+                            ScrollView(.vertical) {
+                                HStack(alignment: .top, spacing: 0) {
+                                    LayerColumn(core: core, rows: rows, editorState: editorState,
+                                                perform: perform, clearSelection: clearSelection)
+                                        .frame(width: layerColumnWidth)
+                                        .frame(maxHeight: .infinity, alignment: .top)
+                                    splitDividerHitArea()
+                                    Color.clear
+                                        .frame(width: trackLeadingInset)
+                                    ZStack(alignment: .topLeading) {
+                                        Color.clear
+                                            .contentShape(Rectangle())
+                                            .onTapGesture(perform: clearSelection)
+                                        VStack(spacing: 0) {
+                                            ForEach(rows) { row in
+                                                TrackRow(core: core,
+                                                         row: row,
+                                                         duration: duration,
+                                                         pointsPerFrame: pointsPerFrame,
+                                                         editorState: editorState,
+                                                         perform: perform,
+                                                         registerEdit: registerEdit)
+                                                    .frame(height: row.height)
+                                            }
+                                        }
+                                        Rectangle()
+                                            .fill(Color.clear)
+                                            .contentShape(Rectangle())
+                                            .frame(width: 12)
+                                            .frame(maxHeight: .infinity)
+                                            .offset(x: playheadX - 6)
+                                            .onHover { isPlayheadHovering = $0 }
+                                            .gesture(playheadDrag(duration: duration,
+                                                                  pointsPerFrame: pointsPerFrame))
+                                    }
+                                    .frame(width: trackWidth)
+                                    .frame(maxHeight: .infinity, alignment: .top)
+                                    .coordinateSpace(name: "tracks")
+                                }
+                                .frame(maxWidth: .infinity, minHeight: scrollProxy.size.height,
+                                       alignment: .topLeading)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                     }
-                }
-                GeometryReader { proxy in
-                    HorizontalSplitDivider(width: splitDividerWidth,
-                                           isActive: isSplitDividerActive)
-                        .frame(width: splitDividerWidth, height: proxy.size.height)
-                        .offset(x: layerColumnWidth)
+                    GeometryReader { proxy in
+                        HorizontalSplitDivider(width: splitDividerWidth,
+                                               isActive: isSplitDividerActive)
+                            .frame(width: splitDividerWidth, height: proxy.size.height)
+                            .offset(x: layerColumnWidth)
+                            .allowsHitTesting(false)
+                    }
+                    PlayheadLine(x: layerColumnWidth + splitDividerWidth + trackLeadingInset + playheadX,
+                                 isHovering: isPlayheadHovering)
                         .allowsHitTesting(false)
                 }
-                PlayheadLine(x: layerColumnWidth + splitDividerWidth + trackLeadingInset + playheadX,
-                             isHovering: isPlayheadHovering)
-                    .allowsHitTesting(false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.primary.opacity(0.04))
@@ -153,18 +166,23 @@ struct TimelineView: View {
                            kind: .propertySpan(path: path, label: label))
     }
 
-    private func scrubGesture(duration: Int64) -> some Gesture {
+    private func pointsPerFrame(duration: Int64, availableWidth: CGFloat) -> CGFloat {
+        let totalFrames = CGFloat(max(duration, 1))
+        return min(pixelsPerFrame, max(1, availableWidth / totalFrames))
+    }
+
+    private func scrubGesture(duration: Int64, pointsPerFrame: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                let frame = Int64((value.location.x / pixelsPerFrame).rounded())
+                let frame = Int64((value.location.x / pointsPerFrame).rounded())
                 editorState.playheadFrame = min(max(frame, 0), duration)
             }
     }
 
-    private func playheadDrag(duration: Int64) -> some Gesture {
+    private func playheadDrag(duration: Int64, pointsPerFrame: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("tracks"))
             .onChanged { value in
-                let frame = Int64((value.location.x / pixelsPerFrame).rounded())
+                let frame = Int64((value.location.x / pointsPerFrame).rounded())
                 editorState.playheadFrame = min(max(frame, 0), duration)
             }
     }
