@@ -14,6 +14,7 @@ struct SceneState {
     int viewportWidth = 0;
     int viewportHeight = 0;
     Color backgroundColor;
+    float cornerRadius = 0.0f;
 };
 
 }  // namespace motion

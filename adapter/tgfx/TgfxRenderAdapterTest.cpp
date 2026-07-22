@@ -77,7 +77,7 @@ TEST(TgfxRenderAdapterTest, FillsRectOverBackground) {
     layer.shapeItems.push_back(item);
     state.layers.push_back(std::move(layer));
 
-    adapter->beginFrame(100, 100, state.backgroundColor);
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
     PlayCommands(BuildCommands(state), *adapter);
     adapter->endFrame();
 
@@ -112,7 +112,7 @@ TEST(TgfxRenderAdapterTest, LayerOpacityBlendsWithBackground) {
     layer.shapeItems.push_back(item);
     state.layers.push_back(std::move(layer));
 
-    adapter->beginFrame(100, 100, state.backgroundColor);
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
     PlayCommands(BuildCommands(state), *adapter);
     adapter->endFrame();
 
@@ -142,7 +142,7 @@ TEST(TgfxRenderAdapterTest, StrokeDrawsAlongPath) {
     layer.shapeItems.push_back(item);
     state.layers.push_back(std::move(layer));
 
-    adapter->beginFrame(100, 100, state.backgroundColor);
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
     PlayCommands(BuildCommands(state), *adapter);
     adapter->endFrame();
 
@@ -184,7 +184,7 @@ TEST(TgfxRenderAdapterTest, RendersDocumentPipelineEndToEnd) {
     ASSERT_TRUE(state.hasValue());
 
     adapter->beginFrame(state->viewportWidth, state->viewportHeight,
-                        state->backgroundColor);
+                        state->backgroundColor, state->cornerRadius);
     PlayCommands(BuildCommands(*state), *adapter);
     adapter->endFrame();
 

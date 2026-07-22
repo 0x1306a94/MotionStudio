@@ -34,6 +34,16 @@ TEST(BridgeDocumentTest, CreateHasDefaultComposition) {
     EXPECT_EQ(ms_composition_frame_rate_num(document, compositionId), 30);
     EXPECT_EQ(ms_composition_frame_rate_den(document, compositionId), 1);
     EXPECT_EQ(ms_composition_layer_count(document, compositionId), 0);
+    float r = 1.0f;
+    float g = 1.0f;
+    float b = 1.0f;
+    float a = 0.0f;
+    ms_composition_background_color(document, compositionId, &r, &g, &b, &a);
+    EXPECT_FLOAT_EQ(r, 0.0f);
+    EXPECT_FLOAT_EQ(g, 0.0f);
+    EXPECT_FLOAT_EQ(b, 0.0f);
+    EXPECT_FLOAT_EQ(a, 1.0f);
+    EXPECT_FLOAT_EQ(ms_composition_corner_radius(document, compositionId), 0.0f);
 
     ms_document_destroy(document);
 }
@@ -118,6 +128,84 @@ TEST(BridgeCommandTest, SetStaticValueUndoRedo) {
     EXPECT_FLOAT_EQ(ms_property_static_float(document, layerId, "transform.rotation"), 0.0f);
     EXPECT_TRUE(ms_document_redo(document));
     EXPECT_FLOAT_EQ(ms_property_static_float(document, layerId, "transform.rotation"), 45.0f);
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCommandTest, CompositionAppearanceCommandsUndoRedo) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+
+    ms_command_set_composition_background_color(document, compositionId, 0.1f, 0.2f, 0.3f, 0.4f);
+    ms_command_set_composition_corner_radius(document, compositionId, 24.0f);
+    ms_document_end_merge_group(document);
+
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+    float a = 0.0f;
+    ms_composition_background_color(document, compositionId, &r, &g, &b, &a);
+    EXPECT_FLOAT_EQ(r, 0.1f);
+    EXPECT_FLOAT_EQ(g, 0.2f);
+    EXPECT_FLOAT_EQ(b, 0.3f);
+    EXPECT_FLOAT_EQ(a, 0.4f);
+    EXPECT_FLOAT_EQ(ms_composition_corner_radius(document, compositionId), 24.0f);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_FLOAT_EQ(ms_composition_corner_radius(document, compositionId), 0.0f);
+    EXPECT_TRUE(ms_document_undo(document));
+    ms_composition_background_color(document, compositionId, &r, &g, &b, &a);
+    EXPECT_FLOAT_EQ(r, 0.0f);
+    EXPECT_FLOAT_EQ(g, 0.0f);
+    EXPECT_FLOAT_EQ(b, 0.0f);
+    EXPECT_FLOAT_EQ(a, 1.0f);
+
+    EXPECT_TRUE(ms_document_redo(document));
+    ms_composition_background_color(document, compositionId, &r, &g, &b, &a);
+    EXPECT_FLOAT_EQ(r, 0.1f);
+    EXPECT_FLOAT_EQ(g, 0.2f);
+    EXPECT_FLOAT_EQ(b, 0.3f);
+    EXPECT_FLOAT_EQ(a, 0.4f);
+    EXPECT_TRUE(ms_document_redo(document));
+    EXPECT_FLOAT_EQ(ms_composition_corner_radius(document, compositionId), 24.0f);
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCommandTest, CompositionSettingsCommandsUndoRedo) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+
+    ms_command_set_composition_size(document, compositionId, 1280, 720);
+    ms_document_end_merge_group(document);
+    ms_command_set_composition_duration(document, compositionId, 240);
+    ms_document_end_merge_group(document);
+    ms_command_set_composition_frame_rate(document, compositionId, 30000, 1001);
+    ms_document_end_merge_group(document);
+
+    EXPECT_EQ(ms_composition_width(document, compositionId), 1280);
+    EXPECT_EQ(ms_composition_height(document, compositionId), 720);
+    EXPECT_EQ(ms_composition_duration(document, compositionId), 240);
+    EXPECT_EQ(ms_composition_frame_rate_num(document, compositionId), 30000);
+    EXPECT_EQ(ms_composition_frame_rate_den(document, compositionId), 1001);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_composition_frame_rate_num(document, compositionId), 30);
+    EXPECT_EQ(ms_composition_frame_rate_den(document, compositionId), 1);
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_composition_duration(document, compositionId), 150);
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_composition_width(document, compositionId), 1920);
+    EXPECT_EQ(ms_composition_height(document, compositionId), 1080);
+
+    EXPECT_TRUE(ms_document_redo(document));
+    EXPECT_EQ(ms_composition_width(document, compositionId), 1280);
+    EXPECT_EQ(ms_composition_height(document, compositionId), 720);
+    EXPECT_TRUE(ms_document_redo(document));
+    EXPECT_EQ(ms_composition_duration(document, compositionId), 240);
+    EXPECT_TRUE(ms_document_redo(document));
+    EXPECT_EQ(ms_composition_frame_rate_num(document, compositionId), 30000);
+    EXPECT_EQ(ms_composition_frame_rate_den(document, compositionId), 1001);
 
     ms_document_destroy(document);
 }

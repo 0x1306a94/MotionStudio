@@ -23,6 +23,9 @@
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/SetCompositionBackgroundColorCommand.h"
+#include "MotionStudio/undo/SetCompositionCornerRadiusCommand.h"
+#include "MotionStudio/undo/SetCompositionSettingsCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
@@ -359,6 +362,33 @@ int ms_composition_layer_count(MSDocument *document, uint64_t compositionId) {
     return composition != nullptr ? int(composition->layers.size()) : 0;
 }
 
+void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r,
+                                     float *g, float *b, float *a) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr) {
+        return;
+    }
+    if (r != nullptr) {
+        *r = composition->backgroundColor.r;
+    }
+    if (g != nullptr) {
+        *g = composition->backgroundColor.g;
+    }
+    if (b != nullptr) {
+        *b = composition->backgroundColor.b;
+    }
+    if (a != nullptr) {
+        *a = composition->backgroundColor.a;
+    }
+}
+
+float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    return composition != nullptr ? composition->cornerRadius : 0.0f;
+}
+
 char *ms_composition_name(MSDocument *document, uint64_t compositionId) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
@@ -657,6 +687,73 @@ void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const 
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
 }
 
+void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId,
+                                                 float r, float g, float b, float a) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::SetCompositionBackgroundColorCommand>(
+                EntityId{compositionId}, Color{r, g, b, a}));
+}
+
+void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId,
+                                              float cornerRadius) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::SetCompositionCornerRadiusCommand>(
+                EntityId{compositionId}, cornerRadius));
+}
+
+void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId,
+                                     int width, int height) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr) {
+        return;
+    }
+    motion::CompositionSettings settings;
+    settings.width = width;
+    settings.height = height;
+    settings.duration = composition->duration;
+    settings.frameRate = composition->frameRate;
+    Execute(document,
+            std::make_unique<motion::SetCompositionSettingsCommand>(
+                EntityId{compositionId}, settings));
+}
+
+void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId,
+                                         int64_t duration) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr) {
+        return;
+    }
+    motion::CompositionSettings settings;
+    settings.width = composition->width;
+    settings.height = composition->height;
+    settings.duration = FrameTime(duration);
+    settings.frameRate = composition->frameRate;
+    Execute(document,
+            std::make_unique<motion::SetCompositionSettingsCommand>(
+                EntityId{compositionId}, settings));
+}
+
+void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId,
+                                           int frameRateNum, int frameRateDen) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr || frameRateNum <= 0 || frameRateDen <= 0) {
+        return;
+    }
+    motion::CompositionSettings settings;
+    settings.width = composition->width;
+    settings.height = composition->height;
+    settings.duration = composition->duration;
+    settings.frameRate = {uint32_t(frameRateNum), uint32_t(frameRateDen)};
+    Execute(document,
+            std::make_unique<motion::SetCompositionSettingsCommand>(
+                EntityId{compositionId}, settings));
+}
+
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path,
                                    int64_t frame, float value) {
     DocumentLock guard(document);
@@ -747,7 +844,7 @@ void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compo
     const motion::SceneState &state = result.value();
     const motion::DrawCommandList commands = motion::BuildCommands(state);
     canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight,
-                                state.backgroundColor);
+                                state.backgroundColor, state.cornerRadius);
     motion::PlayCommands(commands, *canvas->adapter);
     canvas->adapter->endFrame();
 }

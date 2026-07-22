@@ -23,8 +23,9 @@ class RenderAdapter {
     // Begins a frame: resizes/clears the target.
     // width: target width in pixels.
     // height: target height in pixels.
-    // clearColor: background fill color.
-    virtual void beginFrame(int width, int height, Color clearColor) = 0;
+    // backgroundColor: composition background fill color.
+    // cornerRadius: composition clip radius in pixels.
+    virtual void beginFrame(int width, int height, Color backgroundColor, float cornerRadius) = 0;
 
     // Ends the frame and flushes pending drawing.
     virtual void endFrame() = 0;

@@ -95,6 +95,9 @@ int ms_composition_height(MSDocument *document, uint64_t compositionId);
 int ms_composition_frame_rate_num(MSDocument *document, uint64_t compositionId);
 int ms_composition_frame_rate_den(MSDocument *document, uint64_t compositionId);
 int ms_composition_layer_count(MSDocument *document, uint64_t compositionId);
+void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r,
+                                     float *g, float *b, float *a);
+float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId);
 // Composition name (malloc'd).
 char *ms_composition_name(MSDocument *document, uint64_t compositionId);
 
@@ -162,6 +165,16 @@ void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const c
                                 float y);
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path,
                                  float r, float g, float b, float a);
+void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId,
+                                                 float r, float g, float b, float a);
+void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId,
+                                              float cornerRadius);
+void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId,
+                                     int width, int height);
+void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId,
+                                         int64_t duration);
+void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId,
+                                           int frameRateNum, int frameRateDen);
 
 // Adds a keyframe holding the property's given value at frame.
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path,

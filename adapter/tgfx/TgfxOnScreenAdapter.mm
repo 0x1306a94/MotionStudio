@@ -117,7 +117,8 @@ void TgfxOnScreenAdapter::drawPreviewBackdrop() {
     }
 }
 
-void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor) {
+void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
+                                       float cornerRadius) {
     if (sceneWidth <= 0 || sceneHeight <= 0 || !surface_) {
         return;
     }
@@ -141,7 +142,7 @@ void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color ba
     fit.setTranslate(offsetX, offsetY);
     fit.preScale(scaleX, scaleY);
     surface_->getCanvas()->concat(fit);
-    TgfxCanvasAdapter::onFrameReady(sceneWidth, sceneHeight, backgroundColor);
+    TgfxCanvasAdapter::onFrameReady(sceneWidth, sceneHeight, backgroundColor, cornerRadius);
 }
 
 void TgfxOnScreenAdapter::presentTarget() {

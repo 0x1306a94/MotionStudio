@@ -1008,6 +1008,7 @@ json CompositionToJson(const Composition &composition) {
             {"width", composition.width},
             {"height", composition.height},
             {"backgroundColor", ColorToJson(composition.backgroundColor)},
+            {"cornerRadius", composition.cornerRadius},
             {"layers", std::move(layers)}};
 }
 
@@ -1056,6 +1057,14 @@ Expected<std::unique_ptr<Composition>, std::string> CompositionFromJson(const js
         return Unexpected(backgroundColor.error());
     }
     composition->backgroundColor = *backgroundColor;
+
+    if (const json *cornerRadiusNode = FindChild(node, "cornerRadius")) {
+        Expected<float, std::string> cornerRadius = AsFloat(*cornerRadiusNode);
+        if (!cornerRadius) {
+            return Unexpected(cornerRadius.error());
+        }
+        composition->cornerRadius = *cornerRadius;
+    }
 
     const json *layersNode = FindChild(node, "layers");
     if (!layersNode || !layersNode->is_array()) {

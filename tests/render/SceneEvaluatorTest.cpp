@@ -74,12 +74,14 @@ TEST(SceneEvaluatorTest, EmptyCompositionProducesViewportAndBackground) {
     composition->width = 640;
     composition->height = 480;
     composition->backgroundColor = Color{0.5f, 0.5f, 0.5f, 1};
+    composition->cornerRadius = 32.0f;
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, composition->id, 0);
     ASSERT_TRUE(result.hasValue());
     EXPECT_EQ(result->viewportWidth, 640);
     EXPECT_EQ(result->viewportHeight, 480);
     EXPECT_EQ(result->backgroundColor, (Color{0.5f, 0.5f, 0.5f, 1}));
+    EXPECT_FLOAT_EQ(result->cornerRadius, 32.0f);
     EXPECT_TRUE(result->layers.empty());
 }
 

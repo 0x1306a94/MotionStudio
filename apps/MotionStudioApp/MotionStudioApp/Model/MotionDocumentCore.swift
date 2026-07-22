@@ -39,6 +39,15 @@ struct EasingInfo: Equatable {
     static let easeOut = EasingInfo(kind: .bezier, inX: 0, inY: 0, outX: 0.58, outY: 1)
 }
 
+struct MotionColor: Equatable {
+    var r: Float
+    var g: Float
+    var b: Float
+    var a: Float
+
+    static let black = MotionColor(r: 0, g: 0, b: 0, a: 1)
+}
+
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
 ///
@@ -160,6 +169,19 @@ final class MotionDocumentCore {
         return Double(num) / Double(den)
     }
 
+    func backgroundColor(compositionID: UInt64) -> MotionColor {
+        var r: Float = 0
+        var g: Float = 0
+        var b: Float = 0
+        var a: Float = 1
+        ms_composition_background_color(handle, compositionID, &r, &g, &b, &a)
+        return MotionColor(r: r, g: g, b: b, a: a)
+    }
+
+    func cornerRadius(compositionID: UInt64) -> Float {
+        ms_composition_corner_radius(handle, compositionID)
+    }
+
     // MARK: - Layer queries
 
     func layerIDs(compositionID: UInt64) -> [UInt64] {
@@ -263,6 +285,42 @@ final class MotionDocumentCore {
         changed()
     }
 
+    func setStaticColor(entityID: UInt64, path: String, value: MotionColor) {
+        ms_command_set_static_color(handle, entityID, path, value.r, value.g, value.b, value.a)
+        changed()
+    }
+
+    func setCompositionBackgroundColor(compositionID: UInt64, value: MotionColor) {
+        ms_command_set_composition_background_color(handle, compositionID,
+                                                    value.r, value.g, value.b, value.a)
+        changed()
+    }
+
+    func setCompositionCornerRadius(compositionID: UInt64, value: Float) {
+        ms_command_set_composition_corner_radius(handle, compositionID, value)
+        changed()
+    }
+
+    func setCompositionSize(compositionID: UInt64, size: CGSize) {
+        ms_command_set_composition_size(handle, compositionID,
+                                        Int32(max(Int(size.width.rounded()), 1)),
+                                        Int32(max(Int(size.height.rounded()), 1)))
+        changed()
+    }
+
+    func setCompositionDuration(compositionID: UInt64, duration: Int64) {
+        ms_command_set_composition_duration(handle, compositionID, max(duration, 1))
+        changed()
+    }
+
+    func setCompositionFrameRate(compositionID: UInt64, framesPerSecond: Float) {
+        let frameRate = Self.rationalFrameRate(framesPerSecond)
+        ms_command_set_composition_frame_rate(handle, compositionID,
+                                              Int32(frameRate.num),
+                                              Int32(frameRate.den))
+        changed()
+    }
+
     func addKeyframeFloat(entityID: UInt64, path: String, frame: Int64, value: Float) {
         ms_command_add_keyframe_float(handle, entityID, path, frame, value)
         changed()
@@ -329,6 +387,25 @@ final class MotionDocumentCore {
     private func changed() {
         revision += 1
         onDidChange?()
+    }
+
+    private nonisolated static func rationalFrameRate(_ framesPerSecond: Float) -> (num: UInt32, den: UInt32) {
+        let denominator: UInt32 = 1000
+        let fps = max(Double(framesPerSecond), 0.001)
+        let numerator = UInt32(max(1, min(Double(UInt32.max), (fps * Double(denominator)).rounded())))
+        let divisor = greatestCommonDivisor(numerator, denominator)
+        return (numerator / divisor, denominator / divisor)
+    }
+
+    private nonisolated static func greatestCommonDivisor(_ lhs: UInt32, _ rhs: UInt32) -> UInt32 {
+        var a = lhs
+        var b = rhs
+        while b != 0 {
+            let remainder = a % b
+            a = b
+            b = remainder
+        }
+        return max(a, 1)
     }
 
     private nonisolated static func takeString(_ cString: UnsafeMutablePointer<CChar>?) -> String? {

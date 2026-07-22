@@ -21,6 +21,7 @@ class Composition {
     int width = 1920;
     int height = 1080;
     Color backgroundColor{0, 0, 0, 1};
+    float cornerRadius = 0.0f;
 
     // Rendered bottom-to-top; index 0 is the bottommost layer.
     std::vector<std::unique_ptr<Layer>> layers;

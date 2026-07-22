@@ -26,7 +26,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // them as the target texture size; the on-screen adapter treats them as
     // the scene viewport size (the drawable size is authoritative and the
     // scene is fit-transformed into it).
-    void beginFrame(int width, int height, Color clearColor) final;
+    void beginFrame(int width, int height, Color backgroundColor, float cornerRadius) final;
     void endFrame() final;
 
     void save() override;
@@ -59,7 +59,8 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // viewport transform then always paints the composition backgroundColor
     // into the scene rect. Subclasses that transform (on-screen fit) must call
     // the base implementation after their transform.
-    virtual void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor);
+    virtual void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
+                              float cornerRadius);
 
     // Blend mode for the composition background rect. Black preview chrome uses
     // Src; the transparency grid needs SrcOver to avoid dark AA fringes.

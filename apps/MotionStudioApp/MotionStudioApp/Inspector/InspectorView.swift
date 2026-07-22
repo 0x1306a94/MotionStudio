@@ -55,10 +55,16 @@ struct InspectorView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             } else {
-                ContentUnavailableView("No Selection",
-                                       systemImage: "square.dashed",
-                                       description: Text("Select a layer to edit its properties."))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                let compositionID = core.firstCompositionID
+                ScrollView {
+                    CompositionInspector(core: core,
+                                         compositionID: compositionID,
+                                         perform: perform)
+                        .padding(10)
+                        .padding(.bottom, inspectorKeyboardOverlap(keyboardFrame: keyboardFrame,
+                                                                   in: proxy))
+                }
+                .scrollDismissesKeyboard(.interactively)
             }
         }
         .task {

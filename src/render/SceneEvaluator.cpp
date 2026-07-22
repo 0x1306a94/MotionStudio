@@ -276,6 +276,8 @@ Expected<SceneState, std::string> SceneEvaluator::Evaluate(const Document &docum
     state.viewportWidth = composition->width;
     state.viewportHeight = composition->height;
     state.backgroundColor = composition->backgroundColor;
+    state.cornerRadius = std::clamp(composition->cornerRadius, 0.0f,
+                                    float(std::min(composition->width, composition->height)) * 0.5f);
     EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0,
                         state.layers);
     return state;

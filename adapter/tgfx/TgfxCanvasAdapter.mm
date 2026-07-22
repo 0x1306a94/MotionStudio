@@ -124,12 +124,15 @@ TgfxCanvasAdapter::~TgfxCanvasAdapter() {
 void TgfxCanvasAdapter::drawPreviewBackdrop() {
 }
 
-void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor) {
+void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
+                                     float cornerRadius) {
     if (!surface_ || sceneWidth <= 0 || sceneHeight <= 0) {
         return;
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
     const tgfx::Rect compositionBounds = tgfx::Rect::MakeWH(float(sceneWidth), float(sceneHeight));
+    const float radius = std::clamp(cornerRadius, 0.0f,
+                                    std::min(float(sceneWidth), float(sceneHeight)) * 0.5f);
     tgfx::Paint paint;
     paint.setStyle(tgfx::PaintStyle::Fill);
     paint.setColor(ToTgfxColor(backgroundColor));
@@ -137,12 +140,19 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
     // so AA edges blend into the checkerboard instead of writing translucent
     // pixels that composite against the MTKView's black clear.
     paint.setBlendMode(compositionBackgroundSrcOver() ? tgfx::BlendMode::SrcOver : tgfx::BlendMode::Src);
-    canvas->drawRect(compositionBounds, paint);
-    // AE-style hard clip to the composition rect for subsequent layer draws.
-    canvas->clipRect(compositionBounds, false);
+    if (radius > 0.0f) {
+        canvas->drawRoundRect(compositionBounds, radius, radius, paint);
+        tgfx::Path clipPath;
+        clipPath.addRoundRect(compositionBounds, radius, radius);
+        canvas->clipPath(clipPath);
+    } else {
+        canvas->drawRect(compositionBounds, paint);
+        canvas->clipRect(compositionBounds, false);
+    }
 }
 
-void TgfxCanvasAdapter::beginFrame(int width, int height, Color clearColor) {
+void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
+                                   float cornerRadius) {
     // Release before acquireTarget: size changes may destroy the old surface/canvas.
     frameRestore_.reset();
     if (!acquireTarget(width, height) || !surface_) {
@@ -151,7 +161,7 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color clearColor) {
     tgfx::Canvas *canvas = surface_->getCanvas();
     frameRestore_ = std::make_unique<tgfx::AutoCanvasRestore>(canvas);
     drawPreviewBackdrop();
-    onFrameReady(width, height, clearColor);
+    onFrameReady(width, height, backgroundColor, cornerRadius);
     opacity_ = 1;
     blendMode_ = BlendMode::Normal;
     opacityStack_.clear();

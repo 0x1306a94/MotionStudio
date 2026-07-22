@@ -68,6 +68,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     composition->width = 1280;
     composition->height = 720;
     composition->backgroundColor = Color{0.1f, 0.2f, 0.3f, 1};
+    composition->cornerRadius = 18.0f;
 
     // Shape layer: 7 shape element types + keyframes + spatial tangents + mask.
     auto shapeLayer = std::make_unique<Layer>(LayerType::Shape);

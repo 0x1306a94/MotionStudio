@@ -40,6 +40,8 @@ add_library(core STATIC
     undo/RemoveKeyframeCommand.cpp
     undo/RemoveLayerCommand.cpp
     undo/SetEasingCommand.cpp
+    undo/SetCompositionBackgroundColorCommand.cpp
+    undo/SetCompositionCornerRadiusCommand.cpp
     undo/SetLayerLockedCommand.cpp
     undo/SetLayerVisibleCommand.cpp
     undo/SetStaticValueCommand.cpp

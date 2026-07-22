@@ -13,6 +13,7 @@ struct NumberPropertyRow: View {
     let value: Float
     let hasKeyframeAtPlayhead: Bool
     let isEditable: Bool
+    var showsKeyframeButton = true
     let onCommit: (Float) -> Void
     let onToggleKeyframe: (Float) -> Void
 
@@ -39,16 +40,21 @@ struct NumberPropertyRow: View {
                         hasInvalidDraft = false
                     }
                 }
-            Button {
-                toggleKeyframe()
-            } label: {
-                Image(systemName: hasKeyframeAtPlayhead ? "diamond.fill" : "diamond")
-                    .foregroundStyle(hasKeyframeAtPlayhead ? .yellow : .secondary)
+            if showsKeyframeButton {
+                Button {
+                    toggleKeyframe()
+                } label: {
+                    Image(systemName: hasKeyframeAtPlayhead ? "diamond.fill" : "diamond")
+                        .foregroundStyle(hasKeyframeAtPlayhead ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isEditable)
+                .opacity(isEditable ? 1 : 0.42)
+                .help(hasKeyframeAtPlayhead ? "Delete keyframe at playhead" : "Add keyframe at playhead")
+            } else {
+                Color.clear
+                    .frame(width: 16, height: 16)
             }
-            .buttonStyle(.plain)
-            .disabled(!isEditable)
-            .opacity(isEditable ? 1 : 0.42)
-            .help(hasKeyframeAtPlayhead ? "Delete keyframe at playhead" : "Add keyframe at playhead")
         }
         .opacity(isEditable ? 1 : 0.72)
         .onChange(of: value, initial: true) { _, newValue in
