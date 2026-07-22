@@ -201,6 +201,10 @@ void ms_canvas_destroy(MSCanvas *canvas);
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
                           int64_t frame);
 
+// Preview chrome behind the composition: 0 = solid black (default), 1 =
+// transparency checkerboard. Ignored when canvas is null.
+void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop);
+
 #ifdef __cplusplus
 }
 #endif

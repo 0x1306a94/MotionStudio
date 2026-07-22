@@ -32,8 +32,7 @@ std::unique_ptr<TgfxRenderAdapter> TgfxRenderAdapter::Make(int width, int height
         return nullptr;
     }
     // tgfx takes the id<MTLDevice> itself as void*, not a pointer to the id.
-    adapter->device_ =
-        tgfx::MetalDevice::MakeFrom((__bridge void *)adapter->impl_->mtlDevice);
+    adapter->device_ = tgfx::MetalDevice::MakeFrom((__bridge void *)adapter->impl_->mtlDevice);
     if (!adapter->device_) {
         return nullptr;
     }
@@ -51,11 +50,7 @@ bool TgfxRenderAdapter::RecreateTarget(int width, int height) {
     surface_.reset();
     impl_->texture = nil;
 
-    MTLTextureDescriptor *descriptor = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
-                                     width:size_t(width)
-                                    height:size_t(height)
-                                 mipmapped:NO];
+    MTLTextureDescriptor *descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:size_t(width) height:size_t(height) mipmapped:NO];
     descriptor.usage = MTLTextureUsageRenderTarget;
     impl_->texture = [impl_->mtlDevice newTextureWithDescriptor:descriptor];
 
@@ -92,9 +87,7 @@ bool TgfxRenderAdapter::ReadPixels(std::vector<uint8_t> &pixels) {
     if (!context) {
         return false;
     }
-    tgfx::ImageInfo info = tgfx::ImageInfo::Make(impl_->width, impl_->height,
-                                                 tgfx::ColorType::RGBA_8888,
-                                                 tgfx::AlphaType::Premultiplied);
+    tgfx::ImageInfo info = tgfx::ImageInfo::Make(impl_->width, impl_->height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
     pixels.resize(info.rowBytes() * size_t(info.height()));
     const bool ok = surface_->readPixels(info, pixels.data());
     device_->unlock();

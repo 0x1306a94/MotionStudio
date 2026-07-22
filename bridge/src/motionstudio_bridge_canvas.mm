@@ -17,3 +17,12 @@ MSCanvas *ms_canvas_create(void *mtkView) {
 void ms_canvas_destroy(MSCanvas *canvas) {
     delete canvas;
 }
+
+void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop) {
+    if (canvas == nullptr || canvas->adapter == nullptr) {
+        return;
+    }
+    const auto mode = backdrop == 1 ? motion::PreviewBackdrop::Transparent
+                                    : motion::PreviewBackdrop::Black;
+    canvas->adapter->setPreviewBackdrop(mode);
+}

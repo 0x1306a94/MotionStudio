@@ -9,6 +9,7 @@
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Path.h>
 #include <tgfx/core/PathTypes.h>
+#include <tgfx/core/Rect.h>
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Device.h>
 
@@ -22,8 +23,7 @@ uint8_t ToByte(float value) {
 }
 
 tgfx::Color ToTgfxColor(const Color &color) {
-    return tgfx::Color::FromRGBA(ToByte(color.r), ToByte(color.g), ToByte(color.b),
-                                 ToByte(color.a));
+    return tgfx::Color::FromRGBA(ToByte(color.r), ToByte(color.g), ToByte(color.b), ToByte(color.a));
 }
 
 tgfx::BlendMode ToTgfxBlendMode(BlendMode mode) {
@@ -117,14 +117,39 @@ tgfx::Matrix ToTgfxMatrix(const Mat3 &matrix) {
 
 TgfxCanvasAdapter::TgfxCanvasAdapter() = default;
 
-TgfxCanvasAdapter::~TgfxCanvasAdapter() = default;
+TgfxCanvasAdapter::~TgfxCanvasAdapter() {
+    frameRestore_.reset();
+}
+
+void TgfxCanvasAdapter::drawPreviewBackdrop() {
+}
+
+void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor) {
+    if (!surface_ || sceneWidth <= 0 || sceneHeight <= 0) {
+        return;
+    }
+    tgfx::Paint paint;
+    paint.setStyle(tgfx::PaintStyle::Fill);
+    paint.setColor(ToTgfxColor(backgroundColor));
+    // Black chrome: Src replaces coverage cleanly. Transparency grid: SrcOver
+    // so AA edges blend into the checkerboard instead of writing translucent
+    // pixels that composite against the MTKView's black clear.
+    paint.setBlendMode(compositionBackgroundSrcOver() ? tgfx::BlendMode::SrcOver
+                                                      : tgfx::BlendMode::Src);
+    surface_->getCanvas()->drawRect(
+        tgfx::Rect::MakeWH(float(sceneWidth), float(sceneHeight)), paint);
+}
 
 void TgfxCanvasAdapter::beginFrame(int width, int height, Color clearColor) {
+    // Release before acquireTarget: size changes may destroy the old surface/canvas.
+    frameRestore_.reset();
     if (!acquireTarget(width, height) || !surface_) {
         return;
     }
-    surface_->getCanvas()->clear(ToTgfxColor(clearColor));
-    onFrameReady(width, height);
+    tgfx::Canvas *canvas = surface_->getCanvas();
+    frameRestore_ = std::make_unique<tgfx::AutoCanvasRestore>(canvas);
+    drawPreviewBackdrop();
+    onFrameReady(width, height, clearColor);
     opacity_ = 1;
     blendMode_ = BlendMode::Normal;
     opacityStack_.clear();
@@ -132,6 +157,7 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color clearColor) {
 }
 
 void TgfxCanvasAdapter::endFrame() {
+    frameRestore_.reset();
     presentTarget();
 }
 
@@ -184,8 +210,7 @@ void TgfxCanvasAdapter::drawPath(const BezierPath &path, const Paint &paint) {
     surface_->getCanvas()->drawPath(ToTgfxPath(path, paint.fillRule), tgfxPaint);
 }
 
-void TgfxCanvasAdapter::strokePath(const BezierPath &path, const Paint &paint, float width,
-                                   LineCap cap, LineJoin join) {
+void TgfxCanvasAdapter::strokePath(const BezierPath &path, const Paint &paint, float width, LineCap cap, LineJoin join) {
     if (!surface_) {
         return;
     }

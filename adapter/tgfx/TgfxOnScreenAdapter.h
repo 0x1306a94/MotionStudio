@@ -6,9 +6,16 @@
 
 namespace motion {
 
+// Preview chrome behind / around the composition in the live canvas.
+enum class PreviewBackdrop {
+    Black,        // Solid black (AE-like default).
+    Transparent,  // Checkerboard indicating transparency.
+};
+
 // RenderAdapter backed by tgfx on the Metal GPU backend, rendering directly
-// into an MTKView's drawable. Each frame acquires the window surface and
-// presents on endFrame. Intended for the editor's live preview canvas.
+// into an MTKView's drawable. The window surface is reused across frames and
+// recreated only when the drawable size changes; endFrame presents the
+// current drawable. Intended for the editor's live preview canvas.
 class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
   public:
     // Creates an on-screen adapter for the given view.
@@ -18,17 +25,24 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
 
     ~TgfxOnScreenAdapter() override;
 
+    void setPreviewBackdrop(PreviewBackdrop backdrop);
+    PreviewBackdrop previewBackdrop() const;
+
   protected:
     bool acquireTarget(int width, int height) override;
     void presentTarget() override;
-    // Fits the scene viewport into the drawable (letterboxed, centered).
-    void onFrameReady(int sceneWidth, int sceneHeight) override;
+    void drawPreviewBackdrop() override;
+    // Fits the scene into the drawable (AE Fit Up to 100%: letterboxed,
+    // centered, never scaled above 1:1), then paints composition background.
+    void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor) override;
+    bool compositionBackgroundSrcOver() const override;
 
   private:
     TgfxOnScreenAdapter();
 
     struct Impl;
     std::unique_ptr<Impl> impl_;
+    PreviewBackdrop previewBackdrop_ = PreviewBackdrop::Transparent;
 };
 
 }  // namespace motion

@@ -7,6 +7,7 @@
 #include "MotionStudio/render/RenderAdapter.h"
 
 namespace tgfx {
+class AutoCanvasRestore;
 class Device;
 class Surface;
 }  // namespace tgfx
@@ -50,13 +51,20 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // Flushes pending drawing, presents the frame and unlocks the context.
     virtual void presentTarget() = 0;
 
-    // Called after the clear, before any draw command. Lets subclasses map
-    // scene coordinates onto the target (the on-screen adapter applies a fit
-    // transform; the offscreen target is created at scene size so it is a
-    // no-op there).
-    virtual void onFrameReady(int sceneWidth, int sceneHeight) {
-        (void)sceneWidth;
-        (void)sceneHeight;
+    // Draws the preview chrome behind the composition (letterbox area). Default
+    // is a no-op; the on-screen adapter paints black or a transparency grid.
+    virtual void drawPreviewBackdrop();
+
+    // Called after the preview backdrop, before any draw command. Applies any
+    // viewport transform then always paints the composition backgroundColor
+    // into the scene rect. Subclasses that transform (on-screen fit) must call
+    // the base implementation after their transform.
+    virtual void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor);
+
+    // Blend mode for the composition background rect. Black preview chrome uses
+    // Src; the transparency grid needs SrcOver to avoid dark AA fringes.
+    virtual bool compositionBackgroundSrcOver() const {
+        return false;
     }
 
     std::shared_ptr<tgfx::Device> device_;
@@ -67,6 +75,9 @@ class TgfxCanvasAdapter : public RenderAdapter {
     BlendMode blendMode_ = BlendMode::Normal;
     std::vector<float> opacityStack_;
     std::vector<BlendMode> blendStack_;
+    // Spans beginFrame→endFrame; restores canvas state when the frame ends.
+    // Declared after surface_ so destruction still has a live canvas.
+    std::unique_ptr<tgfx::AutoCanvasRestore> frameRestore_;
 };
 
 }  // namespace motion
