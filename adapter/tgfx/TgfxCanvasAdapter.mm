@@ -128,16 +128,18 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
     if (!surface_ || sceneWidth <= 0 || sceneHeight <= 0) {
         return;
     }
+    tgfx::Canvas *canvas = surface_->getCanvas();
+    const tgfx::Rect compositionBounds = tgfx::Rect::MakeWH(float(sceneWidth), float(sceneHeight));
     tgfx::Paint paint;
     paint.setStyle(tgfx::PaintStyle::Fill);
     paint.setColor(ToTgfxColor(backgroundColor));
     // Black chrome: Src replaces coverage cleanly. Transparency grid: SrcOver
     // so AA edges blend into the checkerboard instead of writing translucent
     // pixels that composite against the MTKView's black clear.
-    paint.setBlendMode(compositionBackgroundSrcOver() ? tgfx::BlendMode::SrcOver
-                                                      : tgfx::BlendMode::Src);
-    surface_->getCanvas()->drawRect(
-        tgfx::Rect::MakeWH(float(sceneWidth), float(sceneHeight)), paint);
+    paint.setBlendMode(compositionBackgroundSrcOver() ? tgfx::BlendMode::SrcOver : tgfx::BlendMode::Src);
+    canvas->drawRect(compositionBounds, paint);
+    // AE-style hard clip to the composition rect for subsequent layer draws.
+    canvas->clipRect(compositionBounds, false);
 }
 
 void TgfxCanvasAdapter::beginFrame(int width, int height, Color clearColor) {
