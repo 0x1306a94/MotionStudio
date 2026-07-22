@@ -22,11 +22,11 @@ namespace {
 constexpr int kMaxPrecompDepth = 1024;
 constexpr float kEllipseKappa = 0.5522847498f;
 
-Mat3 LocalMatrixOf(const Transform &transform, FrameTime time) {
-    return Mat3::Translate(transform.position.evaluate(time)) *
-        Mat3::Rotate(transform.rotation.evaluate(time)) *
-        Mat3::Scale(transform.scale.evaluate(time)) *
-        Mat3::Translate(-transform.anchorPoint.evaluate(time));
+Mat3 LocalMatrixOf(const Transform &transform, PreviewTime time) {
+    return Mat3::Translate(transform.position.evaluatePreview(time)) *
+        Mat3::Rotate(transform.rotation.evaluatePreview(time)) *
+        Mat3::Scale(transform.scale.evaluatePreview(time)) *
+        Mat3::Translate(-transform.anchorPoint.evaluatePreview(time));
 }
 
 // Applies the matrix to a path; tangents take the linear part only.
@@ -44,12 +44,12 @@ BezierPath TransformPath(const BezierPath &path, const Mat3 &matrix) {
 
 // Rect centered at position (Lottie convention), corners clockwise from
 // top-left; rounded corners split each corner into an arc pair.
-BezierPath RectToPath(const ShapeRect &rect, FrameTime time) {
-    const Vec2 center = rect.position.evaluate(time);
-    const Vec2 size = rect.size.evaluate(time);
+BezierPath RectToPath(const ShapeRect &rect, PreviewTime time) {
+    const Vec2 center = rect.position.evaluatePreview(time);
+    const Vec2 size = rect.size.evaluatePreview(time);
     const float halfWidth = std::max(size.x * 0.5f, 0.0f);
     const float halfHeight = std::max(size.y * 0.5f, 0.0f);
-    const float radius = std::clamp(rect.cornerRadius.evaluate(time), 0.0f,
+    const float radius = std::clamp(rect.cornerRadius.evaluatePreview(time), 0.0f,
                                     std::min(halfWidth, halfHeight));
     const float left = center.x - halfWidth;
     const float right = center.x + halfWidth;
@@ -78,9 +78,9 @@ BezierPath RectToPath(const ShapeRect &rect, FrameTime time) {
 }
 
 // Ellipse centered at position, approximated by 4 cubic segments.
-BezierPath EllipseToPath(const ShapeEllipse &ellipse, FrameTime time) {
-    const Vec2 center = ellipse.position.evaluate(time);
-    const Vec2 size = ellipse.size.evaluate(time);
+BezierPath EllipseToPath(const ShapeEllipse &ellipse, PreviewTime time) {
+    const Vec2 center = ellipse.position.evaluatePreview(time);
+    const Vec2 size = ellipse.size.evaluatePreview(time);
     const float halfWidth = std::max(size.x * 0.5f, 0.0f);
     const float halfHeight = std::max(size.y * 0.5f, 0.0f);
     const float kx = kEllipseKappa * halfWidth;
@@ -99,14 +99,14 @@ BezierPath EllipseToPath(const ShapeEllipse &ellipse, FrameTime time) {
 // Fill/Stroke consumes them; Groups recurse with a composed transform and
 // compounded alpha.
 void EvaluateElements(const std::vector<std::unique_ptr<ShapeElement>> &elements,
-                      FrameTime time, const Mat3 &transform, float alpha,
+                      PreviewTime time, const Mat3 &transform, float alpha,
                       std::vector<EvaluatedShapeItem> &items) {
     std::vector<BezierPath> localPaths;
     for (const auto &element : elements) {
         switch (element->type()) {
             case ShapeType::Path: {
                 const auto &shape = static_cast<const ShapePath &>(*element);
-                localPaths.push_back(shape.path.evaluate(time));
+                localPaths.push_back(shape.path.evaluatePreview(time));
                 break;
             }
             case ShapeType::Rect: {
@@ -121,8 +121,8 @@ void EvaluateElements(const std::vector<std::unique_ptr<ShapeElement>> &elements
             }
             case ShapeType::Fill: {
                 const auto &fill = static_cast<const ShapeFill &>(*element);
-                Color color = fill.color.evaluate(time);
-                color.a *= fill.opacity.evaluate(time) * alpha;
+                Color color = fill.color.evaluatePreview(time);
+                color.a *= fill.opacity.evaluatePreview(time) * alpha;
                 const Paint paint{color, fill.fillRule};
                 for (const BezierPath &local : localPaths) {
                     items.push_back({TransformPath(local, transform), paint, false, 0,
@@ -132,10 +132,10 @@ void EvaluateElements(const std::vector<std::unique_ptr<ShapeElement>> &elements
             }
             case ShapeType::Stroke: {
                 const auto &stroke = static_cast<const ShapeStroke &>(*element);
-                Color color = stroke.color.evaluate(time);
-                color.a *= stroke.opacity.evaluate(time) * alpha;
+                Color color = stroke.color.evaluatePreview(time);
+                color.a *= stroke.opacity.evaluatePreview(time) * alpha;
                 const Paint paint{color, FillRule::NonZero};
-                const float width = stroke.width.evaluate(time);
+                const float width = stroke.width.evaluatePreview(time);
                 for (const BezierPath &local : localPaths) {
                     items.push_back({TransformPath(local, transform), paint, true, width,
                                      stroke.cap, stroke.join});
@@ -147,7 +147,7 @@ void EvaluateElements(const std::vector<std::unique_ptr<ShapeElement>> &elements
                 const Mat3 childTransform =
                     transform * LocalMatrixOf(group.transform, time);
                 const float childAlpha =
-                    alpha * group.transform.opacity.evaluate(time);
+                    alpha * group.transform.opacity.evaluatePreview(time);
                 EvaluateElements(group.elements, time, childTransform, childAlpha,
                                  items);
                 break;
@@ -161,7 +161,7 @@ void EvaluateElements(const std::vector<std::unique_ptr<ShapeElement>> &elements
 
 // World transform with parent-chain walking; context is the transform handed
 // down by the enclosing precomp. visiting guards against parent cycles.
-Mat3 WorldTransformOf(const Document &document, const Layer &layer, FrameTime time,
+Mat3 WorldTransformOf(const Document &document, const Layer &layer, PreviewTime time,
                       const Mat3 &context, std::vector<EntityId> &visiting) {
     for (const EntityId &visited : visiting) {
         if (visited == layer.id) {
@@ -181,7 +181,7 @@ Mat3 WorldTransformOf(const Document &document, const Layer &layer, FrameTime ti
     return result;
 }
 
-float WorldOpacityOf(const Document &document, const Layer &layer, FrameTime time,
+float WorldOpacityOf(const Document &document, const Layer &layer, PreviewTime time,
                      float context, std::vector<EntityId> &visiting) {
     for (const EntityId &visited : visiting) {
         if (visited == layer.id) {
@@ -189,7 +189,7 @@ float WorldOpacityOf(const Document &document, const Layer &layer, FrameTime tim
         }
     }
     visiting.push_back(layer.id);
-    const float own = layer.transform.opacity.evaluate(time);
+    const float own = layer.transform.opacity.evaluatePreview(time);
     float result = context * own;
     if (layer.parentId.isValid()) {
         const Layer *parent = document.entityIndex().findLayer(layer.parentId);
@@ -202,11 +202,11 @@ float WorldOpacityOf(const Document &document, const Layer &layer, FrameTime tim
 }
 
 void EvaluateComposition(const Document &document, const Composition &composition,
-                         FrameTime time, const Mat3 &contextTransform,
+                         PreviewTime time, const Mat3 &contextTransform,
                          float contextOpacity, int depth,
                          std::vector<EvaluatedLayer> &out);
 
-void EvaluateLayer(const Document &document, const Layer &layer, FrameTime time,
+void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime time,
                    const Mat3 &contextTransform, float contextOpacity, int depth,
                    std::vector<EvaluatedLayer> &out) {
     if (!layer.visible) {
@@ -234,8 +234,8 @@ void EvaluateLayer(const Document &document, const Layer &layer, FrameTime time,
         // innerTime = (outer - inPoint) * timeStretch + startTime
         const double inner =
             double(time - layer.inPoint) * layer.timeStretch + double(layer.startTime);
-        EvaluateComposition(document, *source, FrameTime(std::llround(inner)), world,
-                            opacity, depth + 1, out);
+        EvaluateComposition(document, *source, PreviewTime(inner), world, opacity,
+                            depth + 1, out);
         return;
     }
     if (layer.content->type() != LayerType::Shape) {
@@ -254,7 +254,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, FrameTime time,
 }
 
 void EvaluateComposition(const Document &document, const Composition &composition,
-                         FrameTime time, const Mat3 &contextTransform,
+                         PreviewTime time, const Mat3 &contextTransform,
                          float contextOpacity, int depth,
                          std::vector<EvaluatedLayer> &out) {
     for (const auto &layer : composition.layers) {
@@ -267,6 +267,12 @@ void EvaluateComposition(const Document &document, const Composition &compositio
 
 Expected<SceneState, std::string> SceneEvaluator::Evaluate(const Document &document,
                                                            EntityId compositionId, FrameTime time) {
+    return EvaluatePreview(document, compositionId, PreviewTime(time));
+}
+
+Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document &document,
+                                                                  EntityId compositionId,
+                                                                  PreviewTime time) {
     const Composition *composition =
         document.entityIndex().findComposition(compositionId);
     if (!composition) {

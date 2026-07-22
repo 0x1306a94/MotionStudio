@@ -48,6 +48,40 @@ struct MotionColor: Equatable {
     static let black = MotionColor(r: 0, g: 0, b: 0, a: 1)
 }
 
+struct CanvasFrameProfile: Equatable {
+    let drewFrame: Bool
+    let layerCount: Int
+    let drawCommandCount: Int
+    let totalMilliseconds: Double
+    let documentLockMilliseconds: Double
+    let sceneEvaluateMilliseconds: Double
+    let buildCommandsMilliseconds: Double
+    let beginFrameMilliseconds: Double
+    let playCommandsMilliseconds: Double
+    let endFrameMilliseconds: Double
+    let endFrameCanvasRestoreMilliseconds: Double
+    let endFramePresentMilliseconds: Double
+    let endFrameFlushSubmitMilliseconds: Double
+    let endFrameDeviceUnlockMilliseconds: Double
+
+    init(_ profile: MSCanvasFrameProfile) {
+        drewFrame = profile.drewFrame
+        layerCount = Int(profile.layerCount)
+        drawCommandCount = Int(profile.drawCommandCount)
+        totalMilliseconds = profile.totalMs
+        documentLockMilliseconds = profile.documentLockMs
+        sceneEvaluateMilliseconds = profile.sceneEvaluateMs
+        buildCommandsMilliseconds = profile.buildCommandsMs
+        beginFrameMilliseconds = profile.beginFrameMs
+        playCommandsMilliseconds = profile.playCommandsMs
+        endFrameMilliseconds = profile.endFrameMs
+        endFrameCanvasRestoreMilliseconds = profile.endFrameCanvasRestoreMs
+        endFramePresentMilliseconds = profile.endFramePresentMs
+        endFrameFlushSubmitMilliseconds = profile.endFrameFlushSubmitMs
+        endFrameDeviceUnlockMilliseconds = profile.endFrameDeviceUnlockMs
+    }
+}
+
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
 ///
@@ -382,6 +416,20 @@ final class MotionDocumentCore {
     /// Draws the composition at frame into the canvas's MTKView drawable.
     func drawFrame(canvas: OpaquePointer, compositionID: UInt64, frame: Int64) {
         ms_canvas_draw_frame(canvas, handle, compositionID, frame)
+    }
+
+    /// Draws one frame and returns per-stage CPU timing for profiling.
+    func drawFrameProfiled(canvas: OpaquePointer, compositionID: UInt64, frame: Int64) -> CanvasFrameProfile {
+        var profile = MSCanvasFrameProfile()
+        ms_canvas_draw_frame_profiled(canvas, handle, compositionID, frame, &profile)
+        return CanvasFrameProfile(profile)
+    }
+
+    /// Draws one preview frame at fractional frame time and returns per-stage CPU timing.
+    func drawFrameProfiled(canvas: OpaquePointer, compositionID: UInt64, frameTime: Double) -> CanvasFrameProfile {
+        var profile = MSCanvasFrameProfile()
+        ms_canvas_draw_frame_at_time_profiled(canvas, handle, compositionID, frameTime, &profile)
+        return CanvasFrameProfile(profile)
     }
 
     private func changed() {

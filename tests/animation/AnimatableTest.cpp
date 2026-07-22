@@ -77,6 +77,14 @@ TEST(AnimatableTest, EvaluateLinearInterpolation) {
     EXPECT_FLOAT_EQ(animatable.evaluate(5), 50.0f);
 }
 
+TEST(AnimatableTest, EvaluatePreviewInterpolatesFractionalFrame) {
+    Animatable<float> animatable;
+    animatable.addKeyframe(FloatKeyframe(0, 0));
+    animatable.addKeyframe(FloatKeyframe(10, 100));
+
+    EXPECT_FLOAT_EQ(animatable.evaluatePreview(2.5), 25.0f);
+}
+
 TEST(AnimatableTest, EvaluateHoldKeepsPreviousValue) {
     Animatable<float> animatable;
     animatable.addKeyframe(FloatKeyframe(0, 0, Easing::Hold()));

@@ -8,6 +8,10 @@ namespace motion {
 // Integer frames avoid floating-point drift and serialize deterministically.
 using FrameTime = int64_t;
 
+// Fractional frame time for live preview evaluation. This is not serialized
+// and does not replace FrameTime for keyframes, editing, or export.
+using PreviewTime = double;
+
 // Half-open time interval [start, end).
 struct TimeRange {
     FrameTime start = 0;

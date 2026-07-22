@@ -3,6 +3,7 @@
 #import <MetalKit/MetalKit.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 #include <tgfx/core/Canvas.h>
@@ -16,6 +17,16 @@
 #include <tgfx/gpu/metal/MetalWindow.h>
 
 namespace motion {
+
+namespace {
+
+using ProfileClock = std::chrono::steady_clock;
+
+double Milliseconds(ProfileClock::time_point start, ProfileClock::time_point end) {
+    return std::chrono::duration<double, std::milli>(end - start).count();
+}
+
+}  // namespace
 
 struct TgfxOnScreenAdapter::Impl {
     MTKView *view = nil;
@@ -149,10 +160,16 @@ void TgfxOnScreenAdapter::presentTarget() {
     if (impl_->context != nullptr) {
         // flush + submit triggers MetalWindow::onPresent, which presents the
         // current drawable and releases it; the Surface/proxy is kept for reuse.
+        const auto flushStart = ProfileClock::now();
         impl_->context->flushAndSubmit();
+        const auto flushEnd = ProfileClock::now();
+        endFrameProfile_.flushSubmitMs = Milliseconds(flushStart, flushEnd);
         impl_->context = nullptr;
     }
+    const auto unlockStart = ProfileClock::now();
     device_->unlock();
+    const auto unlockEnd = ProfileClock::now();
+    endFrameProfile_.deviceUnlockMs = Milliseconds(unlockStart, unlockEnd);
 }
 
 }  // namespace motion

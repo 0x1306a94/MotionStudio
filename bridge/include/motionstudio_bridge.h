@@ -20,6 +20,23 @@ extern "C" {
 typedef struct MSDocument MSDocument;
 typedef struct MSCanvas MSCanvas;
 
+typedef struct MSCanvasFrameProfile {
+    bool drewFrame;
+    uint64_t layerCount;
+    uint64_t drawCommandCount;
+    double totalMs;
+    double documentLockMs;
+    double sceneEvaluateMs;
+    double buildCommandsMs;
+    double beginFrameMs;
+    double playCommandsMs;
+    double endFrameMs;
+    double endFrameCanvasRestoreMs;
+    double endFramePresentMs;
+    double endFrameFlushSubmitMs;
+    double endFrameDeviceUnlockMs;
+} MSCanvasFrameProfile;
+
 // Layer content type tag, mirrors motion::LayerType.
 enum {
     MS_LAYER_SHAPE = 0,
@@ -213,6 +230,16 @@ void ms_canvas_destroy(MSCanvas *canvas);
 // canvas's MTKView drawable.
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
                           int64_t frame);
+// Same as ms_canvas_draw_frame, also writing per-stage CPU timings when
+// profileOut is non-null. Durations are milliseconds measured from this call
+// boundary through evaluate/build/adapter playback.
+void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
+                                   int64_t frame, MSCanvasFrameProfile *profileOut);
+// Fractional-frame variant for high-refresh live preview. The project timeline
+// and keyframes remain integer-framed; this samples between frames.
+void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document,
+                                           uint64_t compositionId, double frameTime,
+                                           MSCanvasFrameProfile *profileOut);
 
 // Preview chrome behind the composition: 0 = solid black (default), 1 =
 // transparency checkerboard. Ignored when canvas is null.

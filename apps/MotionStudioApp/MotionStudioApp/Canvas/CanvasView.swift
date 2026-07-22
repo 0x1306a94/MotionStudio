@@ -3,7 +3,7 @@
 //  MotionStudioApp
 //
 //  Live preview canvas: MTKView rendered directly by the tgfx on-screen
-//  adapter via the bridge. Playback is driven by CADisplayLink.
+//  adapter via the bridge. Playback is driven by MTKView's draw loop.
 //
 
 import MetalKit
@@ -39,6 +39,7 @@ struct CanvasView: UIViewRepresentable {
         context.coordinator.sync(playheadFrame: playheadFrame,
                                  isPlaying: isPlaying,
                                  duration: duration,
+                                 frameRate: frameRate,
                                  previewBackdrop: previewBackdrop,
                                  view: view)
     }
@@ -52,13 +53,30 @@ struct CanvasView: UIViewRepresentable {
         private let onAdvancePlayhead: @MainActor (Int64) -> Void
 
         private nonisolated(unsafe) var canvas: OpaquePointer?
-        private nonisolated(unsafe) var displayLink: CADisplayLink?
         private weak var canvasView: MTKView?
         private var playheadFrame: Int64 = 0
+        private var previewFrame: Double = 0
         private var duration: Int64 = 0
         private var previewBackdrop: PreviewBackdrop = .transparent
         private var frameRate: Double
-        private var carrySeconds: Double = 0
+        private var playbackFramesPerSecond: Double
+        private var isPlaying = false
+        private var lastPlayheadPublishTime: CFTimeInterval = 0
+        private var lastPlaybackTimingLogTime: CFTimeInterval = 0
+        private var lastPlaybackDrawTime: CFTimeInterval?
+        private var currentDrawGapMilliseconds: Double = 0
+        private var currentAdvancedFrames: Int = 0
+        private var currentSkippedFrames: Int = 0
+        private var currentPublishMilliseconds: Double = 0
+        private var profileStatsStartTime: CFTimeInterval = 0
+        private var profileFrameCount: Int = 0
+        private var profileDroppedFrameCount: Int = 0
+        private var profileTotalRenderMilliseconds: Double = 0
+        private var profileMaxRenderMilliseconds: Double = 0
+        private var profileMaxDrawGapMilliseconds: Double = 0
+        private var lastSyncTime: CFTimeInterval?
+        private var lastDrawRequestTime: CFTimeInterval?
+        private var lastDrawStartTime: CFTimeInterval?
 
         init(core: MotionDocumentCore,
              compositionID: UInt64,
@@ -70,6 +88,7 @@ struct CanvasView: UIViewRepresentable {
             self.compositionID = compositionID
             self.duration = max(duration, 1)
             self.frameRate = frameRate
+            playbackFramesPerSecond = frameRate
             self.onAdvancePlayhead = onAdvancePlayhead
             super.init()
         }
@@ -78,7 +97,6 @@ struct CanvasView: UIViewRepresentable {
             if let canvas {
                 ms_canvas_destroy(canvas)
             }
-            displayLink?.invalidate()
         }
 
         func makeCanvasView() -> MTKView {
@@ -87,6 +105,7 @@ struct CanvasView: UIViewRepresentable {
             view.isPaused = true
             view.enableSetNeedsDisplay = true
             view.framebufferOnly = true
+            view.preferredFramesPerSecond = max(1, Int(frameRate.rounded()))
             view.delegate = self
             return view
         }
@@ -94,15 +113,27 @@ struct CanvasView: UIViewRepresentable {
         func sync(playheadFrame: Int64,
                   isPlaying: Bool,
                   duration: Int64,
+                  frameRate: Double,
                   previewBackdrop: PreviewBackdrop,
                   view: MTKView)
         {
-            self.playheadFrame = playheadFrame
+            let wasPlaying = self.isPlaying
+            self.isPlaying = isPlaying
+            if wasPlaying && !isPlaying {
+                onAdvancePlayhead(self.playheadFrame)
+            } else if !isPlaying || !wasPlaying {
+                self.playheadFrame = playheadFrame
+                previewFrame = Double(playheadFrame)
+            }
             self.duration = max(duration, 1)
+            self.frameRate = frameRate
             self.previewBackdrop = previewBackdrop
             canvasView = view
-            setPlaying(isPlaying)
-            requestDraw(view: view)
+            lastSyncTime = CACurrentMediaTime()
+            configurePlayback(isPlaying, wasPlaying: wasPlaying, view: view)
+            if !isPlaying || !wasPlaying {
+                requestDraw(view: view)
+            }
         }
 
         // MARK: - MTKViewDelegate
@@ -110,6 +141,13 @@ struct CanvasView: UIViewRepresentable {
         func mtkView(_: MTKView, drawableSizeWillChange _: CGSize) {}
 
         func draw(in view: MTKView) {
+            let drawStartTime = CACurrentMediaTime()
+            let syncToDrawMilliseconds = lastSyncTime.map { (drawStartTime - $0) * 1000 }
+            let requestToDrawMilliseconds = lastDrawRequestTime.map { (drawStartTime - $0) * 1000 }
+            let drawIntervalMilliseconds = lastDrawStartTime.map { (drawStartTime - $0) * 1000 }
+            lastDrawStartTime = drawStartTime
+            advancePlayheadForDraw(at: drawStartTime)
+
             if canvas == nil {
                 guard let created = ms_canvas_create(Unmanaged.passUnretained(view).toOpaque())
                 else {
@@ -121,42 +159,193 @@ struct CanvasView: UIViewRepresentable {
                 return
             }
             ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
-            core.drawFrame(canvas: canvas, compositionID: compositionID, frame: playheadFrame)
+            let profile = core.drawFrameProfiled(canvas: canvas,
+                                                 compositionID: compositionID,
+                                                 frameTime: previewFrame)
+            logSlowFrame(profile)
+            logDrawScheduling(syncToDrawMilliseconds: syncToDrawMilliseconds,
+                              requestToDrawMilliseconds: requestToDrawMilliseconds,
+                              drawIntervalMilliseconds: drawIntervalMilliseconds,
+                              profile: profile)
         }
 
         // MARK: - Playback
 
-        private func setPlaying(_ playing: Bool) {
-            let isRunning = displayLink != nil
-            guard playing != isRunning else {
-                return
-            }
+        private func configurePlayback(_ playing: Bool, wasPlaying: Bool, view: MTKView) {
+            let preferredFramesPerSecond = playing ? displayFramesPerSecond(for: view) : max(1, Int(frameRate.rounded()))
+            view.preferredFramesPerSecond = preferredFramesPerSecond
+            playbackFramesPerSecond = Double(preferredFramesPerSecond)
+            view.enableSetNeedsDisplay = !playing
+            view.isPaused = !playing
             if playing {
-                carrySeconds = 0
-                let link = CADisplayLink(target: self, selector: #selector(tick(_:)))
-                link.add(to: .main, forMode: .common)
-                displayLink = link
-            } else {
-                displayLink?.invalidate()
-                displayLink = nil
+                if !wasPlaying {
+                    lastPlaybackDrawTime = nil
+                    lastPlayheadPublishTime = CACurrentMediaTime()
+                    lastDrawStartTime = nil
+                    resetProfileStats()
+                }
+            } else if wasPlaying {
+                lastPlaybackDrawTime = nil
             }
         }
 
-        @objc
-        private func tick(_ link: CADisplayLink) {
-            let elapsed = link.targetTimestamp - link.timestamp
-            carrySeconds += max(elapsed, 0)
-            let frames = Int(carrySeconds * frameRate)
-            guard frames > 0 else {
+        private func displayFramesPerSecond(for view: MTKView) -> Int {
+            let screen = view.window?.screen ?? UIScreen.main
+            return max(Int(frameRate.rounded()), screen.maximumFramesPerSecond)
+        }
+
+        private func advancePlayheadForDraw(at drawTime: CFTimeInterval) {
+            guard isPlaying else {
+                currentDrawGapMilliseconds = 0
+                currentAdvancedFrames = 0
+                currentSkippedFrames = 0
+                currentPublishMilliseconds = 0
                 return
             }
-            carrySeconds -= Double(frames) / frameRate
-            let next = (playheadFrame + Int64(frames)) % max(duration, 1)
-            onAdvancePlayhead(next)
+            let drawGap = lastPlaybackDrawTime.map { drawTime - $0 }
+            lastPlaybackDrawTime = drawTime
+            currentDrawGapMilliseconds = (drawGap ?? 0) * 1000
+
+            let drawInterval = 1.0 / max(playbackFramesPerSecond, 1)
+            let durationFrames = Double(max(duration, 1))
+            let oldIntegerFrame = Int64(previewFrame.rounded(.down))
+            previewFrame += (drawGap ?? drawInterval) * frameRate
+            if previewFrame >= durationFrames {
+                previewFrame.formTruncatingRemainder(dividingBy: durationFrames)
+            }
+            playheadFrame = Int64(previewFrame.rounded(.down))
+            if playheadFrame >= oldIntegerFrame {
+                currentAdvancedFrames = Int(playheadFrame - oldIntegerFrame)
+            } else {
+                currentAdvancedFrames = Int(Int64(durationFrames) - oldIntegerFrame + playheadFrame)
+            }
+            currentSkippedFrames = max(0, currentAdvancedFrames - 1)
+
+            let advanceMilliseconds = publishPlayheadIfNeeded(playheadFrame)
+            currentPublishMilliseconds = advanceMilliseconds
+            logPlaybackTiming(drawGap: drawGap,
+                              displayInterval: drawInterval,
+                              advancedFrames: currentAdvancedFrames,
+                              advanceMilliseconds: advanceMilliseconds)
+        }
+
+        private func publishPlayheadIfNeeded(_ frame: Int64) -> Double {
+            let now = CACurrentMediaTime()
+            let publishInterval = 1.0 / max(frameRate, 1)
+            guard now - lastPlayheadPublishTime >= publishInterval else {
+                return 0
+            }
+            lastPlayheadPublishTime = now
+            let publishStartTime = CACurrentMediaTime()
+            onAdvancePlayhead(frame)
+            return (CACurrentMediaTime() - publishStartTime) * 1000
         }
 
         private func requestDraw(view: MTKView) {
+            lastDrawRequestTime = CACurrentMediaTime()
             view.setNeedsDisplay()
+        }
+
+        private func logSlowFrame(_ profile: CanvasFrameProfile) {
+            #if DEBUG
+                guard profile.drewFrame else {
+                    return
+                }
+                let frameBudgetMilliseconds = 1000.0 / max(frameRate, 1)
+                let now = CACurrentMediaTime()
+                if profileStatsStartTime == 0 {
+                    profileStatsStartTime = now
+                }
+                profileFrameCount += 1
+                profileDroppedFrameCount += currentSkippedFrames
+                profileTotalRenderMilliseconds += profile.totalMilliseconds
+                profileMaxRenderMilliseconds = max(profileMaxRenderMilliseconds, profile.totalMilliseconds)
+                profileMaxDrawGapMilliseconds = max(profileMaxDrawGapMilliseconds, currentDrawGapMilliseconds)
+
+                guard now - profileStatsStartTime >= 0.5 else {
+                    return
+                }
+                let elapsed = max(now - profileStatsStartTime, 0.001)
+                let observedFramesPerSecond = Double(profileFrameCount) / elapsed
+                let averageRenderMilliseconds = profileTotalRenderMilliseconds / Double(max(profileFrameCount, 1))
+                print(String(format: "Canvas profile %.2fs: draw fps %.1f, frames %d, skipped %d, gap max %.2f ms, render avg %.2f max %.2f (budget %.2f), last render %.2f, publish %.2f, layers %d, commands %d",
+                             elapsed,
+                             observedFramesPerSecond,
+                             profileFrameCount,
+                             profileDroppedFrameCount,
+                             profileMaxDrawGapMilliseconds,
+                             averageRenderMilliseconds,
+                             profileMaxRenderMilliseconds,
+                             frameBudgetMilliseconds,
+                             profile.totalMilliseconds,
+                             currentPublishMilliseconds,
+                             profile.layerCount,
+                             profile.drawCommandCount))
+                resetProfileStats()
+            #endif
+        }
+
+        private func resetProfileStats() {
+            profileStatsStartTime = 0
+            profileFrameCount = 0
+            profileDroppedFrameCount = 0
+            profileTotalRenderMilliseconds = 0
+            profileMaxRenderMilliseconds = 0
+            profileMaxDrawGapMilliseconds = 0
+        }
+
+        private func logDrawScheduling(syncToDrawMilliseconds: Double?,
+                                       requestToDrawMilliseconds: Double?,
+                                       drawIntervalMilliseconds: Double?,
+                                       profile: CanvasFrameProfile)
+        {
+            #if DEBUG
+                let frameBudgetMilliseconds = 1000.0 / max(frameRate, 1)
+                let slowRequest = !isPlaying && (requestToDrawMilliseconds ?? 0) > frameBudgetMilliseconds
+                let slowInterval = isPlaying && (drawIntervalMilliseconds ?? 0) > frameBudgetMilliseconds * 1.5
+                guard slowRequest || slowInterval else {
+                    return
+                }
+                let now = CACurrentMediaTime()
+                guard now - lastPlaybackTimingLogTime > 0.5 else {
+                    return
+                }
+                lastPlaybackTimingLogTime = now
+                print(String(format: "Canvas schedule: sync->draw %.2f ms, request->draw %.2f ms, draw interval %.2f ms, render %.2f ms",
+                             syncToDrawMilliseconds ?? 0,
+                             requestToDrawMilliseconds ?? 0,
+                             drawIntervalMilliseconds ?? 0,
+                             profile.totalMilliseconds))
+            #endif
+        }
+
+        private func logPlaybackTiming(drawGap: CFTimeInterval?,
+                                       displayInterval: CFTimeInterval,
+                                       advancedFrames: Int,
+                                       advanceMilliseconds: Double)
+        {
+            #if DEBUG
+                guard let drawGap else {
+                    return
+                }
+                let displayIntervalMilliseconds = displayInterval * 1000
+                let drawGapMilliseconds = drawGap * 1000
+                guard drawGapMilliseconds > displayIntervalMilliseconds * 1.5 ||
+                    advanceMilliseconds > displayIntervalMilliseconds
+                else {
+                    return
+                }
+                let now = CACurrentMediaTime()
+                guard now - lastPlaybackTimingLogTime > 0.5 else {
+                    return
+                }
+                lastPlaybackTimingLogTime = now
+                print(String(format: "Canvas playback: draw gap %.2f ms (target %.2f), publish %.2f ms, frames %d",
+                             drawGapMilliseconds,
+                             displayIntervalMilliseconds,
+                             advanceMilliseconds,
+                             advancedFrames))
+            #endif
         }
     }
 }

@@ -20,6 +20,15 @@ class SceneEvaluator {
     // time: frame time in the composition timeline.
     static Expected<SceneState, std::string> Evaluate(const Document &document,
                                                       EntityId compositionId, FrameTime time);
+
+    // Evaluates a composition at fractional frame time for live preview.
+    // Editing, serialization, and export should continue using FrameTime.
+    // document: the owning document (provides the entity index).
+    // compositionId: id of the composition to evaluate.
+    // time: fractional frame time in the composition timeline.
+    static Expected<SceneState, std::string> EvaluatePreview(const Document &document,
+                                                             EntityId compositionId,
+                                                             PreviewTime time);
 };
 
 }  // namespace motion

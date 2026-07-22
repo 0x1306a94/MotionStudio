@@ -61,6 +61,11 @@ class Animatable : public AnimatableBase {
     // time: frame time to evaluate at.
     T evaluate(FrameTime time) const;
 
+    // Evaluates the property at a fractional preview time. Keyframes remain
+    // authored on integer frames; this only changes sampling between them.
+    // time: fractional frame time to evaluate at.
+    T evaluatePreview(PreviewTime time) const;
+
     AnimatableType valueType() const override;
 
     // Returns true if the property has keyframes (i.e. is animated rather than static).

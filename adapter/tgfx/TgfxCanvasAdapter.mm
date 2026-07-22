@@ -1,6 +1,7 @@
 #include "TgfxCanvasAdapter.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 #include <tgfx/core/Canvas.h>
@@ -16,6 +17,12 @@
 namespace motion {
 
 namespace {
+
+using ProfileClock = std::chrono::steady_clock;
+
+double Milliseconds(ProfileClock::time_point start, ProfileClock::time_point end) {
+    return std::chrono::duration<double, std::milli>(end - start).count();
+}
 
 uint8_t ToByte(float value) {
     const float clamped = std::min(std::max(value, 0.0f), 1.0f);
@@ -169,8 +176,20 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
 }
 
 void TgfxCanvasAdapter::endFrame() {
+    endFrameProfile_ = {};
+    const auto restoreStart = ProfileClock::now();
     frameRestore_.reset();
+    const auto restoreEnd = ProfileClock::now();
+    endFrameProfile_.canvasRestoreMs = Milliseconds(restoreStart, restoreEnd);
+
+    const auto presentStart = ProfileClock::now();
     presentTarget();
+    const auto presentEnd = ProfileClock::now();
+    endFrameProfile_.presentTargetMs = Milliseconds(presentStart, presentEnd);
+}
+
+const TgfxEndFrameProfile &TgfxCanvasAdapter::endFrameProfile() const {
+    return endFrameProfile_;
 }
 
 void TgfxCanvasAdapter::save() {

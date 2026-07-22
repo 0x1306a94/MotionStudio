@@ -14,6 +14,13 @@ class Surface;
 
 namespace motion {
 
+struct TgfxEndFrameProfile {
+    double canvasRestoreMs = 0;
+    double presentTargetMs = 0;
+    double flushSubmitMs = 0;
+    double deviceUnlockMs = 0;
+};
+
 // Shared RenderAdapter implementation backed by a tgfx canvas. Subclasses only
 // supply the render target: an offscreen texture (TgfxRenderAdapter) or an
 // on-screen window (TgfxOnScreenAdapter). All path/paint/matrix conversions
@@ -28,6 +35,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // scene is fit-transformed into it).
     void beginFrame(int width, int height, Color backgroundColor, float cornerRadius) final;
     void endFrame() final;
+    const TgfxEndFrameProfile &endFrameProfile() const;
 
     void save() override;
     void restore() override;
@@ -70,6 +78,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
 
     std::shared_ptr<tgfx::Device> device_;
     std::shared_ptr<tgfx::Surface> surface_;
+    TgfxEndFrameProfile endFrameProfile_;
 
   private:
     float opacity_ = 1;

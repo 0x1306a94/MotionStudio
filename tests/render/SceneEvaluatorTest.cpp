@@ -57,6 +57,10 @@ struct RectScene {
     Expected<SceneState, std::string> Evaluate(motion::FrameTime time) {
         return SceneEvaluator::Evaluate(document, composition->id, time);
     }
+
+    Expected<SceneState, std::string> EvaluatePreview(motion::PreviewTime time) {
+        return SceneEvaluator::EvaluatePreview(document, composition->id, time);
+    }
 };
 
 }  // namespace
@@ -243,4 +247,21 @@ TEST(SceneEvaluatorTest, AnimatedTransformEvaluatedAtTime) {
     ASSERT_TRUE(mid.hasValue());
     const auto &item = mid->layers[0].shapeItems[0];
     EXPECT_EQ(item.path.vertices[0].point, (Vec2{130, 40}));
+}
+
+TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
+    RectScene scene;
+    motion::Keyframe<Vec2> from;
+    from.time = 0;
+    from.value = Vec2{0, 0};
+    motion::Keyframe<Vec2> to;
+    to.time = 10;
+    to.value = Vec2{100, 0};
+    scene.layer->transform.position.addKeyframe(from);
+    scene.layer->transform.position.addKeyframe(to);
+
+    Expected<SceneState, std::string> quarter = scene.EvaluatePreview(2.5);
+    ASSERT_TRUE(quarter.hasValue());
+    const auto &item = quarter->layers[0].shapeItems[0];
+    EXPECT_EQ(item.path.vertices[0].point, (Vec2{105, 40}));
 }
