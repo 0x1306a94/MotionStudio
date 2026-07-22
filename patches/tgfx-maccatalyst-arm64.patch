@@ -1,0 +1,120 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 76975b3..b3d4646 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -154,18 +154,19 @@ message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
+ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+     if (DEPLOYMENT_TARGET)
+         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
+-    elseif (MACOS)
+-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+-        else ()
+-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+-        endif ()
+     elseif (IOS)
++        # Includes Mac Catalyst (toolchain sets IOS=ON and MACOS=ON).
+         if (TGFX_USE_METAL)
+             set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+         else ()
+             set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+         endif ()
++    elseif (MACOS)
++        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
++            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
++        else ()
++            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
++        endif ()
+     endif ()
+ endif ()
+ 
+@@ -409,7 +410,7 @@ if (TGFX_USE_QT)
+ 
+     file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
+     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
+-    if (MACOS)
++    if (MACOS AND NOT IOS)
+         file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTexture.mm)
+         list(APPEND TGFX_FILES ${CGL_PLATFORM_FILES})
+         list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
+@@ -519,6 +520,8 @@ elseif (OHOS)
+         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
+     endif ()
+ elseif (IOS)
++    # iOS device/simulator and Mac Catalyst (UIKit). When both IOS and MACOS are
++    # ON (MAC_CATALYST*), take this branch — not the native macOS/Cocoa branch.
+     # finds all required platform libraries.
+     find_library(UIKit_LIBS UIKit REQUIRED)
+     list(APPEND TGFX_SHARED_LIBS ${UIKit_LIBS})
+diff --git a/vendor.json b/vendor.json
+index b7e738d..18bc8bf 100644
+--- a/vendor.json
++++ b/vendor.json
+@@ -85,6 +85,7 @@
+           "mac",
+           "android",
+           "ios",
++          "catalyst",
+           "ohos"
+         ],
+         "arguments": [
+@@ -156,7 +157,8 @@
+         ],
+         "platforms": [
+           "ios",
+-          "mac"
++          "mac",
++          "catalyst"
+         ]
+       }
+     },
+@@ -291,6 +293,24 @@
+         ]
+       }
+     },
++    {
++      "name": "shaderc",
++      "cmake": {
++        "targets": [
++          "shaderc_combined"
++        ],
++        "arguments": [
++          "-DSHADERC_SKIP_TESTS=ON",
++          "-DSHADERC_SKIP_EXAMPLES=ON",
++          "-DSHADERC_SKIP_INSTALL=ON",
++          "-DCMAKE_CXX_FLAGS=\"-w\"",
++          "-DDEPLOYMENT_TARGET=13.1"
++        ],
++        "platforms": [
++          "catalyst"
++        ]
++      }
++    },
+     {
+       "name": "SPIRV-Cross",
+       "cmake": {
+@@ -326,6 +346,24 @@
+         ]
+       }
+     },
++    {
++      "name": "SPIRV-Cross",
++      "cmake": {
++        "targets": [
++          "spirv-cross-core",
++          "spirv-cross-glsl",
++          "spirv-cross-msl"
++        ],
++        "arguments": [
++          "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
++          "-DCMAKE_CXX_FLAGS=\"-w\"",
++          "-DDEPLOYMENT_TARGET=13.1"
++        ],
++        "platforms": [
++          "catalyst"
++        ]
++      }
++    },
+     {
+       "name": "shaderc",
+       "cmake": {

@@ -33,6 +33,7 @@ set(_tgfx_prebuild_cmd
 
 if(CMAKE_GENERATOR MATCHES "Xcode")
   set(TGFX_PREBUILT_MAC_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/mac/arm64")
+  set(TGFX_PREBUILT_CATALYST_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/catalyst/arm64")
   set(TGFX_PREBUILT_IOS_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/ios/arm64")
   set(TGFX_PREBUILT_IOSSIM_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/ios/arm64-simulator")
 
@@ -47,7 +48,8 @@ if(CMAKE_GENERATOR MATCHES "Xcode")
 
   function(motionstudio_link_prebuilt_tgfx target_name)
     set_target_properties(${target_name} PROPERTIES
-        XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=macosx*] "${TGFX_PREBUILT_MAC_DIR}"
+        # gen_mac has no native macosx destination; sdk=macosx* is Mac Catalyst.
+        XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=macosx*] "${TGFX_PREBUILT_CATALYST_DIR}"
         XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=iphoneos*] "${TGFX_PREBUILT_IOS_DIR}"
         XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*] "${TGFX_PREBUILT_IOSSIM_DIR}")
     target_link_libraries(${target_name} PUBLIC "-ltgfx")
@@ -119,11 +121,8 @@ target_link_libraries(motionstudio_tgfx_adapter
                       "-framework ImageIO"
                       iconv)
 
-if(CMAKE_GENERATOR MATCHES "Xcode")
-  set_target_properties(motionstudio_tgfx_adapter PROPERTIES
-      XCODE_ATTRIBUTE_OTHER_LDFLAGS[sdk=macosx*]
-          "-framework ApplicationServices -framework Cocoa")
-else()
+# Xcode / gen_mac: Mac destination is Catalyst (UIKit). Native mac Cocoa is Ninja-only.
+if(NOT CMAKE_GENERATOR MATCHES "Xcode")
   target_link_libraries(motionstudio_tgfx_adapter
                         PUBLIC
                         "-framework ApplicationServices"

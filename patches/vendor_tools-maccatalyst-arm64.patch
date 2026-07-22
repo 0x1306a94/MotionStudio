@@ -1,0 +1,130 @@
+diff --git a/lib-build b/lib-build
+index 46f34ac..5ad7f94 100755
+--- a/lib-build
++++ b/lib-build
+@@ -26,7 +26,7 @@ const optionDeclarations = [
+         name: "platform",
+         shortName: "p",
+         type: "string",
+-        description: "Specify the current platform. Supported platforms: [\"win\", \"mac\", \"ios\", \"linux\", \"android\", \"web\", \"ohos\"]."
++        description: "Specify the current platform. Supported platforms: [\"win\", \"mac\", \"ios\", \"catalyst\", \"linux\", \"android\", \"web\", \"ohos\"]."
+     },
+     {
+         name: "arch",
+diff --git a/lib/CMake.js b/lib/CMake.js
+index 850591c..d4fe476 100644
+--- a/lib/CMake.js
++++ b/lib/CMake.js
+@@ -159,6 +159,9 @@ class CMake {
+         if (platform.name === "ios") {
+             return new IOSCMake(platform);
+         }
++        if (platform.name === "catalyst") {
++            return new CatalystCMake(platform);
++        }
+         if (platform.name === "android") {
+             return new AndroidCMake(platform);
+         }
+@@ -557,6 +560,27 @@ class MacCMake extends AppleCMake {
+     }
+ }
+ 
++// Mac Catalyst: UIKit-on-Mac (ios-macabi). Uses ios.toolchain MAC_CATALYST_*.
++class CatalystCMake extends AppleCMake {
++    constructor(platform) {
++        super(platform);
++        this.toolchain = path.resolve(__dirname, "../ios.toolchain.cmake");
++    }
++
++    getPlatformArgs(arch) {
++        let args = [
++            "-DCMAKE_TOOLCHAIN_FILE=" + EscapePath(this.toolchain)
++        ];
++        if (arch === "x64") {
++            args.push("-DPLATFORM=MAC_CATALYST");
++        } else {
++            // Default / arm64 → Apple Silicon Catalyst
++            args.push("-DPLATFORM=MAC_CATALYST_ARM64");
++        }
++        return args;
++    }
++}
++
+ class WinCMake extends CMake {
+     getPlatformArgs(arch) {
+         return [
+diff --git a/lib/CommandLine.js b/lib/CommandLine.js
+index 8a5943e..13ec694 100644
+--- a/lib/CommandLine.js
++++ b/lib/CommandLine.js
+@@ -1,6 +1,6 @@
+ const os = require("os");
+ 
+-const KnownPlatforms = ["win", "mac", "ios", "linux", "android", "web", "ohos"];
++const KnownPlatforms = ["win", "mac", "ios", "catalyst", "linux", "android", "web", "ohos"];
+ const KnownArchs = ["x86", "x64", "arm", "arm64", "arm64-simulator", "wasm", "wasm-mt"];
+ 
+ function getOptionNameMap(optionDeclarations) {
+diff --git a/lib/LibraryTool.js b/lib/LibraryTool.js
+index cb85a66..ecd861c 100755
+--- a/lib/LibraryTool.js
++++ b/lib/LibraryTool.js
+@@ -29,6 +29,10 @@ class LibraryTool {
+         if (platform.name === "ios") {
+             return new IOSLibraryTool(platform);
+         }
++        if (platform.name === "catalyst") {
++            // Single-arch arm64 merge; MacLibraryTool lipo path is sufficient.
++            return new MacLibraryTool(platform);
++        }
+         if (platform.name === "mac") {
+             return new MacLibraryTool(platform);
+         }
+diff --git a/lib/Platform.js b/lib/Platform.js
+index 11fa5b9..ec8e773 100755
+--- a/lib/Platform.js
++++ b/lib/Platform.js
+@@ -30,6 +30,10 @@ class Platform {
+         if (name === "ios") {
+             return new ApplePlatform(name, ["arm64", "arm64-simulator", "x64"], debug, verbose);
+         }
++        if (name === "catalyst") {
++            // Mac Catalyst (ios-macabi). Scope A: arm64 only.
++            return new ApplePlatform(name, ["arm64"], debug, verbose);
++        }
+         if (name === "mac") {
+             return new ApplePlatform(name, ["arm64", "x64"], debug, verbose);
+         }
+diff --git a/lib/XCode.js b/lib/XCode.js
+index fe81f6f..6145f0b 100755
+--- a/lib/XCode.js
++++ b/lib/XCode.js
+@@ -43,6 +43,14 @@ function GetCMakePlatformArgs(options) {
+                 break;
+         }
+ 
++    } else if (platform === "catalyst") {
++        args.push("-DCMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS=\"macosx\"")
++        args.push("-DCMAKE_XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST=\"YES\"")
++        if (arch === "x64") {
++            args.push("-DPLATFORM=MAC_CATALYST");
++        } else {
++            args.push("-DPLATFORM=MAC_CATALYST_ARM64");
++        }
+     } else {
+         switch (arch) {
+             case "x64":
+diff --git a/vendor.cmake b/vendor.cmake
+index 0c33d08..60dec9c 100644
+--- a/vendor.cmake
++++ b/vendor.cmake
+@@ -51,6 +51,9 @@ elseif (ANDROID)
+     message("Using Android NDK: ${CMAKE_ANDROID_NDK}")
+     set(ENV{CMAKE_ANDROID_NDK} ${CMAKE_ANDROID_NDK})
+     list(APPEND ENV_LIST CMAKE_ANDROID_NDK=${CMAKE_ANDROID_NDK})
++elseif (IOS AND MACOS)
++    # ios.toolchain sets both IOS=ON and MACOS=ON for MAC_CATALYST*.
++    set(PLATFORM catalyst)
+ elseif (IOS)
+     set(PLATFORM ios)
+ elseif (APPLE)

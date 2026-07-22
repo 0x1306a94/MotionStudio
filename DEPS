@@ -31,6 +31,14 @@
       {
         "command": "python3 tgfx/third_party/shaderc/utils/git-sync-deps",
         "dir": "third_party"
+      },
+      {
+        "command": "sh -c 'git reset --hard HEAD && git apply ../../../../patches/vendor_tools-maccatalyst-arm64.patch'",
+        "dir": "third_party/tgfx/third_party/vendor_tools"
+      },
+      {
+        "command": "sh -c 'git reset --hard HEAD && git apply ../../patches/tgfx-maccatalyst-arm64.patch'",
+        "dir": "third_party/tgfx"
       }
     ]
   }

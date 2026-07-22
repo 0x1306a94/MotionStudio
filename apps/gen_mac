@@ -15,11 +15,12 @@ rm -rf $GEN_XCODE_PROJEC_DIR/cmake_install.cmake
 
 echo "[*] Generating Xcode (SDKROOT=auto, arm64 only) ..."
 
+# Mac runs as Mac Catalyst (SUPPORTS_MACCATALYST); no native macosx destination.
 cmake -G Xcode \
 -B $GEN_XCODE_PROJEC_DIR \
 -DCMAKE_BUILD_TYPE=RelWithDebInfo \
--DMOTIONSTUDIO_SUPPORTED_PLATFORMS="macosx iphoneos iphonesimulator" \
--DMOTIONSTUDIO_MACOSX_DEPLOYMENT_TARGET=15.0 \
+-DMOTIONSTUDIO_SUPPORTED_PLATFORMS="iphoneos iphonesimulator" \
+-DMOTIONSTUDIO_ENABLE_MACCATALYST=ON \
 -DMOTIONSTUDIO_IPHONEOS_DEPLOYMENT_TARGET=18.0 \
 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
 ${@} \

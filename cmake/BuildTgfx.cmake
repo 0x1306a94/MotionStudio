@@ -2,14 +2,16 @@
 #
 # Expected -D cache vars from the caller:
 #   TGFX_SOURCE_DIR  — path to third_party/tgfx
-#   TGFX_OUT_DIR     — root output directory; layout: <out>/<CMAKE_BUILD_TYPE>/<mac|ios>/<arch>/
+#   TGFX_OUT_DIR     — root output directory; layout: <out>/<CMAKE_BUILD_TYPE>/<mac|ios|catalyst>/<arch>/
 #   TGFX_CMAKE_ARGS  — extra -D flags passed to build_tgfx (space separated)
 #   TGFX_MACOSX_DEPLOYMENT_TARGET   — used for macosx
-#   TGFX_IPHONEOS_DEPLOYMENT_TARGET — used for iphoneos / iphonesimulator
+#   TGFX_IPHONEOS_DEPLOYMENT_TARGET — used for iphoneos / iphonesimulator / Mac Catalyst
 #   CMAKE_BUILD_TYPE                — forwarded to build_tgfx; Debug → also pass -d
 #
 # Reads from the environment when present (Xcode script phase):
-#   PLATFORM_NAME    — macosx / iphoneos / iphonesimulator
+#   PLATFORM_NAME             — macosx / iphoneos / iphonesimulator
+#   EFFECTIVE_PLATFORM_NAME   — -maccatalyst when building Mac Catalyst
+#   SDK_VARIANT               — iosmac when building Mac Catalyst
 
 if(NOT TGFX_SOURCE_DIR OR NOT TGFX_OUT_DIR)
   message(FATAL_ERROR "BuildTgfx.cmake requires TGFX_SOURCE_DIR and TGFX_OUT_DIR")
@@ -23,7 +25,33 @@ else()
   set(_platform_name "macosx")
 endif()
 
+set(_effective_platform "")
+if(DEFINED ENV{EFFECTIVE_PLATFORM_NAME})
+  set(_effective_platform "$ENV{EFFECTIVE_PLATFORM_NAME}")
+endif()
+set(_sdk_variant "")
+if(DEFINED ENV{SDK_VARIANT})
+  set(_sdk_variant "$ENV{SDK_VARIANT}")
+endif()
+
+# Mac Catalyst destination still reports PLATFORM_NAME=macosx; detect via variant.
+set(_is_maccatalyst FALSE)
 if(_platform_name STREQUAL "macosx")
+  if(_effective_platform MATCHES "maccatalyst" OR _sdk_variant STREQUAL "iosmac")
+    set(_is_maccatalyst TRUE)
+  endif()
+endif()
+
+if(_is_maccatalyst)
+  set(_tgfx_platform "catalyst")
+  set(_tgfx_arch "arm64")
+  set(_tgfx_out_subdir "catalyst")
+  if(NOT TGFX_IPHONEOS_DEPLOYMENT_TARGET)
+    message(FATAL_ERROR "BuildTgfx: TGFX_IPHONEOS_DEPLOYMENT_TARGET is required for Mac Catalyst")
+  endif()
+  # ios.toolchain MAC_CATALYST* uses iOS deployment version in the macabi triple.
+  set(_deploy_target "${TGFX_IPHONEOS_DEPLOYMENT_TARGET}")
+elseif(_platform_name STREQUAL "macosx")
   set(_tgfx_platform "mac")
   set(_tgfx_arch "arm64")
   set(_tgfx_out_subdir "mac")
@@ -71,7 +99,7 @@ set(_arch_stamp "${_out_root}/.tgfx.${_tgfx_arch}.md5")
 
 set(_cmake_args "")
 if(TGFX_CMAKE_ARGS)
-  separate_arguments(_cmake_args NATIVE_COMMAND "${TGFX_CMAKE_ARGS}")
+  separate_arguments(_cmake_args NATIVE_COMMAND ${TGFX_CMAKE_ARGS})
 endif()
 # tgfx vendor ios-cmake reads DEPLOYMENT_TARGET; also set CMAKE_OSX_DEPLOYMENT_TARGET.
 list(APPEND _cmake_args
@@ -87,7 +115,7 @@ if(NOT EXISTS "${_arch_dir}/tgfx.a")
 endif()
 
 message(STATUS "======== BuildTgfx BEGIN ========")
-message(STATUS "BuildTgfx: platform=${_platform_name} CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -> -p ${_tgfx_platform} -a ${_tgfx_arch} -o ${_out_root} deploy=${_deploy_target}")
+message(STATUS "BuildTgfx: platform=${_platform_name} catalyst=${_is_maccatalyst} CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -> -p ${_tgfx_platform} -a ${_tgfx_arch} -o ${_out_root} deploy=${_deploy_target}")
 message(STATUS "BuildTgfx: node=${NODE_EXECUTABLE} cwd=${TGFX_SOURCE_DIR}")
 
 execute_process(
