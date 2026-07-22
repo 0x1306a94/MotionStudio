@@ -59,95 +59,99 @@ private struct TransformInspector: View {
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.revision
-        let position = core.staticVec2(entityID: layerID, path: "transform.position")
-        let scale = core.staticVec2(entityID: layerID, path: "transform.scale")
+        let position = core.staticVec2(entityID: layerID, path: TransformProperty.position.path)
+        let scale = core.staticVec2(entityID: layerID, path: TransformProperty.scale.path)
 
-        NumberPropertyRow(label: "Position X",
+        NumberPropertyRow(label: TransformField.positionX.label,
                           value: Float(position.dx),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.position"))
+                          hasKeyframeAtPlayhead: hasKeyframe(.position))
         { newValue in
-            perform("Set Position") {
-                core.setStaticVec2(entityID: layerID, path: "transform.position",
+            performSet(.position) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.position.path,
                                    value: CGVector(dx: CGFloat(newValue), dy: position.dy))
             }
         } onAddKeyframe: { _ in
-            addVec2Keyframe("transform.position")
+            addVec2Keyframe(.position)
         }
 
-        NumberPropertyRow(label: "Position Y",
+        NumberPropertyRow(label: TransformField.positionY.label,
                           value: Float(position.dy),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.position"))
+                          hasKeyframeAtPlayhead: hasKeyframe(.position))
         { newValue in
-            perform("Set Position") {
-                core.setStaticVec2(entityID: layerID, path: "transform.position",
+            performSet(.position) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.position.path,
                                    value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
             }
         } onAddKeyframe: { _ in
-            addVec2Keyframe("transform.position")
+            addVec2Keyframe(.position)
         }
 
-        NumberPropertyRow(label: "Scale X",
+        NumberPropertyRow(label: TransformField.scaleX.label,
                           value: Float(scale.dx),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.scale"))
+                          hasKeyframeAtPlayhead: hasKeyframe(.scale))
         { newValue in
-            perform("Set Scale") {
-                core.setStaticVec2(entityID: layerID, path: "transform.scale",
+            performSet(.scale) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.scale.path,
                                    value: CGVector(dx: CGFloat(newValue), dy: scale.dy))
             }
         } onAddKeyframe: { _ in
-            addVec2Keyframe("transform.scale")
+            addVec2Keyframe(.scale)
         }
 
-        NumberPropertyRow(label: "Scale Y",
+        NumberPropertyRow(label: TransformField.scaleY.label,
                           value: Float(scale.dy),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.scale"))
+                          hasKeyframeAtPlayhead: hasKeyframe(.scale))
         { newValue in
-            perform("Set Scale") {
-                core.setStaticVec2(entityID: layerID, path: "transform.scale",
+            performSet(.scale) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.scale.path,
                                    value: CGVector(dx: scale.dx, dy: CGFloat(newValue)))
             }
         } onAddKeyframe: { _ in
-            addVec2Keyframe("transform.scale")
+            addVec2Keyframe(.scale)
         }
 
-        NumberPropertyRow(label: "Rotation",
-                          value: core.staticFloat(entityID: layerID, path: "transform.rotation"),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.rotation"))
+        NumberPropertyRow(label: TransformField.rotation.label,
+                          value: core.staticFloat(entityID: layerID, path: TransformProperty.rotation.path),
+                          hasKeyframeAtPlayhead: hasKeyframe(.rotation))
         { newValue in
-            perform("Set Rotation") {
-                core.setStaticFloat(entityID: layerID, path: "transform.rotation", value: newValue)
+            performSet(.rotation) {
+                core.setStaticFloat(entityID: layerID, path: TransformProperty.rotation.path, value: newValue)
             }
         } onAddKeyframe: { value in
-            addFloatKeyframe("transform.rotation", value: value)
+            addFloatKeyframe(.rotation, value: value)
         }
 
-        NumberPropertyRow(label: "Opacity",
-                          value: core.staticFloat(entityID: layerID, path: "transform.opacity"),
-                          hasKeyframeAtPlayhead: hasKeyframe("transform.opacity"))
+        NumberPropertyRow(label: TransformField.opacity.label,
+                          value: core.staticFloat(entityID: layerID, path: TransformProperty.opacity.path),
+                          hasKeyframeAtPlayhead: hasKeyframe(.opacity))
         { newValue in
-            perform("Set Opacity") {
-                core.setStaticFloat(entityID: layerID, path: "transform.opacity", value: newValue)
+            performSet(.opacity) {
+                core.setStaticFloat(entityID: layerID, path: TransformProperty.opacity.path, value: newValue)
             }
         } onAddKeyframe: { value in
-            addFloatKeyframe("transform.opacity", value: value)
+            addFloatKeyframe(.opacity, value: value)
         }
     }
 
-    private func hasKeyframe(_ path: String) -> Bool {
-        core.keyframes(entityID: layerID, path: path).contains { $0.frame == playheadFrame }
+    private func hasKeyframe(_ property: TransformProperty) -> Bool {
+        core.keyframes(entityID: layerID, path: property.path).contains { $0.frame == playheadFrame }
     }
 
-    private func addFloatKeyframe(_ path: String, value: Float) {
+    private func performSet(_ property: TransformProperty, action: () -> Void) {
+        perform("Set \(property.actionLabel)", action)
+    }
+
+    private func addFloatKeyframe(_ property: TransformProperty, value: Float) {
         perform("Add Keyframe") {
-            core.addKeyframeFloat(entityID: layerID, path: path,
+            core.addKeyframeFloat(entityID: layerID, path: property.path,
                                   frame: playheadFrame, value: value)
         }
     }
 
-    private func addVec2Keyframe(_ path: String) {
-        let value = core.staticVec2(entityID: layerID, path: path)
+    private func addVec2Keyframe(_ property: TransformProperty) {
+        let value = core.staticVec2(entityID: layerID, path: property.path)
         perform("Add Keyframe") {
-            core.addKeyframeVec2(entityID: layerID, path: path,
+            core.addKeyframeVec2(entityID: layerID, path: property.path,
                                  frame: playheadFrame, value: value)
         }
     }
@@ -166,7 +170,7 @@ private struct ShapeSizeInspector: View {
         let _ = core.revision
         let size = core.staticVec2(entityID: layerID, path: shapeSizePath)
 
-        NumberPropertyRow(label: "Width",
+        NumberPropertyRow(label: ShapeSizeField.width.label,
                           value: Float(size.dx),
                           hasKeyframeAtPlayhead: hasKeyframe())
         { newValue in
@@ -178,7 +182,7 @@ private struct ShapeSizeInspector: View {
             addSizeKeyframe()
         }
 
-        NumberPropertyRow(label: "Height",
+        NumberPropertyRow(label: ShapeSizeField.height.label,
                           value: Float(size.dy),
                           hasKeyframeAtPlayhead: hasKeyframe())
         { newValue in
