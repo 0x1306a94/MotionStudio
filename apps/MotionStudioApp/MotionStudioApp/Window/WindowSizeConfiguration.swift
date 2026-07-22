@@ -16,14 +16,14 @@
             let screenSize = UIScreen.main.bounds.size
             let minimumSize = CGSize(
                 width: screenSize.width * minimumWidthRatio,
-                height: screenSize.height * minimumHeightRatio
+                height: screenSize.height * minimumHeightRatio,
             )
             return WindowSizePersistence.persistedSize(
                 minimumSize: minimumSize,
-                maximumSize: screenSize
+                maximumSize: screenSize,
             ) ?? CGSize(
                 width: screenSize.width * defaultWidthRatio,
-                height: screenSize.height * defaultHeightRatio
+                height: screenSize.height * defaultHeightRatio,
             )
         }
     }
@@ -40,7 +40,7 @@
 
             return CGSize(
                 width: min(max(CGFloat(width), minimumSize.width), maximumSize.width),
-                height: min(max(CGFloat(height), minimumSize.height), maximumSize.height)
+                height: min(max(CGFloat(height), minimumSize.height), maximumSize.height),
             )
         }
 

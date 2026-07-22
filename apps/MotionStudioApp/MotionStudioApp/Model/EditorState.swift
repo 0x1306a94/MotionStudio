@@ -27,36 +27,36 @@ enum PreviewBackdrop: Int32 {
     var next: PreviewBackdrop {
         switch self {
         case .black:
-            return .transparent
+            .transparent
         case .transparent:
-            return .black
+            .black
         }
     }
 
     var accessibilityLabel: String {
         switch self {
         case .black:
-            return "Switch Preview Backdrop to Transparent"
+            "Switch Preview Backdrop to Transparent"
         case .transparent:
-            return "Switch Preview Backdrop to Black"
+            "Switch Preview Backdrop to Black"
         }
     }
 
     var helpText: String {
         switch self {
         case .black:
-            return "Preview backdrop: black"
+            "Preview backdrop: black"
         case .transparent:
-            return "Preview backdrop: transparent"
+            "Preview backdrop: transparent"
         }
     }
 
     var systemImage: String {
         switch self {
         case .black:
-            return "square.fill"
+            "square.fill"
         case .transparent:
-            return "square.grid.2x2"
+            "square.grid.2x2"
         }
     }
 }

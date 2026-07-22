@@ -16,15 +16,15 @@ struct MotionStudioApp: App {
                 .background(
                     WindowSizeConfigurator(
                         minimumWidthRatio: WindowSizeConfiguration.minimumWidthRatio,
-                        minimumHeightRatio: WindowSizeConfiguration.minimumHeightRatio
-                    )
+                        minimumHeightRatio: WindowSizeConfiguration.minimumHeightRatio,
+                    ),
                 )
             #endif
         }
         #if targetEnvironment(macCatalyst)
         .defaultSize(
             width: WindowSizeConfiguration.defaultSize.width,
-            height: WindowSizeConfiguration.defaultSize.height
+            height: WindowSizeConfiguration.defaultSize.height,
         )
         #endif
         .commands {

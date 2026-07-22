@@ -150,14 +150,14 @@ private struct PropertySubRow: View {
 private func layerSymbol(_ type: Int32) -> String {
     switch type {
     case 1:
-        return "photo"
+        "photo"
     case 2:
-        return "textformat"
+        "textformat"
     case 3:
-        return "circle.dashed"
+        "circle.dashed"
     case 4:
-        return "film"
+        "film"
     default:
-        return "square"
+        "square"
     }
 }

@@ -232,7 +232,7 @@ struct EditorRootView: View {
                                                     saveAs: prepareSaveAs,
                                                     addRectangle: addRectangleLayer,
                                                     addEllipse: addEllipseLayer,
-                                                    deleteLayer: deleteSelectedLayer)
+                                                    deleteLayer: deleteSelectedLayer),
         )
     }
 
@@ -323,7 +323,7 @@ struct EditorRootView: View {
             } else {
                 core.performUndo()
             }
-            self.registerInverse(redo: !redo, undoManager: undoManager)
+            registerInverse(redo: !redo, undoManager: undoManager)
         }
     }
 }
@@ -390,7 +390,7 @@ private struct TimelineResizeHandle: View {
                     // Dragging up (negative translation) grows the panel.
                     let next = start - value.translation.height
                     height = min(max(next, minHeight), maxHeight)
-                }
+                },
         )
     }
 }

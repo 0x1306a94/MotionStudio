@@ -21,14 +21,15 @@ struct TrackRow: View {
             TimeRangeTrackView(core: core, layerID: row.layerID,
                                isSelected: editorState.selectedLayerID == row.layerID,
                                editorState: editorState)
+
         case let .propertySpan(path, label):
             PropertyTrackView(core: core,
                               layerID: row.layerID,
                               path: path,
                               label: label,
-                              isSelected: isLayerSelected || editorState.selectedTimelineProperty == TimelinePropertySelection(layerID: row.layerID,
-                                                                                                                               path: path),
+                              isSelected: isLayerSelected || editorState.selectedTimelineProperty == TimelinePropertySelection(layerID: row.layerID, path: path),
                               editorState: editorState)
+
         case let .keyframeTrack(path, _):
             ManualKeyframeTrackView(core: core,
                                     layerID: row.layerID,
@@ -133,7 +134,7 @@ private struct TimeRangeBarBody: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(isSelected ? Color.white.opacity(0.65) : Color.secondary.opacity(0.14),
-                            lineWidth: 1)
+                            lineWidth: 1),
             )
     }
 
@@ -155,7 +156,7 @@ private struct PropertyTrackBar: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(isSelected ? Color.white.opacity(0.7) : Color.secondary.opacity(0.35),
-                            lineWidth: 1)
+                            lineWidth: 1),
             )
             .overlay(alignment: .leading) {
                 propertyEndpointHandle
@@ -313,7 +314,7 @@ private struct EasingSegmentBadge: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 5)
                     .stroke(isSelected ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.22),
-                            lineWidth: 1)
+                            lineWidth: 1),
             )
     }
 }

@@ -46,7 +46,7 @@ format_cpp_files() {
 format_swift_files() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        find "$dir" -name "*.swift" -print0 | xargs -0 -P 4 -n 20 swiftformat
+        find "$dir" -name "*.swift" -print0 | xargs -0 -P 4 -n 20 swiftformat --swift-version 6.3
     fi
 }
 

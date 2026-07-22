@@ -92,7 +92,7 @@ struct KeyframeDiamond: View {
                         }
                         guard let start = dragStartFrame else { return }
                         let target = Int64(
-                            (CGFloat(start) + value.translation.width / pixelsPerFrame).rounded()
+                            (CGFloat(start) + value.translation.width / pixelsPerFrame).rounded(),
                         )
                         let clamped = min(max(target, 0), duration)
                         if clamped != keyframe.frame {
@@ -102,7 +102,7 @@ struct KeyframeDiamond: View {
                     .onEnded { _ in
                         dragStartFrame = nil
                         onMoveEnded()
-                    }
+                    },
             )
             .contextMenu {
                 Button("Delete Keyframe", role: .destructive, action: onDelete)

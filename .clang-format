@@ -2,16 +2,15 @@ BasedOnStyle: LLVM
 PointerAlignment: Right
 AlignConsecutiveAssignments: false
 IndentWidth: 4
-UseTab:	Never
+UseTab: Never
 TabWidth: 4
 MaxEmptyLinesToKeep: 1
-BreakBeforeBraces: Attach
-AllowShortFunctionsOnASingleLine: false
-AllowShortIfStatementsOnASingleLine: false
-AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortBlocksOnASingleLine: Empty
 AllowShortCaseLabelsOnASingleLine: false
-AllowShortEnumsOnASingleLine: false
-AllowShortLambdasOnASingleLine: false
+AllowShortEnumsOnASingleLine: true
+AllowShortLambdasOnASingleLine: Empty
 AllowShortLoopsOnASingleLine: false
 AlignAfterOpenBracket: true
 IndentCaseLabels: true
@@ -30,4 +29,17 @@ AllowAllParametersOfDeclarationOnNextLine: true
 ContinuationIndentWidth: 4
 SpaceBeforeAssignmentOperators: true
 SpacesBeforeTrailingComments: 2
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterEnum: false
+  AfterStruct: false
+  AfterClass: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
 DisableFormat: false

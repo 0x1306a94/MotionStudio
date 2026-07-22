@@ -25,7 +25,7 @@ struct LayerEditStatus: View {
             .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+                    .stroke(Color.secondary.opacity(0.22), lineWidth: 1),
             )
         }
     }

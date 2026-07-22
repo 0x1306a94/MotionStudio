@@ -14,7 +14,7 @@
         var body: some View {
             WindowSizeRepresentable(
                 minimumWidthRatio: minimumWidthRatio,
-                minimumHeightRatio: minimumHeightRatio
+                minimumHeightRatio: minimumHeightRatio,
             )
         }
     }
@@ -63,7 +63,7 @@
             let screenSize = windowScene.screen.bounds.size
             windowScene.sizeRestrictions?.minimumSize = CGSize(
                 width: screenSize.width * minimumWidthRatio,
-                height: screenSize.height * minimumHeightRatio
+                height: screenSize.height * minimumHeightRatio,
             )
         }
 
