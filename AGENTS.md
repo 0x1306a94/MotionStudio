@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Motion Studio 是一个 2D 动效（Motion Graphics）动画工具（类似 After Effects / Rive 的子集）：图层 + Transform + 形状 + 关键帧动画。核心是平台无关的 C++17 静态库，第一阶段应用层为 macOS + iPadOS（SwiftUI + MetalKit）。
+Motion Studio 是一个 2D 动效（Motion Graphics）动画工具（类似 After Effects / Rive 的子集）：图层 + Transform + 形状 + 关键帧动画。核心是平台无关的 C++17 静态库，第一阶段应用层为 macOS Catalyst + iPadOS（SwiftUI + MetalKit）。
 
 ## 常用命令
 
@@ -41,7 +41,7 @@ ctest --test-dir build -L benchmark
 
 ```bash
 apps/gen_mac                        # 用 CMake 生成 apps/gen_xcode Xcode 工程，产物在 gen_xcode/Products/
-# 之后用 apps/MotionStudio.xcworkspace 构建 / 运行 MotionStudioApp（macOS 15.0 / iOS 18.0）
+# 之后用 apps/MotionStudio.xcworkspace 构建 / 运行 MotionStudioApp
 ```
 
 CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ninja 构建 → ctest。tgfx 预编译库按 `build/tgfx_prebuilt/` 缓存，命中时 Ninja 跳过 tgfx 编译。

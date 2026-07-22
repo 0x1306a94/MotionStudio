@@ -8,30 +8,8 @@
 //
 
 import SwiftUI
-#if os(macOS)
-    import AppKit
-#endif
 
 private let handleHeight: CGFloat = 6
-
-#if os(macOS)
-    /// Pins the editor window's min/max size to the screen it is on (40% x 30% up
-    /// to the full visible screen). SwiftUI exposes no scene modifier for this, so
-    /// it is applied through the underlying NSWindow once the view is on screen.
-    private struct WindowSizeConfigurator: NSViewRepresentable {
-        func makeNSView(context _: Context) -> NSView {
-            NSView()
-        }
-
-        func updateNSView(_ nsView: NSView, context _: Context) {
-            guard let window = nsView.window, let screen = window.screen else { return }
-            let visible = screen.visibleFrame
-            window.contentMinSize = NSSize(width: visible.width * 0.4,
-                                           height: visible.height * 0.3)
-            window.contentMaxSize = NSSize(width: visible.width, height: visible.height)
-        }
-    }
-#endif
 
 struct EditorRootView: View {
     let document: MotionDocument
@@ -41,10 +19,8 @@ struct EditorRootView: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    #if os(iOS)
-        @State private var showProject = false
-        @State private var showInspector = false
-    #endif
+    @State private var showProject = false
+    @State private var showInspector = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -68,7 +44,6 @@ struct EditorRootView: View {
                     .frame(height: clampedTimeline)
             }
         }
-        #if os(iOS)
         .toolbar {
             if horizontalSizeClass == .compact {
                 ToolbarItem(placement: .topBarLeading) {
@@ -99,10 +74,6 @@ struct EditorRootView: View {
                     .navigationTitle("Inspector")
             }
         }
-        #endif
-        #if os(macOS)
-        .background(WindowSizeConfigurator())
-        #endif
     }
 
     /// HSplitView/HStack size vertically to their columns' content height and
@@ -111,42 +82,23 @@ struct EditorRootView: View {
     /// collapse and float centered, which is what produced the empty bands).
     @ViewBuilder
     private func topColumns(height: CGFloat) -> some View {
-        #if os(macOS)
-            // HSplitView lays its panes at the split view's own height, so pin
-            // that height here and let the panes fill it (maxHeight: .infinity).
-            // Pinning each pane's height instead left a white band, because the
-            // split view then sized itself to the panes' content, not the region.
-            HSplitView {
+        if horizontalSizeClass == .regular {
+            HStack(alignment: .top, spacing: 0) {
                 ProjectPanelView(document: document, editorState: editorState, perform: perform)
-                    .frame(minWidth: 220, maxWidth: 300)
-                    .frame(maxHeight: .infinity)
-                CanvasContainer(document: document, editorState: editorState)
-                    .frame(minWidth: 320, maxWidth: .infinity)
-                    .frame(maxHeight: .infinity)
-                InspectorView(document: document, editorState: editorState, perform: perform)
-                    .frame(minWidth: 220, maxWidth: 300)
-                    .frame(maxHeight: .infinity)
-            }
-            .frame(height: height)
-        #else
-            if horizontalSizeClass == .regular {
-                HStack(alignment: .top, spacing: 0) {
-                    ProjectPanelView(document: document, editorState: editorState, perform: perform)
-                        .frame(width: 220, height: height)
-                    Divider().frame(height: height)
-                    CanvasContainer(document: document, editorState: editorState)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: height)
-                    Divider().frame(height: height)
-                    InspectorView(document: document, editorState: editorState, perform: perform)
-                        .frame(width: 280, height: height)
-                }
-            } else {
+                    .frame(width: 220, height: height)
+                Divider().frame(height: height)
                 CanvasContainer(document: document, editorState: editorState)
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
+                Divider().frame(height: height)
+                InspectorView(document: document, editorState: editorState, perform: perform)
+                    .frame(width: 280, height: height)
             }
-        #endif
+        } else {
+            CanvasContainer(document: document, editorState: editorState)
+                .frame(maxWidth: .infinity)
+                .frame(height: height)
+        }
     }
 
     // MARK: - Undo integration
@@ -197,29 +149,20 @@ private struct TimelineResizeHandle: View {
         }
         .frame(height: handleHeight)
         .contentShape(Rectangle())
-        #if os(macOS)
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeUpDown.push()
-                } else {
-                    NSCursor.pop()
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .updating($startHeight) { _, state, _ in
+                    if state == nil {
+                        state = height
+                    }
                 }
-            }
-        #endif
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($startHeight) { _, state, _ in
-                        if state == nil {
-                            state = height
-                        }
-                    }
-                    .onChanged { value in
-                        guard let start = startHeight else { return }
-                        // Dragging up (negative translation) grows the panel.
-                        let next = start - value.translation.height
-                        height = min(max(next, minHeight), maxHeight)
-                    }
-            )
+                .onChanged { value in
+                    guard let start = startHeight else { return }
+                    // Dragging up (negative translation) grows the panel.
+                    let next = start - value.translation.height
+                    height = min(max(next, minHeight), maxHeight)
+                }
+        )
     }
 }
 

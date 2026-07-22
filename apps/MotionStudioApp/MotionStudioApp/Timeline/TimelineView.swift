@@ -10,9 +10,6 @@
 //
 
 import SwiftUI
-#if os(macOS)
-    import AppKit
-#endif
 
 private let pixelsPerFrame: CGFloat = 6
 private let rowHeight: CGFloat = 28
@@ -152,15 +149,6 @@ private struct HorizontalSplitDivider: View {
             .overlay(Rectangle().fill(.separator).frame(width: 1))
             .frame(width: width)
             .contentShape(Rectangle())
-        #if os(macOS)
-            .onHover { hovering in
-                if hovering {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-        #endif
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .updating($startWidth) { _, state, _ in
