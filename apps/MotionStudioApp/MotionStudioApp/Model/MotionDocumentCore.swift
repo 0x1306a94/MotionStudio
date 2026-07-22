@@ -57,9 +57,8 @@ final class MotionDocumentCore {
     /// Invoked after every mutation, on the main actor. The document wires this
     /// to its objectWillChange publisher so the system tracks the edited state
     /// (title-bar dot, close prompt, Save menu item). nonisolated(unsafe) so the
-    /// nonisolated document init can install it; the closure only calls the
-    /// nonisolated publisher.send() and is set once before any mutation.
-    nonisolated(unsafe) var onDidChange: (() -> Void)?
+    /// nonisolated document init can install it; it is set once before any mutation.
+    nonisolated(unsafe) var onDidChange: (@MainActor () -> Void)?
 
     /// Construction is main-actor independent (plain C calls), so document
     /// creation works from @Sendable contexts like DocumentGroup.makeDocument.

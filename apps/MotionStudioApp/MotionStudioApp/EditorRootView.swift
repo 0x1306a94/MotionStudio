@@ -13,11 +13,19 @@ private let handleHeight: CGFloat = 6
 
 struct EditorRootView: View {
     let document: MotionDocument
+    let fileURL: URL?
 
     @State private var editorState = EditorState()
     @State private var timelineHeight: CGFloat = 220
+    @State private var exportDocument = MotionDocumentExport()
+    @State private var isSaveAsPresented = false
+    @State private var saveError: MotionDocumentSaveError?
+    @State private var commandRegistrationID = UUID()
+    @State private var currentFileURL: URL?
+    @State private var savedRevision: Int?
     @Environment(\.undoManager) private var undoManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showProject = false
     @State private var showInspector = false
@@ -57,6 +65,9 @@ struct EditorRootView: View {
                     }
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                UnsavedChangesIndicator(isVisible: hasUnsavedChanges)
+            }
         }
         .sheet(isPresented: $showProject) {
             NavigationStack {
@@ -72,6 +83,68 @@ struct EditorRootView: View {
                               editorState: editorState,
                               perform: perform)
                     .navigationTitle("Inspector")
+            }
+        }
+        .onAppear {
+            initializeSaveStateIfNeeded()
+            registerDocumentCommands()
+        }
+        .onDisappear {
+            MotionDocumentCommandRegistry.shared.unregister(id: commandRegistrationID)
+        }
+        .onChange(of: document.core.revision) { _, _ in
+            registerDocumentCommands()
+        }
+        .onChange(of: fileURL) { _, newURL in
+            currentFileURL = newURL
+            markSaved()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                registerDocumentCommands()
+            }
+        }
+        .fileExporter(isPresented: $isSaveAsPresented,
+                      document: exportDocument,
+                      contentType: .motionStudioDocument,
+                      defaultFilename: defaultExportFilename) { result in
+            switch result {
+            case let .success(url):
+                currentFileURL = url
+                markSaved()
+            case let .failure(error):
+                saveError = MotionDocumentSaveError(message: error.localizedDescription)
+            }
+        }
+        .alert("Save Failed", isPresented: saveErrorIsPresented) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveError?.message ?? "The document could not be saved.")
+        }
+    }
+
+    private var documentRevision: Int {
+        document.core.revision
+    }
+
+    private var hasUnsavedChanges: Bool {
+        currentFileURL == nil || savedRevision != documentRevision
+    }
+
+    private var canSaveDocument: Bool {
+        hasUnsavedChanges
+    }
+
+    private var defaultExportFilename: String {
+        currentFileURL?.deletingPathExtension().lastPathComponent ?? "Untitled"
+    }
+
+    private var saveErrorIsPresented: Binding<Bool> {
+        Binding {
+            saveError != nil
+        } set: { isPresented in
+            if !isPresented {
+                saveError = nil
             }
         }
     }
@@ -99,6 +172,52 @@ struct EditorRootView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
         }
+    }
+
+    // MARK: - Saving
+
+    private func initializeSaveStateIfNeeded() {
+        guard savedRevision == nil else { return }
+        currentFileURL = fileURL
+        savedRevision = documentRevision
+    }
+
+    private func registerDocumentCommands() {
+        MotionDocumentCommandRegistry.shared.register(
+            id: commandRegistrationID,
+            handlers: MotionDocumentCommandHandlers(canSave: canSaveDocument,
+                                                    save: saveDocument,
+                                                    saveAs: prepareSaveAs)
+        )
+    }
+
+    private func saveDocument() {
+        guard let currentFileURL else {
+            prepareSaveAs()
+            return
+        }
+
+        do {
+            let data = try document.snapshot(contentType: .motionStudioDocument)
+            try data.write(to: currentFileURL, options: .atomic)
+            markSaved()
+        } catch {
+            saveError = MotionDocumentSaveError(message: error.localizedDescription)
+        }
+    }
+
+    private func prepareSaveAs() {
+        do {
+            exportDocument = MotionDocumentExport(data: try document.snapshot(contentType: .motionStudioDocument))
+            isSaveAsPresented = true
+        } catch {
+            saveError = MotionDocumentSaveError(message: error.localizedDescription)
+        }
+    }
+
+    private func markSaved() {
+        savedRevision = documentRevision
+        registerDocumentCommands()
     }
 
     // MARK: - Undo integration
@@ -131,6 +250,26 @@ struct EditorRootView: View {
                 core.performUndo()
             }
             self.registerInverse(redo: !redo, undoManager: undoManager)
+        }
+    }
+}
+
+private struct UnsavedChangesIndicator: View {
+    let isVisible: Bool
+
+    var body: some View {
+        if isVisible {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(.orange)
+                    .frame(width: 7, height: 7)
+                Text("Unsaved")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 10)
+            .accessibilityLabel("Unsaved changes")
         }
     }
 }

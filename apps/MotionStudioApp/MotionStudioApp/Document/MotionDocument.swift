@@ -34,7 +34,7 @@ final class MotionDocument: ReferenceFileDocument {
     // synthesized ObservableObject witness would be main-actor isolated and
     // cannot satisfy the protocol's nonisolated requirement.
     nonisolated(unsafe) private let publisher = ObservableObjectPublisher()
-    nonisolated(unsafe) var objectWillChange: ObservableObjectPublisher {
+    nonisolated var objectWillChange: ObservableObjectPublisher {
         publisher
     }
 
@@ -55,13 +55,11 @@ final class MotionDocument: ReferenceFileDocument {
 
     /// Forwards every core mutation to objectWillChange so the document system
     /// marks the document edited (title-bar dot, close prompt, Save enabling).
-    /// nonisolated so it can run from the nonisolated inits; the closure only
-    /// touches the nonisolated publisher and is invoked on the main actor.
+    /// nonisolated so it can run from the nonisolated inits; the callback is
+    /// typed as @MainActor and only touches the nonisolated publisher.
     private nonisolated func bindChangeTracking() {
         core.onDidChange = { [weak self] in
-            Task { @MainActor in
-                self?.publisher.send()
-            }
+            self?.publisher.send()
         }
     }
 
