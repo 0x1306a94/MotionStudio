@@ -53,20 +53,25 @@ struct EditorRootView: View {
                     .frame(height: clampedTimeline)
             }
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .toolbar {
             if horizontalSizeClass == .compact {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showProject = true } label: {
-                        Image(systemName: "folder")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showInspector = true } label: {
-                        Image(systemName: "slider.horizontal.3")
+                        Label("Project", systemImage: "folder")
                     }
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                #if !targetEnvironment(macCatalyst)
+                    layerCreationMenu
+                    saveButton
+                #endif
+                if horizontalSizeClass == .compact {
+                    Button { showInspector = true } label: {
+                        Label("Inspector", systemImage: "slider.horizontal.3")
+                    }
+                }
                 UnsavedChangesIndicator(isVisible: hasUnsavedChanges)
             }
         }
@@ -150,6 +155,35 @@ struct EditorRootView: View {
                 saveError = nil
             }
         }
+    }
+
+    private var layerCreationMenu: some View {
+        Menu {
+            Button {
+                addRectangleLayer()
+            } label: {
+                Label("Rectangle", systemImage: "rectangle")
+            }
+
+            Button {
+                addEllipseLayer()
+            } label: {
+                Label("Ellipse", systemImage: "circle")
+            }
+        } label: {
+            Label("Add Layer", systemImage: "plus")
+        }
+        .accessibilityLabel("Add Layer")
+    }
+
+    private var saveButton: some View {
+        Button {
+            saveDocument()
+        } label: {
+            Label("Save", systemImage: "square.and.arrow.down")
+        }
+        .disabled(!canSaveDocument)
+        .accessibilityLabel("Save")
     }
 
     /// HSplitView/HStack size vertically to their columns' content height and

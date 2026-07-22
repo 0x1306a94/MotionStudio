@@ -1,0 +1,145 @@
+//
+//  TransformInspector.swift
+//  MotionStudioApp
+//
+
+import SwiftUI
+
+struct TransformInspector: View {
+    let core: MotionDocumentCore
+    let layerID: UInt64
+    let playheadFrame: Int64
+    let isEditable: Bool
+    let perform: (String, () -> Void) -> Void
+
+    var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
+        let position = core.evaluateVec2(entityID: layerID,
+                                         path: TransformProperty.position.path,
+                                         frame: playheadFrame)
+        let scale = core.evaluateVec2(entityID: layerID,
+                                      path: TransformProperty.scale.path,
+                                      frame: playheadFrame)
+
+        NumberPropertyRow(label: TransformField.positionX.label,
+                          value: Float(position.dx),
+                          hasKeyframeAtPlayhead: hasKeyframe(.position),
+                          isEditable: isEditable)
+        { newValue in
+            performSet(.position) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.position.path,
+                                   value: CGVector(dx: CGFloat(newValue), dy: position.dy))
+            }
+        } onToggleKeyframe: { _ in
+            toggleVec2Keyframe(.position)
+        }
+
+        NumberPropertyRow(label: TransformField.positionY.label,
+                          value: Float(position.dy),
+                          hasKeyframeAtPlayhead: hasKeyframe(.position),
+                          isEditable: isEditable)
+        { newValue in
+            performSet(.position) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.position.path,
+                                   value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
+            }
+        } onToggleKeyframe: { _ in
+            toggleVec2Keyframe(.position)
+        }
+
+        NumberPropertyRow(label: TransformField.scaleX.label,
+                          value: Float(scale.dx),
+                          hasKeyframeAtPlayhead: hasKeyframe(.scale),
+                          isEditable: isEditable)
+        { newValue in
+            performSet(.scale) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.scale.path,
+                                   value: CGVector(dx: CGFloat(newValue), dy: scale.dy))
+            }
+        } onToggleKeyframe: { _ in
+            toggleVec2Keyframe(.scale)
+        }
+
+        NumberPropertyRow(label: TransformField.scaleY.label,
+                          value: Float(scale.dy),
+                          hasKeyframeAtPlayhead: hasKeyframe(.scale),
+                          isEditable: isEditable)
+        { newValue in
+            performSet(.scale) {
+                core.setStaticVec2(entityID: layerID, path: TransformProperty.scale.path,
+                                   value: CGVector(dx: scale.dx, dy: CGFloat(newValue)))
+            }
+        } onToggleKeyframe: { _ in
+            toggleVec2Keyframe(.scale)
+        }
+
+        NumberPropertyRow(label: TransformField.rotation.label,
+                          value: core.evaluateFloat(entityID: layerID,
+                                                    path: TransformProperty.rotation.path,
+                                                    frame: playheadFrame),
+                          hasKeyframeAtPlayhead: hasKeyframe(.rotation),
+                          isEditable: isEditable)
+        { newValue in
+            performSet(.rotation) {
+                core.setStaticFloat(entityID: layerID, path: TransformProperty.rotation.path, value: newValue)
+            }
+        } onToggleKeyframe: { value in
+            toggleFloatKeyframe(.rotation, value: value)
+        }
+
+        NumberPropertyRow(label: TransformField.opacity.label,
+                          value: core.evaluateFloat(entityID: layerID,
+                                                    path: TransformProperty.opacity.path,
+                                                    frame: playheadFrame),
+                          hasKeyframeAtPlayhead: hasKeyframe(.opacity),
+                          isEditable: isEditable)
+        { newValue in
+            performSet(.opacity) {
+                core.setStaticFloat(entityID: layerID, path: TransformProperty.opacity.path, value: newValue)
+            }
+        } onToggleKeyframe: { value in
+            toggleFloatKeyframe(.opacity, value: value)
+        }
+    }
+
+    private func hasKeyframe(_ property: TransformProperty) -> Bool {
+        core.keyframes(entityID: layerID, path: property.path).contains { $0.frame == playheadFrame }
+    }
+
+    private func performSet(_ property: TransformProperty, action: () -> Void) {
+        guard isEditable else { return }
+        perform("Set \(property.actionLabel)", action)
+    }
+
+    private func toggleFloatKeyframe(_ property: TransformProperty, value: Float) {
+        guard isEditable else { return }
+        if hasKeyframe(property) {
+            removeKeyframe(property)
+        } else {
+            perform("Add Keyframe") {
+                core.addKeyframeFloat(entityID: layerID, path: property.path,
+                                      frame: playheadFrame, value: value)
+            }
+        }
+    }
+
+    private func toggleVec2Keyframe(_ property: TransformProperty) {
+        guard isEditable else { return }
+        if hasKeyframe(property) {
+            removeKeyframe(property)
+        } else {
+            let value = core.evaluateVec2(entityID: layerID, path: property.path, frame: playheadFrame)
+            perform("Add Keyframe") {
+                core.addKeyframeVec2(entityID: layerID, path: property.path,
+                                     frame: playheadFrame, value: value)
+            }
+        }
+    }
+
+    private func removeKeyframe(_ property: TransformProperty) {
+        perform("Delete Keyframe") {
+            core.removeKeyframe(entityID: layerID, path: property.path, frame: playheadFrame)
+        }
+    }
+}
