@@ -172,6 +172,19 @@ final class MotionDocumentCore {
         ms_layer_locked(handle, layerID)
     }
 
+    func layerInPoint(_ layerID: UInt64) -> Int64 {
+        ms_layer_in_point(handle, layerID)
+    }
+
+    func layerOutPoint(_ layerID: UInt64) -> Int64 {
+        ms_layer_out_point(handle, layerID)
+    }
+
+    /// MS_LAYER_* type tag; -1 when the layer does not exist.
+    func layerType(_ layerID: UInt64) -> Int32 {
+        ms_layer_type(handle, layerID)
+    }
+
     // MARK: - Property queries
 
     /// Whether the entity exposes the given property path at all.

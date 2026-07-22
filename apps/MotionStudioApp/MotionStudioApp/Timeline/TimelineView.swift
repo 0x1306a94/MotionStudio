@@ -2,21 +2,58 @@
 //  TimelineView.swift
 //  MotionStudioApp
 //
-//  After-Effects-style timeline: a horizontally-frozen left layer stack
-//  (name + visibility + lock) and a right time graph with one keyframe row per
-//  layer. The body scrolls vertically when layers overflow (layer stack and
-//  graph stay in lockstep); the ruler stays pinned above. Horizontal pan/zoom
-//  is intentionally deferred, so the left stack is frozen on both axes.
+//  After-Effects/Figma-Motion-style timeline: a horizontally-frozen left layer
+//  tree (layer rows plus an indented sub-row per animated property) and a right
+//  time graph with a clip bar per layer and a keyframe lane per animated
+//  property. The body scrolls vertically when rows overflow (layer tree and
+//  graph stay in lockstep via a shared flattened row model); the ruler stays
+//  pinned above. Horizontal pan/zoom is intentionally deferred, so the left
+//  tree is frozen on both axes.
 //
 
 import SwiftUI
 
 private let pixelsPerFrame: CGFloat = 6
-private let rowHeight: CGFloat = 28
+private let layerRowHeight: CGFloat = 30
+private let propertyRowHeight: CGFloat = 24
 private let rulerHeight: CGFloat = 24
 private let splitDividerWidth: CGFloat = 5
 private let minLayerColumnWidth: CGFloat = 120
 private let maxLayerColumnWidth: CGFloat = 480
+
+/// Animated properties offered as timeline sub-rows, in display order.
+private struct PropertySpec {
+    let path: String
+    let label: String
+}
+
+private let transformSpecs: [PropertySpec] = [
+    .init(path: "transform.position", label: "Position"),
+    .init(path: "transform.scale", label: "Scale"),
+    .init(path: "transform.rotation", label: "Rotation"),
+    .init(path: "transform.opacity", label: "Opacity"),
+]
+private let shapeSizeSpec = PropertySpec(path: "elements[0].size", label: "Size")
+
+/// One row of the flattened timeline model. Both the left tree and the right
+/// graph iterate the same array so layer rows and property sub-rows line up
+/// vertically for lockstep scrolling.
+private struct TimelineRow: Identifiable {
+    enum RowID: Hashable {
+        case layer(UInt64)
+        case property(UInt64, String)
+    }
+
+    let id: RowID
+    let layerID: UInt64
+    let isLayer: Bool
+    let path: String?
+    let label: String?
+
+    var height: CGFloat {
+        isLayer ? layerRowHeight : propertyRowHeight
+    }
+}
 
 struct TimelineView: View {
     let document: MotionDocument
@@ -34,7 +71,9 @@ struct TimelineView: View {
         let duration = core.duration(compositionID: compositionID)
         let frameRate = core.frameRate(compositionID: compositionID)
         let layerIDs = Array(core.layerIDs(compositionID: compositionID).reversed())
+        let rows = buildRows(core: core, layerIDs: layerIDs)
         let trackWidth = max(CGFloat(duration) * pixelsPerFrame, 1)
+        let playheadX = CGFloat(editorState.playheadFrame) * pixelsPerFrame
 
         VStack(alignment: .leading, spacing: 0) {
             TimelineControls(editorState: editorState, duration: duration)
@@ -48,10 +87,9 @@ struct TimelineView: View {
                     .frame(height: rulerHeight)
                 ZStack(alignment: .topLeading) {
                     RulerCanvas(duration: duration, frameRate: frameRate)
-                    Rectangle()
-                        .fill(.red)
-                        .frame(width: 1.5, height: rulerHeight)
-                        .offset(x: CGFloat(editorState.playheadFrame) * pixelsPerFrame)
+                    PlayheadHead()
+                        .frame(height: rulerHeight)
+                        .offset(x: playheadX - 4)
                         .allowsHitTesting(false)
                 }
                 .frame(width: trackWidth, height: rulerHeight)
@@ -60,10 +98,10 @@ struct TimelineView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Divider()
-            // Vertically scrolling body: layer stack + graph in lockstep.
+            // Vertically scrolling body: layer tree + graph in lockstep.
             ScrollView(.vertical) {
                 HStack(alignment: .top, spacing: 0) {
-                    LayerColumn(core: core, layerIDs: layerIDs, editorState: editorState,
+                    LayerColumn(core: core, rows: rows, editorState: editorState,
                                 perform: perform)
                         .frame(width: layerColumnWidth)
                         .frame(maxHeight: .infinity, alignment: .top)
@@ -72,21 +110,21 @@ struct TimelineView: View {
                         .frame(maxHeight: .infinity)
                     ZStack(alignment: .topLeading) {
                         VStack(spacing: 0) {
-                            ForEach(layerIDs, id: \.self) { id in
+                            ForEach(rows) { row in
                                 TrackRow(core: core,
-                                         layerID: id,
+                                         row: row,
                                          duration: duration,
                                          perform: perform,
                                          registerEdit: registerEdit)
-                                    .frame(height: rowHeight)
+                                    .frame(height: row.height)
                             }
                         }
                         // Playhead spans every row.
                         Rectangle()
-                            .fill(.red)
+                            .fill(.blue)
                             .frame(width: 1.5)
                             .frame(maxHeight: .infinity)
-                            .offset(x: CGFloat(editorState.playheadFrame) * pixelsPerFrame)
+                            .offset(x: playheadX - 0.75)
                             .allowsHitTesting(false)
                         // Narrow grab strip so the playhead itself is draggable
                         // without stealing vertical scroll from the rest of the lane.
@@ -95,7 +133,7 @@ struct TimelineView: View {
                             .contentShape(Rectangle())
                             .frame(width: 12)
                             .frame(maxHeight: .infinity)
-                            .offset(x: CGFloat(editorState.playheadFrame) * pixelsPerFrame - 6)
+                            .offset(x: playheadX - 6)
                             .gesture(playheadDrag(duration: duration))
                     }
                     .frame(width: trackWidth)
@@ -110,6 +148,26 @@ struct TimelineView: View {
         // Faint panel tint so empty lane areas read as a filled panel flush to
         // the window edges rather than as gaps.
         .background(Color.primary.opacity(0.04))
+    }
+
+    /// Flattens the layer stack into a lockstep row sequence: each layer emits a
+    /// layer row followed by one sub-row per currently-animated property.
+    private func buildRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [TimelineRow] {
+        var rows: [TimelineRow] = []
+        for layerID in layerIDs {
+            rows.append(TimelineRow(id: .layer(layerID), layerID: layerID,
+                                    isLayer: true, path: nil, label: nil))
+            for spec in transformSpecs where core.isAnimated(entityID: layerID, path: spec.path) {
+                rows.append(TimelineRow(id: .property(layerID, spec.path), layerID: layerID,
+                                        isLayer: false, path: spec.path, label: spec.label))
+            }
+            if core.isAnimated(entityID: layerID, path: shapeSizeSpec.path) {
+                rows.append(TimelineRow(id: .property(layerID, shapeSizeSpec.path),
+                                        layerID: layerID, isLayer: false,
+                                        path: shapeSizeSpec.path, label: shapeSizeSpec.label))
+            }
+        }
+        return rows
     }
 
     private func scrubGesture(duration: Int64) -> some Gesture {
@@ -164,7 +222,7 @@ private struct HorizontalSplitDivider: View {
     }
 }
 
-// MARK: - Layer column
+// MARK: - Layer column (tree)
 
 private struct LayerColumnHeader: View {
     var body: some View {
@@ -180,15 +238,23 @@ private struct LayerColumnHeader: View {
 
 private struct LayerColumn: View {
     let core: MotionDocumentCore
-    let layerIDs: [UInt64]
+    let rows: [TimelineRow]
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(layerIDs, id: \.self) { id in
-                LayerRow(core: core, layerID: id, editorState: editorState, perform: perform)
-                    .frame(height: rowHeight)
+            ForEach(rows) { row in
+                if row.isLayer {
+                    LayerRow(core: core, layerID: row.layerID,
+                             editorState: editorState, perform: perform)
+                        .frame(height: row.height)
+                } else {
+                    PropertySubRow(core: core, layerID: row.layerID,
+                                   label: row.label ?? "", path: row.path ?? "",
+                                   editorState: editorState)
+                        .frame(height: row.height)
+                }
             }
         }
     }
@@ -205,6 +271,11 @@ private struct LayerRow: View {
         let visible = core.layerIsVisible(layerID)
         let locked = core.layerIsLocked(layerID)
         HStack(spacing: 6) {
+            Image(systemName: layerSymbol(core.layerType(layerID)))
+                .foregroundStyle(.secondary)
+            Text(core.layerName(layerID))
+                .lineLimit(1)
+            Spacer()
             Button {
                 perform(visible ? "Hide Layer" : "Show Layer") {
                     core.setLayerVisible(layerID, visible: !visible)
@@ -223,9 +294,6 @@ private struct LayerRow: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            Text(core.layerName(layerID))
-                .lineLimit(1)
-            Spacer()
         }
         .font(.callout)
         .padding(.horizontal, 8)
@@ -236,20 +304,150 @@ private struct LayerRow: View {
     }
 }
 
-// MARK: - Track row
+/// Indented sub-row naming one animated property. The trailing diamond mirrors
+/// the inspector: filled when a keyframe sits on the playhead. Tapping selects
+/// the owning layer so the inspector follows.
+private struct PropertySubRow: View {
+    let core: MotionDocumentCore
+    let layerID: UInt64
+    let label: String
+    let path: String
+    let editorState: EditorState
+
+    var body: some View {
+        let hasKeyframe = core.keyframes(entityID: layerID, path: path)
+            .contains { $0.frame == editorState.playheadFrame }
+        HStack(spacing: 4) {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            if hasKeyframe {
+                Image(systemName: "diamond.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.yellow)
+            }
+        }
+        .font(.caption)
+        .padding(.leading, 28)
+        .padding(.trailing, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { editorState.selectedLayerID = layerID }
+    }
+}
+
+/// Maps the bridge MS_LAYER_* type tag to an SF Symbol. Shape layers (the only
+/// kind creatable today) fall through to the default square glyph.
+private func layerSymbol(_ type: Int32) -> String {
+    switch type {
+    case 1:
+        return "photo"
+    case 2:
+        return "textformat"
+    case 3:
+        return "circle.dashed"
+    case 4:
+        return "film"
+    default:
+        return "square"
+    }
+}
+
+// MARK: - Track row (graph)
 
 private struct TrackRow: View {
     let core: MotionDocumentCore
-    let layerID: UInt64
+    let row: TimelineRow
     let duration: Int64
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
 
     var body: some View {
-        let path = "transform.position"
+        if row.isLayer {
+            ClipBarView(core: core, layerID: row.layerID)
+        } else {
+            PropertyLaneView(core: core,
+                             layerID: row.layerID,
+                             path: row.path ?? "",
+                             label: row.label ?? "",
+                             duration: duration,
+                             perform: perform,
+                             registerEdit: registerEdit)
+        }
+    }
+}
+
+/// Static clip bar spanning the layer's in/out points: a hatched rounded strip
+/// with end handles. Drawn in one Canvas so the hatching clips to the corners.
+private struct ClipBarView: View {
+    let core: MotionDocumentCore
+    let layerID: UInt64
+
+    var body: some View {
+        let inPoint = CGFloat(core.layerInPoint(layerID))
+        let outPoint = CGFloat(core.layerOutPoint(layerID))
+        let originX = inPoint * pixelsPerFrame
+        let barWidth = max((outPoint - inPoint) * pixelsPerFrame, 2)
+
+        Canvas { context, size in
+            let rect = CGRect(x: originX, y: 4, width: barWidth, height: size.height - 8)
+            let outline = Path(roundedRect: rect, cornerRadius: 4)
+            context.fill(outline, with: .color(Color.secondary.opacity(0.12)))
+
+            context.clip(to: outline)
+            var stripes = Path()
+            let step: CGFloat = 6
+            var stripeX = rect.minX - rect.height
+            while stripeX < rect.maxX {
+                stripes.move(to: CGPoint(x: stripeX, y: rect.maxY))
+                stripes.addLine(to: CGPoint(x: stripeX + rect.height, y: rect.minY))
+                stripeX += step
+            }
+            context.stroke(stripes, with: .color(Color.secondary.opacity(0.18)), lineWidth: 1)
+
+            context.stroke(outline, with: .color(Color.secondary.opacity(0.35)), lineWidth: 1)
+            for handleX in [rect.minX, rect.maxX] {
+                let handle = Path(roundedRect: CGRect(x: handleX - 1.5, y: rect.minY + 2,
+                                                      width: 3, height: rect.height - 4),
+                                  cornerRadius: 1.5)
+                context.fill(handle, with: .color(Color.secondary.opacity(0.5)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// One animated property's lane: a span bar over the first/last keyframe with
+/// the property name centered in it, plus draggable keyframe diamonds.
+private struct PropertyLaneView: View {
+    let core: MotionDocumentCore
+    let layerID: UInt64
+    let path: String
+    let label: String
+    let duration: Int64
+    let perform: (String, () -> Void) -> Void
+    let registerEdit: (String) -> Void
+
+    var body: some View {
         let keyframes = core.keyframes(entityID: layerID, path: path)
-        ZStack {
+        let frames = keyframes.map(\.frame)
+        let firstFrame = frames.min()
+        let lastFrame = frames.max()
+
+        ZStack(alignment: .topLeading) {
             Color.clear
+            if let firstFrame, let lastFrame {
+                let barX = CGFloat(firstFrame) * pixelsPerFrame
+                let barWidth = max(CGFloat(lastFrame - firstFrame) * pixelsPerFrame, 2)
+                let barHeight = propertyRowHeight - 8
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.secondary.opacity(0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.secondary.opacity(0.4), lineWidth: 1))
+                    .overlay(spanLabel(barWidth: barWidth))
+                    .frame(width: barWidth, height: barHeight)
+                    .offset(x: barX, y: (propertyRowHeight - barHeight) / 2)
+            }
             ForEach(keyframes) { keyframe in
                 KeyframeDiamond(keyframe: keyframe, duration: duration) { from, to in
                     core.moveKeyframe(entityID: layerID, path: path, from: from, to: to)
@@ -269,6 +467,17 @@ private struct TrackRow: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func spanLabel(barWidth: CGFloat) -> some View {
+        if barWidth > 40 {
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .padding(.horizontal, 4)
+        }
     }
 }
 
@@ -299,6 +508,24 @@ private struct RulerCanvas: View {
     }
 }
 
+// MARK: - Playhead head
+
+/// Blue downward triangle that caps the playhead in the ruler, matching the
+/// Figma-Motion style. Centered over the playhead x by the caller's offset.
+private struct PlayheadHead: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "arrowtriangle.down.fill")
+                .foregroundStyle(.blue)
+                .font(.system(size: 9))
+                .frame(height: 8)
+            Rectangle()
+                .fill(.blue)
+                .frame(width: 1.5)
+        }
+    }
+}
+
 // MARK: - Keyframe diamond
 
 /// Draggable keyframe diamond. The drag's translation is measured from the
@@ -317,7 +544,7 @@ private struct KeyframeDiamond: View {
         Image(systemName: "diamond.fill")
             .font(.system(size: 11))
             .foregroundStyle(.yellow)
-            .position(x: CGFloat(keyframe.frame) * pixelsPerFrame, y: rowHeight / 2)
+            .position(x: CGFloat(keyframe.frame) * pixelsPerFrame, y: propertyRowHeight / 2)
             .gesture(
                 DragGesture()
                     .onChanged { value in
