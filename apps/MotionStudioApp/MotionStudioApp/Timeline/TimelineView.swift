@@ -75,7 +75,6 @@ struct TimelineView: View {
                             ForEach(layerIDs, id: \.self) { id in
                                 TrackRow(core: core,
                                          layerID: id,
-                                         property: editorState.timelineProperty,
                                          duration: duration,
                                          perform: perform,
                                          registerEdit: registerEdit)
@@ -242,13 +241,12 @@ private struct LayerRow: View {
 private struct TrackRow: View {
     let core: MotionDocumentCore
     let layerID: UInt64
-    let property: TimelineProperty
     let duration: Int64
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
 
     var body: some View {
-        let path = property.rawValue
+        let path = "transform.position"
         let keyframes = core.keyframes(entityID: layerID, path: path)
         ZStack {
             Color.clear

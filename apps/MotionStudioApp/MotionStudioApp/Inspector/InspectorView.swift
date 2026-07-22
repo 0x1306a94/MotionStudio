@@ -2,11 +2,13 @@
 //  InspectorView.swift
 //  MotionStudioApp
 //
-//  Property inspector for the selected layer: transform fields with
-//  per-property "add keyframe at playhead" buttons.
+//  Property inspector for the selected layer: shape size and transform
+//  fields with per-property "add keyframe at playhead" buttons.
 //
 
 import SwiftUI
+
+private let shapeSizePath = "elements[0].size"
 
 struct InspectorView: View {
     let document: MotionDocument
@@ -14,7 +16,6 @@ struct InspectorView: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
-        @Bindable var editorState = editorState
         let core = document.core
         if let layerID = editorState.selectedLayerID {
             let _ = core.revision
@@ -22,12 +23,15 @@ struct InspectorView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(core.layerName(layerID))
                         .font(.headline)
-                    Picker("Timeline lane", selection: $editorState.timelineProperty) {
-                        ForEach(TimelineProperty.allCases, id: \.self) { property in
-                            Text(property.label).tag(property)
-                        }
+                    if core.hasProperty(entityID: layerID, path: shapeSizePath) {
+                        Text("Shape")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        ShapeSizeInspector(core: core,
+                                           layerID: layerID,
+                                           playheadFrame: editorState.playheadFrame,
+                                           perform: perform)
                     }
-                    .pickerStyle(.segmented)
                     Text("Transform")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -117,6 +121,55 @@ private struct TransformInspector: View {
         let value = core.staticVec2(entityID: layerID, path: path)
         perform("Add Keyframe") {
             core.addKeyframeVec2(entityID: layerID, path: path,
+                                 frame: playheadFrame, value: value)
+        }
+    }
+}
+
+/// Shape geometry editor for rect/ellipse layers: width/height fields with
+/// per-property "add keyframe at playhead" buttons.
+private struct ShapeSizeInspector: View {
+    let core: MotionDocumentCore
+    let layerID: UInt64
+    let playheadFrame: Int64
+    let perform: (String, () -> Void) -> Void
+
+    var body: some View {
+        let size = core.staticVec2(entityID: layerID, path: shapeSizePath)
+
+        NumberPropertyRow(label: "Width",
+                          value: Float(size.dx),
+                          hasKeyframeAtPlayhead: hasKeyframe())
+        { newValue in
+            perform("Set Size") {
+                core.setStaticVec2(entityID: layerID, path: shapeSizePath,
+                                   value: CGVector(dx: CGFloat(newValue), dy: size.dy))
+            }
+        } onAddKeyframe: { _ in
+            addSizeKeyframe()
+        }
+
+        NumberPropertyRow(label: "Height",
+                          value: Float(size.dy),
+                          hasKeyframeAtPlayhead: hasKeyframe())
+        { newValue in
+            perform("Set Size") {
+                core.setStaticVec2(entityID: layerID, path: shapeSizePath,
+                                   value: CGVector(dx: size.dx, dy: CGFloat(newValue)))
+            }
+        } onAddKeyframe: { _ in
+            addSizeKeyframe()
+        }
+    }
+
+    private func hasKeyframe() -> Bool {
+        core.keyframes(entityID: layerID, path: shapeSizePath).contains { $0.frame == playheadFrame }
+    }
+
+    private func addSizeKeyframe() {
+        let value = core.staticVec2(entityID: layerID, path: shapeSizePath)
+        perform("Add Keyframe") {
+            core.addKeyframeVec2(entityID: layerID, path: shapeSizePath,
                                  frame: playheadFrame, value: value)
         }
     }

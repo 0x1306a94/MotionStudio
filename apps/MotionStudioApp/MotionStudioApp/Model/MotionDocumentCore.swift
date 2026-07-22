@@ -174,6 +174,11 @@ final class MotionDocumentCore {
 
     // MARK: - Property queries
 
+    /// Whether the entity exposes the given property path at all.
+    func hasProperty(entityID: UInt64, path: String) -> Bool {
+        ms_property_type(handle, entityID, path) >= 0
+    }
+
     func staticFloat(entityID: UInt64, path: String) -> Float {
         ms_property_static_float(handle, entityID, path)
     }
