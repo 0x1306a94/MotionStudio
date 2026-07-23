@@ -18,7 +18,9 @@ extension EditorViewController {
 
         let canvasController = CanvasViewController(document: document.modelDocument,
                                                     editorState: editorState,
-                                                    clearSelection: clearSelection)
+                                                    clearSelection: { [weak self] in
+                                                        self?.clearSelection()
+                                                    })
         canvasController.view.translatesAutoresizingMaskIntoConstraints = false
         addChild(canvasController)
         canvasViewport.addSubview(canvasController.view)
@@ -192,9 +194,15 @@ extension EditorViewController {
 
         let timelineHost = UIHostingController(rootView: UIKitTimelineHostView(document: document.modelDocument,
                                                                                editorState: editorState,
-                                                                               perform: perform,
-                                                                               registerEdit: registerEdit,
-                                                                               clearSelection: clearSelection))
+                                                                               perform: { [weak self] name, edit in
+                                                                                   self?.perform(name, edit: edit)
+                                                                               },
+                                                                               registerEdit: { [weak self] name in
+                                                                                   self?.registerEdit(name)
+                                                                               },
+                                                                               clearSelection: { [weak self] in
+                                                                                   self?.clearSelection()
+                                                                               }))
         timelineHost.view.translatesAutoresizingMaskIntoConstraints = false
         timelineHost.view.backgroundColor = .clear
         addChild(timelineHost)

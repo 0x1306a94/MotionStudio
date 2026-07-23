@@ -64,6 +64,26 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
     }
 
+    /// Stops continuous preview redraw. Must be called before the editor scene tears down,
+    /// otherwise MTKView keeps drawing while the controller is retained.
+    func stopPlayback() {
+        let wasPlaying = isPlaying
+        isPlaying = false
+        guard isViewLoaded else { return }
+        configurePlayback(false, wasPlaying: wasPlaying)
+    }
+
+    func shutdown() {
+        stopPlayback()
+        if isViewLoaded {
+            metalView.delegate = nil
+        }
+        if let canvas {
+            ms_canvas_destroy(canvas)
+            self.canvas = nil
+        }
+    }
+
     override func loadView() {
         let view = MTKView()
         view.device = MTLCreateSystemDefaultDevice()

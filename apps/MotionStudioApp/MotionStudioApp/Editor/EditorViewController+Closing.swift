@@ -29,10 +29,16 @@ extension EditorViewController {
     }
 
     func saveBeforeSceneDisconnect() {
+        stopPreviewPlayback()
         guard hasUnsavedChanges else {
             return
         }
         document.save(to: document.saveURL, for: .forOverwriting, completionHandler: nil)
+    }
+
+    func stopPreviewPlayback() {
+        editorState.isPlaying = false
+        canvasViewController?.shutdown()
     }
 
     func updateWindowCloseAvailability() {
@@ -51,6 +57,7 @@ extension EditorViewController {
     }
 
     private func closeWindowScene() {
+        stopPreviewPlayback()
         guard let sceneSession = view.window?.windowScene?.session else {
             return
         }

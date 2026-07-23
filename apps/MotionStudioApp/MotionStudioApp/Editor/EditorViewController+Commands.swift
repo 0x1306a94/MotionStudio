@@ -79,15 +79,16 @@ extension EditorViewController {
     }
 
     func registerInverse(redo: Bool, undoManager: UndoManager) {
-        undoManager.registerUndo(withTarget: document.core) { core in
+        undoManager.registerUndo(withTarget: document.core) { [weak self] core in
             if redo {
                 core.performRedo()
             } else {
                 core.performUndo()
             }
-            self.document.markEdited()
-            self.updateSaveButtonState()
-            self.registerInverse(redo: !redo, undoManager: undoManager)
+            guard let self else { return }
+            document.markEdited()
+            updateSaveButtonState()
+            registerInverse(redo: !redo, undoManager: undoManager)
         }
     }
 }

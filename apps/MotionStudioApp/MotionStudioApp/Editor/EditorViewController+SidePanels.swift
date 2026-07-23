@@ -17,13 +17,17 @@ extension EditorViewController {
         view.addSubview(inspectorPanel)
 
         let projectHost = UIHostingController(rootView: ProjectPanelView(document: document.modelDocument,
-                                                                         clearSelection: clearSelection))
+                                                                         clearSelection: { [weak self] in
+                                                                             self?.clearSelection()
+                                                                         }))
         embed(projectHost, in: projectPanel)
         projectHostingController = projectHost
 
         let inspectorHost = UIHostingController(rootView: InspectorView(document: document.modelDocument,
                                                                         editorState: editorState,
-                                                                        perform: perform))
+                                                                        perform: { [weak self] name, edit in
+                                                                            self?.perform(name, edit: edit)
+                                                                        }))
         embed(inspectorHost, in: inspectorPanel)
         inspectorHostingController = inspectorHost
 
