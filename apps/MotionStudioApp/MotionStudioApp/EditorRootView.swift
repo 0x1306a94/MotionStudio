@@ -110,7 +110,7 @@ struct EditorRootView: View {
         }
         .fileExporter(isPresented: $isSaveAsPresented,
                       document: exportDocument,
-                      contentType: .motionStudioDocument,
+                      contentType: .motionProjectDocument,
                       defaultFilename: defaultExportFilename)
         { result in
             switch result {
@@ -282,7 +282,7 @@ struct EditorRootView: View {
         }
 
         do {
-            let data = try document.snapshot(contentType: .motionStudioDocument)
+            let data = try document.snapshot(contentType: .motionProjectDocument)
             try data.write(to: currentFileURL, options: .atomic)
             markSaved()
         } catch {
@@ -292,7 +292,7 @@ struct EditorRootView: View {
 
     private func prepareSaveAs() {
         do {
-            exportDocument = try MotionDocumentExport(data: document.snapshot(contentType: .motionStudioDocument))
+            exportDocument = try MotionDocumentExport(data: document.snapshot(contentType: .motionProjectDocument))
             isSaveAsPresented = true
         } catch {
             saveError = MotionDocumentSaveError(message: error.localizedDescription)

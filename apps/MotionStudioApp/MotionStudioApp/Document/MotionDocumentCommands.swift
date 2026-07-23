@@ -44,7 +44,7 @@ final class MotionDocumentCommandRegistry: ObservableObject {
 
 struct MotionDocumentExport: FileDocument {
     static var readableContentTypes: [UTType] {
-        [.motionStudioDocument]
+        [.motionProjectDocument]
     }
 
     var data: Data

@@ -8,46 +8,54 @@
 			<key>CFBundleTypeIconSystemGenerated</key>
 			<true/>
 			<key>CFBundleTypeName</key>
-			<string>Motion Document</string>
+			<string>Motion Project Document</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>$(MOTION_DOCUMENT_IDENTIFIER)</string>
+				<string>$(MOTION_PROJECT_DOCUMENT_IDENTIFIER)</string>
 			</array>
-			<key>NSUbiquitousDocumentUserActivityType</key>
-			<string>$(PRODUCT_BUNDLE_IDENTIFIER).motion</string>
+			<key>UIDocumentClass</key>
+			<string>$(PRODUCT_MODULE_NAME).MotionProjectDocument</string>
 		</dict>
 	</array>
-	<key>UISupportsDocumentBrowser</key>
-	<true/>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.data</string>
+					<string>com.apple.package</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Motion Document</string>
+				<string>Motion Project Document</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>$(MOTION_DOCUMENT_IDENTIFIER)</string>
+			<string>$(MOTION_PROJECT_DOCUMENT_IDENTIFIER)</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>mjson</string>
+						<string>$(MOTION_PROJECT_DOCUMENT_EXTENSION)</string>
 				</array>
 			</dict>
 		</dict>

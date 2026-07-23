@@ -1,0 +1,116 @@
+//
+//  EditorViewController+SidePanels.swift
+//  MotionStudioApp
+//
+//  Floating project and inspector panel management.
+//
+
+import SwiftUI
+import UIKit
+
+@MainActor
+extension EditorViewController {
+    func configureSidePanels() {
+        configureSidePanelContainer(projectPanel)
+        configureSidePanelContainer(inspectorPanel)
+        view.addSubview(projectPanel)
+        view.addSubview(inspectorPanel)
+
+        let projectHost = UIHostingController(rootView: ProjectPanelView(document: document.modelDocument,
+                                                                         clearSelection: clearSelection))
+        embed(projectHost, in: projectPanel)
+        projectHostingController = projectHost
+
+        let inspectorHost = UIHostingController(rootView: InspectorView(document: document.modelDocument,
+                                                                        editorState: editorState,
+                                                                        perform: perform))
+        embed(inspectorHost, in: inspectorPanel)
+        inspectorHostingController = inspectorHost
+
+        NSLayoutConstraint.activate([
+            projectPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor,
+                                                  constant: Metrics.sidePanelHorizontalInset),
+            projectPanel.topAnchor.constraint(equalTo: topToolbar.bottomAnchor,
+                                              constant: Metrics.sidePanelTopSpacing),
+            projectPanel.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor,
+                                                 constant: -Metrics.sidePanelBottomSpacing),
+            projectPanel.widthAnchor.constraint(equalToConstant: Metrics.projectPanelWidth),
+
+            inspectorPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor,
+                                                     constant: -Metrics.sidePanelHorizontalInset),
+            inspectorPanel.topAnchor.constraint(equalTo: topToolbar.bottomAnchor,
+                                                constant: Metrics.sidePanelTopSpacing),
+            inspectorPanel.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor,
+                                                   constant: -Metrics.sidePanelBottomSpacing),
+            inspectorPanel.widthAnchor.constraint(equalToConstant: Metrics.inspectorPanelWidth),
+        ])
+
+        updateSidePanelVisibility(animated: false)
+    }
+
+    func configureSidePanelContainer(_ panel: UIView) {
+        panel.translatesAutoresizingMaskIntoConstraints = false
+        panel.backgroundColor = Palette.panelBackground
+        panel.layer.cornerRadius = Metrics.sidePanelCornerRadius
+        panel.layer.shadowColor = UIColor.black.cgColor
+        panel.layer.shadowOpacity = 0.12
+        panel.layer.shadowRadius = 14
+        panel.layer.shadowOffset = CGSize(width: 0, height: 5)
+        panel.clipsToBounds = false
+    }
+
+    func embed<Content: View>(_ host: UIHostingController<Content>, in container: UIView) {
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        host.view.backgroundColor = .clear
+        addChild(host)
+        container.addSubview(host.view)
+        host.didMove(toParent: self)
+        NSLayoutConstraint.activate([
+            host.view.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            host.view.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            host.view.topAnchor.constraint(equalTo: container.topAnchor),
+            host.view.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+    }
+
+    @objc func toggleProjectPanel() {
+        isProjectPanelVisible.toggle()
+        updateSidePanelVisibility(animated: true)
+    }
+
+    @objc func toggleInspectorPanel() {
+        isInspectorPanelVisible.toggle()
+        updateSidePanelVisibility(animated: true)
+    }
+
+    func updateSidePanelVisibility(animated: Bool) {
+        let changes = {
+            self.projectPanel.alpha = self.isProjectPanelVisible ? 1 : 0
+            self.projectPanel.transform = self.isProjectPanelVisible ? .identity : CGAffineTransform(translationX: -18, y: 0)
+            self.inspectorPanel.alpha = self.isInspectorPanelVisible ? 1 : 0
+            self.inspectorPanel.transform = self.isInspectorPanelVisible ? .identity : CGAffineTransform(translationX: 18, y: 0)
+            self.updatePanelToggleButtons()
+        }
+
+        projectPanel.isUserInteractionEnabled = isProjectPanelVisible
+        inspectorPanel.isUserInteractionEnabled = isInspectorPanelVisible
+        if animated {
+            UIView.animate(withDuration: 0.18,
+                           delay: 0,
+                           options: [.beginFromCurrentState, .curveEaseInOut],
+                           animations: changes)
+        } else {
+            changes()
+        }
+    }
+
+    func updatePanelToggleButtons() {
+        updatePanelToggleButton(projectToggleButton, isActive: isProjectPanelVisible)
+        updatePanelToggleButton(inspectorToggleButton, isActive: isInspectorPanelVisible)
+    }
+
+    func updatePanelToggleButton(_ button: UIButton, isActive: Bool) {
+        button.backgroundColor = isActive ? Palette.buttonBackground : .clear
+        button.tintColor = isActive ? Palette.buttonTint : .secondaryLabel
+    }
+}

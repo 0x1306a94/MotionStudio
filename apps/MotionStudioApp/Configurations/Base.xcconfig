@@ -9,8 +9,9 @@
 // https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project
 
 
-PRODUCT_BUNDLE_IDENTIFIER = com.0x1306a94.MotionStudio
-MOTION_DOCUMENT_IDENTIFIER = com.0x1306a94.motion
+PRODUCT_BUNDLE_IDENTIFIER = com.0x1306a94.motionstudio
+MOTION_PROJECT_DOCUMENT_IDENTIFIER = com.0x1306a94.motionstudio.project
+MOTION_PROJECT_DOCUMENT_EXTENSION = motionproject
 
 // C++ core headers + C ABI bridge headers (imported via the bridging header).
 HEADER_SEARCH_PATHS = $(inherited) $(SRCROOT)/../../include $(SRCROOT)/../../bridge/include
