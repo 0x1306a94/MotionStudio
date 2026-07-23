@@ -7,22 +7,27 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画工具（类似 Afte
 第三方依赖由 depctl 按根目录 `DEPS` 文件同步到 `third_party/`（不入库），任何构建前先同步：
 
 ```bash
-./sync_deps.sh                      # 安装 cmake/ninja 等工具 + depctl，再同步 third_party/
+# 安装 cmake/ninja 等工具 + depctl，再同步 third_party/
+./sync_deps.sh
 ```
 
 构建与测试（Ninja，提交前必须带 ASan）：
 
 ```bash
-cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON   # 同时开启 ASan + UBSan
+# 同时开启 ASan + UBSan
+cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON
 cmake --build build
-ctest --test-dir build --output-on-failure              # 全部测试
+# 全部测试
+ctest --test-dir build --output-on-failure
 ```
 
 测试分三个二进制（均经 `gtest_discover_tests` 注册）：`core_tests`、`bridge_test`、`tgfx_adapter_test`（Apple 平台）。运行单个测试：
 
 ```bash
-./build/tests/core_tests --gtest_filter='AnimatableTest.*'          # gtest 过滤（更细粒度）
-ctest --test-dir build -R 'SerializerTest' --output-on-failure      # 或 ctest 正则
+# gtest 过滤（更细粒度）
+./build/tests/core_tests --gtest_filter='AnimatableTest.*'
+# 或 ctest 正则
+ctest --test-dir build -R 'SerializerTest' --output-on-failure
 ```
 
 性能基准（CI 仅记录不阻断，带 `benchmark` 标签；注意普通 ctest 也会跑它，用 `-LE benchmark` 排除）：
@@ -40,8 +45,19 @@ ctest --test-dir build -L benchmark
 应用层（Apple 平台）：
 
 ```bash
-apps/gen_mac                        # 用 CMake 生成 apps/gen_xcode Xcode 工程，产物在 gen_xcode/Products/
-# 之后用 apps/MotionStudio.xcworkspace 构建 / 运行 MotionStudioApp
+# 用 CMake 生成 apps/gen_xcode Xcode 工程，产物在 gen_xcode/Products/
+apps/gen_mac
+
+# 之后用 MotionStudio.xcworkspace 构建 / 运行 MotionStudioApp
+
+# 编译 Mac Catalyst
+xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configuration Debug -destination "generic/platform=macOS,variant=Mac Catalyst,name=Any Mac" ARCHS="arm64"
+
+# 编译 iPad 模拟器
+xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configuration Debug -destination "generic/platform=iOS Simulator" ARCHS="arm64"
+
+# destination 不可用时，可以用下面命令查看 destinations
+xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -showdestinations
 ```
 
 CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ninja 构建 → ctest。tgfx 预编译库按 `build/tgfx_prebuilt/` 缓存，命中时 Ninja 跳过 tgfx 编译。
