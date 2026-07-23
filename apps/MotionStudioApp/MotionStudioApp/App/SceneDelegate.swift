@@ -17,8 +17,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private var securityScopedProjectURL: URL?
     private var openingDocument: MotionProjectDocument?
 
+    /// Project URL currently shown or loading in this editor scene, if any.
+    var openProjectURL: URL? {
+        if let editor = window?.rootViewController as? EditorViewController {
+            return editor.document.saveURL
+        }
+        return openingDocument?.saveURL ?? securityScopedProjectURL
+    }
+
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else {
+            return
+        }
+
+        let request = editorRequest(from: connectionOptions)
+        if case let .openProject(url)? = request,
+           MotionStudioEditorRouter.discardDuplicateEditorSessionIfNeeded(windowScene.session, projectURL: url)
+        {
             return
         }
 
@@ -26,7 +41,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         self.window = window
 
         let role: WindowRole
-        if let request = MotionStudioSceneActivity.request(from: connectionOptions.userActivities.first) {
+        if let request {
             role = .editor
             configureEditorWindow(window, request: request)
             NotificationCenter.default.post(name: .motionStudioEditorSceneDidConnect, object: windowScene.session)
@@ -37,6 +52,24 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         window.makeKeyAndVisible()
         configureWindowSize(for: windowScene, role: role)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        MotionStudioEditorRouter.openProjectURLs(URLContexts.map(\.url))
+    }
+
+    private func editorRequest(from connectionOptions: UIScene.ConnectionOptions) -> MotionStudioSceneActivity.Request? {
+        if let request = MotionStudioSceneActivity.request(from: connectionOptions.userActivities.first) {
+            return request
+        }
+
+        guard let url = connectionOptions.urlContexts
+            .map(\.url)
+            .first(where: MotionStudioEditorRouter.isMotionProjectURL)
+        else {
+            return nil
+        }
+        return .openProject(url)
     }
 
     private func configureLauncherWindow(_ window: UIWindow) {
@@ -161,12 +194,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func configureInitialWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
         #if targetEnvironment(macCatalyst)
-            let preferredSize: CGSize
-            switch role {
+            let preferredSize = switch role {
             case .launcher:
-                preferredSize = CGSize(width: 980, height: 680)
+                CGSize(width: 980, height: 680)
             case .editor:
-                preferredSize = CGSize(width: 1440, height: 920)
+                CGSize(width: 1440, height: 920)
             }
 
             let screenFrame = windowScene.screen.bounds

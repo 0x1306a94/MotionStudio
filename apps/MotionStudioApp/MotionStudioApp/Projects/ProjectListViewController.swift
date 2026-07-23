@@ -47,7 +47,6 @@ final class ProjectListViewController: UIViewController {
     private var dataSource: UICollectionViewDiffableDataSource<String, String>!
     private var items: [ProjectListItem] = []
     private var itemByIdentifier: [String: ProjectListItem] = [:]
-    private var editorSceneDidConnectObserver: NSObjectProtocol?
     private let modifiedDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -229,41 +228,7 @@ final class ProjectListViewController: UIViewController {
     }
 
     private func openEditorScene(with activity: NSUserActivity) {
-        closeLauncherWhenEditorSceneConnects()
-        UIApplication.shared.requestSceneSessionActivation(nil,
-                                                           userActivity: activity,
-                                                           options: nil)
-        { [weak self] error in
-            Task { @MainActor in
-                self?.stopWaitingForEditorScene()
-                self?.presentOpenError(error)
-            }
-        }
-    }
-
-    private func closeLauncherWhenEditorSceneConnects() {
-        stopWaitingForEditorScene()
-        editorSceneDidConnectObserver = NotificationCenter.default.addObserver(forName: .motionStudioEditorSceneDidConnect,
-                                                                               object: nil,
-                                                                               queue: .main)
-        { [weak self] _ in
-            Task { @MainActor in
-                self?.stopWaitingForEditorScene()
-                self?.closeLauncherScene()
-            }
-        }
-    }
-
-    private func stopWaitingForEditorScene() {
-        if let editorSceneDidConnectObserver {
-            NotificationCenter.default.removeObserver(editorSceneDidConnectObserver)
-            self.editorSceneDidConnectObserver = nil
-        }
-    }
-
-    private func closeLauncherScene() {
-        guard let windowScene = view.window?.windowScene else { return }
-        UIApplication.shared.requestSceneSessionDestruction(windowScene.session, options: nil)
+        MotionStudioEditorRouter.activate(activity: activity, closeLauncher: true)
     }
 
     private func presentOpenError(_ error: Error) {
