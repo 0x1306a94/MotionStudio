@@ -3,7 +3,7 @@
 //  MotionStudioApp
 //
 //  UIDocument wrapper used by the UIKit editor flow. The existing SwiftUI
-//  MotionDocument stays unchanged and remains the model document for panels.
+//  MotionProjectState remains the model state for panels.
 //
 
 import UIKit
@@ -15,7 +15,7 @@ final class MotionProjectDocument: UIDocument {
         static let assetsDirectoryName = "assets"
     }
 
-    private(set) var modelDocument: MotionDocument
+    private(set) var modelDocument: MotionProjectState
     private(set) var saveURL: URL
     private(set) var isTemporaryDraft: Bool
 
@@ -23,7 +23,7 @@ final class MotionProjectDocument: UIDocument {
         modelDocument.core
     }
 
-    init(fileURL: URL, modelDocument: MotionDocument = MotionDocument(), isTemporaryDraft: Bool = false) {
+    init(fileURL: URL, modelDocument: MotionProjectState = MotionProjectState(), isTemporaryDraft: Bool = false) {
         self.modelDocument = modelDocument
         saveURL = fileURL
         self.isTemporaryDraft = isTemporaryDraft
@@ -43,7 +43,7 @@ final class MotionProjectDocument: UIDocument {
 
     override func load(fromContents contents: Any, ofType typeName: String?) throws {
         if let data = contents as? Data {
-            modelDocument = try MotionDocument(data: data)
+            modelDocument = try MotionProjectState(data: data)
             return
         }
 
@@ -52,14 +52,14 @@ final class MotionProjectDocument: UIDocument {
         }
 
         if let data = fileWrapper.regularFileContents {
-            modelDocument = try MotionDocument(data: data)
+            modelDocument = try MotionProjectState(data: data)
             return
         }
 
         guard let data = fileWrapper.fileWrappers?[Package.documentFilename]?.regularFileContents else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        modelDocument = try MotionDocument(data: data)
+        modelDocument = try MotionProjectState(data: data)
     }
 
     func snapshotData() throws -> Data {

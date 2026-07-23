@@ -11,7 +11,7 @@ import SwiftUI
 private let handleHeight: CGFloat = 6
 
 struct EditorRootView: View {
-    let document: MotionDocument
+    let document: MotionProjectState
     let fileURL: URL?
 
     @State private var editorState = EditorState()
@@ -472,7 +472,7 @@ private struct TimelineResizeHandle: View {
 
 /// Wires the canvas to the document with a stable composition ID.
 private struct CanvasContainer: View {
-    let document: MotionDocument
+    let document: MotionProjectState
     let editorState: EditorState
     let clearSelection: () -> Void
 

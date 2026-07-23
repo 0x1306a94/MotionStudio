@@ -12,7 +12,7 @@ import SwiftUI
 #endif
 
 struct InspectorView: View {
-    let document: MotionDocument
+    let document: MotionProjectState
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
 

@@ -35,7 +35,7 @@ final class TimelineGrabberView: UIView {
 }
 
 struct UIKitTimelineHostView: View {
-    let document: MotionDocument
+    let document: MotionProjectState
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void

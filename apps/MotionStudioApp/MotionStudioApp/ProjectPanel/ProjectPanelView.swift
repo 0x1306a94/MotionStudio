@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct ProjectPanelView: View {
-    let document: MotionDocument
+    let document: MotionProjectState
     let clearSelection: () -> Void
 
     var body: some View {

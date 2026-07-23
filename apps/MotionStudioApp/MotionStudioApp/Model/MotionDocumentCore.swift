@@ -131,8 +131,8 @@ final class MotionDocumentCore {
 
     // MARK: - Serialization
 
-    /// Serializes off the main actor: ReferenceFileDocument snapshots run in
-    /// a background isolation domain. Thread safety is provided by the bridge
+    /// Serializes off the main actor for document save snapshots. Thread safety
+    /// is provided by the bridge
     /// (every C API call locks the document mutex).
     nonisolated func serialize() throws -> Data {
         guard let cString = ms_document_save(handle) else {

@@ -10,7 +10,7 @@
 //@main
 //struct MotionStudioApp: App {
 //    var body: some Scene {
-//        DocumentGroup(newDocument: { MotionDocument() }) { file in
+//        DocumentGroup(newDocument: { MotionProjectState() }) { file in
 //            EditorRootView(document: file.document, fileURL: file.fileURL)
 //            #if targetEnvironment(macCatalyst)
 //                .background(WindowSizeConfigurator())

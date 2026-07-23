@@ -12,7 +12,7 @@ import UIKit
 
 @MainActor
 final class CanvasViewController: UIViewController, MTKViewDelegate {
-    private let document: MotionDocument
+    private let document: MotionProjectState
     private let editorState: EditorState
     private let clearSelection: () -> Void
 
@@ -46,7 +46,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var lastDrawRequestTime: CFTimeInterval?
     private var lastDrawStartTime: CFTimeInterval?
 
-    init(document: MotionDocument, editorState: EditorState, clearSelection: @escaping () -> Void) {
+    init(document: MotionProjectState, editorState: EditorState, clearSelection: @escaping () -> Void) {
         self.document = document
         self.editorState = editorState
         self.clearSelection = clearSelection
