@@ -347,6 +347,17 @@ private final class ProjectListHeaderView: UICollectionReusableView {
     static let elementKind = "ProjectListHeaderView"
     static let reuseIdentifier = "ProjectListHeaderView"
 
+    private enum Metrics {
+        static let horizontalInset: CGFloat = 28
+        static var leadingInset: CGFloat {
+            #if targetEnvironment(macCatalyst)
+                return horizontalInset
+            #else
+                return UIDevice.current.userInterfaceIdiom == .pad ? 70 : horizontalInset
+            #endif
+        }
+    }
+
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
 
@@ -382,8 +393,8 @@ private final class ProjectListHeaderView: UICollectionReusableView {
         addSubview(stack)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.leadingInset),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Metrics.horizontalInset),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
     }

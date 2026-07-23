@@ -50,7 +50,10 @@ extension EditorViewController {
         contentStack.alignment = .center
         contentStack.spacing = 8
         contentStack.isLayoutMarginsRelativeArrangement = true
-        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18)
+        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0,
+                                                                        leading: Metrics.topToolbarLeadingInset,
+                                                                        bottom: 0,
+                                                                        trailing: Metrics.topToolbarHorizontalInset)
         topToolbar.contentView.addSubview(contentStack)
 
         configureToolbarButton(saveButton,

@@ -128,27 +128,46 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     private func configureWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
+        configureWindowSizeRestrictions(for: windowScene, role: role)
         configureInitialWindowSize(for: windowScene, role: role)
         DispatchQueue.main.async { [weak windowScene] in
             guard let windowScene else { return }
+            self.configureWindowSizeRestrictions(for: windowScene, role: role)
             self.configureInitialWindowSize(for: windowScene, role: role)
         }
     }
 
+    private func minimumWindowSize(for role: WindowRole) -> CGSize {
+        #if targetEnvironment(macCatalyst)
+            switch role {
+            case .launcher:
+                return CGSize(width: 820, height: 560)
+            case .editor:
+                return CGSize(width: 1180, height: 760)
+            }
+        #else
+            switch role {
+            case .launcher:
+                return CGSize(width: 640, height: 480)
+            case .editor:
+                return CGSize(width: 900, height: 640)
+            }
+        #endif
+    }
+
+    private func configureWindowSizeRestrictions(for windowScene: UIWindowScene, role: WindowRole) {
+        windowScene.sizeRestrictions?.minimumSize = minimumWindowSize(for: role)
+    }
+
     private func configureInitialWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
         #if targetEnvironment(macCatalyst)
-            let minimumSize: CGSize
             let preferredSize: CGSize
             switch role {
             case .launcher:
-                minimumSize = CGSize(width: 820, height: 560)
                 preferredSize = CGSize(width: 980, height: 680)
             case .editor:
-                minimumSize = CGSize(width: 1180, height: 760)
                 preferredSize = CGSize(width: 1440, height: 920)
             }
-
-            windowScene.sizeRestrictions?.minimumSize = minimumSize
 
             let screenFrame = windowScene.screen.bounds
             let size = CGSize(width: min(preferredSize.width, screenFrame.width * 0.9),

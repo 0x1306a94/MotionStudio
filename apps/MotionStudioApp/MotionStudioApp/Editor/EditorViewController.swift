@@ -27,6 +27,14 @@ final class EditorViewController: UIViewController {
         static let inspectorPanelWidth: CGFloat = 320
         static let sidePanelCornerRadius: CGFloat = 12
         static let toolbarButtonSize: CGFloat = 36
+        static let topToolbarHorizontalInset: CGFloat = 18
+        static var topToolbarLeadingInset: CGFloat {
+            #if targetEnvironment(macCatalyst)
+                return topToolbarHorizontalInset
+            #else
+                return UIDevice.current.userInterfaceIdiom == .pad ? 70 : topToolbarHorizontalInset
+            #endif
+        }
     }
 
     enum Palette {
