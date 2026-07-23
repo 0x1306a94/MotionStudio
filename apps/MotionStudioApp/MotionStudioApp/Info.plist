@@ -11,20 +11,22 @@
 			<string>Motion Project Document</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Default</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>$(MOTION_PROJECT_DOCUMENT_IDENTIFIER)</string>
-			</array>
+				<key>LSHandlerRank</key>
+				<string>Default</string>
+				<key>LSTypeIsPackage</key>
+				<true/>
+				<key>LSItemContentTypes</key>
+				<array>
+					<string>$(MOTION_PROJECT_DOCUMENT_IDENTIFIER)</string>
+				</array>
 			<key>UIDocumentClass</key>
 			<string>$(PRODUCT_MODULE_NAME).MotionProjectDocument</string>
 		</dict>
 	</array>
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
+		<key>UIApplicationSceneManifest</key>
+		<dict>
+			<key>UIApplicationSupportsMultipleScenes</key>
+			<true/>
 		<key>UISceneConfigurations</key>
 		<dict>
 			<key>UIWindowSceneSessionRoleApplication</key>
@@ -36,17 +38,19 @@
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
 				</dict>
 			</array>
+			</dict>
 		</dict>
-	</dict>
-	<key>UTExportedTypeDeclarations</key>
+		<key>LSSupportsOpeningDocumentsInPlace</key>
+		<true/>
+		<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-					<string>com.apple.package</string>
+				<string>com.apple.package</string>
 			</array>
 			<key>UTTypeDescription</key>
-				<string>Motion Project Document</string>
+			<string>Motion Project Document</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
@@ -55,7 +59,7 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-						<string>$(MOTION_PROJECT_DOCUMENT_EXTENSION)</string>
+					<string>$(MOTION_PROJECT_DOCUMENT_EXTENSION)</string>
 				</array>
 			</dict>
 		</dict>

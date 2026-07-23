@@ -53,10 +53,6 @@ extension EditorViewController {
         contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18)
         topToolbar.contentView.addSubview(contentStack)
 
-        configureToolbarButton(closeEditorButton,
-                               systemName: "xmark",
-                               accessibilityLabel: "Close Editor",
-                               action: #selector(closeEditor))
         configureToolbarButton(saveButton,
                                systemName: "square.and.arrow.down",
                                accessibilityLabel: "Save",
@@ -70,11 +66,15 @@ extension EditorViewController {
                                accessibilityLabel: "Toggle Inspector Panel",
                                action: #selector(toggleInspectorPanel))
 
-        contentStack.addArrangedSubview(closeEditorButton)
-        contentStack.addArrangedSubview(saveButton)
+        #if !targetEnvironment(macCatalyst)
+            contentStack.addArrangedSubview(saveButton)
+        #endif
         contentStack.addArrangedSubview(projectToggleButton)
         contentStack.addArrangedSubview(UIView())
         contentStack.addArrangedSubview(inspectorToggleButton)
+
+        configureDocumentStatusView()
+        topToolbar.contentView.addSubview(documentStatusView)
 
         let separator = UIView()
         separator.translatesAutoresizingMaskIntoConstraints = false
@@ -92,12 +92,51 @@ extension EditorViewController {
             contentStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             contentStack.heightAnchor.constraint(equalToConstant: Metrics.topToolbarContentHeight),
 
+            documentStatusView.centerXAnchor.constraint(equalTo: topToolbar.contentView.centerXAnchor),
+            documentStatusView.centerYAnchor.constraint(equalTo: contentStack.centerYAnchor),
+            documentStatusView.leadingAnchor.constraint(greaterThanOrEqualTo: contentStack.leadingAnchor, constant: 120),
+            documentStatusView.trailingAnchor.constraint(lessThanOrEqualTo: contentStack.trailingAnchor, constant: -120),
+
             separator.leadingAnchor.constraint(equalTo: topToolbar.contentView.leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: topToolbar.contentView.trailingAnchor),
             separator.bottomAnchor.constraint(equalTo: topToolbar.contentView.bottomAnchor),
             separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
         ])
         updatePanelToggleButtons()
+    }
+
+    func configureDocumentStatusView() {
+        documentStatusView.translatesAutoresizingMaskIntoConstraints = false
+        documentStatusView.isUserInteractionEnabled = true
+        documentStatusView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(renameCurrentProject)))
+
+        documentDirtyIndicator.translatesAutoresizingMaskIntoConstraints = false
+        documentDirtyIndicator.backgroundColor = .systemOrange
+        documentDirtyIndicator.layer.cornerRadius = 3
+        documentDirtyIndicator.isHidden = true
+
+        documentStatusLabel.translatesAutoresizingMaskIntoConstraints = false
+        documentStatusLabel.font = .preferredFont(forTextStyle: .headline)
+        documentStatusLabel.textColor = .secondaryLabel
+        documentStatusLabel.adjustsFontForContentSizeCategory = true
+        documentStatusLabel.lineBreakMode = .byTruncatingMiddle
+
+        let statusStack = UIStackView(arrangedSubviews: [documentDirtyIndicator, documentStatusLabel])
+        statusStack.translatesAutoresizingMaskIntoConstraints = false
+        statusStack.axis = .horizontal
+        statusStack.alignment = .center
+        statusStack.spacing = 6
+        documentStatusView.addSubview(statusStack)
+
+        NSLayoutConstraint.activate([
+            documentDirtyIndicator.widthAnchor.constraint(equalToConstant: 6),
+            documentDirtyIndicator.heightAnchor.constraint(equalToConstant: 6),
+
+            statusStack.leadingAnchor.constraint(equalTo: documentStatusView.leadingAnchor),
+            statusStack.trailingAnchor.constraint(equalTo: documentStatusView.trailingAnchor),
+            statusStack.topAnchor.constraint(equalTo: documentStatusView.topAnchor),
+            statusStack.bottomAnchor.constraint(equalTo: documentStatusView.bottomAnchor),
+        ])
     }
 
     func configureCreationToolbar() {
@@ -149,10 +188,10 @@ extension EditorViewController {
         timelinePanel.contentView.addSubview(timelineHandle)
 
         let timelineHost = UIHostingController(rootView: UIKitTimelineHostView(document: document.modelDocument,
-                                                                              editorState: editorState,
-                                                                              perform: perform,
-                                                                              registerEdit: registerEdit,
-                                                                              clearSelection: clearSelection))
+                                                                               editorState: editorState,
+                                                                               perform: perform,
+                                                                               registerEdit: registerEdit,
+                                                                               clearSelection: clearSelection))
         timelineHost.view.translatesAutoresizingMaskIntoConstraints = false
         timelineHost.view.backgroundColor = .clear
         addChild(timelineHost)

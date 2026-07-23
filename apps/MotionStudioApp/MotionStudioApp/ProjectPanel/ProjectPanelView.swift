@@ -39,14 +39,37 @@ struct ProjectPanelView: View {
 
             Divider()
 
-            List {
-                Section("Compositions") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Compositions")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+
                     ForEach(core.compositionIDs(), id: \.self) { id in
-                        Label(core.compositionName(id), systemImage: "film")
+                        Button {
+                            clearSelection()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "film")
+                                    .frame(width: 16)
+                                Text(core.compositionName(id))
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 6)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .listStyle(.sidebar)
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: clearSelection)

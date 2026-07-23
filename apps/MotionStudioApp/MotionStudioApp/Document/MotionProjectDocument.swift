@@ -51,15 +51,7 @@ final class MotionProjectDocument: UIDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
 
-        if let data = fileWrapper.regularFileContents {
-            modelDocument = try MotionProjectState(data: data)
-            return
-        }
-
-        guard let data = fileWrapper.fileWrappers?[Package.documentFilename]?.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        modelDocument = try MotionProjectState(data: data)
+        modelDocument = try MotionProjectState(data: documentData(from: fileWrapper))
     }
 
     func snapshotData() throws -> Data {
@@ -86,5 +78,28 @@ final class MotionProjectDocument: UIDocument {
         saveURL = url
         isTemporaryDraft = false
         updateChangeCount(.cleared)
+    }
+
+    private func documentData(from fileWrapper: FileWrapper) throws -> Data {
+        if fileWrapper.isRegularFile,
+           let data = fileWrapper.regularFileContents
+        {
+            return data
+        }
+
+        if fileWrapper.isDirectory,
+           let documentWrapper = fileWrapper.fileWrappers?[Package.documentFilename],
+           documentWrapper.isRegularFile,
+           let data = documentWrapper.regularFileContents
+        {
+            return data
+        }
+
+        let packageURL = fileURL.appendingPathComponent(Package.documentFilename)
+        if FileManager.default.fileExists(atPath: packageURL.path(percentEncoded: false)) {
+            return try Data(contentsOf: packageURL)
+        }
+
+        throw CocoaError(.fileReadCorruptFile)
     }
 }

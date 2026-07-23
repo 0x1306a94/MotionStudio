@@ -41,8 +41,10 @@ final class EditorViewController: UIViewController {
 
     let canvasViewport = UIView()
     let topToolbar = UIVisualEffectView(effect: nil)
-    let closeEditorButton = UIButton(type: .system)
     let saveButton = UIButton(type: .system)
+    let documentStatusView = UIView()
+    let documentDirtyIndicator = UIView()
+    let documentStatusLabel = UILabel()
     let projectToggleButton = UIButton(type: .system)
     let inspectorToggleButton = UIButton(type: .system)
     let projectPanel = UIView()
@@ -61,7 +63,6 @@ final class EditorViewController: UIViewController {
     var timelineDragStartHeight = Metrics.timelinePreferredHeight
     var isProjectPanelVisible = true
     var isInspectorPanelVisible = true
-    var pendingExportURL: URL?
 
     init(document: MotionProjectDocument) {
         self.document = document
@@ -91,6 +92,11 @@ final class EditorViewController: UIViewController {
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        updateWindowCloseAvailability()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         clampTimelineHeight()
@@ -111,5 +117,24 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "1", modifierFlags: [.command, .alternate], action: #selector(toggleProjectPanel)),
             UIKeyCommand(input: "2", modifierFlags: [.command, .alternate], action: #selector(toggleInspectorPanel)),
         ]
+    }
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        switch action {
+        case #selector(saveCurrentDocument):
+            return hasUnsavedChanges
+        case #selector(saveDocumentAs),
+             #selector(requestCloseWindow),
+             #selector(addRectangleLayer),
+             #selector(addEllipseLayer),
+             #selector(addImageLayer),
+             #selector(toggleProjectPanel),
+             #selector(toggleInspectorPanel),
+             #selector(renameCurrentProject),
+             #selector(togglePlayback):
+            return true
+        default:
+            return super.canPerformAction(action, withSender: sender)
+        }
     }
 }

@@ -37,14 +37,6 @@ extension EditorViewController {
         editorState.isPlaying.toggle()
     }
 
-    @objc func closeEditor() {
-        if navigationController?.viewControllers.first !== self {
-            navigationController?.popViewController(animated: true)
-        } else {
-            dismiss(animated: true)
-        }
-    }
-
     @objc func addRectangleLayer() {
         let compositionID = document.core.firstCompositionID
         perform("Add Rectangle") {

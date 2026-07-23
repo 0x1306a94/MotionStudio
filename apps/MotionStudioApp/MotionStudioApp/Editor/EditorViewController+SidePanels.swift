@@ -62,6 +62,8 @@ extension EditorViewController {
     func embed<Content: View>(_ host: UIHostingController<Content>, in container: UIView) {
         host.view.translatesAutoresizingMaskIntoConstraints = false
         host.view.backgroundColor = .clear
+        host.view.clipsToBounds = true
+        host.view.layer.cornerRadius = Metrics.sidePanelCornerRadius
         addChild(host)
         container.addSubview(host.view)
         host.didMove(toParent: self)

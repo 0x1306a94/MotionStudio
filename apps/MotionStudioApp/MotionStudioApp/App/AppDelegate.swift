@@ -13,13 +13,45 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Override point for customization after application launch.
         return true
     }
+
+    override func buildMenu(with builder: UIMenuBuilder) {
+        super.buildMenu(with: builder)
+        guard builder.system == UIMenuSystem.main else { return }
+
+        let saveCommand = UIKeyCommand(title: "Save",
+                                       image: nil,
+                                       action: #selector(EditorViewController.saveCurrentDocument),
+                                       input: "s",
+                                       modifierFlags: .command)
+        let saveAsCommand = UIKeyCommand(title: "Save As...",
+                                         image: nil,
+                                         action: #selector(EditorViewController.saveDocumentAs),
+                                         input: "s",
+                                         modifierFlags: [.command, .shift])
+        let saveMenu = UIMenu(title: "",
+                              options: .displayInline,
+                              children: [saveCommand, saveAsCommand])
+        builder.insertSibling(saveMenu, beforeMenu: .close)
+
+        let closeCommand = UIKeyCommand(title: "Close",
+                                        image: nil,
+                                        action: #selector(EditorViewController.requestCloseWindow),
+                                        input: "w",
+                                        modifierFlags: .command)
+        builder.replaceChildren(ofMenu: .close) { _ in
+            [closeCommand]
+        }
+    }
     
     // MARK: UISceneSession Lifecycle
     
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        // Called when a new scene session is being created.
-        // Use this method to select a configuration to create the new scene with.
-        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        let activity = options.userActivities.first
+        let isEditorScene = MotionStudioSceneActivity.request(from: activity) != nil
+        let configurationName = isEditorScene ? "Editor Configuration" : "Launcher Configuration"
+        let configuration = UISceneConfiguration(name: configurationName, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
     }
     
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {

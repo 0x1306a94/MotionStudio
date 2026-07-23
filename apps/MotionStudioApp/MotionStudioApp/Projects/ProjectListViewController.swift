@@ -19,7 +19,18 @@ private struct ProjectListItem {
     enum Kind {
         case newDocument
         case openFile
-        case recent(URL?)
+        case project(URL)
+    }
+
+    var identifier: String {
+        switch kind {
+        case .newDocument:
+            return "action:new"
+        case .openFile:
+            return "action:open"
+        case let .project(url):
+            return "project:\(url.absoluteString):\(title):\(subtitle)"
+        }
     }
 }
 
@@ -33,9 +44,16 @@ final class ProjectListViewController: UIViewController {
     }
 
     private var collectionView: UICollectionView!
-    private var dataSource: UICollectionViewDiffableDataSource<String, Int>!
+    private var dataSource: UICollectionViewDiffableDataSource<String, String>!
     private var items: [ProjectListItem] = []
-    private var openingDocument: MotionProjectDocument?
+    private var itemByIdentifier: [String: ProjectListItem] = [:]
+    private var editorSceneDidConnectObserver: NSObjectProtocol?
+    private let modifiedDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -48,6 +66,7 @@ final class ProjectListViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
+        applySnapshot()
     }
 
     private func configureCollectionView() {
@@ -106,8 +125,8 @@ final class ProjectListViewController: UIViewController {
                                 forSupplementaryViewOfKind: ProjectListHeaderView.elementKind,
                                 withReuseIdentifier: ProjectListHeaderView.reuseIdentifier)
 
-        dataSource = UICollectionViewDiffableDataSource<String, Int>(collectionView: collectionView) { [weak self] collectionView, indexPath, itemIndex in
-            guard let item = self?.items[itemIndex] else {
+        dataSource = UICollectionViewDiffableDataSource<String, String>(collectionView: collectionView) { [weak self] collectionView, indexPath, identifier in
+            guard let item = self?.itemByIdentifier[identifier] else {
                 return UICollectionViewCell()
             }
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ProjectCardCell.reuseIdentifier,
@@ -136,30 +155,69 @@ final class ProjectListViewController: UIViewController {
                             systemImage: "plus.square",
                             kind: .newDocument),
             ProjectListItem(title: "Open Project File",
-                            subtitle: "Choose a .motionstudio document",
+                            subtitle: "Import a .motionproject document",
                             systemImage: "folder",
                             kind: .openFile),
-            ProjectListItem(title: "Untitled Motion",
-                            subtitle: "Local draft",
-                            systemImage: "film.stack",
-                            kind: .recent(nil)),
-        ]
-        var snapshot = NSDiffableDataSourceSnapshot<String, Int>()
+        ] + projectLibraryItems()
+        itemByIdentifier = Dictionary(uniqueKeysWithValues: items.map { ($0.identifier, $0) })
+
+        var snapshot = NSDiffableDataSourceSnapshot<String, String>()
         snapshot.appendSections([projectListMainSection])
-        snapshot.appendItems(Array(items.indices))
+        snapshot.appendItems(items.map(\.identifier))
         dataSource.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func projectLibraryItems() -> [ProjectListItem] {
+        ProjectLibraryStore.projectItems().map { item in
+            ProjectListItem(title: item.url.deletingPathExtension().lastPathComponent,
+                            subtitle: "Modified \(modifiedDateFormatter.string(from: item.modifiedAt))",
+                            systemImage: "film.stack",
+                            kind: .project(item.url))
+        }
     }
 
     private func open(_ item: ProjectListItem) {
         switch item.kind {
-        case .newDocument, .recent(nil):
-            let document = MotionProjectDocument.makeTemporaryDraft()
-            let editor = EditorViewController(document: document)
-            navigationController?.pushViewController(editor, animated: true)
-        case let .recent(.some(url)):
-            openDocument(at: url)
+        case .newDocument:
+            openEditorScene(with: MotionStudioSceneActivity.newProjectActivity())
+        case let .project(url):
+            openEditorScene(with: MotionStudioSceneActivity.openProjectActivity(url: url))
         case .openFile:
             presentDocumentPicker()
+        }
+    }
+
+    private func deleteProject(at url: URL) {
+        do {
+            try ProjectLibraryStore.remove(url: url)
+            applySnapshot()
+        } catch {
+            presentOpenError(error)
+        }
+    }
+
+    private func renameProject(at url: URL) {
+        let alert = UIAlertController(title: "Rename Project",
+                                      message: nil,
+                                      preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.text = url.deletingPathExtension().lastPathComponent
+            textField.clearButtonMode = .whileEditing
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Rename", style: .default) { [weak self, weak alert] _ in
+            guard let name = alert?.textFields?.first?.text else { return }
+            self?.commitProjectRename(url: url, name: name)
+        })
+        present(alert, animated: true)
+    }
+
+    private func commitProjectRename(url: URL, name: String) {
+        do {
+            _ = try ProjectLibraryStore.rename(url: url, to: name)
+            applySnapshot()
+        } catch {
+            presentOpenError(error)
         }
     }
 
@@ -170,26 +228,42 @@ final class ProjectListViewController: UIViewController {
         present(picker, animated: true)
     }
 
-    private func openDocument(at url: URL) {
-        let document = MotionProjectDocument(fileURL: url)
-        openingDocument = document
-        document.open { [weak self] success in
+    private func openEditorScene(with activity: NSUserActivity) {
+        closeLauncherWhenEditorSceneConnects()
+        UIApplication.shared.requestSceneSessionActivation(nil,
+                                                           userActivity: activity,
+                                                           options: nil)
+        { [weak self] error in
             Task { @MainActor in
-                self?.finishOpeningDocument(at: url, success: success)
+                self?.stopWaitingForEditorScene()
+                self?.presentOpenError(error)
             }
         }
     }
 
-    private func finishOpeningDocument(at url: URL, success: Bool) {
-        guard let document = openingDocument else { return }
-        openingDocument = nil
-        if success {
-            document.markSaved(to: url)
-            let editor = EditorViewController(document: document)
-            navigationController?.pushViewController(editor, animated: true)
-        } else {
-            presentOpenError(CocoaError(.fileReadCorruptFile))
+    private func closeLauncherWhenEditorSceneConnects() {
+        stopWaitingForEditorScene()
+        editorSceneDidConnectObserver = NotificationCenter.default.addObserver(forName: .motionStudioEditorSceneDidConnect,
+                                                                               object: nil,
+                                                                               queue: .main)
+        { [weak self] _ in
+            Task { @MainActor in
+                self?.stopWaitingForEditorScene()
+                self?.closeLauncherScene()
+            }
         }
+    }
+
+    private func stopWaitingForEditorScene() {
+        if let editorSceneDidConnectObserver {
+            NotificationCenter.default.removeObserver(editorSceneDidConnectObserver)
+            self.editorSceneDidConnectObserver = nil
+        }
+    }
+
+    private func closeLauncherScene() {
+        guard let windowScene = view.window?.windowScene else { return }
+        UIApplication.shared.requestSceneSessionDestruction(windowScene.session, options: nil)
     }
 
     private func presentOpenError(_ error: Error) {
@@ -212,16 +286,60 @@ private extension ProjectListItem {
 
 extension ProjectListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard let itemIndex = dataSource.itemIdentifier(for: indexPath) else { return }
+        guard let identifier = dataSource.itemIdentifier(for: indexPath),
+              let item = itemByIdentifier[identifier]
+        else {
+            return
+        }
         collectionView.deselectItem(at: indexPath, animated: true)
-        open(items[itemIndex])
+        open(item)
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        contextMenuConfigurationForItemAt indexPath: IndexPath,
+                        point: CGPoint) -> UIContextMenuConfiguration?
+    {
+        guard let identifier = dataSource.itemIdentifier(for: indexPath),
+              let item = itemByIdentifier[identifier],
+              case let .project(url) = item.kind
+        else {
+            return nil
+        }
+
+        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
+            let renameAction = UIAction(title: "Rename",
+                                        image: UIImage(systemName: "pencil"))
+            { _ in
+                self?.renameProject(at: url)
+            }
+            let removeAction = UIAction(title: "Delete Project",
+                                        image: UIImage(systemName: "trash"),
+                                        attributes: .destructive)
+            { _ in
+                self?.deleteProject(at: url)
+            }
+            return UIMenu(children: [renameAction, removeAction])
+        }
     }
 }
 
 extension ProjectListViewController: UIDocumentPickerDelegate {
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        guard let url = urls.first else { return }
-        openDocument(at: url)
+        guard let sourceURL = urls.first else { return }
+        let shouldStopAccessing = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if shouldStopAccessing {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let projectURL = try ProjectLibraryStore.importProjectIfNeeded(from: sourceURL)
+            applySnapshot()
+            openEditorScene(with: MotionStudioSceneActivity.openProjectActivity(url: projectURL))
+        } catch {
+            presentOpenError(error)
+        }
     }
 }
 

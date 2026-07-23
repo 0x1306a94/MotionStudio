@@ -8,66 +8,203 @@
 import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+    private enum WindowRole {
+        case launcher
+        case editor
+    }
+
     var window: UIWindow?
+    private var securityScopedProjectURL: URL?
+    private var openingDocument: MotionProjectDocument?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
-        // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
         guard let windowScene = scene as? UIWindowScene else {
             return
         }
 
         let window = UIWindow(windowScene: windowScene)
-        let projectList = ProjectListViewController()
-        window.rootViewController = UINavigationController(rootViewController: projectList)
-        window.makeKeyAndVisible()
         self.window = window
-        configureInitialWindowSize(for: windowScene)
+
+        let role: WindowRole
+        if let request = MotionStudioSceneActivity.request(from: connectionOptions.userActivities.first) {
+            role = .editor
+            configureEditorWindow(window, request: request)
+            NotificationCenter.default.post(name: .motionStudioEditorSceneDidConnect, object: windowScene.session)
+        } else {
+            role = .launcher
+            configureLauncherWindow(window)
+        }
+
+        window.makeKeyAndVisible()
+        configureWindowSize(for: windowScene, role: role)
     }
 
-    private func configureInitialWindowSize(for windowScene: UIWindowScene) {
+    private func configureLauncherWindow(_ window: UIWindow) {
+        let projectList = ProjectListViewController()
+        window.rootViewController = UINavigationController(rootViewController: projectList)
+    }
+
+    private func configureEditorWindow(_ window: UIWindow, request: MotionStudioSceneActivity.Request) {
+        switch request {
+        case .newProject:
+            createEditorDocument(in: window)
+        case let .openProject(url):
+            openEditorDocument(at: url, in: window)
+        }
+    }
+
+    private func showEditor(document: MotionProjectDocument, in window: UIWindow) {
+        window.rootViewController = EditorViewController(document: document)
+    }
+
+    private func createEditorDocument(in window: UIWindow) {
+        do {
+            let url = try ProjectLibraryStore.makeNewProjectURL()
+            let loadingViewController = EditorSceneLoadingViewController(title: url.deletingPathExtension().lastPathComponent)
+            window.rootViewController = loadingViewController
+
+            let document = MotionProjectDocument(fileURL: url)
+            openingDocument = document
+            document.save(to: url, for: .forCreating) { [weak self] success in
+                Task { @MainActor in
+                    self?.finishCreatingDocument(at: url, success: success)
+                }
+            }
+        } catch {
+            let loadingViewController = EditorSceneLoadingViewController(title: "New Motion Project")
+            window.rootViewController = loadingViewController
+            loadingViewController.showOpenError(error)
+        }
+    }
+
+    private func finishCreatingDocument(at url: URL, success: Bool) {
+        guard let document = openingDocument else { return }
+        openingDocument = nil
+        guard let window else { return }
+
+        if success {
+            document.markSaved(to: url)
+            ProjectLibraryStore.remember(url: url)
+            showEditor(document: document, in: window)
+        } else {
+            (window.rootViewController as? EditorSceneLoadingViewController)?.showOpenError(CocoaError(.fileWriteUnknown))
+        }
+    }
+
+    private func openEditorDocument(at url: URL, in window: UIWindow) {
+        let loadingViewController = EditorSceneLoadingViewController(title: url.deletingPathExtension().lastPathComponent)
+        window.rootViewController = loadingViewController
+
+        let shouldStopAccessing = url.startAccessingSecurityScopedResource()
+        if shouldStopAccessing {
+            securityScopedProjectURL = url
+        }
+
+        let document = MotionProjectDocument(fileURL: url)
+        openingDocument = document
+        document.open { [weak self] success in
+            Task { @MainActor in
+                self?.finishOpeningDocument(at: url, success: success, shouldStopAccessing: shouldStopAccessing)
+            }
+        }
+    }
+
+    private func finishOpeningDocument(at url: URL, success: Bool, shouldStopAccessing: Bool) {
+        guard let document = openingDocument else { return }
+        openingDocument = nil
+        guard let window else { return }
+
+        if success {
+            document.markSaved(to: url)
+            ProjectLibraryStore.remember(url: url)
+            showEditor(document: document, in: window)
+        } else {
+            (window.rootViewController as? EditorSceneLoadingViewController)?.showOpenError(CocoaError(.fileReadCorruptFile))
+            if shouldStopAccessing {
+                url.stopAccessingSecurityScopedResource()
+                securityScopedProjectURL = nil
+            }
+        }
+    }
+
+    private func configureWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
+        configureInitialWindowSize(for: windowScene, role: role)
+        DispatchQueue.main.async { [weak windowScene] in
+            guard let windowScene else { return }
+            self.configureInitialWindowSize(for: windowScene, role: role)
+        }
+    }
+
+    private func configureInitialWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
         #if targetEnvironment(macCatalyst)
-            let minimumSize = CGSize(width: 820, height: 560)
-            let preferredSize = CGSize(width: 980, height: 680)
+            let minimumSize: CGSize
+            let preferredSize: CGSize
+            switch role {
+            case .launcher:
+                minimumSize = CGSize(width: 820, height: 560)
+                preferredSize = CGSize(width: 980, height: 680)
+            case .editor:
+                minimumSize = CGSize(width: 1180, height: 760)
+                preferredSize = CGSize(width: 1440, height: 920)
+            }
+
             windowScene.sizeRestrictions?.minimumSize = minimumSize
 
             let screenFrame = windowScene.screen.bounds
-            let size = CGSize(width: min(preferredSize.width, screenFrame.width * 0.82),
-                              height: min(preferredSize.height, screenFrame.height * 0.82))
+            let size = CGSize(width: min(preferredSize.width, screenFrame.width * 0.9),
+                              height: min(preferredSize.height, screenFrame.height * 0.9))
             let origin = CGPoint(x: screenFrame.midX - size.width * 0.5,
                                  y: screenFrame.midY - size.height * 0.5)
             let preferences = UIWindowScene.GeometryPreferences.Mac(systemFrame: CGRect(origin: origin, size: size))
-            DispatchQueue.main.async {
-                windowScene.requestGeometryUpdate(preferences)
-            }
+            windowScene.requestGeometryUpdate(preferences)
         #endif
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
-        // Called as the scene is being released by the system.
-        // This occurs shortly after the scene enters the background, or when its session is discarded.
-        // Release any resources associated with this scene that can be re-created the next time the scene connects.
-        // The scene may re-connect later, as its session was not necessarily discarded (see `application:didDiscardSceneSessions` instead).
+        (window?.rootViewController as? EditorViewController)?.saveBeforeSceneDisconnect()
+        if let securityScopedProjectURL {
+            securityScopedProjectURL.stopAccessingSecurityScopedResource()
+            self.securityScopedProjectURL = nil
+        }
+    }
+}
+
+private final class EditorSceneLoadingViewController: UIViewController {
+    private let projectTitle: String
+    private let statusLabel = UILabel()
+
+    init(title: String) {
+        projectTitle = title
+        super.init(nibName: nil, bundle: nil)
     }
 
-    func sceneDidBecomeActive(_ scene: UIScene) {
-        // Called when the scene has moved from an inactive state to an active state.
-        // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
     }
 
-    func sceneWillResignActive(_ scene: UIScene) {
-        // Called when the scene will move from an active state to an inactive state.
-        // This may occur due to temporary interruptions (ex. an incoming phone call).
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground
+
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.font = .preferredFont(forTextStyle: .headline)
+        statusLabel.textColor = .secondaryLabel
+        statusLabel.text = "Opening \(projectTitle)..."
+        view.addSubview(statusLabel)
+
+        NSLayoutConstraint.activate([
+            statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            statusLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ])
     }
 
-    func sceneWillEnterForeground(_ scene: UIScene) {
-        // Called as the scene transitions from the background to the foreground.
-        // Use this method to undo the changes made on entering the background.
-    }
-
-    func sceneDidEnterBackground(_ scene: UIScene) {
-        // Called as the scene transitions from the foreground to the background.
-        // Use this method to save data, release shared resources, and store enough scene-specific state information
-        // to restore the scene back to its current state.
+    func showOpenError(_ error: Error) {
+        statusLabel.text = "Open failed"
+        let alert = UIAlertController(title: "Open Failed",
+                                      message: error.localizedDescription,
+                                      preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }
