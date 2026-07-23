@@ -307,7 +307,7 @@ final class MotionDocumentCore {
 
     // Every method below runs a command through the core undo manager and
     // bumps `revision`. Callers additionally register with the system
-    // UndoManager (see EditorRootView.perform).
+    // UndoManager from the editor controller.
 
     func setStaticFloat(entityID: UInt64, path: String, value: Float) {
         ms_command_set_static_float(handle, entityID, path, value)
