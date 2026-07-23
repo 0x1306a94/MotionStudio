@@ -25,6 +25,14 @@ struct MotionStudioSceneActivity {
     private static let newProjectKind = "newProject"
     private static let openProjectKind = "openProject"
 
+#if targetEnvironment(macCatalyst)
+    private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = [.withSecurityScope]
+    private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+#else
+    private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = []
+    private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = []
+#endif
+
     static func newProjectActivity() -> NSUserActivity {
         let activity = NSUserActivity(activityType: editorActivityType)
         activity.title = "New Motion Project"
@@ -39,7 +47,7 @@ struct MotionStudioSceneActivity {
             requestKindKey: openProjectKind,
             projectURLStringKey: url.absoluteString,
         ]
-        if let bookmarkData = try? url.bookmarkData(options: .withSecurityScope,
+        if let bookmarkData = try? url.bookmarkData(options: bookmarkCreationOptions,
                                                     includingResourceValuesForKeys: nil,
                                                     relativeTo: nil)
         {
@@ -72,7 +80,7 @@ struct MotionStudioSceneActivity {
         if let bookmarkData = userInfo[projectURLBookmarkKey] as? Data {
             var isStale = false
             if let url = try? URL(resolvingBookmarkData: bookmarkData,
-                                  options: .withSecurityScope,
+                                  options: bookmarkResolutionOptions,
                                   relativeTo: nil,
                                   bookmarkDataIsStale: &isStale), !isStale
             {
