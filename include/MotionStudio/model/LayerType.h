@@ -7,7 +7,7 @@ enum class LayerType {
     Shape,
     Image,
     Text,
-    Null,
+    Group,
     Precomp
 };
 

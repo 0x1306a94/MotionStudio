@@ -2,18 +2,22 @@
 
 namespace motion {
 
+enum class EasingType {
+    Linear = 0,
+    Hold = 1,
+    Ease = 2,
+    EaseIn = 3,
+    EaseOut = 4,
+    EaseInOut = 5,
+    CubicBezier = 6
+};
+
 // Easing curve: controls the interpolation rhythm between consecutive keyframes.
-// The Bezier type defines a cubic bezier with P0=(0,0), P1=(inX,inY),
+// The CubicBezier type defines a cubic bezier with P0=(0,0), P1=(inX,inY),
 // P2=(outX,outY), P3=(1,1), matching the CSS cubic-bezier(x1, y1, x2, y2)
 // convention where (inX,inY)=(x1,y1) and (outX,outY)=(x2,y2).
 struct Easing {
-    enum class Type {
-        Linear,
-        Bezier,
-        Hold
-    };
-
-    Type type = Type::Linear;
+    EasingType type = EasingType::Linear;
     float inX = 0;
     float inY = 0;
     float outX = 1;
@@ -32,11 +36,17 @@ struct Easing {
     // outY: y coordinate of the second control point.
     static Easing Bezier(float inX, float inY, float outX, float outY);
 
+    // Returns the CSS ease curve: Bezier(0.25, 0.1, 0.25, 1).
+    static Easing Ease();
+
     // Returns a standard ease-in curve: Bezier(0.42, 0, 1, 1).
     static Easing EaseIn();
 
     // Returns a standard ease-out curve: Bezier(0, 0, 0.58, 1).
     static Easing EaseOut();
+
+    // Returns a standard ease-in-out curve: Bezier(0.42, 0, 0.58, 1).
+    static Easing EaseInOut();
 
     bool operator==(const Easing &other) const;
     bool operator!=(const Easing &other) const;

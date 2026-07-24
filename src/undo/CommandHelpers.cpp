@@ -211,7 +211,7 @@ bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing
 int IndexOfLayer(const Composition &composition, EntityId layerId) {
     for (size_t i = 0; i < composition.layers.size(); ++i) {
         if (composition.layers[i]->id == layerId) {
-            return int(i);
+            return static_cast<int>(i);
         }
     }
     return -1;

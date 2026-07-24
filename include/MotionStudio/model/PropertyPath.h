@@ -14,8 +14,8 @@ class Document;
 // Syntax (dot-separated segments, array segments written as name[index]):
 //   Layer:         "transform.position" / "content.text"
 //                  "size" (ShapeContent; resolves against the primary geometry element)
-//                  "elements[0].color" (ShapeContent; groups nest via "elements[i]")
-//   ShapeElement:  "color" / "path" / "width" ... (entityId points directly at the element)
+//                  "styles[0].color" (Layer style; styles apply to layer output)
+//   ShapeElement:  "path" / "size" / "cornerRadius" ... (entityId points directly at the element)
 struct PropertyPath {
     EntityId entityId;  // id of the owning Layer or ShapeElement
     std::string path;

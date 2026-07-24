@@ -60,7 +60,8 @@ void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compo
 }
 
 void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame, MSCanvasFrameProfile *profileOut) {
-    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId, double(frame), profileOut);
+    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId,
+                                          static_cast<double>(frame), profileOut);
 }
 
 void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, MSCanvasFrameProfile *profileOut) {

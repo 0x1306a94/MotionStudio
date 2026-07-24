@@ -50,7 +50,7 @@ bool TgfxRenderAdapter::RecreateTarget(int width, int height) {
     surface_.reset();
     impl_->texture = nil;
 
-    MTLTextureDescriptor *descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:size_t(width) height:size_t(height) mipmapped:NO];
+    MTLTextureDescriptor *descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:static_cast<size_t>(width) height:static_cast<size_t>(height) mipmapped:NO];
     descriptor.usage = MTLTextureUsageRenderTarget;
     impl_->texture = [impl_->mtlDevice newTextureWithDescriptor:descriptor];
 
@@ -88,7 +88,7 @@ bool TgfxRenderAdapter::ReadPixels(std::vector<uint8_t> &pixels) {
         return false;
     }
     tgfx::ImageInfo info = tgfx::ImageInfo::Make(impl_->width, impl_->height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
-    pixels.resize(info.rowBytes() * size_t(info.height()));
+    pixels.resize(info.rowBytes() * static_cast<size_t>(info.height()));
     const bool ok = surface_->readPixels(info, pixels.data());
     device_->unlock();
     return ok;

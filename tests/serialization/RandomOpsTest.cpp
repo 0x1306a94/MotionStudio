@@ -7,8 +7,9 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/serialization/Serializer.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
@@ -31,6 +32,7 @@ using motion::Document;
 using motion::DocumentFingerprint;
 using motion::Easing;
 using motion::EntityId;
+using motion::FillStyle;
 using motion::FrameTime;
 using motion::Keyframe;
 using motion::Layer;
@@ -45,7 +47,7 @@ using motion::Serializer;
 using motion::SetEasingCommand;
 using motion::SetStaticValueCommand;
 using motion::ShapeContent;
-using motion::ShapeFill;
+using motion::ShapeRect;
 using motion::UndoManager;
 using motion::Vec2;
 
@@ -57,16 +59,16 @@ const char *kTransformProperties[] = {"transform.position", "transform.scale",
 Document MakeRandomDocument(std::mt19937_64 &rng) {
     Document document;
     document.name = "fuzz";
-    const int compositionCount = 1 + int(rng() % 2);
+    const int compositionCount = 1 + static_cast<int>(rng() % 2);
     for (int i = 0; i < compositionCount; ++i) {
         auto composition = std::make_unique<Composition>();
         composition->duration = 100;
-        const int layerCount = int(rng() % 4);
+        const int layerCount = static_cast<int>(rng() % 4);
         for (int j = 0; j < layerCount; ++j) {
             auto layer = std::make_unique<Layer>(LayerType::Shape);
             auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
-            auto fill = std::make_unique<ShapeFill>();
-            shapeContent->elements.push_back(std::move(fill));
+            shapeContent->geometry = std::make_unique<ShapeRect>();
+            layer->styles.push_back(std::make_unique<FillStyle>());
             composition->layers.push_back(std::move(layer));
         }
         document.addComposition(std::move(composition));
@@ -85,7 +87,7 @@ std::vector<Layer *> CollectLayers(Document &document) {
 }
 
 float RandomFloat(std::mt19937_64 &rng) {
-    return float(rng() % 1000) - 500.0f;
+    return static_cast<float>(rng() % 1000) - 500.0f;
 }
 
 Vec2 RandomVec2(std::mt19937_64 &rng) {
@@ -103,19 +105,19 @@ std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64 &rng, Document &docum
     EntityId layerId = layers.empty() ? EntityId{rng() % 100}
                                       : layers[rng() % layers.size()]->id;
     PropertyPath property{layerId, kTransformProperties[rng() % 3]};
-    const FrameTime time = FrameTime(rng() % 100);
+    const FrameTime time = static_cast<FrameTime>(rng() % 100);
 
     switch (rng() % 7) {
         case 0: {
             return std::make_unique<AddLayerCommand>(
-                compositionId, std::make_unique<Layer>(LayerType::Null));
+                compositionId, std::make_unique<Layer>(LayerType::Group));
         }
         case 1: {
             return std::make_unique<RemoveLayerCommand>(compositionId, layerId);
         }
         case 2: {
-            return std::make_unique<MoveLayerCommand>(compositionId, int(rng() % 6),
-                                                      int(rng() % 6));
+            return std::make_unique<MoveLayerCommand>(
+                compositionId, static_cast<int>(rng() % 6), static_cast<int>(rng() % 6));
         }
         case 3: {
             return std::make_unique<SetStaticValueCommand>(
@@ -134,7 +136,7 @@ std::unique_ptr<Command> MakeRandomCommand(std::mt19937_64 &rng, Document &docum
                 ? std::unique_ptr<Command>(
                       std::make_unique<RemoveKeyframeCommand>(property, time))
                 : std::make_unique<MoveKeyframeCommand>(
-                      property, time, FrameTime(rng() % 100));
+                      property, time, static_cast<FrameTime>(rng() % 100));
         }
         default: {
             const Easing easings[] = {Easing::Linear(), Easing::EaseIn(),

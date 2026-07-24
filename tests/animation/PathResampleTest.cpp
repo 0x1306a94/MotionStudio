@@ -65,7 +65,7 @@ TEST(PathResampleTest, OpenLineGetsEvenlySpacedVertices) {
     ASSERT_EQ(result.vertices.size(), 5u);
     EXPECT_FALSE(result.closed);
     for (size_t i = 0; i < 5; ++i) {
-        EXPECT_TRUE(ApproxEqual(result.vertices[i].point, Vec2{float(i) * 2.5f, 0}))
+        EXPECT_TRUE(ApproxEqual(result.vertices[i].point, Vec2{static_cast<float>(i) * 2.5f, 0}))
             << "i=" << i;
     }
 }

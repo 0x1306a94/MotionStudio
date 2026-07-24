@@ -4,13 +4,23 @@
 
 using motion::ApplyEasing;
 using motion::Easing;
+using motion::EasingType;
 using motion::SolveBezierEasing;
 
 TEST(EasingTest, Presets) {
-    EXPECT_EQ(Easing::Linear().type, Easing::Type::Linear);
-    EXPECT_EQ(Easing::Hold().type, Easing::Type::Hold);
-    EXPECT_EQ(Easing::EaseIn(), Easing::Bezier(0.42f, 0, 1, 1));
-    EXPECT_EQ(Easing::EaseOut(), Easing::Bezier(0, 0, 0.58f, 1));
+    EXPECT_EQ(Easing::Linear().type, EasingType::Linear);
+    EXPECT_EQ(Easing::Hold().type, EasingType::Hold);
+    EXPECT_EQ(Easing::Ease().type, EasingType::Ease);
+    EXPECT_EQ(Easing::EaseIn().type, EasingType::EaseIn);
+    EXPECT_EQ(Easing::EaseOut().type, EasingType::EaseOut);
+    EXPECT_EQ(Easing::EaseInOut().type, EasingType::EaseInOut);
+    EXPECT_FLOAT_EQ(Easing::EaseIn().inX, 0.42f);
+    EXPECT_FLOAT_EQ(Easing::EaseOut().outX, 0.58f);
+}
+
+TEST(EasingTest, BezierEqualityUsesTolerance) {
+    EXPECT_EQ(Easing::Bezier(0.42000001f, 0, 1, 1),
+              Easing::Bezier(0.42f, 0, 1, 1));
 }
 
 TEST(ApplyEasingTest, LinearIsIdentity) {

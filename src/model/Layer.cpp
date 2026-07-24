@@ -22,7 +22,7 @@ std::unique_ptr<LayerContent> MakeContent(LayerType type) {
         case LayerType::Text: {
             return std::make_unique<TextContent>();
         }
-        case LayerType::Null: {
+        case LayerType::Group: {
             return std::make_unique<NullContent>();
         }
         case LayerType::Precomp: {

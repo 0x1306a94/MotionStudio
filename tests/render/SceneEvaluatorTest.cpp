@@ -3,12 +3,11 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapeRect.h"
-#include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
 using motion::Color;
@@ -16,16 +15,16 @@ using motion::Composition;
 using motion::Document;
 using motion::EntityId;
 using motion::Expected;
+using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
 using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
-using motion::ShapeFill;
 using motion::ShapeGroup;
 using motion::ShapeRect;
-using motion::ShapeStroke;
+using motion::StrokeStyle;
 using motion::Vec2;
 
 namespace {
@@ -35,7 +34,7 @@ struct RectScene {
     Composition *composition;
     Layer *layer;
     ShapeRect *rect = nullptr;
-    ShapeFill *fill = nullptr;
+    FillStyle *fill = nullptr;
 
     RectScene() {
         composition = document.addComposition(std::make_unique<Composition>());
@@ -47,11 +46,11 @@ struct RectScene {
         rect = rectElement.get();
         rect->position.setStaticValue(Vec2{100, 50});
         rect->size.setStaticValue(Vec2{40, 20});
-        content->elements.push_back(std::move(rectElement));
-        auto fillElement = std::make_unique<ShapeFill>();
+        content->geometry = std::move(rectElement);
+        auto fillElement = std::make_unique<FillStyle>();
         fill = fillElement.get();
         fill->color.setStaticValue(Color{1, 0, 0, 1});
-        content->elements.push_back(std::move(fillElement));
+        layer->styles.push_back(std::move(fillElement));
     }
 
     Expected<SceneState, std::string> Evaluate(motion::FrameTime time) {
@@ -121,14 +120,14 @@ TEST(SceneEvaluatorTest, LayerTransformAppliesToPath) {
 TEST(SceneEvaluatorTest, ParentTransformChain) {
     RectScene scene;
     Layer *parent =
-        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
     parent->outPoint = 100;
     parent->transform.position.setStaticValue(Vec2{100, 0});
     scene.layer->parentId = parent->id;
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);  // Null parent produces no items
+    ASSERT_EQ(result->layers.size(), 1u);  // Group parent produces no items
     const auto &item = result->layers[0].shapeItems[0];
     EXPECT_EQ(item.path.vertices[0].point, (Vec2{180, 40}));
 }
@@ -136,7 +135,7 @@ TEST(SceneEvaluatorTest, ParentTransformChain) {
 TEST(SceneEvaluatorTest, OpacityInheritsFromParent) {
     RectScene scene;
     Layer *parent =
-        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
     parent->outPoint = 100;
     parent->transform.opacity.setStaticValue(0.5f);
     scene.layer->parentId = parent->id;
@@ -176,16 +175,13 @@ TEST(SceneEvaluatorTest, InvisibleLayerSkipped) {
 TEST(SceneEvaluatorTest, GroupTransformComposesIntoPath) {
     RectScene scene;
     auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
-    content->elements.clear();
     auto group = std::make_unique<ShapeGroup>();
     group->transform.position.setStaticValue(Vec2{5, 5});
     auto rect = std::make_unique<ShapeRect>();
     rect->position.setStaticValue(Vec2{0, 0});
     rect->size.setStaticValue(Vec2{10, 10});
     group->elements.push_back(std::move(rect));
-    auto fill = std::make_unique<ShapeFill>();
-    group->elements.push_back(std::move(fill));
-    content->elements.push_back(std::move(group));
+    content->geometry = std::move(group);
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
@@ -196,11 +192,10 @@ TEST(SceneEvaluatorTest, GroupTransformComposesIntoPath) {
 
 TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
     RectScene scene;
-    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
-    auto stroke = std::make_unique<ShapeStroke>();
+    auto stroke = std::make_unique<StrokeStyle>();
     stroke->width.setStaticValue(3.0f);
     stroke->cap = motion::LineCap::Round;
-    content->elements.push_back(std::move(stroke));
+    scene.layer->styles.push_back(std::move(stroke));
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
@@ -214,12 +209,10 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
 TEST(SceneEvaluatorTest, EllipseProducesFourVertexClosedPath) {
     RectScene scene;
     auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
-    content->elements.clear();
     auto ellipse = std::make_unique<ShapeEllipse>();
     ellipse->position.setStaticValue(Vec2{0, 0});
     ellipse->size.setStaticValue(Vec2{20, 10});
-    content->elements.push_back(std::move(ellipse));
-    content->elements.push_back(std::make_unique<ShapeFill>());
+    content->geometry = std::move(ellipse);
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());

@@ -13,15 +13,15 @@ ScreenTransform MakeOnScreenTransform(int sceneWidth, int sceneHeight, float tar
     }
     // Fit Up to 100% (AE Composition panel default): scale down to fit when the
     // drawable is smaller than the composition; never scale above 1:1.
-    const float fitScale = std::min(1.0f, std::min(targetWidth / float(sceneWidth), targetHeight / float(sceneHeight)));
+    const float fitScale = std::min(1.0f, std::min(targetWidth / static_cast<float>(sceneWidth), targetHeight / static_cast<float>(sceneHeight)));
     // Map onto a whole-pixel destination rect so AA edges don't sit on half
     // pixels (which previously produced dark left/top fringes with Src).
-    const int destWidth = std::max(1, int(std::floor(float(sceneWidth) * fitScale + 1e-6f)));
-    const int destHeight = std::max(1, int(std::floor(float(sceneHeight) * fitScale + 1e-6f)));
-    const float offsetX = std::floor((targetWidth - float(destWidth)) * 0.5f);
-    const float offsetY = std::floor((targetHeight - float(destHeight)) * 0.5f);
-    const float fitScaleX = float(destWidth) / float(sceneWidth);
-    const float fitScaleY = float(destHeight) / float(sceneHeight);
+    const int destWidth = std::max(1, static_cast<int>(std::floor(static_cast<float>(sceneWidth) * fitScale + 1e-6f)));
+    const int destHeight = std::max(1, static_cast<int>(std::floor(static_cast<float>(sceneHeight) * fitScale + 1e-6f)));
+    const float offsetX = std::floor((targetWidth - static_cast<float>(destWidth)) * 0.5f);
+    const float offsetY = std::floor((targetHeight - static_cast<float>(destHeight)) * 0.5f);
+    const float fitScaleX = static_cast<float>(destWidth) / static_cast<float>(sceneWidth);
+    const float fitScaleY = static_cast<float>(destHeight) / static_cast<float>(sceneHeight);
 
     const float safeZoom = zoom > 0.0f ? zoom : 1.0f;
     const float pointScale = contentsScale > 0.0f ? contentsScale : 1.0f;

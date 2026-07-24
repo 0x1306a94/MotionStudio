@@ -4,19 +4,29 @@
 
 namespace motion {
 
+namespace {
+
+constexpr float kEasingEqualityEpsilon = 1e-5f;
+
+bool AlmostEqual(float left, float right) {
+    return std::abs(left - right) <= kEasingEqualityEpsilon;
+}
+
+}  // namespace
+
 Easing Easing::Linear() {
     return {};
 }
 
 Easing Easing::Hold() {
     Easing easing;
-    easing.type = Type::Hold;
+    easing.type = EasingType::Hold;
     return easing;
 }
 
 Easing Easing::Bezier(float inX, float inY, float outX, float outY) {
     Easing easing;
-    easing.type = Type::Bezier;
+    easing.type = EasingType::CubicBezier;
     easing.inX = inX;
     easing.inY = inY;
     easing.outX = outX;
@@ -24,22 +34,39 @@ Easing Easing::Bezier(float inX, float inY, float outX, float outY) {
     return easing;
 }
 
+Easing Easing::Ease() {
+    Easing easing = Bezier(0.25f, 0.1f, 0.25f, 1);
+    easing.type = EasingType::Ease;
+    return easing;
+}
+
 Easing Easing::EaseIn() {
-    return Bezier(0.42f, 0, 1, 1);
+    Easing easing = Bezier(0.42f, 0, 1, 1);
+    easing.type = EasingType::EaseIn;
+    return easing;
 }
 
 Easing Easing::EaseOut() {
-    return Bezier(0, 0, 0.58f, 1);
+    Easing easing = Bezier(0, 0, 0.58f, 1);
+    easing.type = EasingType::EaseOut;
+    return easing;
+}
+
+Easing Easing::EaseInOut() {
+    Easing easing = Bezier(0.42f, 0, 0.58f, 1);
+    easing.type = EasingType::EaseInOut;
+    return easing;
 }
 
 bool Easing::operator==(const Easing &other) const {
     if (type != other.type) {
         return false;
     }
-    if (type != Type::Bezier) {
+    if (type != EasingType::CubicBezier) {
         return true;
     }
-    return inX == other.inX && inY == other.inY && outX == other.outX && outY == other.outY;
+    return AlmostEqual(inX, other.inX) && AlmostEqual(inY, other.inY) &&
+        AlmostEqual(outX, other.outX) && AlmostEqual(outY, other.outY);
 }
 
 bool Easing::operator!=(const Easing &other) const {
@@ -114,13 +141,17 @@ float SolveBezierEasing(float x1, float y1, float x2, float y2, float x) {
 
 float ApplyEasing(const Easing &easing, float progress) {
     switch (easing.type) {
-        case Easing::Type::Linear: {
+        case EasingType::Linear: {
             return progress;
         }
-        case Easing::Type::Hold: {
+        case EasingType::Hold: {
             return 0;
         }
-        case Easing::Type::Bezier: {
+        case EasingType::Ease:
+        case EasingType::EaseIn:
+        case EasingType::EaseOut:
+        case EasingType::EaseInOut:
+        case EasingType::CubicBezier: {
             return SolveBezierEasing(easing.inX, easing.inY, easing.outX, easing.outY,
                                      progress);
         }

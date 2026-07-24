@@ -4,16 +4,16 @@
 
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
+#include "MotionStudio/model/ShapeRect.h"
 
 using motion::Composition;
 using motion::Document;
 using motion::Layer;
 using motion::LayerType;
 using motion::ShapeContent;
-using motion::ShapeFill;
 using motion::ShapeGroup;
+using motion::ShapeRect;
 
 namespace {
 
@@ -51,7 +51,7 @@ TEST(DocumentTest, AddLayerAtIndexInserts) {
     Composition *composition = AddComposition(document, "main");
     Layer *bottom = AddShapeLayer(document, composition->id);
     Layer *top = AddShapeLayer(document, composition->id);
-    Layer *middle = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null), 1);
+    Layer *middle = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group), 1);
 
     ASSERT_EQ(composition->layers.size(), 3u);
     EXPECT_EQ(composition->layers[0]->id, bottom->id);
@@ -72,10 +72,10 @@ TEST(DocumentTest, TakeLayerUnregistersSubtree) {
 
     auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
     auto group = std::make_unique<ShapeGroup>();
-    auto nestedFill = std::make_unique<ShapeFill>();
-    const motion::EntityId nestedId = nestedFill->id;
-    group->elements.push_back(std::move(nestedFill));
-    shapeContent->elements.push_back(std::move(group));
+    auto nestedRect = std::make_unique<ShapeRect>();
+    const motion::EntityId nestedId = nestedRect->id;
+    group->elements.push_back(std::move(nestedRect));
+    shapeContent->geometry = std::move(group);
     document.refreshEntityIndex();
     ASSERT_NE(document.entityIndex().findShape(nestedId), nullptr);
 

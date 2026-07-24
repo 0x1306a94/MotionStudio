@@ -56,8 +56,10 @@ struct KeyframeDiamond: View {
                 Button("Delete Keyframe", role: .destructive, action: onDelete)
                 Divider()
                 Button("Linear") { onSetEasing(.linear) }
+                Button("Ease") { onSetEasing(.ease) }
                 Button("Ease In") { onSetEasing(.easeIn) }
                 Button("Ease Out") { onSetEasing(.easeOut) }
+                Button("Ease In Out") { onSetEasing(.easeInOut) }
                 Button("Hold") { onSetEasing(.hold) }
             }
     }

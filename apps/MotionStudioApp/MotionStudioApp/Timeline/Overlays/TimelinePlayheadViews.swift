@@ -61,4 +61,3 @@ private struct PlayheadTriangle: Shape {
         return path
     }
 }
-

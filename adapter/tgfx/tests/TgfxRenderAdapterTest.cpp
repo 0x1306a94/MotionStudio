@@ -5,10 +5,9 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeRect.h"
-#include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/render/CommandBuilder.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
@@ -21,6 +20,7 @@ using motion::Composition;
 using motion::Document;
 using motion::EvaluatedLayer;
 using motion::EvaluatedShapeItem;
+using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
 using motion::LineCap;
@@ -29,9 +29,7 @@ using motion::PlayCommands;
 using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
-using motion::ShapeFill;
 using motion::ShapeRect;
-using motion::ShapeStroke;
 using motion::TgfxRenderAdapter;
 using motion::Vec2;
 
@@ -45,7 +43,8 @@ struct Pixel {
 };
 
 Pixel PixelAt(const std::vector<uint8_t> &pixels, int width, int x, int y) {
-    const size_t offset = (size_t(y) * size_t(width) + size_t(x)) * 4;
+    const size_t offset =
+        (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
     return {pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]};
 }
 
@@ -176,10 +175,10 @@ TEST(TgfxRenderAdapterTest, RendersDocumentPipelineEndToEnd) {
     auto rect = std::make_unique<ShapeRect>();
     rect->position.setStaticValue(Vec2{50, 50});
     rect->size.setStaticValue(Vec2{40, 40});
-    content->elements.push_back(std::move(rect));
-    auto fill = std::make_unique<ShapeFill>();
+    content->geometry = std::move(rect);
+    auto fill = std::make_unique<FillStyle>();
     fill->color.setStaticValue(Color{1, 1, 0, 1});
-    content->elements.push_back(std::move(fill));
+    layer->styles.push_back(std::move(fill));
 
     auto state = SceneEvaluator::Evaluate(document, composition->id, 10);
     ASSERT_TRUE(state.hasValue());

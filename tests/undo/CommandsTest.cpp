@@ -3,8 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
-#include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeFill.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
@@ -24,6 +23,7 @@ using motion::Composition;
 using motion::Document;
 using motion::Easing;
 using motion::EntityId;
+using motion::FillStyle;
 using motion::Keyframe;
 using motion::KeyframeData;
 using motion::Layer;
@@ -36,8 +36,6 @@ using motion::RemoveKeyframeCommand;
 using motion::RemoveLayerCommand;
 using motion::SetEasingCommand;
 using motion::SetStaticValueCommand;
-using motion::ShapeContent;
-using motion::ShapeFill;
 using motion::UndoManager;
 using motion::Vec2;
 
@@ -78,7 +76,7 @@ Keyframe<Vec2> PositionKeyframe(motion::FrameTime time, Vec2 value,
 
 TEST(AddLayerCommandTest, AddUndoRedo) {
     Scene scene;
-    auto layer = std::make_unique<Layer>(LayerType::Null);
+    auto layer = std::make_unique<Layer>(LayerType::Group);
     const EntityId layerId = layer->id;
 
     scene.execute<AddLayerCommand>(scene.composition->id, std::move(layer));
@@ -96,7 +94,7 @@ TEST(AddLayerCommandTest, AddUndoRedo) {
 
 TEST(AddLayerCommandTest, InsertsAtIndex) {
     Scene scene;
-    auto layer = std::make_unique<Layer>(LayerType::Null);
+    auto layer = std::make_unique<Layer>(LayerType::Group);
     const EntityId layerId = layer->id;
 
     scene.execute<AddLayerCommand>(scene.composition->id, std::move(layer), 0);
@@ -105,11 +103,9 @@ TEST(AddLayerCommandTest, InsertsAtIndex) {
 
 TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
     Scene scene;
-    auto *shapeContent = static_cast<ShapeContent *>(scene.layer->content.get());
-    auto fill = std::make_unique<ShapeFill>();
+    auto fill = std::make_unique<FillStyle>();
     auto *fillRaw = fill.get();
-    shapeContent->elements.push_back(std::move(fill));
-    scene.document.refreshEntityIndex();
+    scene.layer->styles.push_back(std::move(fill));
 
     Keyframe<Color> colorKeyframe;
     colorKeyframe.time = 10;
@@ -119,16 +115,14 @@ TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {
 
     scene.execute<RemoveLayerCommand>(scene.composition->id, layerId);
     EXPECT_TRUE(scene.composition->layers.empty());
-    EXPECT_EQ(scene.document.entityIndex().findShape(fillRaw->id), nullptr);
 
     scene.undo.undo(scene.document);
     ASSERT_EQ(scene.composition->layers.size(), 1u);
-    auto *restoredFill = scene.document.entityIndex().findShape(fillRaw->id);
-    ASSERT_NE(restoredFill, nullptr);
-    EXPECT_EQ(restoredFill->id, fillRaw->id);
     auto *restoredLayer = scene.document.entityIndex().findLayer(layerId);
-    auto *restoredContent = static_cast<ShapeContent *>(restoredLayer->content.get());
-    auto *fill2 = static_cast<ShapeFill *>(restoredContent->elements[0].get());
+    ASSERT_NE(restoredLayer, nullptr);
+    ASSERT_EQ(restoredLayer->styles.size(), 1u);
+    auto *fill2 = static_cast<FillStyle *>(restoredLayer->styles[0].get());
+    EXPECT_EQ(fill2->id, fillRaw->id);
     EXPECT_EQ(fill2->color.keyframes().size(), 1u);
     EXPECT_EQ(fill2->color.evaluate(10), (Color{1, 0, 0, 1}));
 }
@@ -144,9 +138,9 @@ TEST(RemoveLayerCommandTest, ExecuteSkipsMissingLayer) {
 TEST(MoveLayerCommandTest, MoveAndUndo) {
     Scene scene;
     Layer *second =
-        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
     Layer *third =
-        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
 
     scene.execute<MoveLayerCommand>(scene.composition->id, 0, 2);
     EXPECT_EQ(scene.composition->layers[2]->id, scene.layer->id);
@@ -160,7 +154,7 @@ TEST(MoveLayerCommandTest, MoveAndUndo) {
 TEST(MoveLayerCommandTest, ConsecutiveDragsMerge) {
     Scene scene;
     for (int i = 0; i < 3; ++i) {
-        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
     }
     // Consecutive drags 0 → 1 → 2 → 3 merge into a single undo unit.
     scene.execute<MoveLayerCommand>(scene.composition->id, 0, 1);

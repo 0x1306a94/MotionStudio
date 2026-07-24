@@ -4,9 +4,9 @@
 
 #include "MotionStudio/animation/Keyframe.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
@@ -14,6 +14,7 @@ using motion::Composition;
 using motion::Document;
 using motion::EntityId;
 using motion::Expected;
+using motion::FillStyle;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
@@ -21,7 +22,6 @@ using motion::PrecompContent;
 using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
-using motion::ShapeFill;
 using motion::ShapeRect;
 using motion::Vec2;
 
@@ -36,8 +36,8 @@ Layer *AddRectLayer(Document &document, EntityId compositionId, Vec2 center) {
     auto rect = std::make_unique<ShapeRect>();
     rect->position.setStaticValue(center);
     rect->size.setStaticValue(Vec2{10, 10});
-    content->elements.push_back(std::move(rect));
-    content->elements.push_back(std::make_unique<ShapeFill>());
+    content->geometry = std::move(rect);
+    layer->styles.push_back(std::make_unique<FillStyle>());
     return layer;
 }
 

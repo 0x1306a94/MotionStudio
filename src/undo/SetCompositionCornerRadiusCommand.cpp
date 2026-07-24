@@ -60,9 +60,9 @@ namespace {
 CompositionSettings SanitizeSettings(CompositionSettings settings) {
     settings.width = std::max(settings.width, 1);
     settings.height = std::max(settings.height, 1);
-    settings.duration = std::max(settings.duration, FrameTime(1));
-    settings.frameRate.num = std::max(settings.frameRate.num, uint32_t(1));
-    settings.frameRate.den = std::max(settings.frameRate.den, uint32_t(1));
+    settings.duration = std::max(settings.duration, static_cast<FrameTime>(1));
+    settings.frameRate.num = std::max(settings.frameRate.num, static_cast<uint32_t>(1));
+    settings.frameRate.den = std::max(settings.frameRate.den, static_cast<uint32_t>(1));
     return settings;
 }
 

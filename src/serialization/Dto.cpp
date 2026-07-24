@@ -13,8 +13,8 @@ const char *ToString(LayerType type) {
         case LayerType::Text: {
             return "text";
         }
-        case LayerType::Null: {
-            return "null";
+        case LayerType::Group: {
+            return "group";
         }
         case LayerType::Precomp: {
             return "precomp";
@@ -33,8 +33,8 @@ Expected<LayerType, std::string> layerTypeFromString(const std::string &text) {
     if (text == "text") {
         return LayerType::Text;
     }
-    if (text == "null") {
-        return LayerType::Null;
+    if (text == "group") {
+        return LayerType::Group;
     }
     if (text == "precomp") {
         return LayerType::Precomp;
@@ -46,12 +46,6 @@ const char *ToString(ShapeType type) {
     switch (type) {
         case ShapeType::Path: {
             return "path";
-        }
-        case ShapeType::Fill: {
-            return "fill";
-        }
-        case ShapeType::Stroke: {
-            return "stroke";
         }
         case ShapeType::Group: {
             return "group";
@@ -72,12 +66,6 @@ const char *ToString(ShapeType type) {
 Expected<ShapeType, std::string> shapeTypeFromString(const std::string &text) {
     if (text == "path") {
         return ShapeType::Path;
-    }
-    if (text == "fill") {
-        return ShapeType::Fill;
-    }
-    if (text == "stroke") {
-        return ShapeType::Stroke;
     }
     if (text == "group") {
         return ShapeType::Group;
@@ -238,34 +226,6 @@ Expected<AssetType, std::string> assetTypeFromString(const std::string &text) {
         return AssetType::Font;
     }
     return Unexpected(std::string("unknown asset type: " + text));
-}
-
-const char *ToString(Easing::Type type) {
-    switch (type) {
-        case Easing::Type::Linear: {
-            return "linear";
-        }
-        case Easing::Type::Bezier: {
-            return "bezier";
-        }
-        case Easing::Type::Hold: {
-            return "hold";
-        }
-    }
-    return "unknown";
-}
-
-Expected<Easing::Type, std::string> easingTypeFromString(const std::string &text) {
-    if (text == "linear") {
-        return Easing::Type::Linear;
-    }
-    if (text == "bezier") {
-        return Easing::Type::Bezier;
-    }
-    if (text == "hold") {
-        return Easing::Type::Hold;
-    }
-    return Unexpected(std::string("unknown easing type: " + text));
 }
 
 }  // namespace motion::dto

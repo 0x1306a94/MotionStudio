@@ -7,6 +7,7 @@
 namespace motion {
 
 class Composition;
+class Document;
 class Layer;
 class ShapeElement;
 
@@ -20,13 +21,15 @@ class EntityIndex {
     Composition *findComposition(EntityId id) const;
     ShapeElement *findShape(EntityId id) const;
 
+  private:
+    friend class Document;
+
     // layer: non-owning pointer to register.
     void registerLayer(Layer *layer);
     void registerComposition(Composition *composition);
     void registerShape(ShapeElement *shape);
     void clear();
 
-  private:
     std::unordered_map<EntityId, Layer *> layers_;
     std::unordered_map<EntityId, Composition *> compositions_;
     std::unordered_map<EntityId, ShapeElement *> shapes_;

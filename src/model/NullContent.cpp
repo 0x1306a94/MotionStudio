@@ -3,7 +3,7 @@
 namespace motion {
 
 NullContent::NullContent()
-    : LayerContent(LayerType::Null) {
+    : LayerContent(LayerType::Group) {
 }
 
 NullContent::~NullContent() = default;

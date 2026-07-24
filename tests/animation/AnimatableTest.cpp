@@ -44,9 +44,9 @@ TEST(AnimatableTest, AddKeyframeKeepsAscendingOrder) {
     animatable.addKeyframe(FloatKeyframe(10, 1));
 
     ASSERT_EQ(animatable.keyframes().size(), 3u);
-    EXPECT_EQ(animatable.keyframes()[0].time, FrameTime(0));
-    EXPECT_EQ(animatable.keyframes()[1].time, FrameTime(10));
-    EXPECT_EQ(animatable.keyframes()[2].time, FrameTime(20));
+    EXPECT_EQ(animatable.keyframes()[0].time, static_cast<FrameTime>(0));
+    EXPECT_EQ(animatable.keyframes()[1].time, static_cast<FrameTime>(10));
+    EXPECT_EQ(animatable.keyframes()[2].time, static_cast<FrameTime>(20));
     EXPECT_TRUE(animatable.isAnimated());
 }
 

@@ -17,7 +17,7 @@ TEST(TimeRangeTest, EndIsExclusive) {
 TEST(FrameRateTest, ToAndFromSeconds) {
     FrameRate fps30{30, 1};
     EXPECT_DOUBLE_EQ(fps30.toSeconds(90), 3.0);
-    EXPECT_EQ(fps30.fromSeconds(3.0), FrameTime(90));
+    EXPECT_EQ(fps30.fromSeconds(3.0), static_cast<FrameTime>(90));
 }
 
 TEST(FrameRateTest, NonIntegerRateRoundTripsWithinOneFrame) {

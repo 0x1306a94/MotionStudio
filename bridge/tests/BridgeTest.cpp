@@ -246,14 +246,12 @@ TEST(BridgeCommandTest, Vec2AndColorProperties) {
     EXPECT_FLOAT_EQ(x, 120.0f);
     EXPECT_FLOAT_EQ(y, 340.0f);
 
-    // Existing model still stores the default fill as shape content; layer
-    // styles will replace this as the editor-facing model.
-    ms_command_set_static_color(document, layerId, "elements[1].color", 0.1f, 0.2f, 0.3f, 1.0f);
+    ms_command_set_static_color(document, layerId, "styles[0].color", 0.1f, 0.2f, 0.3f, 1.0f);
     float r = 0;
     float g = 0;
     float b = 0;
     float a = 0;
-    ms_property_static_color(document, layerId, "elements[1].color", &r, &g, &b, &a);
+    ms_property_static_color(document, layerId, "styles[0].color", &r, &g, &b, &a);
     EXPECT_FLOAT_EQ(r, 0.1f);
     EXPECT_FLOAT_EQ(g, 0.2f);
     EXPECT_FLOAT_EQ(b, 0.3f);
@@ -282,15 +280,15 @@ TEST(BridgeCommandTest, KeyframeLifecycle) {
                     45.0f);
 
     // Easing round trip.
-    ms_command_set_easing(document, layerId, "transform.rotation", 0, MS_EASING_BEZIER, 0.42f,
-                          0.0f, 1.0f, 1.0f);
+    ms_command_set_easing(document, layerId, "transform.rotation", 0, MS_EASING_CUBIC_BEZIER,
+                          0.42f, 0.0f, 1.0f, 1.0f);
     float inX = 0;
     float inY = 0;
     float outX = 0;
     float outY = 0;
     const int easingType = ms_property_keyframe_easing_at(
         document, layerId, "transform.rotation", 0, &inX, &inY, &outX, &outY);
-    EXPECT_EQ(easingType, MS_EASING_BEZIER);
+    EXPECT_EQ(easingType, MS_EASING_CUBIC_BEZIER);
     EXPECT_FLOAT_EQ(inX, 0.42f);
     EXPECT_FLOAT_EQ(outY, 1.0f);
 

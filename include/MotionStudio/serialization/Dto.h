@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/common/Expected.h"
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/BlendMode.h"
@@ -45,8 +44,5 @@ Expected<MaskMode, std::string> maskModeFromString(const std::string &text);
 
 const char *ToString(AssetType type);
 Expected<AssetType, std::string> assetTypeFromString(const std::string &text);
-
-const char *ToString(Easing::Type type);
-Expected<Easing::Type, std::string> easingTypeFromString(const std::string &text);
 
 }  // namespace motion::dto

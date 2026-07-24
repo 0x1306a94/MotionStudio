@@ -137,9 +137,9 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
         return;
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
-    const tgfx::Rect compositionBounds = tgfx::Rect::MakeWH(float(sceneWidth), float(sceneHeight));
+    const tgfx::Rect compositionBounds = tgfx::Rect::MakeWH(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight));
     const float radius = std::clamp(cornerRadius, 0.0f,
-                                    std::min(float(sceneWidth), float(sceneHeight)) * 0.5f);
+                                    std::min(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight)) * 0.5f);
     tgfx::Paint paint;
     paint.setStyle(tgfx::PaintStyle::Fill);
     paint.setColor(ToTgfxColor(backgroundColor));

@@ -9,8 +9,8 @@
 #include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/animation/Keyframe.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
@@ -18,13 +18,13 @@ using motion::Composition;
 using motion::Document;
 using motion::Easing;
 using motion::EntityId;
+using motion::FillStyle;
 using motion::FrameTime;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
 using motion::SceneEvaluator;
 using motion::ShapeContent;
-using motion::ShapeFill;
 using motion::ShapeRect;
 using motion::Vec2;
 
@@ -41,22 +41,21 @@ Document BuildScene() {
     Composition *composition = document.addComposition(std::make_unique<Composition>());
     composition->duration = kFrameCount;
     for (int i = 0; i < kLayerCount; ++i) {
-        Layer *layer =
-            document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+        Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
         layer->outPoint = kFrameCount;
         for (int k = 0; k < kKeyframesPerProperty; ++k) {
             Keyframe<Vec2> keyframe;
-            keyframe.time = FrameTime(k * kFrameCount / kKeyframesPerProperty);
-            keyframe.value = Vec2{float(k % 2 == 0 ? 0 : 400), float(i)};
+            keyframe.time = static_cast<FrameTime>(k * kFrameCount / kKeyframesPerProperty);
+            keyframe.value = Vec2{static_cast<float>(k % 2 == 0 ? 0 : 400), static_cast<float>(i)};
             keyframe.easing = Easing::EaseOut();
             layer->transform.position.addKeyframe(keyframe);
         }
         auto *content = static_cast<ShapeContent *>(layer->content.get());
         auto rect = std::make_unique<ShapeRect>();
-        rect->position.setStaticValue(Vec2{0, float(i)});
+        rect->position.setStaticValue(Vec2{0, static_cast<float>(i)});
         rect->size.setStaticValue(Vec2{50, 8});
-        content->elements.push_back(std::move(rect));
-        content->elements.push_back(std::make_unique<ShapeFill>());
+        content->geometry = std::move(rect);
+        layer->styles.push_back(std::make_unique<FillStyle>());
     }
     return document;
 }
@@ -79,9 +78,7 @@ int main() {
         }
     }
     const auto elapsed = std::chrono::steady_clock::now() - start;
-    const double msPerFrame =
-        std::chrono::duration<double, std::milli>(elapsed).count() /
-        double(kRepetitions * kFrameCount);
+    const double msPerFrame = std::chrono::duration<double, std::milli>(elapsed).count() / static_cast<double>(kRepetitions * kFrameCount);
 
     std::printf("scene evaluation: %.3f ms/frame (%d layers x %d keyframes, budget "
                 "%.3f ms) %s\n",

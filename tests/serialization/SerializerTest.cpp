@@ -5,14 +5,13 @@
 
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
-#include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
@@ -26,6 +25,7 @@ using motion::Document;
 using motion::DocumentFingerprint;
 using motion::Easing;
 using motion::Expected;
+using motion::FillStyle;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
@@ -35,11 +35,9 @@ using motion::SchemaMigrator;
 using motion::Serializer;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
-using motion::ShapeFill;
 using motion::ShapeGroup;
 using motion::ShapePath;
 using motion::ShapeRect;
-using motion::ShapeStroke;
 using motion::ShapeTrimPath;
 using motion::Vec2;
 
@@ -59,7 +57,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     auto precompTarget = std::make_unique<Composition>();
     precompTarget->name = "nested";
     precompTarget->duration = 30;
-    precompTarget->layers.push_back(std::make_unique<Layer>(LayerType::Null));
+    precompTarget->layers.push_back(std::make_unique<Layer>(LayerType::Group));
 
     auto composition = std::make_unique<Composition>();
     composition->name = "main";
@@ -95,7 +93,17 @@ std::unique_ptr<Document> BuildRichDocument() {
     mask.inverted = true;
     shapeLayer->masks.push_back(mask);
 
+    auto fillStyle = std::make_unique<FillStyle>();
+    Keyframe<Color> styleColorKeyframe;
+    styleColorKeyframe.time = 10;
+    styleColorKeyframe.value = Color{0.2f, 0.4f, 0.6f, 1};
+    fillStyle->color.addKeyframe(styleColorKeyframe);
+    shapeLayer->styles.push_back(std::move(fillStyle));
+
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
+
+    auto group = std::make_unique<ShapeGroup>();
+    group->transform.position.setStaticValue(Vec2{5, 5});
 
     auto path = std::make_unique<ShapePath>();
     motion::BezierPath bezier;
@@ -103,32 +111,17 @@ std::unique_ptr<Document> BuildRichDocument() {
     bezier.vertices.push_back({{0, 0}, {-1, 0}, {1, 0}});
     bezier.vertices.push_back({{10, 0}, {-1, 0}, {1, 0}});
     path->path.setStaticValue(bezier);
-    shapeContent->elements.push_back(std::move(path));
-
-    auto fill = std::make_unique<ShapeFill>();
-    Keyframe<Color> colorKeyframe;
-    colorKeyframe.time = 10;
-    colorKeyframe.value = Color{1, 0, 0, 1};
-    colorKeyframe.easing = Easing::Bezier(0.3f, 0.1f, 0.7f, 0.9f);
-    fill->color.addKeyframe(colorKeyframe);
-    shapeContent->elements.push_back(std::move(fill));
-
-    auto stroke = std::make_unique<ShapeStroke>();
-    stroke->width.setStaticValue(3.5f);
-    shapeContent->elements.push_back(std::move(stroke));
-
-    auto group = std::make_unique<ShapeGroup>();
-    group->transform.position.setStaticValue(Vec2{5, 5});
+    group->elements.push_back(std::move(path));
     group->elements.push_back(std::make_unique<ShapeRect>());
     group->elements.push_back(std::make_unique<ShapeEllipse>());
-    shapeContent->elements.push_back(std::move(group));
-
-    shapeContent->elements.push_back(std::make_unique<ShapeTrimPath>());
+    group->elements.push_back(std::make_unique<ShapeTrimPath>());
+    const motion::EntityId geometryId = group->id;
+    shapeContent->geometry = std::move(group);
 
     composition->layers.push_back(std::move(shapeLayer));
 
-    // Null parent layer + child layer referencing it.
-    auto nullLayer = std::make_unique<Layer>(LayerType::Null);
+    // Group parent layer + child layer referencing it.
+    auto nullLayer = std::make_unique<Layer>(LayerType::Group);
     const motion::EntityId nullId = nullLayer->id;
     composition->layers.push_back(std::move(nullLayer));
 
@@ -189,12 +182,17 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     EXPECT_TRUE(shapes.transform.position.isAnimated());
     EXPECT_EQ(shapes.transform.position.keyframes()[0].easing, Easing::EaseIn());
     EXPECT_EQ(shapes.transform.rotation.staticValue(), 45.0f);
+    ASSERT_EQ(shapes.styles.size(), 1u);
+    const auto *fillStyle = static_cast<const FillStyle *>(shapes.styles[0].get());
+    EXPECT_TRUE(fillStyle->color.isAnimated());
+    EXPECT_EQ(fillStyle->color.evaluate(10), (Color{0.2f, 0.4f, 0.6f, 1}));
 
     // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);
-    const auto *shapeContent = static_cast<const ShapeContent *>(shapes.content.get());
-    EXPECT_NE((*restored)->entityIndex().findShape(shapeContent->elements[0]->id),
-              nullptr);
+    const auto *originalContent =
+        static_cast<const ShapeContent *>(originalShapes.content.get());
+    ASSERT_NE(originalContent->geometry, nullptr);
+    EXPECT_NE((*restored)->entityIndex().findShape(originalContent->geometry->id), nullptr);
 
     // Parent-child relationship preserved.
     const Layer &textLayer = *main.layers[2];
@@ -204,7 +202,7 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
 TEST(SerializerTest, AnimatableJsonShape) {
     Document document;
     Composition *composition = document.addComposition(std::make_unique<Composition>());
-    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null));
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
     layer->transform.rotation.setStaticValue(30.0f);
     Keyframe<Vec2> keyframe;
     keyframe.time = 5;
@@ -216,7 +214,41 @@ TEST(SerializerTest, AnimatableJsonShape) {
         json["compositions"][0]["layers"][0]["transform"];
     EXPECT_EQ(transform["rotation"]["static"], 30.0f);
     EXPECT_EQ(transform["position"]["keyframes"][0]["time"], 5);
+    EXPECT_EQ(transform["position"]["keyframes"][0]["easing"], "linear");
     EXPECT_FALSE(transform["position"].contains("static"));
+}
+
+TEST(SerializerTest, EasingSerializesAsString) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+
+    Keyframe<Vec2> presetKeyframe;
+    presetKeyframe.time = 5;
+    presetKeyframe.value = Vec2{1, 2};
+    presetKeyframe.easing = Easing::EaseInOut();
+    layer->transform.position.addKeyframe(presetKeyframe);
+
+    Keyframe<float> customKeyframe;
+    customKeyframe.time = 8;
+    customKeyframe.value = 12;
+    customKeyframe.easing = Easing::Bezier(0.25f, 0.5f, 0.75f, 1.0f);
+    layer->transform.rotation.addKeyframe(customKeyframe);
+
+    const auto json = nlohmann::json::parse(Serializer::serialize(document));
+    const auto &transform = json["compositions"][0]["layers"][0]["transform"];
+    EXPECT_EQ(transform["position"]["keyframes"][0]["easing"], "ease-in-out");
+    EXPECT_EQ(transform["rotation"]["keyframes"][0]["easing"],
+              "cubic-bezier(0.25,0.5,0.75,1)");
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(Serializer::serialize(document));
+    ASSERT_TRUE(restored.hasValue());
+    const auto &restoredLayer = *(*restored)->compositions[0]->layers[0];
+    EXPECT_EQ(restoredLayer.transform.position.keyframes()[0].easing,
+              Easing::EaseInOut());
+    EXPECT_EQ(restoredLayer.transform.rotation.keyframes()[0].easing,
+              Easing::Bezier(0.25f, 0.5f, 0.75f, 1.0f));
 }
 
 TEST(SerializerTest, EntityIdSerializesAs16HexChars) {

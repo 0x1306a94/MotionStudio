@@ -79,7 +79,7 @@ void Animatable<T>::clearKeyframes() {
 
 template <typename T>
 T Animatable<T>::evaluate(FrameTime time) const {
-    return evaluatePreview(PreviewTime(time));
+    return evaluatePreview(static_cast<PreviewTime>(time));
 }
 
 template <typename T>
@@ -87,22 +87,23 @@ T Animatable<T>::evaluatePreview(PreviewTime time) const {
     if (keyframes_.empty()) {
         return value_;
     }
-    if (time <= PreviewTime(keyframes_.front().time)) {
+    if (time <= static_cast<PreviewTime>(keyframes_.front().time)) {
         return keyframes_.front().value;
     }
-    if (time >= PreviewTime(keyframes_.back().time)) {
+    if (time >= static_cast<PreviewTime>(keyframes_.back().time)) {
         return keyframes_.back().value;
     }
 
     auto it = std::upper_bound(keyframes_.begin(), keyframes_.end(), time,
                                [](PreviewTime value, const Keyframe<T> &keyframe) {
-                                   return value < PreviewTime(keyframe.time);
+                                   return value < static_cast<PreviewTime>(keyframe.time);
                                });
     const Keyframe<T> &from = *(it - 1);
     const Keyframe<T> &to = *it;
 
-    const float progress = float((time - PreviewTime(from.time)) /
-                                 PreviewTime(to.time - from.time));
+    const float progress = static_cast<float>(
+        (time - static_cast<PreviewTime>(from.time)) /
+        static_cast<PreviewTime>(to.time - from.time));
     const float easedProgress = ApplyEasing(from.easing, progress);
 
     if constexpr (std::is_same_v<T, Vec2>) {

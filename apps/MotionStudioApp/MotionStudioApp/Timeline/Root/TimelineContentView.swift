@@ -82,12 +82,12 @@ struct TimelineContentView: View {
                 TimelineHeaderStrip(layerColumnWidth: layerColumnWidth,
                                     splitDivider: splitDividerHitArea(height: rulerHeight),
                                     ruler: rulerStrip(pointsPerFrame: pointsPerFrame,
-                                                       scrollX: scrollX,
-                                                       visiblePlayheadX: visiblePlayheadX,
-                                                       contentPlayheadX: contentPlayheadX,
-                                                       contentViewportWidth: contentViewportWidth,
-                                                       trackViewportWidth: trackViewportWidth,
-                                                       trackWidth: trackWidth))
+                                                      scrollX: scrollX,
+                                                      visiblePlayheadX: visiblePlayheadX,
+                                                      contentPlayheadX: contentPlayheadX,
+                                                      contentViewportWidth: contentViewportWidth,
+                                                      trackViewportWidth: trackViewportWidth,
+                                                      trackWidth: trackWidth))
                 Divider()
                 TimelineBodyStrip(layerColumnWidth: layerColumnWidth,
                                   splitDivider: splitDividerHitArea(),

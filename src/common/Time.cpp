@@ -17,11 +17,11 @@ bool TimeRange::operator!=(const TimeRange &other) const {
 }
 
 double FrameRate::toSeconds(FrameTime frame) const {
-    return double(frame) * den / num;
+    return static_cast<double>(frame) * den / num;
 }
 
 FrameTime FrameRate::fromSeconds(double seconds) const {
-    return FrameTime(std::llround(seconds * num / den));
+    return static_cast<FrameTime>(std::llround(seconds * num / den));
 }
 
 bool FrameRate::operator==(const FrameRate &other) const {

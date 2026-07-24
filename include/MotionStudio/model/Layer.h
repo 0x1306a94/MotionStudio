@@ -11,6 +11,7 @@
 #include "MotionStudio/common/Time.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/LayerContent.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/Transform.h"
 
@@ -67,6 +68,7 @@ class Layer {
 
     BlendMode blendMode = BlendMode::Normal;
     std::vector<Mask> masks;
+    std::vector<std::unique_ptr<LayerStyle>> styles;
 
   private:
     Mat3 worldTransform(FrameTime time, const Document &document, int depth) const;

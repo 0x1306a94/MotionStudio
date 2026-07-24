@@ -47,7 +47,7 @@ constexpr float kTolerance = 1e-5f;
 
 void CompareAgainstCss(float x1, float y1, float x2, float y2) {
     for (int i = 1; i < 100; ++i) {
-        const float x = float(i) / 100.0f;
+        const float x = static_cast<float>(i) / 100.0f;
         EXPECT_NEAR(SolveBezierEasing(x1, y1, x2, y2, x),
                     CssCubicBezier(x1, y1, x2, y2, x), kTolerance)
             << "x=" << x << " curve=(" << x1 << "," << y1 << "," << x2 << "," << y2
@@ -85,7 +85,7 @@ TEST(EasingCssTest, NearVerticalHandles) {
 TEST(EasingCssTest, FineGridOnEaseIn) {
     const Easing easeIn = Easing::EaseIn();
     for (int i = 1; i < 1000; ++i) {
-        const float x = float(i) / 1000.0f;
+        const float x = static_cast<float>(i) / 1000.0f;
         EXPECT_NEAR(SolveBezierEasing(easeIn.inX, easeIn.inY, easeIn.outX, easeIn.outY, x),
                     CssCubicBezier(easeIn.inX, easeIn.inY, easeIn.outX, easeIn.outY, x),
                     kTolerance)

@@ -5,8 +5,8 @@
 
 namespace motion {
 
-// Base class for shape elements. Concrete types: ShapePath, ShapeFill,
-// ShapeStroke, ShapeGroup, ShapeRect, ShapeEllipse, ShapeTrimPath.
+// Base class for shape geometry elements. Fill/Stroke live on Layer as styles.
+// Concrete geometry types: ShapePath, ShapeGroup, ShapeRect, ShapeEllipse, ShapeTrimPath.
 // Elements are rendered in the order they appear in their parent list.
 class ShapeElement {
   public:

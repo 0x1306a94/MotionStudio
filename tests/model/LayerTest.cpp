@@ -24,7 +24,7 @@ struct TwoLayerScene {
     TwoLayerScene() {
         auto compositionPtr = std::make_unique<Composition>();
         composition = document.addComposition(std::move(compositionPtr));
-        parentLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Null));
+        parentLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
         childLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
     }
 };
@@ -46,7 +46,7 @@ TEST(SetParentTest, RejectsSelfCycle) {
 TEST(SetParentTest, RejectsIndirectCycle) {
     TwoLayerScene scene;
     Layer *grandchild =
-        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Null));
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
     ASSERT_TRUE(scene.childLayer->setParent(scene.parentLayer->id, scene.document));
     ASSERT_TRUE(grandchild->setParent(scene.childLayer->id, scene.document));
 

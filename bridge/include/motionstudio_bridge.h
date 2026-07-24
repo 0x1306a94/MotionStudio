@@ -42,7 +42,7 @@ enum {
     MS_LAYER_SHAPE = 0,
     MS_LAYER_IMAGE = 1,
     MS_LAYER_TEXT = 2,
-    MS_LAYER_NULL = 3,
+    MS_LAYER_GROUP = 3,
     MS_LAYER_PRECOMP = 4,
 };
 
@@ -55,11 +55,15 @@ enum {
     MS_VALUE_STRING = 4,
 };
 
-// Easing type tag, mirrors motion::Easing::Type.
+// Easing type tag, mirrors motion::EasingType.
 enum {
     MS_EASING_LINEAR = 0,
-    MS_EASING_BEZIER = 1,
-    MS_EASING_HOLD = 2,
+    MS_EASING_HOLD = 1,
+    MS_EASING_EASE = 2,
+    MS_EASING_EASE_IN = 3,
+    MS_EASING_EASE_OUT = 4,
+    MS_EASING_EASE_IN_OUT = 5,
+    MS_EASING_CUBIC_BEZIER = 6,
 };
 
 enum {
@@ -145,8 +149,8 @@ bool ms_layer_locked(MSDocument *document, uint64_t layerId);
 
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
-// path: dot-separated property path. Layer examples: "transform.position", "size".
-// ShapeElement examples: "color", "opacity".
+// path: dot-separated property path. Layer examples: "transform.position", "size", "styles[0].color".
+// ShapeElement examples: "path", "size", "cornerRadius".
 
 // Value type tag (MS_VALUE_*), -1 when the property does not exist.
 int ms_property_type(MSDocument *document, uint64_t entityId, const char *path);
@@ -165,8 +169,8 @@ float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, con
 void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *x, float *y);
 
 // Easing of the keyframe at index. Returns the easing type tag (MS_EASING_*);
-// bezier control points are written to the out parameters (only meaningful
-// for MS_EASING_BEZIER). Returns -1 when the keyframe does not exist.
+// bezier control points are written to the out parameters for bezier-backed
+// easings. Returns -1 when the keyframe does not exist.
 int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY);
 
 // Value of the property evaluated at the given frame.
@@ -191,7 +195,7 @@ void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, cons
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
-// easingType: MS_EASING_* tag. Control points are only used for MS_EASING_BEZIER.
+// easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.
 void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY);
 
 // Adds a rectangle/ellipse shape layer (200x200, centered on the composition,

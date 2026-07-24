@@ -12,10 +12,10 @@
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
@@ -46,6 +46,7 @@ using motion::Composition;
 using motion::Document;
 using motion::Easing;
 using motion::EntityId;
+using motion::FillStyle;
 using motion::FrameTime;
 using motion::Keyframe;
 using motion::Layer;
@@ -56,7 +57,6 @@ using motion::SceneEvaluator;
 using motion::Serializer;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
-using motion::ShapeFill;
 using motion::ShapeRect;
 using motion::UndoManager;
 using motion::Vec2;
@@ -140,11 +140,23 @@ PropertyPath MakePath(uint64_t entityId, const char *path) {
 
 Easing MakeEasing(int easingType, float inX, float inY, float outX, float outY) {
     switch (easingType) {
-        case MS_EASING_BEZIER: {
-            return Easing::Bezier(inX, inY, outX, outY);
-        }
         case MS_EASING_HOLD: {
             return Easing::Hold();
+        }
+        case MS_EASING_EASE: {
+            return Easing::Ease();
+        }
+        case MS_EASING_EASE_IN: {
+            return Easing::EaseIn();
+        }
+        case MS_EASING_EASE_OUT: {
+            return Easing::EaseOut();
+        }
+        case MS_EASING_EASE_IN_OUT: {
+            return Easing::EaseInOut();
+        }
+        case MS_EASING_CUBIC_BEZIER: {
+            return Easing::Bezier(inX, inY, outX, outY);
         }
         default: {
             return Easing::Linear();
@@ -176,15 +188,15 @@ uint64_t AddShapeLayer(MSDocument *handle, uint64_t compositionId, bool ellipse)
     if (ellipse) {
         auto shape = std::make_unique<ShapeEllipse>();
         shape->size.setStaticValue(Vec2{200.0f, 200.0f});
-        content->elements.push_back(std::move(shape));
+        content->geometry = std::move(shape);
     } else {
         auto shape = std::make_unique<ShapeRect>();
         shape->size.setStaticValue(Vec2{200.0f, 200.0f});
-        content->elements.push_back(std::move(shape));
+        content->geometry = std::move(shape);
     }
-    auto fill = std::make_unique<ShapeFill>();
+    auto fill = std::make_unique<FillStyle>();
     fill->color.setStaticValue(SHAPE_PALETTE[composition->layers.size() % 6]);
-    content->elements.push_back(std::move(fill));
+    layer->styles.push_back(std::move(fill));
 
     const uint64_t layerId = layer->id.value;
     Execute(handle, std::make_unique<motion::AddLayerCommand>(composition->id, std::move(layer)));
@@ -299,7 +311,7 @@ void ms_document_end_merge_group(MSDocument *document) {
 int ms_document_composition_count(MSDocument *document) {
     DocumentLock guard(document);
     Document *doc = Doc(document);
-    return doc != nullptr ? int(doc->compositions.size()) : 0;
+    return doc != nullptr ? static_cast<int>(doc->compositions.size()) : 0;
 }
 
 uint64_t ms_document_composition_id_at(MSDocument *document, int index) {
@@ -308,7 +320,7 @@ uint64_t ms_document_composition_id_at(MSDocument *document, int index) {
     if (doc == nullptr || index < 0 || static_cast<size_t>(index) >= doc->compositions.size()) {
         return 0;
     }
-    return doc->compositions[size_t(index)]->id.value;
+    return doc->compositions[static_cast<size_t>(index)]->id.value;
 }
 
 int64_t ms_composition_duration(MSDocument *document, uint64_t compositionId) {
@@ -441,10 +453,10 @@ char *ms_composition_name(MSDocument *document, uint64_t compositionId) {
 uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
-    if (composition == nullptr || index < 0 || size_t(index) >= composition->layers.size()) {
+    if (composition == nullptr || index < 0 || static_cast<size_t>(index) >= composition->layers.size()) {
         return 0;
     }
-    return composition->layers[size_t(index)]->id.value;
+    return composition->layers[static_cast<size_t>(index)]->id.value;
 }
 
 char *ms_layer_name(MSDocument *document, uint64_t layerId) {
@@ -459,7 +471,7 @@ int ms_layer_type(MSDocument *document, uint64_t layerId) {
     if (layer == nullptr) {
         return -1;
     }
-    return int(layer->type());
+    return static_cast<int>(layer->type());
 }
 
 int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId) {
@@ -600,7 +612,7 @@ const Keyframe<T> *KeyframeAt(const Animatable<T> *property, int index) {
     if (property == nullptr || index < 0 || static_cast<size_t>(index) >= property->keyframes().size()) {
         return nullptr;
     }
-    return &property->keyframes()[size_t(index)];
+    return &property->keyframes()[static_cast<size_t>(index)];
 }
 
 int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path, int index) {
@@ -672,13 +684,13 @@ int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, cons
     if (outY != nullptr) {
         *outY = easing->outY;
     }
-    return int(easing->type);
+    return static_cast<int>(easing->type);
 }
 
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
     const Animatable<float> *property = AsFloat(FindProperty(document, entityId, path));
-    return property != nullptr ? property->evaluate(FrameTime(frame)) : 0.0f;
+    return property != nullptr ? property->evaluate(static_cast<FrameTime>(frame)) : 0.0f;
 }
 
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y) {
@@ -687,7 +699,7 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
     if (property == nullptr) {
         return;
     }
-    const Vec2 value = property->evaluate(FrameTime(frame));
+    const Vec2 value = property->evaluate(static_cast<FrameTime>(frame));
     if (x != nullptr) {
         *x = value.x;
     }
@@ -746,7 +758,7 @@ void ms_command_set_composition_duration(MSDocument *document, uint64_t composit
     motion::CompositionSettings settings;
     settings.width = composition->width;
     settings.height = composition->height;
-    settings.duration = FrameTime(duration);
+    settings.duration = static_cast<FrameTime>(duration);
     settings.frameRate = composition->frameRate;
     Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
 }
@@ -761,33 +773,34 @@ void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compos
     settings.width = composition->width;
     settings.height = composition->height;
     settings.duration = composition->duration;
-    settings.frameRate = {uint32_t(frameRateNum), uint32_t(frameRateDen)};
+    settings.frameRate = {static_cast<uint32_t>(frameRateNum),
+                          static_cast<uint32_t>(frameRateDen)};
     Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
 }
 
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(FrameTime(frame), value))));
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), value))));
 }
 
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(FrameTime(frame), Vec2{x, y}))));
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec2{x, y}))));
 }
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path), FrameTime(frame)));
+    Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame)));
 }
 
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::MoveKeyframeCommand>(MakePath(entityId, path), FrameTime(oldFrame), FrameTime(newFrame)));
+    Execute(document, std::make_unique<motion::MoveKeyframeCommand>(MakePath(entityId, path), static_cast<FrameTime>(oldFrame), static_cast<FrameTime>(newFrame)));
 }
 
 void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetEasingCommand>(MakePath(entityId, path), FrameTime(frame), MakeEasing(easingType, inX, inY, outX, outY)));
+    Execute(document, std::make_unique<motion::SetEasingCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame), MakeEasing(easingType, inX, inY, outX, outY)));
 }
 
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId) {

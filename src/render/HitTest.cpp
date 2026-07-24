@@ -52,7 +52,7 @@ std::vector<Vec2> FlattenPath(const BezierPath &path) {
             const Vec2 c1 = from.point + from.outTangent;
             const Vec2 c2 = to.point + to.inTangent;
             for (int sample = 1; sample <= kSamplesPerSegment; ++sample) {
-                const float t = float(sample) / float(kSamplesPerSegment);
+                const float t = static_cast<float>(sample) / static_cast<float>(kSamplesPerSegment);
                 points.push_back(CubicPoint(from.point, c1, c2, to.point, t));
             }
         } else {

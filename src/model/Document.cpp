@@ -5,21 +5,17 @@
 
 namespace motion {
 
-namespace {
-
-void RegisterShapeTree(EntityIndex &index, ShapeElement *element) {
-    index.registerShape(element);
-    if (element->type() == ShapeType::Group) {
-        auto *group = static_cast<ShapeGroup *>(element);
-        for (auto &child : group->elements) {
-            RegisterShapeTree(index, child.get());
-        }
-    }
-}
-
-}  // namespace
-
 void Document::refreshEntityIndex() {
+    auto registerShapeTree = [this](auto &self, ShapeElement *element) -> void {
+        entityIndex_.registerShape(element);
+        if (element->type() == ShapeType::Group) {
+            auto *group = static_cast<ShapeGroup *>(element);
+            for (auto &child : group->elements) {
+                self(self, child.get());
+            }
+        }
+    };
+
     entityIndex_.clear();
     for (auto &composition : compositions) {
         entityIndex_.registerComposition(composition.get());
@@ -27,8 +23,8 @@ void Document::refreshEntityIndex() {
             entityIndex_.registerLayer(layer.get());
             if (layer->content->type() == LayerType::Shape) {
                 auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
-                for (auto &element : shapeContent->elements) {
-                    RegisterShapeTree(entityIndex_, element.get());
+                if (shapeContent->geometry) {
+                    registerShapeTree(registerShapeTree, shapeContent->geometry.get());
                 }
             }
         }
@@ -67,7 +63,7 @@ Layer *Document::addLayer(EntityId compositionId, std::unique_ptr<Layer> layer, 
     }
 
     Layer *raw = layer.get();
-    const int count = int(composition->layers.size());
+    const int count = static_cast<int>(composition->layers.size());
     if (index < 0 || index >= count) {
         composition->layers.push_back(std::move(layer));
     } else {
@@ -103,11 +99,11 @@ bool Document::moveLayer(EntityId compositionId, int fromIndex, int toIndex) {
     }
 
     auto &layers = composition->layers;
-    const int count = int(layers.size());
+    const int count = static_cast<int>(layers.size());
     if (fromIndex < 0 || fromIndex >= count || toIndex < 0 || toIndex >= count) {
         return false;
     }
-    std::unique_ptr<Layer> layer = std::move(layers[size_t(fromIndex)]);
+    std::unique_ptr<Layer> layer = std::move(layers[static_cast<size_t>(fromIndex)]);
     layers.erase(layers.begin() + fromIndex);
     layers.insert(layers.begin() + toIndex, std::move(layer));
     return true;

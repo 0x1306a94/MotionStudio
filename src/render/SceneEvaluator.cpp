@@ -6,14 +6,13 @@
 #include <vector>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
-#include "MotionStudio/model/ShapeStroke.h"
 
 namespace motion {
 
@@ -95,65 +94,73 @@ BezierPath EllipseToPath(const ShapeEllipse &ellipse, PreviewTime time) {
     return path;
 }
 
-// Flattens shape elements into world-space items. Paths accumulate until a
-// Fill/Stroke consumes them; Groups recurse with a composed transform and
-// compounded alpha.
-void EvaluateElements(const std::vector<std::unique_ptr<ShapeElement>> &elements,
-                      PreviewTime time, const Mat3 &transform, float alpha,
-                      std::vector<EvaluatedShapeItem> &items) {
-    std::vector<BezierPath> localPaths;
+void CollectGeometryPath(const ShapeElement &element, PreviewTime time,
+                         const Mat3 &transform, std::vector<BezierPath> &paths);
+
+void CollectGeometryPaths(const std::vector<std::unique_ptr<ShapeElement>> &elements,
+                          PreviewTime time, const Mat3 &transform,
+                          std::vector<BezierPath> &paths) {
     for (const auto &element : elements) {
-        switch (element->type()) {
-            case ShapeType::Path: {
-                const auto &shape = static_cast<const ShapePath &>(*element);
-                localPaths.push_back(shape.path.evaluatePreview(time));
-                break;
-            }
-            case ShapeType::Rect: {
-                const auto &shape = static_cast<const ShapeRect &>(*element);
-                localPaths.push_back(RectToPath(shape, time));
-                break;
-            }
-            case ShapeType::Ellipse: {
-                const auto &shape = static_cast<const ShapeEllipse &>(*element);
-                localPaths.push_back(EllipseToPath(shape, time));
-                break;
-            }
-            case ShapeType::Fill: {
-                const auto &fill = static_cast<const ShapeFill &>(*element);
+        CollectGeometryPath(*element, time, transform, paths);
+    }
+}
+
+void CollectGeometryPath(const ShapeElement &element, PreviewTime time,
+                         const Mat3 &transform, std::vector<BezierPath> &paths) {
+    switch (element.type()) {
+        case ShapeType::Path: {
+            const auto &shape = static_cast<const ShapePath &>(element);
+            paths.push_back(TransformPath(shape.path.evaluatePreview(time), transform));
+            break;
+        }
+        case ShapeType::Rect: {
+            const auto &shape = static_cast<const ShapeRect &>(element);
+            paths.push_back(TransformPath(RectToPath(shape, time), transform));
+            break;
+        }
+        case ShapeType::Ellipse: {
+            const auto &shape = static_cast<const ShapeEllipse &>(element);
+            paths.push_back(TransformPath(EllipseToPath(shape, time), transform));
+            break;
+        }
+        case ShapeType::Group: {
+            const auto &group = static_cast<const ShapeGroup &>(element);
+            CollectGeometryPaths(group.elements, time,
+                                 transform * LocalMatrixOf(group.transform, time),
+                                 paths);
+            break;
+        }
+        case ShapeType::TrimPath: {
+            break;
+        }
+    }
+}
+
+void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
+                      const std::vector<BezierPath> &paths,
+                      std::vector<EvaluatedShapeItem> &items) {
+    for (const auto &style : layer.styles) {
+        switch (style->type()) {
+            case LayerStyleType::Fill: {
+                const auto &fill = static_cast<const FillStyle &>(*style);
                 Color color = fill.color.evaluatePreview(time);
-                color.a *= fill.opacity.evaluatePreview(time) * alpha;
+                color.a *= alpha;
                 const Paint paint{color, fill.fillRule};
-                for (const BezierPath &local : localPaths) {
-                    items.push_back({TransformPath(local, transform), paint, false, 0,
-                                     LineCap::Butt, LineJoin::Miter});
+                for (const BezierPath &path : paths) {
+                    items.push_back({path, paint, false, 0, LineCap::Butt, LineJoin::Miter});
                 }
                 break;
             }
-            case ShapeType::Stroke: {
-                const auto &stroke = static_cast<const ShapeStroke &>(*element);
+            case LayerStyleType::Stroke: {
+                const auto &stroke = static_cast<const StrokeStyle &>(*style);
                 Color color = stroke.color.evaluatePreview(time);
-                color.a *= stroke.opacity.evaluatePreview(time) * alpha;
+                color.a *= alpha;
                 const Paint paint{color, FillRule::NonZero};
                 const float width = stroke.width.evaluatePreview(time);
-                for (const BezierPath &local : localPaths) {
-                    items.push_back({TransformPath(local, transform), paint, true, width,
-                                     stroke.cap, stroke.join});
+                for (const BezierPath &path : paths) {
+                    items.push_back({path, paint, true, width, stroke.cap, stroke.join});
                 }
                 break;
-            }
-            case ShapeType::Group: {
-                const auto &group = static_cast<const ShapeGroup &>(*element);
-                const Mat3 childTransform =
-                    transform * LocalMatrixOf(group.transform, time);
-                const float childAlpha =
-                    alpha * group.transform.opacity.evaluatePreview(time);
-                EvaluateElements(group.elements, time, childTransform, childAlpha,
-                                 items);
-                break;
-            }
-            case ShapeType::TrimPath: {
-                break;  // M2: data only, trim expansion deferred
             }
         }
     }
@@ -233,9 +240,10 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         }
         // innerTime = (outer - inPoint) * timeStretch + startTime
         const double inner =
-            double(time - layer.inPoint) * layer.timeStretch + double(layer.startTime);
-        EvaluateComposition(document, *source, PreviewTime(inner), world, opacity,
-                            depth + 1, out);
+            static_cast<double>(time - layer.inPoint) * layer.timeStretch +
+            static_cast<double>(layer.startTime);
+        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world,
+                            opacity, depth + 1, out);
         return;
     }
     if (layer.content->type() != LayerType::Shape) {
@@ -247,7 +255,13 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     evaluated.worldTransform = world;
     evaluated.opacity = opacity;
     evaluated.blendMode = layer.blendMode;
-    EvaluateElements(shapeContent.elements, time, world, 1.0f, evaluated.shapeItems);
+    if (!layer.styles.empty()) {
+        std::vector<BezierPath> paths;
+        if (shapeContent.geometry) {
+            CollectGeometryPath(*shapeContent.geometry, time, world, paths);
+        }
+        ApplyLayerStyles(layer, time, 1.0f, paths, evaluated.shapeItems);
+    }
     if (!evaluated.shapeItems.empty()) {
         out.push_back(std::move(evaluated));
     }
@@ -267,7 +281,7 @@ void EvaluateComposition(const Document &document, const Composition &compositio
 
 Expected<SceneState, std::string> SceneEvaluator::Evaluate(const Document &document,
                                                            EntityId compositionId, FrameTime time) {
-    return EvaluatePreview(document, compositionId, PreviewTime(time));
+    return EvaluatePreview(document, compositionId, static_cast<PreviewTime>(time));
 }
 
 Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document &document,
@@ -283,7 +297,7 @@ Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document
     state.viewportHeight = composition->height;
     state.backgroundColor = composition->backgroundColor;
     state.cornerRadius = std::clamp(composition->cornerRadius, 0.0f,
-                                    float(std::min(composition->width, composition->height)) * 0.5f);
+                                    static_cast<float>(std::min(composition->width, composition->height)) * 0.5f);
     EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0,
                         state.layers);
     return state;

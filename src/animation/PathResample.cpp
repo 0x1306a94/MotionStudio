@@ -26,7 +26,7 @@ float SegmentPrefixLength(Vec2 p0, Vec2 c1, Vec2 c2, Vec2 p3, float t) {
     float length = 0;
     Vec2 previous = p0;
     for (size_t i = 1; i <= kRefineSamples; ++i) {
-        const float u = t * float(i) / float(kRefineSamples);
+        const float u = t * static_cast<float>(i) / static_cast<float>(kRefineSamples);
         const Vec2 point = CubicPoint(p0, c1, c2, p3, u);
         length += Length(point - previous);
         previous = point;
@@ -69,7 +69,7 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
         const Vec2 c2 = to.point + to.inTangent;
         Vec2 previous = from.point;
         for (size_t sample = 1; sample <= kSamplesPerSegment; ++sample) {
-            const float t = float(sample) / float(kSamplesPerSegment);
+            const float t = static_cast<float>(sample) / static_cast<float>(kSamplesPerSegment);
             const Vec2 point = CubicPoint(from.point, c1, c2, to.point, t);
             cumulative.push_back(cumulative.back() + Length(point - previous));
             previous = point;
@@ -85,10 +85,11 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
     result.vertices.reserve(vertexCount);
     const size_t spanCount = path.closed ? vertexCount : vertexCount - 1;
     for (size_t k = 0; k < vertexCount; ++k) {
-        const float target = total * float(k) / float(spanCount);
+        const float target = total * static_cast<float>(k) / static_cast<float>(spanCount);
         const auto it = std::lower_bound(cumulative.begin(), cumulative.end(), target);
         const size_t sampleIndex =
-            std::clamp(size_t(it - cumulative.begin()), size_t(1), cumulative.size() - 1);
+            std::clamp(static_cast<size_t>(it - cumulative.begin()), static_cast<size_t>(1),
+                       cumulative.size() - 1);
         const size_t segment = (sampleIndex - 1) / kSamplesPerSegment;
         const BezierPath::Vertex &from = path.vertices[segment];
         const BezierPath::Vertex &to = path.vertices[(segment + 1) % count];

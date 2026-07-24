@@ -4,13 +4,12 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
-#include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
 #include "MotionStudio/model/TextContent.h"
 
@@ -105,27 +104,6 @@ AnimatableBase *resolveShapeProperty(ShapeElement *element, const std::string &n
             }
             break;
         }
-        case ShapeType::Fill: {
-            if (name == "color") {
-                return &static_cast<ShapeFill *>(element)->color;
-            }
-            if (name == "opacity") {
-                return &static_cast<ShapeFill *>(element)->opacity;
-            }
-            break;
-        }
-        case ShapeType::Stroke: {
-            if (name == "color") {
-                return &static_cast<ShapeStroke *>(element)->color;
-            }
-            if (name == "width") {
-                return &static_cast<ShapeStroke *>(element)->width;
-            }
-            if (name == "opacity") {
-                return &static_cast<ShapeStroke *>(element)->opacity;
-            }
-            break;
-        }
         case ShapeType::Rect: {
             if (name == "position") {
                 return &static_cast<ShapeRect *>(element)->position;
@@ -166,36 +144,38 @@ AnimatableBase *resolveShapeProperty(ShapeElement *element, const std::string &n
     return nullptr;
 }
 
-// Walk segments[from..] from a shape element downward; the last segment must be a property name.
-AnimatableBase *resolveShapeSegments(ShapeElement *element,
-                                     const std::vector<PathSegment> &segments,
-                                     size_t from) {
-    ShapeElement *current = element;
-    for (size_t i = from; i < segments.size(); ++i) {
-        const PathSegment &segment = segments[i];
+AnimatableBase *resolveStyleProperty(LayerStyle *style, const std::string &name) {
+    switch (style->type()) {
+        case LayerStyleType::Fill: {
+            auto *fill = static_cast<FillStyle *>(style);
+            if (name == "color") {
+                return &fill->color;
+            }
+            break;
+        }
+        case LayerStyleType::Stroke: {
+            auto *stroke = static_cast<StrokeStyle *>(style);
+            if (name == "color") {
+                return &stroke->color;
+            }
+            if (name == "width") {
+                return &stroke->width;
+            }
+            break;
+        }
+    }
+    return nullptr;
+}
 
-        if (segment.name == "elements" && segment.index >= 0) {
-            if (current->type() != ShapeType::Group) {
-                return nullptr;
-            }
-            auto *group = static_cast<ShapeGroup *>(current);
-            if (segment.index >= int(group->elements.size())) {
-                return nullptr;
-            }
-            current = group->elements[size_t(segment.index)].get();
-            continue;
-        }
-        if (segment.name == "transform") {
-            if (current->type() != ShapeType::Group || i + 1 != segments.size() - 1) {
-                return nullptr;
-            }
-            auto *group = static_cast<ShapeGroup *>(current);
-            return resolveTransformProperty(group->transform, segments[i + 1].name);
-        }
-        if (i != segments.size() - 1) {
-            return nullptr;
-        }
-        return resolveShapeProperty(current, segment.name);
+AnimatableBase *resolveShapeElementPath(ShapeElement *element,
+                                        const std::vector<PathSegment> &segments) {
+    if (segments.size() == 1) {
+        return resolveShapeProperty(element, segments[0].name);
+    }
+    if (segments.size() == 2 && segments[0].name == "transform" &&
+        element->type() == ShapeType::Group) {
+        auto *group = static_cast<ShapeGroup *>(element);
+        return resolveTransformProperty(group->transform, segments[1].name);
     }
     return nullptr;
 }
@@ -213,23 +193,19 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
         if (first.name == "transform" && segments.size() == 2) {
             return resolveTransformProperty(layer->transform, segments[1].name);
         }
-        if (first.name == "elements" && first.index >= 0) {
-            if (layer->content->type() != LayerType::Shape) {
+        if (first.name == "styles" && first.index >= 0 && segments.size() == 2) {
+            if (first.index >= static_cast<int>(layer->styles.size())) {
                 return nullptr;
             }
-            auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
-            if (first.index >= int(shapeContent->elements.size())) {
-                return nullptr;
-            }
-            return resolveShapeSegments(shapeContent->elements[size_t(first.index)].get(),
-                                        segments, 1);
+            return resolveStyleProperty(layer->styles[static_cast<size_t>(first.index)].get(),
+                                        segments[1].name);
         }
         if (segments.size() == 1 && layer->content->type() == LayerType::Shape) {
             auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
-            if (shapeContent->elements.empty()) {
+            if (!shapeContent->geometry) {
                 return nullptr;
             }
-            return resolveShapeProperty(shapeContent->elements.front().get(), first.name);
+            return resolveShapeProperty(shapeContent->geometry.get(), first.name);
         }
         if (first.name == "content" && segments.size() == 2) {
             if (layer->content->type() != LayerType::Text) {
@@ -248,7 +224,7 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
     }
 
     if (ShapeElement *shape = document.entityIndex().findShape(property.entityId)) {
-        return resolveShapeSegments(shape, segments, 0);
+        return resolveShapeElementPath(shape, segments);
     }
 
     return nullptr;

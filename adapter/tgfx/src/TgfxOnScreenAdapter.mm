@@ -84,8 +84,8 @@ bool TgfxOnScreenAdapter::acquireTarget(int /*width*/, int /*height*/) {
         return false;
     }
     const CGSize drawableSize = impl_->view.drawableSize;
-    const int drawableWidth = int(drawableSize.width);
-    const int drawableHeight = int(drawableSize.height);
+    const int drawableWidth = static_cast<int>(drawableSize.width);
+    const int drawableHeight = static_cast<int>(drawableSize.height);
     if (drawableWidth <= 0 || drawableHeight <= 0) {
         device_->unlock();
         return false;
@@ -119,7 +119,7 @@ void TgfxOnScreenAdapter::drawPreviewBackdrop() {
     tgfx::Paint tilePaint;
     tilePaint.setStyle(tgfx::PaintStyle::Fill);
     tilePaint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-    int tileSize = 16 * int(impl_->view.layer.contentsScale);
+    int tileSize = 16 * static_cast<int>(impl_->view.layer.contentsScale);
     if (tileSize <= 0) {
         tileSize = 16;
     }
@@ -127,7 +127,7 @@ void TgfxOnScreenAdapter::drawPreviewBackdrop() {
         bool draw = (y / tileSize) % 2 == 1;
         for (int x = 0; x < width; x += tileSize) {
             if (draw) {
-                canvas->drawRect(tgfx::Rect::MakeXYWH(float(x), float(y), float(tileSize), float(tileSize)), tilePaint);
+                canvas->drawRect(tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y), static_cast<float>(tileSize), static_cast<float>(tileSize)), tilePaint);
             }
             draw = !draw;
         }
@@ -139,9 +139,9 @@ void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color ba
     if (sceneWidth <= 0 || sceneHeight <= 0 || !surface_) {
         return;
     }
-    const float targetWidth = float(surface_->width());
-    const float targetHeight = float(surface_->height());
-    const float contentsScale = float(impl_->view.layer.contentsScale);
+    const float targetWidth = static_cast<float>(surface_->width());
+    const float targetHeight = static_cast<float>(surface_->height());
+    const float contentsScale = static_cast<float>(impl_->view.layer.contentsScale);
     const ScreenTransform screen = MakeOnScreenTransform(sceneWidth, sceneHeight, targetWidth, targetHeight,
                                                          viewZoom_, viewPanX_, viewPanY_, contentsScale);
     tgfx::Matrix matrix;

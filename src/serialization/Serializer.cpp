@@ -1,7 +1,12 @@
 #include "MotionStudio/serialization/Serializer.h"
 
+#include <cerrno>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <string_view>
 #include <utility>
 
 #include <nlohmann/json.hpp>
@@ -9,15 +14,14 @@
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
-#include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/serialization/Dto.h"
@@ -73,15 +77,15 @@ Expected<int, std::string> AsInt(const json &node) {
     if (!value) {
         return Unexpected(value.error());
     }
-    return int(*value);
+    return static_cast<int>(*value);
 }
 
 Expected<uint32_t, std::string> AsUint32(const json &node) {
     Expected<int64_t, std::string> value = AsInt64(node);
-    if (!value || *value < 0 || *value > int64_t(UINT32_MAX)) {
+    if (!value || *value < 0 || *value > static_cast<int64_t>(UINT32_MAX)) {
         return Unexpected(std::string("field is not a valid unsigned integer"));
     }
-    return uint32_t(*value);
+    return static_cast<uint32_t>(*value);
 }
 
 Expected<bool, std::string> AsBool(const json &node) {
@@ -267,37 +271,141 @@ Expected<T, std::string> ParseField(const json &node, const char *key) {
 
 // ---- Easing ----
 
-json EasingToJson(const Easing &easing) {
-    json node{{"type", dto::ToString(easing.type)}};
-    if (easing.type == Easing::Type::Bezier) {
-        node["inX"] = easing.inX;
-        node["inY"] = easing.inY;
-        node["outX"] = easing.outX;
-        node["outY"] = easing.outY;
+std::string FormatFloat(float value) {
+    char buffer[32];
+    const int count = std::snprintf(buffer, sizeof(buffer), "%.9g", static_cast<double>(value));
+    if (count <= 0) {
+        return "0";
     }
-    return node;
+    return std::string(buffer, static_cast<size_t>(count));
+}
+
+std::string CubicBezierToString(const Easing &easing) {
+    return "cubic-bezier(" + FormatFloat(easing.inX) + "," + FormatFloat(easing.inY) +
+        "," + FormatFloat(easing.outX) + "," + FormatFloat(easing.outY) + ")";
+}
+
+json EasingToJson(const Easing &easing) {
+    switch (easing.type) {
+        case EasingType::Linear: {
+            return "linear";
+        }
+        case EasingType::Hold: {
+            return "hold";
+        }
+        case EasingType::Ease: {
+            return "ease";
+        }
+        case EasingType::EaseIn: {
+            return "ease-in";
+        }
+        case EasingType::EaseOut: {
+            return "ease-out";
+        }
+        case EasingType::EaseInOut: {
+            return "ease-in-out";
+        }
+        case EasingType::CubicBezier: {
+            return CubicBezierToString(easing);
+        }
+    }
+    return "linear";
+}
+
+bool ConsumeChar(std::string_view text, size_t &position, char value) {
+    while (position < text.size() && text[position] == ' ') {
+        ++position;
+    }
+    if (position >= text.size() || text[position] != value) {
+        return false;
+    }
+    ++position;
+    return true;
+}
+
+Expected<float, std::string> ParseFloatToken(std::string_view text, size_t &position) {
+    while (position < text.size() && text[position] == ' ') {
+        ++position;
+    }
+    const size_t start = position;
+    while (position < text.size() && text[position] != ',' && text[position] != ')') {
+        ++position;
+    }
+    size_t end = position;
+    while (end > start && text[end - 1] == ' ') {
+        --end;
+    }
+    if (start == end) {
+        return Unexpected(std::string("empty cubic-bezier control point"));
+    }
+    const std::string token{text.substr(start, end - start)};
+    char *parseEnd = nullptr;
+    errno = 0;
+    const float value = std::strtof(token.c_str(), &parseEnd);
+    if (errno != 0 || parseEnd == token.c_str() || *parseEnd != '\0' ||
+        !std::isfinite(value)) {
+        return Unexpected(std::string("invalid cubic-bezier control point"));
+    }
+    return value;
+}
+
+Expected<Easing, std::string> EasingFromString(const std::string &text) {
+    if (text == "linear") {
+        return Easing::Linear();
+    }
+    if (text == "hold") {
+        return Easing::Hold();
+    }
+    if (text == "ease") {
+        return Easing::Ease();
+    }
+    if (text == "ease-in") {
+        return Easing::EaseIn();
+    }
+    if (text == "ease-out") {
+        return Easing::EaseOut();
+    }
+    if (text == "ease-in-out") {
+        return Easing::EaseInOut();
+    }
+
+    constexpr std::string_view prefix = "cubic-bezier(";
+    std::string_view view{text};
+    if (view.substr(0, prefix.size()) != prefix) {
+        return Unexpected(std::string("unknown easing: " + text));
+    }
+    size_t position = prefix.size();
+    Expected<float, std::string> inX = ParseFloatToken(view, position);
+    if (!inX || !ConsumeChar(view, position, ',')) {
+        return Unexpected(std::string("invalid cubic-bezier easing"));
+    }
+    Expected<float, std::string> inY = ParseFloatToken(view, position);
+    if (!inY || !ConsumeChar(view, position, ',')) {
+        return Unexpected(std::string("invalid cubic-bezier easing"));
+    }
+    Expected<float, std::string> outX = ParseFloatToken(view, position);
+    if (!outX || !ConsumeChar(view, position, ',')) {
+        return Unexpected(std::string("invalid cubic-bezier easing"));
+    }
+    Expected<float, std::string> outY = ParseFloatToken(view, position);
+    if (!outY || !ConsumeChar(view, position, ')')) {
+        return Unexpected(std::string("invalid cubic-bezier easing"));
+    }
+    while (position < view.size() && view[position] == ' ') {
+        ++position;
+    }
+    if (position != view.size()) {
+        return Unexpected(std::string("invalid cubic-bezier easing"));
+    }
+    return Easing::Bezier(*inX, *inY, *outX, *outY);
 }
 
 Expected<Easing, std::string> EasingFromJson(const json &node) {
-    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
-    if (!typeText) {
-        return Unexpected(typeText.error());
+    Expected<std::string, std::string> text = AsString(node);
+    if (!text) {
+        return Unexpected(std::string("Easing must be a string"));
     }
-    Expected<Easing::Type, std::string> type = dto::easingTypeFromString(*typeText);
-    if (!type) {
-        return Unexpected(type.error());
-    }
-    if (*type != Easing::Type::Bezier) {
-        return *type == Easing::Type::Hold ? Easing::Hold() : Easing::Linear();
-    }
-    Expected<float, std::string> inX = ParseField<float>(node, "inX");
-    Expected<float, std::string> inY = ParseField<float>(node, "inY");
-    Expected<float, std::string> outX = ParseField<float>(node, "outX");
-    Expected<float, std::string> outY = ParseField<float>(node, "outY");
-    if (!inX || !inY || !outX || !outY) {
-        return Unexpected(std::string("Bezier easing is missing control point fields"));
-    }
-    return Easing::Bezier(*inX, *inY, *outX, *outY);
+    return EasingFromString(*text);
 }
 
 // ---- Animatable<T>: static {"static": ...} / keyframes {"keyframes": [...]} ----
@@ -492,23 +600,6 @@ json ShapeToJson(const ShapeElement &element) {
             node["path"] = AnimatableToJson(shape.path);
             break;
         }
-        case ShapeType::Fill: {
-            const auto &shape = static_cast<const ShapeFill &>(element);
-            node["color"] = AnimatableToJson(shape.color);
-            node["opacity"] = AnimatableToJson(shape.opacity);
-            node["fillRule"] = dto::ToString(shape.fillRule);
-            break;
-        }
-        case ShapeType::Stroke: {
-            const auto &shape = static_cast<const ShapeStroke &>(element);
-            node["color"] = AnimatableToJson(shape.color);
-            node["width"] = AnimatableToJson(shape.width);
-            node["opacity"] = AnimatableToJson(shape.opacity);
-            node["cap"] = dto::ToString(shape.cap);
-            node["join"] = dto::ToString(shape.join);
-            node["miterLimit"] = shape.miterLimit;
-            break;
-        }
         case ShapeType::Group: {
             const auto &shape = static_cast<const ShapeGroup &>(element);
             node["transform"] = TransformToJson(shape.transform);
@@ -568,84 +659,6 @@ Expected<std::unique_ptr<ShapeElement>, std::string> ShapeFromJson(const json &n
             if (!result) {
                 return Unexpected(result.error());
             }
-            element = std::move(shape);
-            break;
-        }
-        case ShapeType::Fill: {
-            auto shape = std::make_unique<ShapeFill>();
-            Expected<const json *, std::string> colorNode = Child(node, "color");
-            if (!colorNode) {
-                return Unexpected(colorNode.error());
-            }
-            Expected<void, std::string> result = AnimatableFromJson(**colorNode, shape->color);
-            if (!result) {
-                return Unexpected(result.error());
-            }
-            Expected<const json *, std::string> opacityNode = Child(node, "opacity");
-            if (!opacityNode) {
-                return Unexpected(opacityNode.error());
-            }
-            result = AnimatableFromJson(**opacityNode, shape->opacity);
-            if (!result) {
-                return Unexpected(result.error());
-            }
-            Expected<std::string, std::string> ruleText = ParseField<std::string>(node, "fillRule");
-            if (!ruleText) {
-                return Unexpected(ruleText.error());
-            }
-            Expected<FillRule, std::string> fillRule = dto::fillRuleFromString(*ruleText);
-            if (!fillRule) {
-                return Unexpected(fillRule.error());
-            }
-            shape->fillRule = *fillRule;
-            element = std::move(shape);
-            break;
-        }
-        case ShapeType::Stroke: {
-            auto shape = std::make_unique<ShapeStroke>();
-            const char *animatableFields[] = {"color", "width", "opacity"};
-            Animatable<Color> *colorTarget = &shape->color;
-            Expected<const json *, std::string> colorNode = Child(node, animatableFields[0]);
-            if (!colorNode) {
-                return Unexpected(colorNode.error());
-            }
-            Expected<void, std::string> result = AnimatableFromJson(**colorNode, *colorTarget);
-            if (!result) {
-                return Unexpected(result.error());
-            }
-            Expected<const json *, std::string> widthNode = Child(node, animatableFields[1]);
-            if (!widthNode) {
-                return Unexpected(widthNode.error());
-            }
-            result = AnimatableFromJson(**widthNode, shape->width);
-            if (!result) {
-                return Unexpected(result.error());
-            }
-            Expected<const json *, std::string> opacityNode = Child(node, animatableFields[2]);
-            if (!opacityNode) {
-                return Unexpected(opacityNode.error());
-            }
-            result = AnimatableFromJson(**opacityNode, shape->opacity);
-            if (!result) {
-                return Unexpected(result.error());
-            }
-            Expected<std::string, std::string> capText = ParseField<std::string>(node, "cap");
-            Expected<std::string, std::string> joinText = ParseField<std::string>(node, "join");
-            Expected<float, std::string> miterLimit = ParseField<float>(node, "miterLimit");
-            if (!capText || !joinText || !miterLimit) {
-                return Unexpected(std::string("Stroke is missing the cap/join/miterLimit fields"));
-            }
-            Expected<LineCap, std::string> cap = dto::lineCapFromString(*capText);
-            if (!cap) {
-                return Unexpected(cap.error());
-            }
-            Expected<LineJoin, std::string> join = dto::lineJoinFromString(*joinText);
-            if (!join) {
-                return Unexpected(join.error());
-            }
-            shape->cap = *cap;
-            shape->join = *join;
-            shape->miterLimit = *miterLimit;
             element = std::move(shape);
             break;
         }
@@ -764,12 +777,108 @@ Expected<std::unique_ptr<ShapeElement>, std::string> ShapeFromJson(const json &n
 
 // ---- LayerContent (discriminant field "type") ----
 
+json LayerStyleToJson(const LayerStyle &style) {
+    switch (style.type()) {
+        case LayerStyleType::Fill: {
+            const auto &fill = static_cast<const FillStyle &>(style);
+            return {{"id", IdToString(fill.id)},
+                    {"type", "fill"},
+                    {"color", AnimatableToJson(fill.color)},
+                    {"fillRule", dto::ToString(fill.fillRule)}};
+        }
+        case LayerStyleType::Stroke: {
+            const auto &stroke = static_cast<const StrokeStyle &>(style);
+            return {{"id", IdToString(stroke.id)},
+                    {"type", "stroke"},
+                    {"color", AnimatableToJson(stroke.color)},
+                    {"width", AnimatableToJson(stroke.width)},
+                    {"cap", dto::ToString(stroke.cap)},
+                    {"join", dto::ToString(stroke.join)},
+                    {"miterLimit", stroke.miterLimit}};
+        }
+    }
+    return json::object();
+}
+
+Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Unexpected(typeText.error());
+    }
+
+    std::unique_ptr<LayerStyle> style;
+    if (*typeText == "fill") {
+        auto fill = std::make_unique<FillStyle>();
+        Expected<const json *, std::string> colorNode = Child(node, "color");
+        if (!colorNode) {
+            return Unexpected(std::string("Fill style is missing color field"));
+        }
+        Expected<void, std::string> result = AnimatableFromJson(**colorNode, fill->color);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        Expected<std::string, std::string> ruleText = ParseField<std::string>(node, "fillRule");
+        if (!ruleText) {
+            return Unexpected(ruleText.error());
+        }
+        Expected<FillRule, std::string> fillRule = dto::fillRuleFromString(*ruleText);
+        if (!fillRule) {
+            return Unexpected(fillRule.error());
+        }
+        fill->fillRule = *fillRule;
+        style = std::move(fill);
+    } else if (*typeText == "stroke") {
+        auto stroke = std::make_unique<StrokeStyle>();
+        Expected<const json *, std::string> colorNode = Child(node, "color");
+        Expected<const json *, std::string> widthNode = Child(node, "width");
+        if (!colorNode || !widthNode) {
+            return Unexpected(std::string("Stroke style is missing color/width fields"));
+        }
+        Expected<void, std::string> result = AnimatableFromJson(**colorNode, stroke->color);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        result = AnimatableFromJson(**widthNode, stroke->width);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        Expected<std::string, std::string> capText = ParseField<std::string>(node, "cap");
+        Expected<std::string, std::string> joinText = ParseField<std::string>(node, "join");
+        Expected<float, std::string> miterLimit = ParseField<float>(node, "miterLimit");
+        if (!capText || !joinText || !miterLimit) {
+            return Unexpected(std::string("Stroke style is missing cap/join/miterLimit fields"));
+        }
+        Expected<LineCap, std::string> cap = dto::lineCapFromString(*capText);
+        Expected<LineJoin, std::string> join = dto::lineJoinFromString(*joinText);
+        if (!cap || !join) {
+            return Unexpected(std::string("Stroke style has invalid cap/join values"));
+        }
+        stroke->cap = *cap;
+        stroke->join = *join;
+        stroke->miterLimit = *miterLimit;
+        style = std::move(stroke);
+    } else {
+        return Unexpected(std::string("unknown layer style type: " + *typeText));
+    }
+
+    Expected<EntityId, std::string> id = IdField(node, "id");
+    if (!id) {
+        return Unexpected(id.error());
+    }
+    style->id = *id;
+    return style;
+}
+
 json ContentToJson(const LayerContent &content) {
     json node{{"type", dto::ToString(content.type())}};
     switch (content.type()) {
         case LayerType::Shape: {
             const auto &shape = static_cast<const ShapeContent &>(content);
-            node["elements"] = ShapesToJson(shape.elements);
+            if (shape.geometry) {
+                node["geometry"] = ShapeToJson(*shape.geometry);
+            } else {
+                node["geometry"] = nullptr;
+            }
             break;
         }
         case LayerType::Image: {
@@ -784,7 +893,7 @@ json ContentToJson(const LayerContent &content) {
             node["fontSize"] = AnimatableToJson(text.fontSize);
             break;
         }
-        case LayerType::Null: {
+        case LayerType::Group: {
             break;
         }
         case LayerType::Precomp: {
@@ -808,16 +917,17 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
     switch (*type) {
         case LayerType::Shape: {
             auto content = std::make_unique<ShapeContent>();
-            const json *elementsNode = FindChild(node, "elements");
-            if (!elementsNode || !elementsNode->is_array()) {
-                return Unexpected(std::string("Shape content is missing the elements array"));
+            Expected<const json *, std::string> geometryNode = Child(node, "geometry");
+            if (!geometryNode) {
+                return Unexpected(geometryNode.error());
             }
-            for (const json &elementNode : *elementsNode) {
-                Expected<std::unique_ptr<ShapeElement>, std::string> element = ShapeFromJson(elementNode);
-                if (!element) {
-                    return Unexpected(element.error());
+            if (!(**geometryNode).is_null()) {
+                Expected<std::unique_ptr<ShapeElement>, std::string> geometry =
+                    ShapeFromJson(**geometryNode);
+                if (!geometry) {
+                    return Unexpected(geometry.error());
                 }
-                content->elements.push_back(std::move(*element));
+                content->geometry = std::move(*geometry);
             }
             return std::unique_ptr<LayerContent>(std::move(content));
         }
@@ -855,7 +965,7 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
             }
             return std::unique_ptr<LayerContent>(std::move(content));
         }
-        case LayerType::Null: {
+        case LayerType::Group: {
             return std::unique_ptr<LayerContent>(std::make_unique<NullContent>());
         }
         case LayerType::Precomp: {
@@ -896,6 +1006,11 @@ json LayerToJson(const Layer &layer) {
         masks.push_back(MaskToJson(mask));
     }
     node["masks"] = std::move(masks);
+    json styles = json::array();
+    for (const auto &style : layer.styles) {
+        styles.push_back(LayerStyleToJson(*style));
+    }
+    node["styles"] = std::move(styles);
     return node;
 }
 
@@ -991,6 +1106,20 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
             }
             layer->masks.push_back(std::move(*mask));
         }
+    }
+    Expected<const json *, std::string> stylesNode = Child(node, "styles");
+    if (!stylesNode) {
+        return Unexpected(stylesNode.error());
+    }
+    if (!(**stylesNode).is_array()) {
+        return Unexpected(std::string("styles must be an array"));
+    }
+    for (const json &styleNode : **stylesNode) {
+        Expected<std::unique_ptr<LayerStyle>, std::string> style = LayerStyleFromJson(styleNode);
+        if (!style) {
+            return Unexpected(style.error());
+        }
+        layer->styles.push_back(std::move(*style));
     }
     return layer;
 }

@@ -24,8 +24,12 @@ struct KeyframeInfo: Equatable, Identifiable {
 struct EasingInfo: Equatable {
     enum Kind: Int32, Equatable {
         case linear = 0
-        case bezier = 1
-        case hold = 2
+        case hold = 1
+        case ease = 2
+        case easeIn = 3
+        case easeOut = 4
+        case easeInOut = 5
+        case cubicBezier = 6
     }
 
     var kind: Kind
@@ -36,8 +40,10 @@ struct EasingInfo: Equatable {
 
     static let linear = EasingInfo(kind: .linear)
     static let hold = EasingInfo(kind: .hold)
-    static let easeIn = EasingInfo(kind: .bezier, inX: 0.42, inY: 0, outX: 1, outY: 1)
-    static let easeOut = EasingInfo(kind: .bezier, inX: 0, inY: 0, outX: 0.58, outY: 1)
+    static let ease = EasingInfo(kind: .ease, inX: 0.25, inY: 0.1, outX: 0.25, outY: 1)
+    static let easeIn = EasingInfo(kind: .easeIn, inX: 0.42, inY: 0, outX: 1, outY: 1)
+    static let easeOut = EasingInfo(kind: .easeOut, inX: 0, inY: 0, outX: 0.58, outY: 1)
+    static let easeInOut = EasingInfo(kind: .easeInOut, inX: 0.42, inY: 0, outX: 0.58, outY: 1)
 }
 
 struct MotionColor: Equatable {
