@@ -164,12 +164,10 @@ uint64_t AddShapeLayer(MSDocument *handle, uint64_t compositionId, bool ellipse)
         return 0;
     }
     auto layer = std::make_unique<Layer>(LayerType::Shape);
-    layer->name = (ellipse ? "Ellipse " : "Rectangle ") +
-        std::to_string(composition->layers.size() + 1);
+    layer->name = (ellipse ? "Ellipse " : "Rectangle ") + std::to_string(composition->layers.size() + 1);
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
-    layer->transform.position.setStaticValue(
-        Vec2{composition->width * 0.5f, composition->height * 0.5f});
+    layer->transform.position.setStaticValue(Vec2{composition->width * 0.5f, composition->height * 0.5f});
 
     auto *content = static_cast<ShapeContent *>(layer->content.get());
     if (ellipse) {
@@ -186,8 +184,7 @@ uint64_t AddShapeLayer(MSDocument *handle, uint64_t compositionId, bool ellipse)
     content->elements.push_back(std::move(fill));
 
     const uint64_t layerId = layer->id.value;
-    Execute(handle,
-            std::make_unique<motion::AddLayerCommand>(composition->id, std::move(layer)));
+    Execute(handle, std::make_unique<motion::AddLayerCommand>(composition->id, std::move(layer)));
     return layerId;
 }
 
@@ -220,6 +217,7 @@ MSDocument *ms_document_load(const char *jsonText, size_t length, char **errorOu
     }
     auto *handle = new MSDocument();
     handle->document = std::move(result).value();
+    handle->undoManager = std::make_unique<UndoManager>();
     return handle;
 }
 
@@ -304,7 +302,7 @@ int ms_document_composition_count(MSDocument *document) {
 uint64_t ms_document_composition_id_at(MSDocument *document, int index) {
     DocumentLock guard(document);
     Document *doc = Doc(document);
-    if (doc == nullptr || index < 0 || size_t(index) >= doc->compositions.size()) {
+    if (doc == nullptr || index < 0 || static_cast<size_t>(index) >= doc->compositions.size()) {
         return 0;
     }
     return doc->compositions[size_t(index)]->id.value;
@@ -331,23 +329,22 @@ int ms_composition_height(MSDocument *document, uint64_t compositionId) {
 int ms_composition_frame_rate_num(MSDocument *document, uint64_t compositionId) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
-    return composition != nullptr ? int(composition->frameRate.num) : 0;
+    return composition != nullptr ? static_cast<int>(composition->frameRate.num) : 0;
 }
 
 int ms_composition_frame_rate_den(MSDocument *document, uint64_t compositionId) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
-    return composition != nullptr ? int(composition->frameRate.den) : 0;
+    return composition != nullptr ? static_cast<int>(composition->frameRate.den) : 0;
 }
 
 int ms_composition_layer_count(MSDocument *document, uint64_t compositionId) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
-    return composition != nullptr ? int(composition->layers.size()) : 0;
+    return composition != nullptr ? static_cast<int>(composition->layers.size()) : 0;
 }
 
-void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r,
-                                     float *g, float *b, float *a) {
+void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r, float *g, float *b, float *a) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     if (composition == nullptr) {
@@ -440,7 +437,7 @@ bool ms_layer_locked(MSDocument *document, uint64_t layerId) {
 int ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
-    return property != nullptr ? int(property->valueType()) : -1;
+    return property != nullptr ? static_cast<int>(property->valueType()) : -1;
 }
 
 bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char *path) {
@@ -475,8 +472,7 @@ float ms_property_static_float(MSDocument *document, uint64_t entityId, const ch
     return property != nullptr ? property->staticValue() : 0.0f;
 }
 
-void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x,
-                             float *y) {
+void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y) {
     DocumentLock guard(document);
     const Animatable<Vec2> *property = AsVec2(FindProperty(document, entityId, path));
     if (property == nullptr) {
@@ -520,21 +516,19 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
     }
     switch (property->valueType()) {
         case AnimatableType::Float: {
-            return int(AsFloat(property)->keyframes().size());
+            return static_cast<int>(AsFloat(property)->keyframes().size());
         }
         case AnimatableType::Vec2: {
-            return int(AsVec2(property)->keyframes().size());
+            return static_cast<int>(AsVec2(property)->keyframes().size());
         }
         case AnimatableType::Color: {
-            return int(AsColor(property)->keyframes().size());
+            return static_cast<int>(AsColor(property)->keyframes().size());
         }
         case AnimatableType::BezierPath: {
-            return int(
-                static_cast<const Animatable<motion::BezierPath> *>(property)->keyframes().size());
+            return static_cast<int>(static_cast<const Animatable<motion::BezierPath> *>(property)->keyframes().size());
         }
         case AnimatableType::String: {
-            return int(
-                static_cast<const Animatable<std::string> *>(property)->keyframes().size());
+            return static_cast<int>(static_cast<const Animatable<std::string> *>(property)->keyframes().size());
         }
     }
     return 0;
@@ -543,7 +537,7 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
 // Looks up the keyframe at index for the expected value type.
 template <typename T>
 const Keyframe<T> *KeyframeAt(const Animatable<T> *property, int index) {
-    if (property == nullptr || index < 0 || size_t(index) >= property->keyframes().size()) {
+    if (property == nullptr || index < 0 || static_cast<size_t>(index) >= property->keyframes().size()) {
         return nullptr;
     }
     return &property->keyframes()[size_t(index)];
@@ -569,15 +563,13 @@ int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, co
 
 float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, const char *path, int index) {
     DocumentLock guard(document);
-    const Keyframe<float> *keyframe =
-        KeyframeAt(AsFloat(FindProperty(document, entityId, path)), index);
+    const Keyframe<float> *keyframe = KeyframeAt(AsFloat(FindProperty(document, entityId, path)), index);
     return keyframe != nullptr ? keyframe->value : 0.0f;
 }
 
 void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *x, float *y) {
     DocumentLock guard(document);
-    const Keyframe<Vec2> *keyframe =
-        KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
+    const Keyframe<Vec2> *keyframe = KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
     if (keyframe == nullptr) {
         return;
     }
