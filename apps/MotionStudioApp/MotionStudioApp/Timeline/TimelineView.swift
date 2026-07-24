@@ -23,6 +23,7 @@ struct TimelineView: View {
     @State private var layerColumnWidth: CGFloat = minLayerColumnWidth
     @State private var isSplitDividerHovering = false
     @State private var isPlayheadHovering = false
+    @State private var isTimeRangeDragging = false
     @State private var lastResolvedPointsPerFrame: CGFloat = pixelsPerFrame
     @GestureState private var splitDragStartWidth: CGFloat?
     @GestureState private var timelineDragStartX: CGFloat?
@@ -116,6 +117,7 @@ struct TimelineView: View {
                                                              pointsPerFrame: pointsPerFrame,
                                                              scrollX: scrollX,
                                                              editorState: editorState,
+                                                             isTimeRangeDragging: $isTimeRangeDragging,
                                                              perform: perform,
                                                              registerEdit: registerEdit)
                                                         .frame(height: row.height)
@@ -314,11 +316,13 @@ struct TimelineView: View {
     private func timelinePanGesture(trackWidth: CGFloat, viewportWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 6)
             .updating($timelineDragStartX) { _, state, _ in
+                guard !isTimeRangeDragging else { return }
                 if state == nil {
                     state = CGFloat(editorState.timelineScrollX)
                 }
             }
             .onChanged { value in
+                guard !isTimeRangeDragging else { return }
                 guard let start = timelineDragStartX else { return }
                 let next = start - value.translation.width
                 editorState.timelineScrollX = Double(clampedTimelineScrollX(next,
@@ -385,7 +389,7 @@ private struct TimelinePointerInputView: UIViewRepresentable {
     let contentInset: CGFloat
 
     func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
+        let view = TimelinePointerPassthroughView(frame: .zero)
         view.backgroundColor = .clear
 
         let hoverGesture = UIHoverGestureRecognizer(target: context.coordinator,
@@ -555,5 +559,17 @@ private struct TimelinePointerInputView: UIViewRepresentable {
         private func clampedScrollX(_ value: CGFloat, trackWidth: CGFloat) -> CGFloat {
             min(max(value, 0), max(0, trackWidth - viewportWidth))
         }
+    }
+}
+
+private final class TimelinePointerPassthroughView: UIView {
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        guard let event else {
+            return super.point(inside: point, with: event)
+        }
+        if event.type == .touches, (event.allTouches?.count ?? 1) <= 1 {
+            return false
+        }
+        return super.point(inside: point, with: event)
     }
 }
