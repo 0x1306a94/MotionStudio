@@ -22,6 +22,13 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
     void setPreviewBackdrop(PreviewBackdrop backdrop) override;
     PreviewBackdrop previewBackdrop() const override;
 
+    // Sets the user view transform applied on top of the fit-to-drawable
+    // transform every frame.
+    // zoom: magnification relative to fit (1 = fit to drawable).
+    // panXPoints: horizontal translation in view points.
+    // panYPoints: vertical translation in view points.
+    void setViewTransform(float zoom, float panXPoints, float panYPoints);
+
   protected:
     bool acquireTarget(int width, int height) override;
     void presentTarget() override;
@@ -37,6 +44,9 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
     struct Impl;
     std::unique_ptr<Impl> impl_;
     PreviewBackdrop previewBackdrop_ = PreviewBackdrop::Transparent;
+    float viewZoom_ = {1};
+    float viewPanX_ = {};
+    float viewPanY_ = {};
 };
 
 }  // namespace motion

@@ -2,9 +2,9 @@
 
 #import <MetalKit/MetalKit.h>
 
-#include <algorithm>
 #include <chrono>
-#include <cmath>
+
+#include "OnScreenTransform.h"
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/Color.h>
@@ -63,6 +63,12 @@ void TgfxOnScreenAdapter::setPreviewBackdrop(PreviewBackdrop backdrop) {
 
 PreviewBackdrop TgfxOnScreenAdapter::previewBackdrop() const {
     return previewBackdrop_;
+}
+
+void TgfxOnScreenAdapter::setViewTransform(float zoom, float panXPoints, float panYPoints) {
+    viewZoom_ = zoom;
+    viewPanX_ = panXPoints;
+    viewPanY_ = panYPoints;
 }
 
 bool TgfxOnScreenAdapter::compositionBackgroundSrcOver() const {
@@ -135,24 +141,14 @@ void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color ba
     }
     const float targetWidth = float(surface_->width());
     const float targetHeight = float(surface_->height());
-    // Fit Up to 100% (AE Composition panel default): scale down to fit when the
-    // drawable is smaller than the composition; never scale above 1:1.
-    const float fitScale = std::min(1.0f, std::min(targetWidth / float(sceneWidth), targetHeight / float(sceneHeight)));
-    if (fitScale <= 0.0f) {
-        return;
-    }
-    // Map onto a whole-pixel destination rect so AA edges don't sit on half
-    // pixels (which previously produced dark left/top fringes with Src).
-    const int destWidth = std::max(1, int(std::floor(float(sceneWidth) * fitScale + 1e-6f)));
-    const int destHeight = std::max(1, int(std::floor(float(sceneHeight) * fitScale + 1e-6f)));
-    const float offsetX = std::floor((targetWidth - float(destWidth)) * 0.5f);
-    const float offsetY = std::floor((targetHeight - float(destHeight)) * 0.5f);
-    const float scaleX = float(destWidth) / float(sceneWidth);
-    const float scaleY = float(destHeight) / float(sceneHeight);
-    tgfx::Matrix fit;
-    fit.setTranslate(offsetX, offsetY);
-    fit.preScale(scaleX, scaleY);
-    surface_->getCanvas()->concat(fit);
+    const float contentsScale = float(impl_->view.layer.contentsScale);
+    const ScreenTransform screen = MakeOnScreenTransform(sceneWidth, sceneHeight, targetWidth, targetHeight,
+                                                         viewZoom_, viewPanX_, viewPanY_, contentsScale);
+    tgfx::Matrix matrix;
+    matrix.setAll(screen.scaleX, screen.skewX, screen.translateX,
+                  screen.skewY, screen.scaleY, screen.translateY,
+                  0.0f, 0.0f, 1.0f);
+    surface_->getCanvas()->concat(matrix);
     TgfxCanvasAdapter::onFrameReady(sceneWidth, sceneHeight, backgroundColor, cornerRadius);
 }
 

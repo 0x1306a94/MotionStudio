@@ -223,6 +223,14 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 // Preview chrome behind the composition: 0 = solid black (default), 1 =
 // transparency checkerboard. Ignored when canvas is null.
 void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop);
+
+// Sets the user view transform applied on top of the fit-to-drawable
+// transform, effective for every subsequent draw call.
+// zoom: magnification relative to fit (1 = fit to drawable).
+// panX: horizontal translation in view points.
+// panY: vertical translation in view points.
+// Ignored when canvas is null.
+void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, float panY);
 #endif
 
 #ifdef __cplusplus

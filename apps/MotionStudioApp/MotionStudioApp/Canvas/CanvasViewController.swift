@@ -46,6 +46,19 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var lastDrawRequestTime: CFTimeInterval?
     private var lastDrawStartTime: CFTimeInterval?
 
+    // User view transform on top of fit (zoom 1 = fit to drawable).
+    private var canvasZoom: CGFloat = 1
+    private var canvasPan: CGPoint = .zero
+    private var lastPinchScale: CGFloat = 1
+    private var lastTouchPanTranslation: CGPoint = .zero
+    private var lastScrollTranslation: CGPoint = .zero
+    private var lastPointerLocation: CGPoint?
+    private var pinchGesture: UIPinchGestureRecognizer?
+
+    private static let minCanvasZoom: CGFloat = 0.02
+    private static let maxCanvasZoom: CGFloat = 64
+    private static let scrollZoomSensitivity: CGFloat = 0.01
+
     init(document: MotionProjectState, editorState: EditorState, clearSelection: @escaping () -> Void) {
         self.document = document
         self.editorState = editorState
@@ -91,6 +104,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         view.enableSetNeedsDisplay = true
         view.framebufferOnly = true
         view.autoResizeDrawable = true
+        // Multi-touch delivery is off by default; pinch and two-finger pan
+        // never begin without it.
+        view.isMultipleTouchEnabled = true
         view.delegate = self
         self.view = view
     }
@@ -98,10 +114,40 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasTap))
-        view.addGestureRecognizer(tapGesture)
+        configureCanvasGestures()
         syncFromState()
         observeStateChanges()
+    }
+
+    private func configureCanvasGestures() {
+        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasDoubleTap))
+        doubleTapGesture.numberOfTapsRequired = 2
+        view.addGestureRecognizer(doubleTapGesture)
+
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasTap))
+        tapGesture.require(toFail: doubleTapGesture)
+        view.addGestureRecognizer(tapGesture)
+
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handleCanvasPinch(_:)))
+        self.pinchGesture = pinchGesture
+        view.addGestureRecognizer(pinchGesture)
+
+        // Scroll events carry no pointer location (WWDC20 session 10094), so
+        // track the pointer separately to anchor Cmd+scroll zoom under it.
+        let hoverGesture = UIHoverGestureRecognizer(target: self, action: #selector(handleCanvasHover(_:)))
+        view.addGestureRecognizer(hoverGesture)
+
+        let touchPanGesture = UIPanGestureRecognizer(target: self, action: #selector(handleCanvasTouchPan(_:)))
+        touchPanGesture.minimumNumberOfTouches = 2
+        touchPanGesture.maximumNumberOfTouches = 2
+        view.addGestureRecognizer(touchPanGesture)
+
+        // Trackpad / mouse wheel input: UIKit routes scroll events to a
+        // touchless pan recognizer (Catalyst scroll and iPad pointer alike).
+        let scrollGesture = UIPanGestureRecognizer(target: self, action: #selector(handleCanvasScroll(_:)))
+        scrollGesture.maximumNumberOfTouches = 0
+        scrollGesture.allowedScrollTypesMask = [.continuous, .discrete]
+        view.addGestureRecognizer(scrollGesture)
     }
 
     func syncFromState() {
@@ -180,6 +226,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                 return
             }
             canvas = created
+            ms_canvas_set_view_transform(created, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
         }
         guard let canvas else { return }
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
@@ -274,6 +321,103 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     @objc private func handleCanvasTap() {
         clearSelection()
+    }
+
+    // MARK: - Canvas view transform (zoom & pan)
+
+    @objc private func handleCanvasDoubleTap() {
+        canvasZoom = 1
+        canvasPan = .zero
+        pushViewTransform()
+    }
+
+    @objc private func handleCanvasPinch(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            lastPinchScale = gesture.scale
+        case .changed:
+            let delta = gesture.scale / lastPinchScale
+            lastPinchScale = gesture.scale
+            applyZoom(delta: delta, anchor: gesture.location(in: view))
+        default:
+            break
+        }
+    }
+
+    @objc private func handleCanvasTouchPan(_ gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            lastTouchPanTranslation = .zero
+        case .changed:
+            let translation = gesture.translation(in: view)
+            applyPan(delta: CGPoint(x: translation.x - lastTouchPanTranslation.x,
+                                    y: translation.y - lastTouchPanTranslation.y))
+            lastTouchPanTranslation = translation
+        default:
+            lastTouchPanTranslation = .zero
+        }
+    }
+
+    @objc private func handleCanvasHover(_ gesture: UIHoverGestureRecognizer) {
+        switch gesture.state {
+        case .began, .changed:
+            lastPointerLocation = gesture.location(in: view)
+        default:
+            break
+        }
+    }
+
+    @objc private func handleCanvasScroll(_ gesture: UIPanGestureRecognizer) {
+        // A trackpad pinch can emit scroll events at the same time; the pinch
+        // handler owns the transform while it is active.
+        if let pinchGesture, pinchGesture.state == .began || pinchGesture.state == .changed {
+            lastScrollTranslation = gesture.translation(in: view)
+            return
+        }
+        switch gesture.state {
+        case .began:
+            lastScrollTranslation = .zero
+        case .changed:
+            let translation = gesture.translation(in: view)
+            let delta = CGPoint(x: translation.x - lastScrollTranslation.x,
+                                y: translation.y - lastScrollTranslation.y)
+            lastScrollTranslation = translation
+            if gesture.modifierFlags.contains(.command) {
+                // location(in:) is unreliable for scroll-driven recognizers;
+                // use the hover-tracked pointer position instead.
+                let anchor = lastPointerLocation ?? CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+                applyZoom(delta: exp(-delta.y * Self.scrollZoomSensitivity),
+                          anchor: anchor)
+            } else {
+                applyPan(delta: delta)
+            }
+        default:
+            lastScrollTranslation = .zero
+        }
+    }
+
+    private func applyZoom(delta: CGFloat, anchor: CGPoint) {
+        let zoom = min(max(canvasZoom * delta, Self.minCanvasZoom), Self.maxCanvasZoom)
+        let applied = zoom / canvasZoom
+        // Keeps the scene point under the anchor fixed while zooming.
+        canvasPan = CGPoint(x: anchor.x - applied * (anchor.x - canvasPan.x),
+                            y: anchor.y - applied * (anchor.y - canvasPan.y))
+        canvasZoom = zoom
+        pushViewTransform()
+    }
+
+    private func applyPan(delta: CGPoint) {
+        canvasPan.x += delta.x
+        canvasPan.y += delta.y
+        pushViewTransform()
+    }
+
+    private func pushViewTransform() {
+        guard let canvas else {
+            return
+        }
+        ms_canvas_set_view_transform(canvas, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
+        requestDraw()
     }
 
     private func logSlowFrame(_ profile: CanvasFrameProfile) {

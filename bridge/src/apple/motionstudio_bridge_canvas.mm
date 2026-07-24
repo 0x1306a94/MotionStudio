@@ -48,6 +48,13 @@ void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop) {
     canvas->adapter->setPreviewBackdrop(mode);
 }
 
+void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, float panY) {
+    if (canvas == nullptr || canvas->adapter == nullptr) {
+        return;
+    }
+    canvas->adapter->setViewTransform(zoom, panX, panY);
+}
+
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame) {
     ms_canvas_draw_frame_profiled(canvas, document, compositionId, frame, nullptr);
 }
