@@ -149,11 +149,15 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
     paint.setBlendMode(compositionBackgroundSrcOver() ? tgfx::BlendMode::SrcOver : tgfx::BlendMode::Src);
     if (radius > 0.0f) {
         canvas->drawRoundRect(compositionBounds, radius, radius, paint);
+        canvas->save();
+        compositionClipSaved_ = true;
         tgfx::Path clipPath;
         clipPath.addRoundRect(compositionBounds, radius, radius);
         canvas->clipPath(clipPath);
     } else {
         canvas->drawRect(compositionBounds, paint);
+        canvas->save();
+        compositionClipSaved_ = true;
         canvas->clipRect(compositionBounds, false);
     }
 }
@@ -167,6 +171,7 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
     frameRestore_ = std::make_unique<tgfx::AutoCanvasRestore>(canvas);
+    compositionClipSaved_ = false;
     drawPreviewBackdrop();
     onFrameReady(width, height, backgroundColor, cornerRadius);
     opacity_ = 1;
@@ -179,6 +184,7 @@ void TgfxCanvasAdapter::endFrame() {
     endFrameProfile_ = {};
     const auto restoreStart = ProfileClock::now();
     frameRestore_.reset();
+    compositionClipSaved_ = false;
     const auto restoreEnd = ProfileClock::now();
     endFrameProfile_.canvasRestoreMs = Milliseconds(restoreStart, restoreEnd);
 
@@ -190,6 +196,14 @@ void TgfxCanvasAdapter::endFrame() {
 
 const TgfxEndFrameProfile &TgfxCanvasAdapter::endFrameProfile() const {
     return endFrameProfile_;
+}
+
+void TgfxCanvasAdapter::restoreCompositionClip() {
+    if (!surface_ || !compositionClipSaved_) {
+        return;
+    }
+    surface_->getCanvas()->restore();
+    compositionClipSaved_ = false;
 }
 
 void TgfxCanvasAdapter::save() {

@@ -233,6 +233,11 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 // transparency checkerboard. Ignored when canvas is null.
 void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop);
 
+// Sets preview-only layer selection chrome for subsequent draw calls.
+// layerIds may be null only when count is 0. Supports multiple IDs so callers
+// can pass future multi-selection without changing the canvas API.
+void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, size_t count);
+
 // Sets the user view transform applied on top of the fit-to-drawable
 // transform, effective for every subsequent draw call.
 // zoom: magnification relative to fit (1 = fit to drawable).

@@ -37,6 +37,11 @@ class TgfxCanvasAdapter : public RenderAdapter {
     void endFrame() final;
     const TgfxEndFrameProfile &endFrameProfile() const;
 
+    // Restores the canvas to the scene transform without the composition clip.
+    // Preview chrome such as selection outlines can then draw outside the
+    // composition bounds while still sharing the same scene-to-target mapping.
+    void restoreCompositionClip();
+
     void save() override;
     void restore() override;
     void concatTransform(const Mat3 &matrix) override;
@@ -85,6 +90,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
     BlendMode blendMode_ = BlendMode::Normal;
     std::vector<float> opacityStack_;
     std::vector<BlendMode> blendStack_;
+    bool compositionClipSaved_ = false;
     // Spans beginFrame→endFrame; restores canvas state when the frame ends.
     // Declared after surface_ so destruction still has a live canvas.
     std::unique_ptr<tgfx::AutoCanvasRestore> frameRestore_;

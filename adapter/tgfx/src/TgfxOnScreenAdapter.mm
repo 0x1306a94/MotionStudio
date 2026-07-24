@@ -2,7 +2,9 @@
 
 #import <MetalKit/MetalKit.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 
 #include "OnScreenTransform.h"
 
@@ -69,6 +71,21 @@ void TgfxOnScreenAdapter::setViewTransform(float zoom, float panXPoints, float p
     viewZoom_ = zoom;
     viewPanX_ = panXPoints;
     viewPanY_ = panYPoints;
+}
+
+float TgfxOnScreenAdapter::sceneUnitsPerViewPoint(int sceneWidth, int sceneHeight) const {
+    if (sceneWidth <= 0 || sceneHeight <= 0 || impl_->view == nil) {
+        return 1.0f;
+    }
+    const CGSize drawableSize = impl_->view.drawableSize;
+    const float contentsScale = static_cast<float>(impl_->view.layer.contentsScale);
+    const ScreenTransform screen = MakeOnScreenTransform(sceneWidth, sceneHeight,
+                                                         static_cast<float>(drawableSize.width),
+                                                         static_cast<float>(drawableSize.height),
+                                                         viewZoom_, viewPanX_, viewPanY_, contentsScale);
+    const float scale = std::min(std::abs(screen.scaleX), std::abs(screen.scaleY));
+    const float pointScale = contentsScale > 0.0f ? contentsScale : 1.0f;
+    return pointScale / std::max(scale, 0.001f);
 }
 
 bool TgfxOnScreenAdapter::compositionBackgroundSrcOver() const {

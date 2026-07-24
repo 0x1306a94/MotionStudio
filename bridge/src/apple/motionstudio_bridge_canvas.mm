@@ -1,6 +1,7 @@
 #include "motionstudio_bridge.h"
 
 #include <utility>
+#include <vector>
 
 #include "../common/DocumentLock.h"
 #include "../common/MSDocument.h"
@@ -15,6 +16,7 @@ using motion::EntityId;
 
 struct MSCanvas {
     std::unique_ptr<motion::TgfxOnScreenAdapter> adapter;
+    std::vector<EntityId> selectedLayerIds;
 };
 
 namespace {
@@ -53,6 +55,23 @@ void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, floa
         return;
     }
     canvas->adapter->setViewTransform(zoom, panX, panY);
+}
+
+void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, size_t count) {
+    if (canvas == nullptr) {
+        return;
+    }
+    canvas->selectedLayerIds.clear();
+    if (layerIds == nullptr || count == 0) {
+        return;
+    }
+    canvas->selectedLayerIds.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+        EntityId id{layerIds[index]};
+        if (id.isValid()) {
+            canvas->selectedLayerIds.push_back(id);
+        }
+    }
 }
 
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame) {
@@ -95,10 +114,13 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     profile.layerCount = state.layers.size();
 
     const auto buildStart = ProfileClock::now();
-    const motion::DrawCommandList commands = motion::BuildCommands(state);
+    motion::DrawCommandList commands = motion::BuildCommands(state);
+    const float outlineWidth = 1.5f * canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    motion::DrawCommandList selectionCommands =
+        motion::BuildSelectionOutlineCommands(state, canvas->selectedLayerIds, outlineWidth);
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
-    profile.drawCommandCount = commands.size();
+    profile.drawCommandCount = commands.size() + selectionCommands.size();
 
     const auto beginFrameStart = ProfileClock::now();
     canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight, state.backgroundColor, state.cornerRadius);
@@ -107,6 +129,10 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
     const auto playCommandsStart = ProfileClock::now();
     motion::PlayCommands(commands, *canvas->adapter);
+    if (!selectionCommands.empty()) {
+        canvas->adapter->restoreCompositionClip();
+        motion::PlayCommands(selectionCommands, *canvas->adapter);
+    }
     const auto playCommandsEnd = ProfileClock::now();
     profile.playCommandsMs = Milliseconds(playCommandsStart, playCommandsEnd);
 

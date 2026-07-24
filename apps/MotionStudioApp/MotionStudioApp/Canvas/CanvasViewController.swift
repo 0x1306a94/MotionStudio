@@ -58,7 +58,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var pinchGesture: UIPinchGestureRecognizer?
     private var layerDrag: LayerDrag?
     private var layerDragDidMove = false
-    private let selectionOutlineLayer = CAShapeLayer()
 
     private static let minCanvasZoom: CGFloat = 0.02
     private static let maxCanvasZoom: CGFloat = 64
@@ -125,7 +124,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         // Multi-touch delivery is off by default; pinch and two-finger pan
         // never begin without it.
         view.isMultipleTouchEnabled = true
-        configureSelectionOutlineLayer(on: view)
         view.delegate = self
         self.view = view
     }
@@ -136,21 +134,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         configureCanvasGestures()
         syncFromState()
         observeStateChanges()
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        selectionOutlineLayer.frame = view.bounds
-        updateSelectionOutline()
-    }
-
-    private func configureSelectionOutlineLayer(on view: MTKView) {
-        selectionOutlineLayer.fillColor = UIColor.clear.cgColor
-        selectionOutlineLayer.strokeColor = UIColor.systemBlue.cgColor
-        selectionOutlineLayer.lineWidth = 1.5
-        selectionOutlineLayer.lineJoin = .round
-        selectionOutlineLayer.isHidden = true
-        view.layer.addSublayer(selectionOutlineLayer)
     }
 
     private func configureCanvasGestures() {
@@ -240,7 +223,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         self.previewBackdrop = previewBackdrop
         lastSyncTime = CACurrentMediaTime()
         configurePlayback(isPlaying, wasPlaying: wasPlaying)
-        updateSelectionOutline()
         if !isPlaying || !wasPlaying {
             requestDraw()
         }
@@ -269,9 +251,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             ms_canvas_set_view_transform(created, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
         }
         guard let canvas else { return }
+        updateSelectionOutline()
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
         let profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
-        updateSelectionOutline()
         logSlowFrame(profile)
         logDrawScheduling(syncToDrawMilliseconds: syncToDrawMilliseconds,
                           requestToDrawMilliseconds: requestToDrawMilliseconds,
@@ -367,6 +349,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         } else {
             clearSelection()
             updateSelectionOutline()
+            requestDraw()
         }
     }
 
@@ -450,14 +433,12 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         canvasPan = CGPoint(x: anchor.x - applied * (anchor.x - canvasPan.x),
                             y: anchor.y - applied * (anchor.y - canvasPan.y))
         canvasZoom = zoom
-        updateSelectionOutline()
         pushViewTransform()
     }
 
     private func applyPan(delta: CGPoint) {
         canvasPan.x += delta.x
         canvasPan.y += delta.y
-        updateSelectionOutline()
         pushViewTransform()
     }
 
@@ -529,7 +510,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                         value: position)
         }
         layerDragDidMove = true
-        updateSelectionOutline()
         requestDraw()
     }
 
@@ -550,6 +530,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         editorState.selectedTimelineProperty = nil
         editorState.selectedTimelineSegment = nil
         updateSelectionOutline()
+        requestDraw()
     }
 
     private func hitTestLayer(at viewPoint: CGPoint) -> UInt64? {
@@ -571,34 +552,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func updateSelectionOutline() {
-        guard let layerID = editorState.selectedLayerID,
-              let sceneBounds = document.core.layerBounds(compositionID: compositionID,
-                                                          layerID: layerID,
-                                                          frameTime: previewFrame),
-              let viewBounds = viewRect(fromSceneRect: sceneBounds)
-        else {
-            selectionOutlineLayer.isHidden = true
-            selectionOutlineLayer.path = nil
+        guard let canvas else {
             return
         }
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        selectionOutlineLayer.frame = view.bounds
-        selectionOutlineLayer.path = UIBezierPath(rect: viewBounds.insetBy(dx: -1, dy: -1)).cgPath
-        selectionOutlineLayer.isHidden = false
-        CATransaction.commit()
-    }
-
-    private func viewRect(fromSceneRect rect: CGRect) -> CGRect? {
-        guard let transform = currentScreenTransform() else {
-            return nil
+        var selectedLayerIDs: [UInt64] = []
+        if let selectedLayerID = editorState.selectedLayerID {
+            selectedLayerIDs.append(selectedLayerID)
         }
-        let minPoint = transform.viewPoint(fromScenePoint: rect.origin)
-        let maxPoint = transform.viewPoint(fromScenePoint: CGPoint(x: rect.maxX, y: rect.maxY))
-        return CGRect(x: min(minPoint.x, maxPoint.x),
-                      y: min(minPoint.y, maxPoint.y),
-                      width: abs(maxPoint.x - minPoint.x),
-                      height: abs(maxPoint.y - minPoint.y))
+        selectedLayerIDs.withUnsafeBufferPointer { buffer in
+            ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
+        }
     }
 
     private func hitToleranceSceneUnits() -> CGFloat {
