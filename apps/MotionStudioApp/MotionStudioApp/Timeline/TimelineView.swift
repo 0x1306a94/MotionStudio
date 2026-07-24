@@ -25,6 +25,7 @@ struct TimelineView: View {
     @State private var isPlayheadHovering = false
     @State private var isTimeRangeDragging = false
     @State private var lastResolvedPointsPerFrame: CGFloat = pixelsPerFrame
+    @State private var lastTimelineMagnification: CGFloat = 1
     @GestureState private var splitDragStartWidth: CGFloat?
     @GestureState private var timelineDragStartX: CGFloat?
 
@@ -75,6 +76,10 @@ struct TimelineView: View {
                                     .gesture(scrubGesture(duration: duration,
                                                           pointsPerFrame: pointsPerFrame,
                                                           scrollX: scrollX))
+                                    .simultaneousGesture(timelineMagnifyGesture(duration: duration,
+                                                                                pointsPerFrame: pointsPerFrame,
+                                                                                viewportWidth: trackViewportWidth,
+                                                                                contentWidth: contentViewportWidth))
                                 if isPlayheadVisible(visiblePlayheadX, viewportWidth: trackViewportWidth) {
                                     PlayheadLine(x: contentPlayheadX,
                                                  isHovering: isPlayheadHovering)
@@ -107,7 +112,8 @@ struct TimelineView: View {
                                             .contentShape(Rectangle())
                                             .onTapGesture(perform: clearSelection)
                                             .gesture(timelinePanGesture(trackWidth: trackWidth,
-                                                                        viewportWidth: trackViewportWidth))
+                                                                        viewportWidth: trackViewportWidth,
+                                                                        playheadX: contentPlayheadX))
                                         ZStack(alignment: .topLeading) {
                                             VStack(spacing: 0) {
                                                 ForEach(rows) { row in
@@ -154,7 +160,12 @@ struct TimelineView: View {
                                                              visiblePlayheadX: contentPlayheadX)
                                     }
                                     .simultaneousGesture(timelinePanGesture(trackWidth: trackWidth,
-                                                                            viewportWidth: trackViewportWidth))
+                                                                            viewportWidth: trackViewportWidth,
+                                                                            playheadX: contentPlayheadX))
+                                    .simultaneousGesture(timelineMagnifyGesture(duration: duration,
+                                                                                pointsPerFrame: pointsPerFrame,
+                                                                                viewportWidth: trackViewportWidth,
+                                                                                contentWidth: contentViewportWidth))
                                     .clipped()
                                 }
                                 .frame(maxWidth: .infinity, minHeight: scrollProxy.size.height,
@@ -313,22 +324,66 @@ struct TimelineView: View {
                                                                     viewportWidth: viewportWidth))
     }
 
-    private func timelinePanGesture(trackWidth: CGFloat, viewportWidth: CGFloat) -> some Gesture {
+    private func timelinePanGesture(trackWidth: CGFloat, viewportWidth: CGFloat,
+                                    playheadX: CGFloat? = nil) -> some Gesture
+    {
         DragGesture(minimumDistance: 6)
-            .updating($timelineDragStartX) { _, state, _ in
+            .updating($timelineDragStartX) { value, state, _ in
                 guard !isTimeRangeDragging else { return }
                 if state == nil {
-                    state = CGFloat(editorState.timelineScrollX)
+                    state = isPlayheadDragStart(value.startLocation.x, playheadX: playheadX)
+                        ? .nan
+                        : CGFloat(editorState.timelineScrollX)
                 }
             }
             .onChanged { value in
                 guard !isTimeRangeDragging else { return }
-                guard let start = timelineDragStartX else { return }
+                guard let start = timelineDragStartX, !start.isNaN else { return }
                 let next = start - value.translation.width
                 editorState.timelineScrollX = Double(clampedTimelineScrollX(next,
                                                                             trackWidth: trackWidth,
                                                                             viewportWidth: viewportWidth))
             }
+    }
+
+    private func isPlayheadDragStart(_ x: CGFloat, playheadX: CGFloat?) -> Bool {
+        guard let playheadX else { return false }
+        return abs(x - playheadX) <= 10
+    }
+
+    private func timelineMagnifyGesture(duration: Int64, pointsPerFrame: CGFloat,
+                                        viewportWidth: CGFloat, contentWidth: CGFloat) -> some Gesture
+    {
+        MagnifyGesture(minimumScaleDelta: 0)
+            .onChanged { value in
+                let delta = value.magnification / lastTimelineMagnification
+                lastTimelineMagnification = value.magnification
+                let anchorX = value.startAnchor.x * contentWidth
+                applyTimelineZoom(delta: delta,
+                                  anchorX: anchorX,
+                                  duration: duration,
+                                  pointsPerFrame: pointsPerFrame,
+                                  viewportWidth: viewportWidth)
+            }
+            .onEnded { _ in
+                lastTimelineMagnification = 1
+            }
+    }
+
+    private func applyTimelineZoom(delta: CGFloat, anchorX: CGFloat, duration: Int64,
+                                   pointsPerFrame: CGFloat, viewportWidth: CGFloat)
+    {
+        guard delta.isFinite, delta > 0, pointsPerFrame > 0 else { return }
+        let nextPointsPerFrame = min(max(pointsPerFrame * delta, minTimelinePointsPerFrame),
+                                     maxTimelinePointsPerFrame)
+        let anchorTimelineX = min(max(anchorX - trackLeadingInset, 0), viewportWidth)
+        let frameUnderAnchor = (CGFloat(editorState.timelineScrollX) + anchorTimelineX) / pointsPerFrame
+        let nextTrackWidth = max(CGFloat(duration) * nextPointsPerFrame, viewportWidth)
+        let nextScrollX = frameUnderAnchor * nextPointsPerFrame - anchorTimelineX
+        editorState.timelinePointsPerFrame = Double(nextPointsPerFrame)
+        editorState.timelineScrollX = Double(clampedTimelineScrollX(nextScrollX,
+                                                                    trackWidth: nextTrackWidth,
+                                                                    viewportWidth: viewportWidth))
     }
 
     private func clampTimelineScrollX(trackWidth: CGFloat, viewportWidth: CGFloat) {
