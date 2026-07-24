@@ -81,6 +81,13 @@ struct TimelineView: View {
                                 }
                             }
                             .frame(width: contentViewportWidth, height: rulerHeight)
+                            .overlay {
+                                timelinePointerInput(duration: duration,
+                                                     pointsPerFrame: pointsPerFrame,
+                                                     trackWidth: trackWidth,
+                                                     viewportWidth: trackViewportWidth,
+                                                     visiblePlayheadX: contentPlayheadX)
+                            }
                             .clipped()
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -137,15 +144,12 @@ struct TimelineView: View {
                                     .frame(width: contentViewportWidth)
                                     .frame(maxHeight: .infinity, alignment: .top)
                                     .coordinateSpace(name: "timelineViewport")
-                                    .background {
-                                        TimelinePointerInputView(editorState: editorState,
-                                                                 isPlayheadHovering: $isPlayheadHovering,
-                                                                 duration: duration,
-                                                                 pointsPerFrame: pointsPerFrame,
-                                                                 trackWidth: trackWidth,
-                                                                 viewportWidth: trackViewportWidth,
-                                                                 visiblePlayheadX: contentPlayheadX,
-                                                                 contentInset: trackLeadingInset)
+                                    .overlay {
+                                        timelinePointerInput(duration: duration,
+                                                             pointsPerFrame: pointsPerFrame,
+                                                             trackWidth: trackWidth,
+                                                             viewportWidth: trackViewportWidth,
+                                                             visiblePlayheadX: contentPlayheadX)
                                     }
                                     .simultaneousGesture(timelinePanGesture(trackWidth: trackWidth,
                                                                             viewportWidth: trackViewportWidth))
@@ -227,6 +231,20 @@ struct TimelineView: View {
         let totalFrames = CGFloat(max(duration, 1))
         let fitPointsPerFrame = max(minTimelinePointsPerFrame, availableWidth / totalFrames)
         return min(max(CGFloat(editorState.timelinePointsPerFrame), fitPointsPerFrame), maxTimelinePointsPerFrame)
+    }
+
+    private func timelinePointerInput(duration: Int64, pointsPerFrame: CGFloat,
+                                      trackWidth: CGFloat, viewportWidth: CGFloat,
+                                      visiblePlayheadX: CGFloat) -> some View
+    {
+        TimelinePointerInputView(editorState: editorState,
+                                 isPlayheadHovering: $isPlayheadHovering,
+                                 duration: duration,
+                                 pointsPerFrame: pointsPerFrame,
+                                 trackWidth: trackWidth,
+                                 viewportWidth: viewportWidth,
+                                 visiblePlayheadX: visiblePlayheadX,
+                                 contentInset: trackLeadingInset)
     }
 
     private func scrubGesture(duration: Int64, pointsPerFrame: CGFloat,
@@ -372,10 +390,12 @@ private struct TimelinePointerInputView: UIViewRepresentable {
 
         let hoverGesture = UIHoverGestureRecognizer(target: context.coordinator,
                                                     action: #selector(Coordinator.handleHover(_:)))
+        hoverGesture.cancelsTouchesInView = false
         view.addGestureRecognizer(hoverGesture)
 
         let pinchGesture = UIPinchGestureRecognizer(target: context.coordinator,
                                                     action: #selector(Coordinator.handlePinch(_:)))
+        pinchGesture.cancelsTouchesInView = false
         pinchGesture.delegate = context.coordinator
         context.coordinator.pinchGesture = pinchGesture
         view.addGestureRecognizer(pinchGesture)
@@ -384,6 +404,7 @@ private struct TimelinePointerInputView: UIViewRepresentable {
                                                    action: #selector(Coordinator.handleScroll(_:)))
         scrollGesture.maximumNumberOfTouches = 0
         scrollGesture.allowedScrollTypesMask = [.continuous, .discrete]
+        scrollGesture.cancelsTouchesInView = false
         scrollGesture.delegate = context.coordinator
         view.addGestureRecognizer(scrollGesture)
 
@@ -504,7 +525,7 @@ private struct TimelinePointerInputView: UIViewRepresentable {
         private func timelineScrollDelta(delta: CGPoint,
                                          modifierFlags: UIKeyModifierFlags) -> CGFloat
         {
-            if abs(delta.x) >= abs(delta.y) {
+            if delta.x != 0 {
                 return delta.x
             }
             if modifierFlags.contains(.shift) {
