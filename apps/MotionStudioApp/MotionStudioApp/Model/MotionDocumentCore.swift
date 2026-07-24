@@ -5,6 +5,7 @@
 //  Swift facade over the C++ core via the C ABI bridge.
 //
 
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -214,6 +215,29 @@ final class MotionDocumentCore {
 
     func cornerRadius(compositionID: UInt64) -> Float {
         ms_composition_corner_radius(handle, compositionID)
+    }
+
+    func hitTestLayer(compositionID: UInt64, frameTime: Double, point: CGPoint, tolerance: CGFloat) -> UInt64? {
+        let layerID = ms_composition_hit_test_layer(handle, compositionID, frameTime,
+                                                    Float(point.x), Float(point.y),
+                                                    Float(max(tolerance, 0)))
+        return layerID == 0 ? nil : layerID
+    }
+
+    func layerBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double) -> CGRect? {
+        var minX: Float = 0
+        var minY: Float = 0
+        var maxX: Float = 0
+        var maxY: Float = 0
+        guard ms_composition_layer_bounds(handle, compositionID, layerID, frameTime,
+                                          &minX, &minY, &maxX, &maxY)
+        else {
+            return nil
+        }
+        return CGRect(x: CGFloat(minX),
+                      y: CGFloat(minY),
+                      width: CGFloat(maxX - minX),
+                      height: CGFloat(maxY - minY))
     }
 
     // MARK: - Layer queries

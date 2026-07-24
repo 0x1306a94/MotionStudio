@@ -17,6 +17,8 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/render/HitTest.h"
+#include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/serialization/Serializer.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
@@ -50,6 +52,7 @@ using motion::Layer;
 using motion::LayerType;
 using motion::PropertyPath;
 using motion::ResolveAnimatable;
+using motion::SceneEvaluator;
 using motion::Serializer;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
@@ -368,6 +371,63 @@ float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId)
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     return composition != nullptr ? composition->cornerRadius : 0.0f;
+}
+
+uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositionId, double frameTime, float x, float y, float tolerance) {
+    DocumentLock guard(document);
+    Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return 0;
+    }
+    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    if (!result.hasValue()) {
+        return 0;
+    }
+    const motion::SceneState &state = result.value();
+    for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
+        const Layer *layer = doc->entityIndex().findLayer(it->id);
+        if (layer != nullptr && !layer->locked && motion::HitTestLayer(*it, Vec2{x, y}, tolerance)) {
+            return it->id.value;
+        }
+    }
+    return 0;
+}
+
+bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
+                                 float *minX, float *minY, float *maxX, float *maxY) {
+    DocumentLock guard(document);
+    Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return false;
+    }
+    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    if (!result.hasValue()) {
+        return false;
+    }
+    for (const motion::EvaluatedLayer &layer : result.value().layers) {
+        if (layer.id.value != layerId) {
+            continue;
+        }
+        Vec2 minPoint;
+        Vec2 maxPoint;
+        if (!motion::BoundsOfLayer(layer, minPoint, maxPoint)) {
+            return false;
+        }
+        if (minX != nullptr) {
+            *minX = minPoint.x;
+        }
+        if (minY != nullptr) {
+            *minY = minPoint.y;
+        }
+        if (maxX != nullptr) {
+            *maxX = maxPoint.x;
+        }
+        if (maxY != nullptr) {
+            *maxY = maxPoint.y;
+        }
+        return true;
+    }
+    return false;
 }
 
 char *ms_composition_name(MSDocument *document, uint64_t compositionId) {

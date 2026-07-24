@@ -71,11 +71,16 @@ extension EditorViewController {
     }
 
     func registerEdit(_ actionName: String) {
-        guard let undoManager else { return }
-        undoManager.setActionName(actionName)
-        registerInverse(redo: false, undoManager: undoManager)
         document.markEdited()
         updateSaveButtonState()
+        guard let undoManager = currentUndoManager() else { return }
+        undoManager.setActionName(actionName)
+        registerInverse(redo: false, undoManager: undoManager)
+    }
+
+    private func currentUndoManager() -> UndoManager? {
+        becomeFirstResponder()
+        return undoManager
     }
 
     func registerInverse(redo: Bool, undoManager: UndoManager) {

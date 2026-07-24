@@ -38,6 +38,18 @@ void AddKeyframeCommand::undo(Document &document) {
     }
 }
 
+bool AddKeyframeCommand::mergeWith(const Command &other) {
+    if (other.kind() != CommandKind::AddKeyframe) {
+        return false;
+    }
+    const auto &typed = static_cast<const AddKeyframeCommand &>(other);
+    if (typed.property_ != property_ || KeyframeTime(typed.keyframe_) != KeyframeTime(keyframe_)) {
+        return false;
+    }
+    keyframe_ = typed.keyframe_;  // Preserve replaced_, absorb final value.
+    return true;
+}
+
 CommandKind AddKeyframeCommand::kind() const {
     return CommandKind::AddKeyframe;
 }

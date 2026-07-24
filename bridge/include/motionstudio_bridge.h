@@ -119,6 +119,10 @@ int ms_composition_frame_rate_den(MSDocument *document, uint64_t compositionId);
 int ms_composition_layer_count(MSDocument *document, uint64_t compositionId);
 void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r, float *g, float *b, float *a);
 float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId);
+// Topmost unlocked layer hit at scene-space point, or 0 when none hit.
+uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositionId, double frameTime, float x, float y, float tolerance);
+bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
+                                 float *minX, float *minY, float *maxX, float *maxY);
 // Composition name (malloc'd).
 char *ms_composition_name(MSDocument *document, uint64_t compositionId);
 

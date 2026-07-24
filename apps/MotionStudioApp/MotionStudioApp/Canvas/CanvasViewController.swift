@@ -8,6 +8,7 @@
 
 import MetalKit
 import Observation
+import QuartzCore
 import UIKit
 
 @MainActor
@@ -15,6 +16,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private let document: MotionProjectState
     private let editorState: EditorState
     private let clearSelection: () -> Void
+    private let registerEdit: (String) -> Void
 
     private var metalView: MTKView {
         view as! MTKView
@@ -54,15 +56,31 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var lastScrollTranslation: CGPoint = .zero
     private var lastPointerLocation: CGPoint?
     private var pinchGesture: UIPinchGestureRecognizer?
+    private var layerDrag: LayerDrag?
+    private var layerDragDidMove = false
+    private let selectionOutlineLayer = CAShapeLayer()
 
     private static let minCanvasZoom: CGFloat = 0.02
     private static let maxCanvasZoom: CGFloat = 64
     private static let scrollZoomSensitivity: CGFloat = 0.01
+    private static let hitTolerancePoints: CGFloat = 6
 
-    init(document: MotionProjectState, editorState: EditorState, clearSelection: @escaping () -> Void) {
+    private struct LayerDrag {
+        let layerID: UInt64
+        let startScenePoint: CGPoint
+        let startPosition: CGVector
+        let writesKeyframe: Bool
+    }
+
+    init(document: MotionProjectState,
+         editorState: EditorState,
+         clearSelection: @escaping () -> Void,
+         registerEdit: @escaping (String) -> Void)
+    {
         self.document = document
         self.editorState = editorState
         self.clearSelection = clearSelection
+        self.registerEdit = registerEdit
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -107,6 +125,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         // Multi-touch delivery is off by default; pinch and two-finger pan
         // never begin without it.
         view.isMultipleTouchEnabled = true
+        configureSelectionOutlineLayer(on: view)
         view.delegate = self
         self.view = view
     }
@@ -119,12 +138,27 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         observeStateChanges()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        selectionOutlineLayer.frame = view.bounds
+        updateSelectionOutline()
+    }
+
+    private func configureSelectionOutlineLayer(on view: MTKView) {
+        selectionOutlineLayer.fillColor = UIColor.clear.cgColor
+        selectionOutlineLayer.strokeColor = UIColor.systemBlue.cgColor
+        selectionOutlineLayer.lineWidth = 1.5
+        selectionOutlineLayer.lineJoin = .round
+        selectionOutlineLayer.isHidden = true
+        view.layer.addSublayer(selectionOutlineLayer)
+    }
+
     private func configureCanvasGestures() {
         let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasDoubleTap))
         doubleTapGesture.numberOfTapsRequired = 2
         view.addGestureRecognizer(doubleTapGesture)
 
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasTap))
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasTap(_:)))
         tapGesture.require(toFail: doubleTapGesture)
         view.addGestureRecognizer(tapGesture)
 
@@ -141,6 +175,11 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         touchPanGesture.minimumNumberOfTouches = 2
         touchPanGesture.maximumNumberOfTouches = 2
         view.addGestureRecognizer(touchPanGesture)
+
+        let layerDragGesture = UIPanGestureRecognizer(target: self, action: #selector(handleLayerDrag(_:)))
+        layerDragGesture.minimumNumberOfTouches = 1
+        layerDragGesture.maximumNumberOfTouches = 1
+        view.addGestureRecognizer(layerDragGesture)
 
         // Trackpad / mouse wheel input: UIKit routes scroll events to a
         // touchless pan recognizer (Catalyst scroll and iPad pointer alike).
@@ -168,6 +207,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private func observeStateChanges() {
         withObservationTracking {
             _ = document.core.revision
+            _ = editorState.selectedLayerID
             _ = editorState.playheadFrame
             _ = editorState.isPlaying
             _ = editorState.previewBackdrop
@@ -201,6 +241,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         self.previewBackdrop = previewBackdrop
         lastSyncTime = CACurrentMediaTime()
         configurePlayback(isPlaying, wasPlaying: wasPlaying)
+        updateSelectionOutline()
         if !isPlaying || !wasPlaying {
             requestDraw()
         }
@@ -231,6 +272,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard let canvas else { return }
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
         let profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
+        updateSelectionOutline()
         logSlowFrame(profile)
         logDrawScheduling(syncToDrawMilliseconds: syncToDrawMilliseconds,
                           requestToDrawMilliseconds: requestToDrawMilliseconds,
@@ -319,8 +361,14 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         metalView.setNeedsDisplay()
     }
 
-    @objc private func handleCanvasTap() {
-        clearSelection()
+    @objc private func handleCanvasTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        if let layerID = hitTestLayer(at: gesture.location(in: view)) {
+            selectLayer(layerID)
+        } else {
+            clearSelection()
+            updateSelectionOutline()
+        }
     }
 
     // MARK: - Canvas view transform (zoom & pan)
@@ -403,12 +451,14 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         canvasPan = CGPoint(x: anchor.x - applied * (anchor.x - canvasPan.x),
                             y: anchor.y - applied * (anchor.y - canvasPan.y))
         canvasZoom = zoom
+        updateSelectionOutline()
         pushViewTransform()
     }
 
     private func applyPan(delta: CGPoint) {
         canvasPan.x += delta.x
         canvasPan.y += delta.y
+        updateSelectionOutline()
         pushViewTransform()
     }
 
@@ -418,6 +468,190 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
         ms_canvas_set_view_transform(canvas, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
         requestDraw()
+    }
+
+    // MARK: - Layer selection & movement
+
+    @objc private func handleLayerDrag(_ gesture: UIPanGestureRecognizer) {
+        guard !isPlaying else { return }
+        switch gesture.state {
+        case .began:
+            beginLayerDrag(at: gesture.location(in: view))
+        case .changed:
+            updateLayerDrag(at: gesture.location(in: view))
+        case .ended, .cancelled, .failed:
+            endLayerDrag()
+        default:
+            break
+        }
+    }
+
+    private func beginLayerDrag(at viewPoint: CGPoint) {
+        guard let layerID = hitTestLayer(at: viewPoint),
+              !document.core.layerIsLocked(layerID),
+              let scenePoint = scenePoint(fromViewPoint: viewPoint)
+        else {
+            layerDrag = nil
+            layerDragDidMove = false
+            return
+        }
+        selectLayer(layerID)
+        layerDrag = LayerDrag(layerID: layerID,
+                              startScenePoint: scenePoint,
+                              startPosition: document.core.evaluateVec2(entityID: layerID,
+                                                                        path: TransformProperty.position.path,
+                                                                        frame: playheadFrame),
+                              writesKeyframe: document.core.isAnimated(entityID: layerID,
+                                                                       path: TransformProperty.position.path))
+        layerDragDidMove = false
+    }
+
+    private func updateLayerDrag(at viewPoint: CGPoint) {
+        guard let layerDrag,
+              let scenePoint = scenePoint(fromViewPoint: viewPoint)
+        else {
+            return
+        }
+        let delta = CGPoint(x: scenePoint.x - layerDrag.startScenePoint.x,
+                            y: scenePoint.y - layerDrag.startScenePoint.y)
+        guard abs(delta.x) > 0.001 || abs(delta.y) > 0.001 else {
+            return
+        }
+        let position = CGVector(dx: layerDrag.startPosition.dx + delta.x,
+                                dy: layerDrag.startPosition.dy + delta.y)
+        if layerDrag.writesKeyframe {
+            document.core.addKeyframeVec2(entityID: layerDrag.layerID,
+                                          path: TransformProperty.position.path,
+                                          frame: playheadFrame,
+                                          value: position)
+        } else {
+            document.core.setStaticVec2(entityID: layerDrag.layerID,
+                                        path: TransformProperty.position.path,
+                                        value: position)
+        }
+        layerDragDidMove = true
+        updateSelectionOutline()
+        requestDraw()
+    }
+
+    private func endLayerDrag() {
+        defer {
+            layerDrag = nil
+            layerDragDidMove = false
+        }
+        guard layerDragDidMove else {
+            return
+        }
+        document.core.endDrag()
+        registerEdit("Move Layer")
+    }
+
+    private func selectLayer(_ layerID: UInt64) {
+        editorState.selectedLayerID = layerID
+        editorState.selectedTimelineProperty = nil
+        editorState.selectedTimelineSegment = nil
+        updateSelectionOutline()
+    }
+
+    private func hitTestLayer(at viewPoint: CGPoint) -> UInt64? {
+        guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
+            return nil
+        }
+        return document.core.hitTestLayer(compositionID: compositionID,
+                                          frameTime: previewFrame,
+                                          point: scenePoint,
+                                          tolerance: hitToleranceSceneUnits())
+    }
+
+    private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {
+        guard let transform = currentScreenTransform() else {
+            return nil
+        }
+        return CGPoint(x: (point.x * transform.contentsScale - transform.panX - transform.zoomedOffsetX) / transform.scaleX,
+                       y: (point.y * transform.contentsScale - transform.panY - transform.zoomedOffsetY) / transform.scaleY)
+    }
+
+    private func updateSelectionOutline() {
+        guard let layerID = editorState.selectedLayerID,
+              let sceneBounds = document.core.layerBounds(compositionID: compositionID,
+                                                          layerID: layerID,
+                                                          frameTime: previewFrame),
+              let viewBounds = viewRect(fromSceneRect: sceneBounds)
+        else {
+            selectionOutlineLayer.isHidden = true
+            selectionOutlineLayer.path = nil
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        selectionOutlineLayer.frame = view.bounds
+        selectionOutlineLayer.path = UIBezierPath(rect: viewBounds.insetBy(dx: -1, dy: -1)).cgPath
+        selectionOutlineLayer.isHidden = false
+        CATransaction.commit()
+    }
+
+    private func viewRect(fromSceneRect rect: CGRect) -> CGRect? {
+        guard let transform = currentScreenTransform() else {
+            return nil
+        }
+        let minPoint = transform.viewPoint(fromScenePoint: rect.origin)
+        let maxPoint = transform.viewPoint(fromScenePoint: CGPoint(x: rect.maxX, y: rect.maxY))
+        return CGRect(x: min(minPoint.x, maxPoint.x),
+                      y: min(minPoint.y, maxPoint.y),
+                      width: abs(maxPoint.x - minPoint.x),
+                      height: abs(maxPoint.y - minPoint.y))
+    }
+
+    private func hitToleranceSceneUnits() -> CGFloat {
+        guard let transform = currentScreenTransform() else {
+            return Self.hitTolerancePoints
+        }
+        return Self.hitTolerancePoints * transform.contentsScale / max(min(abs(transform.scaleX), abs(transform.scaleY)), 0.001)
+    }
+
+    private func currentScreenTransform() -> CanvasScreenTransform? {
+        let compositionSize = document.core.size(compositionID: compositionID)
+        let drawableSize = metalView.drawableSize
+        guard compositionSize.width > 0,
+              compositionSize.height > 0,
+              drawableSize.width > 0,
+              drawableSize.height > 0,
+              view.bounds.width > 0,
+              view.bounds.height > 0
+        else {
+            return nil
+        }
+        let fitScale = min(1, min(drawableSize.width / compositionSize.width,
+                                  drawableSize.height / compositionSize.height))
+        let destWidth = max(1, floor(compositionSize.width * fitScale + 0.000_001))
+        let destHeight = max(1, floor(compositionSize.height * fitScale + 0.000_001))
+        let fitScaleX = destWidth / compositionSize.width
+        let fitScaleY = destHeight / compositionSize.height
+        let offsetX = floor((drawableSize.width - destWidth) * 0.5)
+        let offsetY = floor((drawableSize.height - destHeight) * 0.5)
+        let contentsScale = drawableSize.width / view.bounds.width
+        return CanvasScreenTransform(contentsScale: contentsScale,
+                                     scaleX: canvasZoom * fitScaleX,
+                                     scaleY: canvasZoom * fitScaleY,
+                                     panX: canvasPan.x * contentsScale,
+                                     panY: canvasPan.y * contentsScale,
+                                     zoomedOffsetX: canvasZoom * offsetX,
+                                     zoomedOffsetY: canvasZoom * offsetY)
+    }
+
+    private struct CanvasScreenTransform {
+        let contentsScale: CGFloat
+        let scaleX: CGFloat
+        let scaleY: CGFloat
+        let panX: CGFloat
+        let panY: CGFloat
+        let zoomedOffsetX: CGFloat
+        let zoomedOffsetY: CGFloat
+
+        func viewPoint(fromScenePoint point: CGPoint) -> CGPoint {
+            CGPoint(x: (point.x * scaleX + panX + zoomedOffsetX) / contentsScale,
+                    y: (point.y * scaleY + panY + zoomedOffsetY) / contentsScale)
+        }
     }
 
     private func logSlowFrame(_ profile: CanvasFrameProfile) {

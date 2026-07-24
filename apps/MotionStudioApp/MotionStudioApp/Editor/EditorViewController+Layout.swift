@@ -20,6 +20,9 @@ extension EditorViewController {
                                                     editorState: editorState,
                                                     clearSelection: { [weak self] in
                                                         self?.clearSelection()
+                                                    },
+                                                    registerEdit: { [weak self] actionName in
+                                                        self?.registerEdit(actionName)
                                                     })
         canvasController.view.translatesAutoresizingMaskIntoConstraints = false
         addChild(canvasController)

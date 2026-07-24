@@ -46,6 +46,7 @@ final class EditorViewController: UIViewController {
 
     let document: MotionProjectDocument
     let editorState = EditorState()
+    private let editorUndoManager = UndoManager()
 
     let canvasViewport = UIView()
     let topToolbar = UIVisualEffectView(effect: nil)
@@ -112,6 +113,10 @@ final class EditorViewController: UIViewController {
 
     override var canBecomeFirstResponder: Bool {
         true
+    }
+
+    override var undoManager: UndoManager? {
+        editorUndoManager
     }
 
     override var keyCommands: [UIKeyCommand]? {
