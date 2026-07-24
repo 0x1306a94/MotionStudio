@@ -47,6 +47,38 @@ func timelineX(for frame: CGFloat, pointsPerFrame: CGFloat = pixelsPerFrame) -> 
     frame * pointsPerFrame
 }
 
+func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [TimelineRow] {
+    var rows: [TimelineRow] = []
+    for layerID in layerIDs {
+        rows.append(TimelineRow(id: .layer(layerID), layerID: layerID, kind: .layer))
+        let animatedPaths = Set(timelineAnimatedPropertyPaths(core: core, layerID: layerID))
+        for property in TransformProperty.allCases where animatedPaths.contains(property.path) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: property.path,
+                                            label: property.actionLabel))
+        }
+        if animatedPaths.contains(timelineShapeSizePath) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: timelineShapeSizePath,
+                                            label: "Size"))
+        }
+    }
+    return rows
+}
+
+private func timelinePropertyRow(core: MotionDocumentCore, layerID: UInt64, path: String,
+                                 label: String) -> TimelineRow
+{
+    if timelineUsesManualKeyframeTrack(core: core, layerID: layerID, path: path) {
+        return TimelineRow(id: .keyframeTrack(layerID, path), layerID: layerID,
+                           kind: .keyframeTrack(path: path, label: label))
+    }
+    return TimelineRow(id: .propertySpan(layerID, path), layerID: layerID,
+                       kind: .propertySpan(path: path, label: label))
+}
+
 /// One row of the flattened timeline model. Both the left tree and the right
 /// graph iterate the same array so layer rows and property sub-rows line up
 /// vertically for lockstep scrolling.

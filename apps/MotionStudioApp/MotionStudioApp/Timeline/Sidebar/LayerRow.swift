@@ -1,0 +1,80 @@
+//
+//  LayerRow.swift
+//  MotionStudioApp
+//
+
+import SwiftUI
+
+struct LayerRow: View {
+    @Environment(MotionDocumentCore.self) private var core
+    @Environment(EditorState.self) private var editorState
+
+    let layerID: UInt64
+    let perform: (String, () -> Void) -> Void
+
+    var body: some View {
+        // Re-render on any document mutation; bridge reads don't trigger observation.
+        let _ = core.revision
+        let selected = editorState.selectedLayerID == layerID
+        let visible = core.layerIsVisible(layerID)
+        let locked = core.layerIsLocked(layerID)
+        HStack(spacing: 6) {
+            Image(systemName: layerSymbol(core.layerType(layerID)))
+                .foregroundStyle(.secondary)
+            Text(core.layerName(layerID))
+                .lineLimit(1)
+            Spacer()
+            Button {
+                perform(visible ? "Hide Layer" : "Show Layer") {
+                    core.setLayerVisible(layerID, visible: !visible)
+                }
+            } label: {
+                Image(systemName: visible ? "eye.fill" : "eye.slash")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: layerActionIconSize))
+                    .frame(width: layerActionIconSize, height: layerActionIconSize)
+            }
+            .frame(width: layerActionButtonSize, height: layerActionButtonSize)
+            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            Button {
+                perform(locked ? "Unlock Layer" : "Lock Layer") {
+                    core.setLayerLocked(layerID, locked: !locked)
+                }
+            } label: {
+                Image(systemName: locked ? "lock.fill" : "lock.open")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: layerActionIconSize))
+                    .frame(width: layerActionIconSize, height: layerActionIconSize)
+            }
+            .frame(width: layerActionButtonSize, height: layerActionButtonSize)
+            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+        }
+        .font(.callout)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(selected ? Color.accentColor.opacity(0.25) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            editorState.selectedLayerID = layerID
+            editorState.selectedTimelineProperty = nil
+            editorState.selectedTimelineSegment = nil
+        }
+    }
+
+    private func layerSymbol(_ type: Int32) -> String {
+        switch type {
+        case 1:
+            "photo"
+        case 2:
+            "textformat"
+        case 3:
+            "circle.dashed"
+        case 4:
+            "film"
+        default:
+            "square"
+        }
+    }
+}
