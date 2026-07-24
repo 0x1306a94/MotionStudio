@@ -29,25 +29,25 @@ struct HorizontalSplitDivider: View {
 struct PlayheadLine: View {
     let x: CGFloat
     let isHovering: Bool
+    var showsMarker = true
 
     var body: some View {
         let color = isHovering ? Color.red : Color.blue
         let markerWidth: CGFloat = 10
-        // The triangle is a hand-drawn shape (not an SF Symbol) so its top edge
-        // sits exactly at y=0, flush with the line top.
-        ZStack(alignment: .top) {
+        ZStack(alignment: .topLeading) {
             Rectangle()
                 .fill(color)
                 .frame(width: 1)
                 .frame(maxHeight: .infinity, alignment: .top)
-                .frame(width: markerWidth)
-            PlayheadTriangle()
-                .fill(color)
-                .frame(width: markerWidth, height: 7)
+                .offset(x: x - 0.5)
+            if showsMarker {
+                PlayheadTriangle()
+                    .fill(color)
+                    .frame(width: markerWidth, height: 7)
+                    .offset(x: x - markerWidth / 2)
+            }
         }
-        .frame(width: markerWidth)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .offset(x: x - markerWidth / 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -66,6 +66,7 @@ struct KeyframeDiamond: View {
     let keyframe: KeyframeInfo
     let duration: Int64
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
     let isSelected: Bool
     let onMove: (Int64, Int64) -> Void
     let onMoveEnded: () -> Void
@@ -84,7 +85,8 @@ struct KeyframeDiamond: View {
             .frame(width: 20, height: propertyRowHeight)
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }
-            .position(x: timelineX(for: keyframe.frame, pointsPerFrame: pointsPerFrame), y: propertyRowHeight / 2)
+            .position(x: trackLeadingInset + timelineX(for: keyframe.frame, pointsPerFrame: pointsPerFrame) - scrollX,
+                      y: propertyRowHeight / 2)
             .gesture(
                 DragGesture()
                     .onChanged { value in

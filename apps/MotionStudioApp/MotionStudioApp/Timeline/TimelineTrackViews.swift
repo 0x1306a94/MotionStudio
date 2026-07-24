@@ -12,6 +12,7 @@ struct TrackRow: View {
     let row: TimelineRow
     let duration: Int64
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
@@ -21,6 +22,7 @@ struct TrackRow: View {
         case .layer:
             TimeRangeTrackView(core: core, layerID: row.layerID,
                                pointsPerFrame: pointsPerFrame,
+                               scrollX: scrollX,
                                isSelected: editorState.selectedLayerID == row.layerID,
                                editorState: editorState)
 
@@ -30,6 +32,7 @@ struct TrackRow: View {
                               path: path,
                               label: label,
                               pointsPerFrame: pointsPerFrame,
+                              scrollX: scrollX,
                               isSelected: isLayerSelected || editorState.selectedTimelineProperty == TimelinePropertySelection(layerID: row.layerID, path: path),
                               editorState: editorState)
 
@@ -39,6 +42,7 @@ struct TrackRow: View {
                                     path: path,
                                     duration: duration,
                                     pointsPerFrame: pointsPerFrame,
+                                    scrollX: scrollX,
                                     isTrackSelected: isLayerSelected,
                                     editorState: editorState,
                                     perform: perform,
@@ -55,6 +59,7 @@ private struct TimeRangeTrackView: View {
     let core: MotionDocumentCore
     let layerID: UInt64
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
     let isSelected: Bool
     let editorState: EditorState
 
@@ -70,8 +75,8 @@ private struct TimeRangeTrackView: View {
 
         ZStack(alignment: .topLeading) {
             if let firstFrame, let lastFrame, firstFrame < lastFrame {
-                let startX = timelineX(for: firstFrame, pointsPerFrame: pointsPerFrame)
-                let endX = timelineX(for: lastFrame, pointsPerFrame: pointsPerFrame)
+                let startX = trackLeadingInset + timelineX(for: firstFrame, pointsPerFrame: pointsPerFrame) - scrollX
+                let endX = trackLeadingInset + timelineX(for: lastFrame, pointsPerFrame: pointsPerFrame) - scrollX
                 let spanWidth = max(endX - startX, 2)
                 TimeRangeBarBody(isSelected: isSelected)
                     .frame(width: spanWidth, height: barHeight)
@@ -94,6 +99,7 @@ private struct PropertyTrackView: View {
     let path: String
     let label: String
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
     let isSelected: Bool
     let editorState: EditorState
 
@@ -106,8 +112,8 @@ private struct PropertyTrackView: View {
 
         ZStack(alignment: .topLeading) {
             if let firstFrame, let lastFrame, firstFrame < lastFrame {
-                let startX = timelineX(for: firstFrame, pointsPerFrame: pointsPerFrame)
-                let endX = timelineX(for: lastFrame, pointsPerFrame: pointsPerFrame)
+                let startX = trackLeadingInset + timelineX(for: firstFrame, pointsPerFrame: pointsPerFrame) - scrollX
+                let endX = trackLeadingInset + timelineX(for: lastFrame, pointsPerFrame: pointsPerFrame) - scrollX
                 let spanWidth = max(endX - startX, 2)
                 PropertyTrackBar(label: label, isSelected: isSelected)
                     .frame(width: spanWidth, height: propertyRowHeight - 8)
@@ -194,6 +200,7 @@ private struct ManualKeyframeTrackView: View {
     let path: String
     let duration: Int64
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
     let isTrackSelected: Bool
     let editorState: EditorState
     let perform: (String, () -> Void) -> Void
@@ -212,6 +219,7 @@ private struct ManualKeyframeTrackView: View {
                                           path: path,
                                           segment: segment,
                                           pointsPerFrame: pointsPerFrame,
+                                          scrollX: scrollX,
                                           isTrackSelected: isTrackSelected,
                                           editorState: editorState)
             }
@@ -219,6 +227,7 @@ private struct ManualKeyframeTrackView: View {
                 KeyframeDiamond(keyframe: keyframe,
                                 duration: duration,
                                 pointsPerFrame: pointsPerFrame,
+                                scrollX: scrollX,
                                 isSelected: isKeyframeSelected(keyframe.frame))
                 { from, to in
                     core.moveKeyframe(entityID: layerID, path: path, from: from, to: to)
@@ -268,13 +277,14 @@ private struct KeyframeConnectionSegment: View {
     let path: String
     let segment: KeyframeSegment
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
     let isTrackSelected: Bool
     let editorState: EditorState
     @State private var isHovering = false
 
     var body: some View {
-        let startX = timelineX(for: segment.start.frame, pointsPerFrame: pointsPerFrame)
-        let endX = timelineX(for: segment.end.frame, pointsPerFrame: pointsPerFrame)
+        let startX = trackLeadingInset + timelineX(for: segment.start.frame, pointsPerFrame: pointsPerFrame) - scrollX
+        let endX = trackLeadingInset + timelineX(for: segment.end.frame, pointsPerFrame: pointsPerFrame) - scrollX
         let width = max(endX - startX, 2)
         let centerY = propertyRowHeight / 2
         let selected = isSelected || isTrackSelected
@@ -333,24 +343,54 @@ struct RulerCanvas: View {
     let duration: Int64
     let frameRate: Double
     let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
+    let contentInset: CGFloat
 
     var body: some View {
-        Canvas { context, _ in
+        Canvas { context, size in
             let total = Int(duration)
             let second = max(Int(frameRate.rounded()), 1)
-            let step = max(second / 2, 1)
-            for frame in stride(from: 0, through: total, by: step) {
-                let x = timelineX(for: Int64(frame), pointsPerFrame: pointsPerFrame)
-                let isSecond = frame % second == 0
+            let majorStep = rulerMajorStep(pointsPerFrame: pointsPerFrame)
+            let minorStep = max(majorStep / 5, 1)
+            let visibleTrackWidth = max(0, size.width - contentInset)
+            let firstFrame = max(0, Int(floor(scrollX / pointsPerFrame)))
+            let lastFrame = min(total, Int(ceil((scrollX + visibleTrackWidth) / pointsPerFrame)) + minorStep)
+            let firstTick = firstFrame + (minorStep - firstFrame % minorStep) % minorStep
+            for frame in stride(from: firstTick, through: lastFrame, by: minorStep) {
+                let x = contentInset + timelineX(for: Int64(frame), pointsPerFrame: pointsPerFrame) - scrollX
+                guard x >= contentInset, x <= size.width else { continue }
+                let isMajor = frame % majorStep == 0
                 var tick = Path()
-                tick.move(to: CGPoint(x: x, y: isSecond ? 8 : 14))
+                tick.move(to: CGPoint(x: x, y: isMajor ? 8 : 15))
                 tick.addLine(to: CGPoint(x: x, y: 22))
-                context.stroke(tick, with: .color(.secondary), lineWidth: 1)
-                if isSecond {
-                    context.draw(Text("\(frame / second)s").font(.system(size: 9)),
-                                 at: CGPoint(x: x + 10, y: 8), anchor: .leading)
+                context.stroke(tick, with: .color(.secondary), lineWidth: isMajor ? 1 : 0.5)
+                if isMajor {
+                    context.draw(Text(rulerLabel(frame: frame, second: second)).font(.system(size: 9)),
+                                 at: CGPoint(x: x + 8, y: 8), anchor: .leading)
                 }
             }
         }
+    }
+
+    private func rulerMajorStep(pointsPerFrame: CGFloat) -> Int {
+        let targetFrames = max(1, Int((80 / max(pointsPerFrame, 1)).rounded()))
+        var scale = 1
+        while scale * 10 < targetFrames {
+            scale *= 10
+        }
+        for multiplier in [1, 2, 5, 10] {
+            let step = multiplier * scale
+            if step >= targetFrames {
+                return step
+            }
+        }
+        return 10 * scale
+    }
+
+    private func rulerLabel(frame: Int, second: Int) -> String {
+        if frame % second == 0 {
+            return "\(frame / second)s"
+        }
+        return "\(frame)f"
     }
 }

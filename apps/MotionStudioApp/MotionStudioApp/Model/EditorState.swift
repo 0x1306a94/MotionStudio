@@ -78,4 +78,8 @@ final class EditorState {
     var isPlaying = false
 
     var previewBackdrop: PreviewBackdrop = .transparent
+
+    var timelinePointsPerFrame: Double = 6
+
+    var timelineScrollX: Double = 0
 }

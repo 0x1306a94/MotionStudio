@@ -7,7 +7,10 @@
 
 import SwiftUI
 
+let minTimelinePointsPerFrame: CGFloat = 1
 let pixelsPerFrame: CGFloat = 6
+let maxTimelinePointsPerFrame: CGFloat = 48
+let timelineZoomStep: CGFloat = 1.25
 let layerRowHeight: CGFloat = 30
 let propertyRowHeight: CGFloat = 24
 let rulerHeight: CGFloat = 24
