@@ -159,7 +159,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         view.addGestureRecognizer(doubleTapGesture)
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasTap(_:)))
-        tapGesture.require(toFail: doubleTapGesture)
         view.addGestureRecognizer(tapGesture)
 
         let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handleCanvasPinch(_:)))

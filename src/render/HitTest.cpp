@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <vector>
 
 #include "MotionStudio/model/FillRule.h"
@@ -115,8 +116,35 @@ bool ContainsPoint(const std::vector<Vec2> &points, FillRule fillRule, Vec2 poin
     return winding != 0;
 }
 
-bool HitTestShapeItem(const EvaluatedShapeItem &item, Vec2 point, float tolerance) {
-    const std::vector<Vec2> points = FlattenPath(item.path);
+void ExpandBounds(const std::vector<Vec2> &points, Vec2 &minPoint, Vec2 &maxPoint) {
+    for (Vec2 point : points) {
+        minPoint.x = std::min(minPoint.x, point.x);
+        minPoint.y = std::min(minPoint.y, point.y);
+        maxPoint.x = std::max(maxPoint.x, point.x);
+        maxPoint.y = std::max(maxPoint.y, point.y);
+    }
+}
+
+void ExpandBounds(const std::vector<Vec2> &points, float padding, Vec2 &minPoint, Vec2 &maxPoint) {
+    for (Vec2 point : points) {
+        minPoint.x = std::min(minPoint.x, point.x - padding);
+        minPoint.y = std::min(minPoint.y, point.y - padding);
+        maxPoint.x = std::max(maxPoint.x, point.x + padding);
+        maxPoint.y = std::max(maxPoint.y, point.y + padding);
+    }
+}
+
+bool BoundsContain(Vec2 minPoint, Vec2 maxPoint, Vec2 point) {
+    return point.x >= minPoint.x && point.x <= maxPoint.x && point.y >= minPoint.y &&
+        point.y <= maxPoint.y;
+}
+
+struct FlattenedShapeItem {
+    const EvaluatedShapeItem *item = nullptr;
+    std::vector<Vec2> points;
+};
+
+bool HitTestShapeItem(const EvaluatedShapeItem &item, const std::vector<Vec2> &points, Vec2 point, float tolerance) {
     const float strokeTolerance = std::max(tolerance, item.strokeWidth * 0.5f + tolerance);
     if (item.isStroke) {
         return IsNearPolyline(points, item.path.closed, point, strokeTolerance);
@@ -127,15 +155,6 @@ bool HitTestShapeItem(const EvaluatedShapeItem &item, Vec2 point, float toleranc
     return IsNearPolyline(points, item.path.closed, point, tolerance);
 }
 
-void ExpandBounds(const std::vector<Vec2> &points, Vec2 &minPoint, Vec2 &maxPoint) {
-    for (Vec2 point : points) {
-        minPoint.x = std::min(minPoint.x, point.x);
-        minPoint.y = std::min(minPoint.y, point.y);
-        maxPoint.x = std::max(maxPoint.x, point.x);
-        maxPoint.y = std::max(maxPoint.y, point.y);
-    }
-}
-
 }  // namespace
 
 bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
@@ -143,8 +162,31 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
         return false;
     }
     const float safeTolerance = std::max(tolerance, 0.0f);
+    Vec2 minPoint{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+    Vec2 maxPoint{std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
+    bool hasBounds = false;
+    std::vector<FlattenedShapeItem> flattenedItems;
+    flattenedItems.reserve(layer.shapeItems.size());
+
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
-        if (HitTestShapeItem(item, point, safeTolerance)) {
+        FlattenedShapeItem flattened;
+        flattened.item = &item;
+        flattened.points = FlattenPath(item.path);
+        if (flattened.points.empty()) {
+            continue;
+        }
+        const float padding = item.isStroke ? item.strokeWidth * 0.5f + safeTolerance : safeTolerance;
+        ExpandBounds(flattened.points, padding, minPoint, maxPoint);
+        hasBounds = true;
+        flattenedItems.push_back(std::move(flattened));
+    }
+
+    if (!hasBounds || !BoundsContain(minPoint, maxPoint, point)) {
+        return false;
+    }
+
+    for (const FlattenedShapeItem &flattened : flattenedItems) {
+        if (flattened.item != nullptr && HitTestShapeItem(*flattened.item, flattened.points, point, safeTolerance)) {
             return true;
         }
     }
