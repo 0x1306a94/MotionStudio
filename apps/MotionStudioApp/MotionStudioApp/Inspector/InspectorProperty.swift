@@ -31,6 +31,24 @@ enum TransformProperty: String, CaseIterable {
     }
 }
 
+enum ShapeProperty: String, CaseIterable {
+    case size
+    case cornerRadius
+
+    var path: String {
+        rawValue
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .size:
+            "Size"
+        case .cornerRadius:
+            "Corner Radius"
+        }
+    }
+}
+
 enum TransformField {
     case positionX
     case positionY

@@ -145,7 +145,8 @@ bool ms_layer_locked(MSDocument *document, uint64_t layerId);
 
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
-// path: dot-separated property path ("transform.position", "elements[0].color").
+// path: dot-separated property path. Layer examples: "transform.position", "size".
+// ShapeElement examples: "color", "opacity".
 
 // Value type tag (MS_VALUE_*), -1 when the property does not exist.
 int ms_property_type(MSDocument *document, uint64_t entityId, const char *path);

@@ -13,6 +13,7 @@ class Document;
 // Property path that locates an Animatable<T> within an entity.
 // Syntax (dot-separated segments, array segments written as name[index]):
 //   Layer:         "transform.position" / "content.text"
+//                  "size" (ShapeContent; resolves against the primary geometry element)
 //                  "elements[0].color" (ShapeContent; groups nest via "elements[i]")
 //   ShapeElement:  "color" / "path" / "width" ... (entityId points directly at the element)
 struct PropertyPath {

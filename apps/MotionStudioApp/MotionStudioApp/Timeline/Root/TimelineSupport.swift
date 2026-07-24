@@ -21,7 +21,7 @@ let maxLayerColumnWidth: CGFloat = 400
 let layerActionIconSize: CGFloat = 16
 let layerActionButtonSize: CGFloat = 22
 let timelineEndpointHandleWidth: CGFloat = 11
-let timelineShapeSizePath = "elements[0].size"
+let timelineShapeSizePath = ShapeProperty.size.path
 
 func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) -> [String] {
     var paths = TransformProperty.allCases
@@ -62,7 +62,7 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: timelineShapeSizePath,
-                                            label: "Size"))
+                                            label: ShapeProperty.size.actionLabel))
         }
     }
     return rows

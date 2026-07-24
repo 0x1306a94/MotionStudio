@@ -9,6 +9,7 @@
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeFill.h"
 #include "MotionStudio/model/ShapeGroup.h"
+#include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/model/TextContent.h"
 
@@ -24,6 +25,7 @@ using motion::ResolveAnimatable;
 using motion::ShapeContent;
 using motion::ShapeFill;
 using motion::ShapeGroup;
+using motion::ShapeRect;
 using motion::ShapeStroke;
 
 TEST(ParsePropertyPathTest, SimpleDottedPath) {
@@ -100,6 +102,23 @@ TEST(ResolveAnimatableTest, ResolvesLayerElementsPath) {
     AnimatableBase *resolved =
         ResolveAnimatable(scene.document, {scene.layer->id, "elements[0].color"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.fill->color));
+}
+
+TEST(ResolveAnimatableTest, ResolvesPrimaryShapePropertyFromLayer) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
+
+    auto rectElement = std::make_unique<ShapeRect>();
+    ShapeRect *rect = rectElement.get();
+    shapeContent->elements.push_back(std::move(rectElement));
+    document.refreshEntityIndex();
+
+    AnimatableBase *size = ResolveAnimatable(document, {layer->id, "size"});
+    AnimatableBase *cornerRadius = ResolveAnimatable(document, {layer->id, "cornerRadius"});
+    EXPECT_EQ(size, static_cast<AnimatableBase *>(&rect->size));
+    EXPECT_EQ(cornerRadius, static_cast<AnimatableBase *>(&rect->cornerRadius));
 }
 
 TEST(ResolveAnimatableTest, ResolvesNestedGroupPath) {

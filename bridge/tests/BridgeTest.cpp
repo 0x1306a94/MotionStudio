@@ -246,7 +246,8 @@ TEST(BridgeCommandTest, Vec2AndColorProperties) {
     EXPECT_FLOAT_EQ(x, 120.0f);
     EXPECT_FLOAT_EQ(y, 340.0f);
 
-    // Shape fill color lives on the second element of the shape content.
+    // Existing model still stores the default fill as shape content; layer
+    // styles will replace this as the editor-facing model.
     ms_command_set_static_color(document, layerId, "elements[1].color", 0.1f, 0.2f, 0.3f, 1.0f);
     float r = 0;
     float g = 0;

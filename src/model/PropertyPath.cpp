@@ -224,6 +224,13 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             return resolveShapeSegments(shapeContent->elements[size_t(first.index)].get(),
                                         segments, 1);
         }
+        if (segments.size() == 1 && layer->content->type() == LayerType::Shape) {
+            auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
+            if (shapeContent->elements.empty()) {
+                return nullptr;
+            }
+            return resolveShapeProperty(shapeContent->elements.front().get(), first.name);
+        }
         if (first.name == "content" && segments.size() == 2) {
             if (layer->content->type() != LayerType::Text) {
                 return nullptr;

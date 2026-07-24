@@ -5,8 +5,8 @@
 
 import SwiftUI
 
-let shapeSizePath = "elements[0].size"
-let shapeCornerRadiusPath = "elements[0].cornerRadius"
+let shapeSizePath = ShapeProperty.size.path
+let shapeCornerRadiusPath = ShapeProperty.cornerRadius.path
 
 /// Shape geometry editor for rect/ellipse layers: width/height fields with
 /// per-property "add keyframe at playhead" buttons.
