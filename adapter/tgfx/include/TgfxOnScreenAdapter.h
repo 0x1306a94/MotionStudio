@@ -28,8 +28,7 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
     void drawPreviewBackdrop() override;
     // Fits the scene into the drawable (AE Fit Up to 100%: letterboxed,
     // centered, never scaled above 1:1), then paints composition background.
-    void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
-                      float cornerRadius) override;
+    void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor, float cornerRadius) override;
     bool compositionBackgroundSrcOver() const override;
 
   private:

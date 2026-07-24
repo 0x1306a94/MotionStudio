@@ -11,6 +11,8 @@ if(CMAKE_GENERATOR MATCHES "Xcode")
   include("${CMAKE_SOURCE_DIR}/cmake/apple_xcode.cmake")
 endif()
 
+include("${CMAKE_SOURCE_DIR}/cmake/Utils.cmake")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

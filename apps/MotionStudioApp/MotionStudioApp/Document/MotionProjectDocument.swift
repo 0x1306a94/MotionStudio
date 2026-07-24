@@ -37,11 +37,11 @@ final class MotionProjectDocument: UIDocument {
         return MotionProjectDocument(fileURL: url, isTemporaryDraft: true)
     }
 
-    override func contents(forType typeName: String) throws -> Any {
+    override func contents(forType _: String) throws -> Any {
         try packageFileWrapper()
     }
 
-    override func load(fromContents contents: Any, ofType typeName: String?) throws {
+    override func load(fromContents contents: Any, ofType _: String?) throws {
         if let data = contents as? Data {
             modelDocument = try MotionProjectState(data: data)
             return

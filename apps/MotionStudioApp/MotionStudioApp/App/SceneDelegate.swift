@@ -25,7 +25,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         return openingDocument?.saveURL ?? securityScopedProjectURL
     }
 
-    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+    func scene(_ scene: UIScene, willConnectTo _: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else {
             return
         }
@@ -54,7 +54,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         configureWindowSize(for: windowScene, role: role)
     }
 
-    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    func scene(_: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         MotionStudioEditorRouter.openProjectURLs(URLContexts.map(\.url))
     }
 
@@ -211,7 +211,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         #endif
     }
 
-    func sceneDidDisconnect(_ scene: UIScene) {
+    func sceneDidDisconnect(_: UIScene) {
         (window?.rootViewController as? EditorViewController)?.saveBeforeSceneDisconnect()
         if let securityScopedProjectURL {
             securityScopedProjectURL.stopAccessingSecurityScopedResource()
@@ -230,7 +230,7 @@ private final class EditorSceneLoadingViewController: UIViewController {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 

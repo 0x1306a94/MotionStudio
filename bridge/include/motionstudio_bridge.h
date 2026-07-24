@@ -62,6 +62,11 @@ enum {
     MS_EASING_HOLD = 2,
 };
 
+enum {
+    MS_PREVIWER_BACKDROP_BLACK = 0,
+    MS_PREVIWER_BACKDROP_TRANSPARENT = 1,
+};
+
 /* ============================ lifecycle ============================ */
 
 // Creates a new document containing one default composition
@@ -112,8 +117,7 @@ int ms_composition_height(MSDocument *document, uint64_t compositionId);
 int ms_composition_frame_rate_num(MSDocument *document, uint64_t compositionId);
 int ms_composition_frame_rate_den(MSDocument *document, uint64_t compositionId);
 int ms_composition_layer_count(MSDocument *document, uint64_t compositionId);
-void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r,
-                                     float *g, float *b, float *a);
+void ms_composition_background_color(MSDocument *document, uint64_t compositionId, float *r, float *g, float *b, float *a);
 float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId);
 // Composition name (malloc'd).
 char *ms_composition_name(MSDocument *document, uint64_t compositionId);
@@ -146,66 +150,44 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
 // Static value accessors. Return zero/fill nothing when the property does not
 // exist or the type does not match.
 float ms_property_static_float(MSDocument *document, uint64_t entityId, const char *path);
-void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x,
-                             float *y);
-void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r,
-                              float *g, float *b, float *a);
+void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y);
+void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r, float *g, float *b, float *a);
 
 // Keyframe accessors (index into the ascending-time keyframe list).
 int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path);
-int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path,
-                                     int index);
-float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, const char *path,
-                                    int index);
-void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path,
-                                  int index, float *x, float *y);
+int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path, int index);
+float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, const char *path, int index);
+void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *x, float *y);
 
 // Easing of the keyframe at index. Returns the easing type tag (MS_EASING_*);
 // bezier control points are written to the out parameters (only meaningful
 // for MS_EASING_BEZIER). Returns -1 when the keyframe does not exist.
-int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path,
-                                   int index, float *inX, float *inY, float *outX, float *outY);
+int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY);
 
 // Value of the property evaluated at the given frame.
-float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path,
-                                 int64_t frame);
-void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path,
-                               int64_t frame, float *x, float *y);
+float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
+void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y);
 
 /* ============================ commands ============================ */
 // Every function below executes a command through the document's undo
 // manager, so each call is undoable.
 
-void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path,
-                                 float value);
-void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x,
-                                float y);
-void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path,
-                                 float r, float g, float b, float a);
-void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId,
-                                                 float r, float g, float b, float a);
-void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId,
-                                              float cornerRadius);
-void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId,
-                                     int width, int height);
-void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId,
-                                         int64_t duration);
-void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId,
-                                           int frameRateNum, int frameRateDen);
+void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value);
+void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x, float y);
+void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a);
+void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a);
+void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId, float cornerRadius);
+void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId, int width, int height);
+void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId, int64_t duration);
+void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId, int frameRateNum, int frameRateDen);
 
 // Adds a keyframe holding the property's given value at frame.
-void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path,
-                                   int64_t frame, float value);
-void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path,
-                                  int64_t frame, float x, float y);
-void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path,
-                                int64_t frame);
-void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path,
-                              int64_t oldFrame, int64_t newFrame);
+void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value);
+void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
+void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
+void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_BEZIER.
-void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path,
-                           int64_t frame, int easingType, float inX, float inY, float outX,
-                           float outY);
+void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY);
 
 // Adds a rectangle/ellipse shape layer (200x200, centered on the composition,
 // default fill, spanning the full composition duration).
@@ -213,10 +195,11 @@ void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId);
 uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t compositionId);
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);
-void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex,
-                           int toIndex);
+void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked);
+
+#if defined(__APPLE__)
 
 /* ============================ canvas (Apple platforms) ============================ */
 
@@ -228,22 +211,19 @@ void ms_canvas_destroy(MSCanvas *canvas);
 
 // Evaluates the composition at frame and presents the result into the
 // canvas's MTKView drawable.
-void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
-                          int64_t frame);
+void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame);
 // Same as ms_canvas_draw_frame, also writing per-stage CPU timings when
 // profileOut is non-null. Durations are milliseconds measured from this call
 // boundary through evaluate/build/adapter playback.
-void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
-                                   int64_t frame, MSCanvasFrameProfile *profileOut);
+void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame, MSCanvasFrameProfile *profileOut);
 // Fractional-frame variant for high-refresh live preview. The project timeline
 // and keyframes remain integer-framed; this samples between frames.
-void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document,
-                                           uint64_t compositionId, double frameTime,
-                                           MSCanvasFrameProfile *profileOut);
+void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, MSCanvasFrameProfile *profileOut);
 
 // Preview chrome behind the composition: 0 = solid black (default), 1 =
 // transparency checkerboard. Ignored when canvas is null.
 void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop);
+#endif
 
 #ifdef __cplusplus
 }

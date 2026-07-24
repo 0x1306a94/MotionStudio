@@ -1,28 +1,47 @@
 include(GoogleTest)
 
-add_executable(core_tests
-    core/VersionTest.cpp
-    common/BezierPathTest.cpp
-    common/EntityIdTest.cpp
-    common/ExpectedTest.cpp
-    common/MathTest.cpp
-    common/TimeTest.cpp
-    animation/AnimatableTest.cpp
-    animation/EasingCssTest.cpp
-    animation/EasingTest.cpp
-    animation/InterpolatorTest.cpp
-    animation/PathResampleTest.cpp
-    model/DocumentTest.cpp
-    model/LayerTest.cpp
-    model/PropertyPathTest.cpp
-    render/CommandBuilderTest.cpp
-    render/PrecompTest.cpp
-    render/SceneEvaluatorTest.cpp
-    undo/CommandsTest.cpp
-    undo/UndoManagerTest.cpp
-    serialization/RandomOpsTest.cpp
-    serialization/SerializerTest.cpp
+
+add_files_by_extension(COMMON_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
 )
+
+add_files_by_extension(CORE_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+)
+
+add_files_by_extension(MODEL_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/model
+)
+
+add_files_by_extension(SERIALIZATION_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/serialization
+)
+
+add_files_by_extension(RENDER_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/render
+)
+
+add_files_by_extension(ANIMATION_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/animation
+)
+
+add_files_by_extension(UNDO_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/undo
+)
+
+list(APPEND TESTS_SOURCES
+    ${COMMON_TESTS_SOURCES}
+    ${CORE_TESTS_SOURCES}
+    ${MODEL_TESTS_SOURCES}
+    ${SERIALIZATION_TESTS_SOURCES}
+    ${RENDER_TESTS_SOURCES}
+    ${ANIMATION_TESTS_SOURCES}
+    ${UNDO_TESTS_SOURCES}
+)
+add_executable(core_tests ${TESTS_SOURCES})
+
+add_source_group(TESTS_SOURCES ${CMAKE_CURRENT_LIST_DIR} "Sources")
+
 # nlohmann/json 仅测试用来校验 JSON 产物结构，非 core 公共依赖。
 target_link_libraries(core_tests PRIVATE core GTest::gtest_main nlohmann_json::nlohmann_json)
 gtest_discover_tests(core_tests)

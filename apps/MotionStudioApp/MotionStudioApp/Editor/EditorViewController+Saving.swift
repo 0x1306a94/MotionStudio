@@ -58,9 +58,9 @@ extension EditorViewController {
                 url.stopAccessingSecurityScopedResource()
             }
             if success {
-                self.markSaved(at: url)
+                markSaved(at: url)
             } else {
-                self.presentSaveError(CocoaError(.fileWriteUnknown))
+                presentSaveError(CocoaError(.fileWriteUnknown))
             }
             completion?(success)
         }

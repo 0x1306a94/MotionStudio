@@ -1,55 +1,49 @@
-add_library(core STATIC
-    core/Version.cpp
-    common/BezierPath.cpp
-    common/Color.cpp
-    common/EntityId.cpp
-    common/Mat3.cpp
-    common/Time.cpp
-    common/Vec2.cpp
-    animation/Animatable.cpp
-    animation/Easing.cpp
-    animation/Interpolator.cpp
-    animation/PathResample.cpp
-    model/Document.cpp
-    model/EntityIndex.cpp
-    model/ImageContent.cpp
-    model/Layer.cpp
-    model/LayerContent.cpp
-    model/NullContent.cpp
-    model/PrecompContent.cpp
-    model/PropertyPath.cpp
-    model/ShapeContent.cpp
-    model/ShapeElement.cpp
-    model/ShapeEllipse.cpp
-    model/ShapeFill.cpp
-    model/ShapeGroup.cpp
-    model/ShapePath.cpp
-    model/ShapeRect.cpp
-    model/ShapeStroke.cpp
-    model/ShapeTrimPath.cpp
-    model/TextContent.cpp
-    render/CommandBuilder.cpp
-    render/RenderAdapter.cpp
-    render/SceneEvaluator.cpp
-    undo/AddKeyframeCommand.cpp
-    undo/AddLayerCommand.cpp
-    undo/CommandHelpers.cpp
-    undo/CompositeCommand.cpp
-    undo/MoveKeyframeCommand.cpp
-    undo/MoveLayerCommand.cpp
-    undo/RemoveKeyframeCommand.cpp
-    undo/RemoveLayerCommand.cpp
-    undo/SetEasingCommand.cpp
-    undo/SetCompositionBackgroundColorCommand.cpp
-    undo/SetCompositionCornerRadiusCommand.cpp
-    undo/SetLayerLockedCommand.cpp
-    undo/SetLayerVisibleCommand.cpp
-    undo/SetStaticValueCommand.cpp
-    undo/UndoManager.cpp
-    serialization/Dto.cpp
-    serialization/SchemaMigrator.cpp
-    serialization/Serializer.cpp
+
+add_files_by_extension(COMMON_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
 )
+
+add_files_by_extension(CORE_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/core
+)
+
+add_files_by_extension(MODEL_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/model
+)
+
+add_files_by_extension(RENDER_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/render
+)
+
+add_files_by_extension(ANIMATION_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/animation
+)
+
+add_files_by_extension(UNDO_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/undo
+)
+
+add_files_by_extension(SERIALIZATION_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/serialization
+)
+
+add_files_by_extension(PUBLIC_HEADERS ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/MotionStudio
+)
+
+list(APPEND CORE_SOURCES
+    ${COMMON_SOURCES}
+    ${CORE_SOURCES}
+    ${MODEL_SOURCES}
+    ${RENDER_SOURCES}
+    ${ANIMATION_SOURCES}
+    ${UNDO_SOURCES}
+    ${SERIALIZATION_SOURCES}
+)
+add_library(core STATIC ${PUBLIC_HEADERS} ${CORE_SOURCES})
+add_source_group(PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/../include/MotionStudio "Public Headers")
+add_source_group(CORE_SOURCES ${CMAKE_CURRENT_LIST_DIR} "Sources")
+
 target_include_directories(core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_include_directories(core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # nlohmann/json 仅供 core 内部实现使用，不经公共头暴露。

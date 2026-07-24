@@ -33,6 +33,9 @@
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
+#include "DocumentLock.h"
+#include "MSDocument.h"
+
 using motion::Animatable;
 using motion::AnimatableBase;
 using motion::AnimatableType;
@@ -55,35 +58,7 @@ using motion::ShapeRect;
 using motion::UndoManager;
 using motion::Vec2;
 
-// The document model is only safe for single-threaded use, but callers reach
-// it from multiple threads: UI edits on the main actor and document
-// serialization on a background actor (ReferenceFileDocument snapshots run
-// off the main actor). The mutex serializes every entry point.
-struct MSDocument {
-    std::mutex mutex;
-    std::unique_ptr<Document> document;
-    UndoManager undoManager;
-};
-
 namespace {
-
-using ProfileClock = std::chrono::steady_clock;
-
-double Milliseconds(ProfileClock::time_point start, ProfileClock::time_point end) {
-    return std::chrono::duration<double, std::milli>(end - start).count();
-}
-
-// Locks the document's mutex for the duration of one C API call. A null
-// handle leaves the lock unheld; callers still null-check afterwards.
-struct DocumentLock {
-    std::unique_lock<std::mutex> lock;
-
-    explicit DocumentLock(MSDocument *handle) {
-        if (handle != nullptr) {
-            lock = std::unique_lock<std::mutex>(handle->mutex);
-        }
-    }
-};
 
 Document *Doc(MSDocument *handle) {
     return handle != nullptr ? handle->document.get() : nullptr;
@@ -153,7 +128,7 @@ void Execute(MSDocument *handle, std::unique_ptr<motion::Command> command) {
     if (handle == nullptr) {
         return;
     }
-    handle->undoManager.execute(*handle->document, std::move(command));
+    handle->undoManager->execute(*handle->document, std::move(command));
 }
 
 PropertyPath MakePath(uint64_t entityId, const char *path) {
@@ -223,6 +198,8 @@ uint64_t AddShapeLayer(MSDocument *handle, uint64_t compositionId, bool ellipse)
 MSDocument *ms_document_create(void) {
     auto *handle = new MSDocument();
     handle->document = std::make_unique<Document>();
+    handle->undoManager = std::make_unique<UndoManager>();
+
     auto composition = std::make_unique<Composition>();
     composition->name = "Composition 1";
     composition->duration = 150;  // 5 seconds at the default 30 fps
@@ -267,52 +244,52 @@ void ms_string_free(char *string) {
 
 bool ms_document_undo(MSDocument *document) {
     DocumentLock guard(document);
-    if (document == nullptr || !document->undoManager.canUndo()) {
+    if (document == nullptr || !document->undoManager->canUndo()) {
         return false;
     }
-    document->undoManager.undo(*document->document);
+    document->undoManager->undo(*document->document);
     return true;
 }
 
 bool ms_document_redo(MSDocument *document) {
     DocumentLock guard(document);
-    if (document == nullptr || !document->undoManager.canRedo()) {
+    if (document == nullptr || !document->undoManager->canRedo()) {
         return false;
     }
-    document->undoManager.redo(*document->document);
+    document->undoManager->redo(*document->document);
     return true;
 }
 
 bool ms_document_can_undo(MSDocument *document) {
     DocumentLock guard(document);
-    return document != nullptr && document->undoManager.canUndo();
+    return document != nullptr && document->undoManager->canUndo();
 }
 
 bool ms_document_can_redo(MSDocument *document) {
     DocumentLock guard(document);
-    return document != nullptr && document->undoManager.canRedo();
+    return document != nullptr && document->undoManager->canRedo();
 }
 
 char *ms_document_undo_description(MSDocument *document) {
     DocumentLock guard(document);
-    if (document == nullptr || !document->undoManager.canUndo()) {
+    if (document == nullptr || !document->undoManager->canUndo()) {
         return nullptr;
     }
-    return strdup(document->undoManager.undoDescription().c_str());
+    return strdup(document->undoManager->undoDescription().c_str());
 }
 
 char *ms_document_redo_description(MSDocument *document) {
     DocumentLock guard(document);
-    if (document == nullptr || !document->undoManager.canRedo()) {
+    if (document == nullptr || !document->undoManager->canRedo()) {
         return nullptr;
     }
-    return strdup(document->undoManager.redoDescription().c_str());
+    return strdup(document->undoManager->redoDescription().c_str());
 }
 
 void ms_document_end_merge_group(MSDocument *document) {
     DocumentLock guard(document);
     if (document != nullptr) {
-        document->undoManager.endMergeGroup();
+        document->undoManager->endMergeGroup();
     }
 }
 
@@ -514,8 +491,7 @@ void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char
     }
 }
 
-void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r,
-                              float *g, float *b, float *a) {
+void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r, float *g, float *b, float *a) {
     DocumentLock guard(document);
     const Animatable<Color> *property = AsColor(FindProperty(document, entityId, path));
     if (property == nullptr) {
@@ -573,8 +549,7 @@ const Keyframe<T> *KeyframeAt(const Animatable<T> *property, int index) {
     return &property->keyframes()[size_t(index)];
 }
 
-int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path,
-                                     int index) {
+int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path, int index) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     const Keyframe<float> *floatKey = KeyframeAt(AsFloat(property), index);
@@ -592,16 +567,14 @@ int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, co
     return 0;
 }
 
-float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, const char *path,
-                                    int index) {
+float ms_property_keyframe_float_at(MSDocument *document, uint64_t entityId, const char *path, int index) {
     DocumentLock guard(document);
     const Keyframe<float> *keyframe =
         KeyframeAt(AsFloat(FindProperty(document, entityId, path)), index);
     return keyframe != nullptr ? keyframe->value : 0.0f;
 }
 
-void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path,
-                                  int index, float *x, float *y) {
+void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *x, float *y) {
     DocumentLock guard(document);
     const Keyframe<Vec2> *keyframe =
         KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
@@ -616,8 +589,7 @@ void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const
     }
 }
 
-int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path,
-                                   int index, float *inX, float *inY, float *outX, float *outY) {
+int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     const Easing *easing = nullptr;
@@ -651,15 +623,13 @@ int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, cons
     return int(easing->type);
 }
 
-float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path,
-                                 int64_t frame) {
+float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
     const Animatable<float> *property = AsFloat(FindProperty(document, entityId, path));
     return property != nullptr ? property->evaluate(FrameTime(frame)) : 0.0f;
 }
 
-void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path,
-                               int64_t frame, float *x, float *y) {
+void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y) {
     DocumentLock guard(document);
     const Animatable<Vec2> *property = AsVec2(FindProperty(document, entityId, path));
     if (property == nullptr) {
@@ -676,42 +646,32 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
 
 /* ============================ commands ============================ */
 
-void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path,
-                                 float value) {
+void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value)));
 }
 
-void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path,
-                                float x, float y) {
+void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x, float y) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Vec2{x, y})));
 }
 
-void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path,
-                                 float r, float g, float b, float a) {
+void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
 }
 
-void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId,
-                                                 float r, float g, float b, float a) {
+void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::SetCompositionBackgroundColorCommand>(
-                EntityId{compositionId}, Color{r, g, b, a}));
+    Execute(document, std::make_unique<motion::SetCompositionBackgroundColorCommand>(EntityId{compositionId}, Color{r, g, b, a}));
 }
 
-void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId,
-                                              float cornerRadius) {
+void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId, float cornerRadius) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::SetCompositionCornerRadiusCommand>(
-                EntityId{compositionId}, cornerRadius));
+    Execute(document, std::make_unique<motion::SetCompositionCornerRadiusCommand>(EntityId{compositionId}, cornerRadius));
 }
 
-void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId,
-                                     int width, int height) {
+void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId, int width, int height) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     if (composition == nullptr) {
@@ -722,13 +682,10 @@ void ms_command_set_composition_size(MSDocument *document, uint64_t compositionI
     settings.height = height;
     settings.duration = composition->duration;
     settings.frameRate = composition->frameRate;
-    Execute(document,
-            std::make_unique<motion::SetCompositionSettingsCommand>(
-                EntityId{compositionId}, settings));
+    Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
 }
 
-void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId,
-                                         int64_t duration) {
+void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId, int64_t duration) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     if (composition == nullptr) {
@@ -739,13 +696,10 @@ void ms_command_set_composition_duration(MSDocument *document, uint64_t composit
     settings.height = composition->height;
     settings.duration = FrameTime(duration);
     settings.frameRate = composition->frameRate;
-    Execute(document,
-            std::make_unique<motion::SetCompositionSettingsCommand>(
-                EntityId{compositionId}, settings));
+    Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
 }
 
-void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId,
-                                           int frameRateNum, int frameRateDen) {
+void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId, int frameRateNum, int frameRateDen) {
     DocumentLock guard(document);
     Composition *composition = FindComposition(document, compositionId);
     if (composition == nullptr || frameRateNum <= 0 || frameRateDen <= 0) {
@@ -756,44 +710,30 @@ void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compos
     settings.height = composition->height;
     settings.duration = composition->duration;
     settings.frameRate = {uint32_t(frameRateNum), uint32_t(frameRateDen)};
-    Execute(document,
-            std::make_unique<motion::SetCompositionSettingsCommand>(
-                EntityId{compositionId}, settings));
+    Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
 }
 
-void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path,
-                                   int64_t frame, float value) {
+void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::AddKeyframeCommand>(
-                MakePath(entityId, path),
-                motion::KeyframeData(MakeKeyframe(FrameTime(frame), value))));
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(FrameTime(frame), value))));
 }
 
-void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path,
-                                  int64_t frame, float x, float y) {
+void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::AddKeyframeCommand>(
-                MakePath(entityId, path),
-                motion::KeyframeData(MakeKeyframe(FrameTime(frame), Vec2{x, y}))));
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(FrameTime(frame), Vec2{x, y}))));
 }
 
-void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path,
-                                int64_t frame) {
+void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path), FrameTime(frame)));
 }
 
-void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path,
-                              int64_t oldFrame, int64_t newFrame) {
+void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveKeyframeCommand>(MakePath(entityId, path), FrameTime(oldFrame), FrameTime(newFrame)));
 }
 
-void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path,
-                           int64_t frame, int easingType, float inX, float inY, float outX,
-                           float outY) {
+void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetEasingCommand>(MakePath(entityId, path), FrameTime(frame), MakeEasing(easingType, inX, inY, outX, outY)));
 }
@@ -813,8 +753,7 @@ void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint6
     Execute(document, std::make_unique<motion::RemoveLayerCommand>(EntityId{compositionId}, EntityId{layerId}));
 }
 
-void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex,
-                           int toIndex) {
+void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, fromIndex, toIndex));
 }
@@ -828,91 +767,3 @@ void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool lo
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetLayerLockedCommand>(EntityId{layerId}, locked));
 }
-
-/* ============================ canvas ============================ */
-
-#if defined(__APPLE__)
-
-#include "MSCanvasInternal.h"
-#include "MotionStudio/render/CommandBuilder.h"
-#include "MotionStudio/render/SceneEvaluator.h"
-
-void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
-                          int64_t frame) {
-    ms_canvas_draw_frame_profiled(canvas, document, compositionId, frame, nullptr);
-}
-
-void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
-                                   int64_t frame, MSCanvasFrameProfile *profileOut) {
-    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId, double(frame),
-                                          profileOut);
-}
-
-void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document,
-                                           uint64_t compositionId, double frameTime,
-                                           MSCanvasFrameProfile *profileOut) {
-    MSCanvasFrameProfile profile{};
-    const auto totalStart = ProfileClock::now();
-    const auto lockStart = ProfileClock::now();
-    DocumentLock guard(document);
-    const auto lockEnd = ProfileClock::now();
-    profile.documentLockMs = Milliseconds(lockStart, lockEnd);
-
-    if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr) {
-        profile.totalMs = Milliseconds(totalStart, ProfileClock::now());
-        if (profileOut != nullptr) {
-            *profileOut = profile;
-        }
-        return;
-    }
-
-    const auto evaluateStart = ProfileClock::now();
-    auto result = motion::SceneEvaluator::EvaluatePreview(
-        *document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    const auto evaluateEnd = ProfileClock::now();
-    profile.sceneEvaluateMs = Milliseconds(evaluateStart, evaluateEnd);
-    if (!result.hasValue()) {
-        profile.totalMs = Milliseconds(totalStart, ProfileClock::now());
-        if (profileOut != nullptr) {
-            *profileOut = profile;
-        }
-        return;
-    }
-    const motion::SceneState &state = result.value();
-    profile.layerCount = state.layers.size();
-
-    const auto buildStart = ProfileClock::now();
-    const motion::DrawCommandList commands = motion::BuildCommands(state);
-    const auto buildEnd = ProfileClock::now();
-    profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
-    profile.drawCommandCount = commands.size();
-
-    const auto beginFrameStart = ProfileClock::now();
-    canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight,
-                                state.backgroundColor, state.cornerRadius);
-    const auto beginFrameEnd = ProfileClock::now();
-    profile.beginFrameMs = Milliseconds(beginFrameStart, beginFrameEnd);
-
-    const auto playCommandsStart = ProfileClock::now();
-    motion::PlayCommands(commands, *canvas->adapter);
-    const auto playCommandsEnd = ProfileClock::now();
-    profile.playCommandsMs = Milliseconds(playCommandsStart, playCommandsEnd);
-
-    const auto endFrameStart = ProfileClock::now();
-    canvas->adapter->endFrame();
-    const auto endFrameEnd = ProfileClock::now();
-    profile.endFrameMs = Milliseconds(endFrameStart, endFrameEnd);
-    const motion::TgfxEndFrameProfile &endFrameProfile = canvas->adapter->endFrameProfile();
-    profile.endFrameCanvasRestoreMs = endFrameProfile.canvasRestoreMs;
-    profile.endFramePresentMs = endFrameProfile.presentTargetMs;
-    profile.endFrameFlushSubmitMs = endFrameProfile.flushSubmitMs;
-    profile.endFrameDeviceUnlockMs = endFrameProfile.deviceUnlockMs;
-    profile.drewFrame = true;
-    profile.totalMs = Milliseconds(totalStart, endFrameEnd);
-
-    if (profileOut != nullptr) {
-        *profileOut = profile;
-    }
-}
-
-#endif

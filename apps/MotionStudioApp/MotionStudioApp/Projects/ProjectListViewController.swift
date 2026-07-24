@@ -25,11 +25,11 @@ private struct ProjectListItem {
     var identifier: String {
         switch kind {
         case .newDocument:
-            return "action:new"
+            "action:new"
         case .openFile:
-            return "action:open"
+            "action:open"
         case let .project(url):
-            return "project:\(url.absoluteString):\(title):\(subtitle)"
+            "project:\(url.absoluteString):\(title):\(subtitle)"
         }
     }
 }
@@ -260,9 +260,9 @@ extension ProjectListViewController: UICollectionViewDelegate {
         open(item)
     }
 
-    func collectionView(_ collectionView: UICollectionView,
+    func collectionView(_: UICollectionView,
                         contextMenuConfigurationForItemAt indexPath: IndexPath,
-                        point: CGPoint) -> UIContextMenuConfiguration?
+                        point _: CGPoint) -> UIContextMenuConfiguration?
     {
         guard let identifier = dataSource.itemIdentifier(for: indexPath),
               let item = itemByIdentifier[identifier],
@@ -289,7 +289,7 @@ extension ProjectListViewController: UICollectionViewDelegate {
 }
 
 extension ProjectListViewController: UIDocumentPickerDelegate {
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         guard let sourceURL = urls.first else { return }
         let shouldStopAccessing = sourceURL.startAccessingSecurityScopedResource()
         defer {
@@ -332,7 +332,7 @@ private final class ProjectListHeaderView: UICollectionReusableView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 
@@ -378,7 +378,7 @@ private final class ProjectCardCell: UICollectionViewCell {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 

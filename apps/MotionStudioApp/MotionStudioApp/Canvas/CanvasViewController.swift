@@ -54,7 +54,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 
@@ -162,7 +162,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     // MARK: - MTKViewDelegate
 
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+    func mtkView(_: MTKView, drawableSizeWillChange size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         requestDraw()
     }
@@ -183,9 +183,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
         guard let canvas else { return }
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
-        let profile = document.core.drawFrameProfiled(canvas: canvas,
-                                                      compositionID: compositionID,
-                                                      frameTime: previewFrame)
+        let profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
         logSlowFrame(profile)
         logDrawScheduling(syncToDrawMilliseconds: syncToDrawMilliseconds,
                           requestToDrawMilliseconds: requestToDrawMilliseconds,

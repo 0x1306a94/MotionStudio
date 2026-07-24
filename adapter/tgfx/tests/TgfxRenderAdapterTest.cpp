@@ -11,6 +11,7 @@
 #include "MotionStudio/model/ShapeStroke.h"
 #include "MotionStudio/render/CommandBuilder.h"
 #include "MotionStudio/render/SceneEvaluator.h"
+
 #include "TgfxRenderAdapter.h"
 
 using motion::BezierPath;

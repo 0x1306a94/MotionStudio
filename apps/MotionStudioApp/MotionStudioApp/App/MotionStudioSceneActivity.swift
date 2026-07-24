@@ -11,7 +11,7 @@ extension Notification.Name {
     static let motionStudioEditorSceneDidConnect = Notification.Name("MotionStudioEditorSceneDidConnect")
 }
 
-struct MotionStudioSceneActivity {
+enum MotionStudioSceneActivity {
     enum Request {
         case newProject
         case openProject(URL)
@@ -25,13 +25,13 @@ struct MotionStudioSceneActivity {
     private static let newProjectKind = "newProject"
     private static let openProjectKind = "openProject"
 
-#if targetEnvironment(macCatalyst)
-    private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = [.withSecurityScope]
-    private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
-#else
-    private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = []
-    private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = []
-#endif
+    #if targetEnvironment(macCatalyst)
+        private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = [.withSecurityScope]
+        private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = [.withSecurityScope]
+    #else
+        private static let bookmarkCreationOptions: URL.BookmarkCreationOptions = []
+        private static let bookmarkResolutionOptions: URL.BookmarkResolutionOptions = []
+    #endif
 
     static func newProjectActivity() -> NSUserActivity {
         let activity = NSUserActivity(activityType: editorActivityType)

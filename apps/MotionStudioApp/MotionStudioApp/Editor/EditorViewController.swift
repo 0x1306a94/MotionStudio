@@ -78,7 +78,7 @@ final class EditorViewController: UIViewController {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    required init?(coder _: NSCoder) {
         nil
     }
 
@@ -130,7 +130,7 @@ final class EditorViewController: UIViewController {
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         switch action {
         case #selector(saveCurrentDocument):
-            return hasUnsavedChanges
+            hasUnsavedChanges
         case #selector(saveDocumentAs),
              #selector(requestCloseWindow),
              #selector(addRectangleLayer),
@@ -140,9 +140,9 @@ final class EditorViewController: UIViewController {
              #selector(toggleInspectorPanel),
              #selector(renameCurrentProject),
              #selector(togglePlayback):
-            return true
+            true
         default:
-            return super.canPerformAction(action, withSender: sender)
+            super.canPerformAction(action, withSender: sender)
         }
     }
 }

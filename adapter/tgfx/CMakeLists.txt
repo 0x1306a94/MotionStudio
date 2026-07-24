@@ -101,14 +101,26 @@ else()
   endfunction()
 endif()
 
-add_library(motionstudio_tgfx_adapter STATIC
-            TgfxCanvasAdapter.mm
-            TgfxRenderAdapter.mm
-            TgfxOnScreenAdapter.mm)
+add_files_by_extension(TGFX_ADAPTER_SOURCES ".h;.mm"
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+add_files_by_extension(TGFX_ADAPTER_PUBLIC_HEADERS ".h"
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+add_library(motionstudio_tgfx_adapter STATIC ${TGFX_ADAPTER_PUBLIC_HEADERS} ${TGFX_ADAPTER_SOURCES})
+add_source_group(TGFX_ADAPTER_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src "Sources")
+
 target_include_directories(motionstudio_tgfx_adapter
                            PUBLIC
-                           "${CMAKE_CURRENT_SOURCE_DIR}"
+                           "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+target_include_directories(motionstudio_tgfx_adapter
+                           PRIVATE
+                           "${CMAKE_CURRENT_SOURCE_DIR}/src"
                            "${TGFX_INCLUDE_DIR}")
+
 target_link_libraries(motionstudio_tgfx_adapter
                       PUBLIC
                       core
@@ -133,9 +145,14 @@ motionstudio_add_tgfx_prebuild(motionstudio_tgfx_adapter)
 motionstudio_link_prebuilt_tgfx(motionstudio_tgfx_adapter)
 
 include(GoogleTest)
-add_executable(tgfx_adapter_test TgfxRenderAdapterTest.cpp)
-target_link_libraries(tgfx_adapter_test
-                      PRIVATE motionstudio_tgfx_adapter GTest::gtest_main)
+add_files_by_extension(TGFX_ADAPTER_TEST_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+)
+
+add_executable(tgfx_adapter_test ${TGFX_ADAPTER_TEST_SOURCES})
+add_source_group(TGFX_ADAPTER_TEST_SOURCES ${CMAKE_CURRENT_LIST_DIR}/tests "Tests")
+
+target_link_libraries(tgfx_adapter_test PRIVATE motionstudio_tgfx_adapter GTest::gtest_main)
 motionstudio_add_tgfx_prebuild(tgfx_adapter_test)
 motionstudio_link_prebuilt_tgfx(tgfx_adapter_test)
 gtest_discover_tests(tgfx_adapter_test)

@@ -63,7 +63,7 @@ extension EditorViewController {
         panel.clipsToBounds = false
     }
 
-    func embed<Content: View>(_ host: UIHostingController<Content>, in container: UIView) {
+    func embed(_ host: UIHostingController<some View>, in container: UIView) {
         host.view.translatesAutoresizingMaskIntoConstraints = false
         host.view.backgroundColor = .clear
         host.view.clipsToBounds = true

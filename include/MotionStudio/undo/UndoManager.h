@@ -22,9 +22,7 @@ class UndoManager {
   public:
     // maxHistory: maximum number of commands kept in the undo stack.
     // mergeWindow: time window within which consecutive commands may merge.
-    explicit UndoManager(size_t maxHistory = 200,
-                         std::chrono::milliseconds mergeWindow =
-                             std::chrono::milliseconds(500));
+    explicit UndoManager(size_t maxHistory = 200, std::chrono::milliseconds mergeWindow = std::chrono::milliseconds(500));
 
     // Executes a command and records it for undo.
     // document: the document to mutate.
