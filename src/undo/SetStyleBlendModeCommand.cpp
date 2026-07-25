@@ -8,17 +8,22 @@ namespace motion {
 
 namespace {
 
-FillStyle *FindFill(Document &document, EntityId layerId, int index) {
+BlendMode *FindStyleBlendMode(Document &document, EntityId layerId, int index) {
     Layer *layer = document.entityIndex().findLayer(layerId);
     if (layer == nullptr || index < 0 ||
         static_cast<size_t>(index) >= layer->styles.size()) {
         return nullptr;
     }
     LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
-    if (style->type() != LayerStyleType::Fill) {
-        return nullptr;
+    switch (style->type()) {
+        case LayerStyleType::Fill: {
+            return &static_cast<FillStyle *>(style)->blendMode;
+        }
+        case LayerStyleType::Stroke: {
+            return &static_cast<StrokeStyle *>(style)->blendMode;
+        }
     }
-    return static_cast<FillStyle *>(style);
+    return nullptr;
 }
 
 }  // namespace
@@ -31,23 +36,23 @@ SetStyleBlendModeCommand::SetStyleBlendModeCommand(EntityId layerId, int index,
 }
 
 void SetStyleBlendModeCommand::execute(Document &document) {
-    FillStyle *fill = FindFill(document, layerId_, index_);
-    if (fill == nullptr) {
+    BlendMode *target = FindStyleBlendMode(document, layerId_, index_);
+    if (target == nullptr) {
         return;
     }
     if (!oldBlendMode_) {
-        oldBlendMode_ = fill->blendMode;
+        oldBlendMode_ = *target;
     }
-    fill->blendMode = blendMode_;
+    *target = blendMode_;
 }
 
 void SetStyleBlendModeCommand::undo(Document &document) {
     if (!oldBlendMode_) {
         return;
     }
-    FillStyle *fill = FindFill(document, layerId_, index_);
-    if (fill != nullptr) {
-        fill->blendMode = *oldBlendMode_;
+    BlendMode *target = FindStyleBlendMode(document, layerId_, index_);
+    if (target != nullptr) {
+        *target = *oldBlendMode_;
     }
 }
 
@@ -68,7 +73,7 @@ CommandKind SetStyleBlendModeCommand::kind() const {
 }
 
 std::string SetStyleBlendModeCommand::describe() const {
-    return "Set Fill Blend Mode";
+    return "Set Style Blend Mode";
 }
 
 }  // namespace motion

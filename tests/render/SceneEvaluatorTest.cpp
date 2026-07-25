@@ -127,11 +127,12 @@ TEST(SceneEvaluatorTest, MultipleFillsProduceItemsWithOwnBlendModes) {
     EXPECT_EQ(second.paint.blendMode, motion::BlendMode::Screen);
 }
 
-TEST(SceneEvaluatorTest, StrokeItemKeepsLayerBlendMode) {
+TEST(SceneEvaluatorTest, StrokeItemUsesOwnBlendMode) {
     RectScene scene;
     scene.layer->blendMode = motion::BlendMode::Multiply;
     auto stroke = std::make_unique<StrokeStyle>();
     stroke->width.setStaticValue(4.0f);
+    stroke->blendMode = motion::BlendMode::Screen;
     scene.layer->styles.push_back(std::move(stroke));
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
@@ -142,7 +143,26 @@ TEST(SceneEvaluatorTest, StrokeItemKeepsLayerBlendMode) {
     EXPECT_FALSE(fillItem.isStroke);
     EXPECT_EQ(fillItem.paint.blendMode, motion::BlendMode::Normal);
     EXPECT_TRUE(strokeItem.isStroke);
-    EXPECT_EQ(strokeItem.paint.blendMode, motion::BlendMode::Multiply);
+    EXPECT_EQ(strokeItem.paint.blendMode, motion::BlendMode::Screen);
+}
+
+TEST(SceneEvaluatorTest, StrokeItemCarriesPositionAndTrim) {
+    RectScene scene;
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->position = motion::StrokePosition::Inside;
+    stroke->trimStart.setStaticValue(0.25f);
+    stroke->trimEnd.setStaticValue(0.75f);
+    stroke->trimOffset.setStaticValue(90.0f);
+    scene.layer->styles.push_back(std::move(stroke));
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
+    const auto &strokeItem = result->layers[0].shapeItems[1];
+    EXPECT_EQ(strokeItem.stroke.position, motion::StrokePosition::Inside);
+    EXPECT_FLOAT_EQ(strokeItem.stroke.trimStart, 0.25f);
+    EXPECT_FLOAT_EQ(strokeItem.stroke.trimEnd, 0.75f);
+    EXPECT_FLOAT_EQ(strokeItem.stroke.trimOffset, 90.0f);
 }
 
 TEST(SceneEvaluatorTest, LayerTransformAppliesToPath) {
@@ -239,8 +259,8 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
     ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
     const auto &strokeItem = result->layers[0].shapeItems[1];
     EXPECT_TRUE(strokeItem.isStroke);
-    EXPECT_FLOAT_EQ(strokeItem.strokeWidth, 3.0f);
-    EXPECT_EQ(strokeItem.cap, motion::LineCap::Round);
+    EXPECT_FLOAT_EQ(strokeItem.stroke.width, 3.0f);
+    EXPECT_EQ(strokeItem.stroke.cap, motion::LineCap::Round);
 }
 
 TEST(SceneEvaluatorTest, EllipseProducesFourVertexClosedPath) {

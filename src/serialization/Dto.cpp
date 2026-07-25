@@ -139,6 +139,34 @@ const char *ToString(LineJoin join) {
     return "unknown";
 }
 
+const char *ToString(StrokePosition position) {
+    switch (position) {
+        case StrokePosition::Center: {
+            return "center";
+        }
+        case StrokePosition::Inside: {
+            return "inside";
+        }
+        case StrokePosition::Outside: {
+            return "outside";
+        }
+    }
+    return "unknown";
+}
+
+Expected<StrokePosition, std::string> strokePositionFromString(const std::string &text) {
+    if (text == "center") {
+        return StrokePosition::Center;
+    }
+    if (text == "inside") {
+        return StrokePosition::Inside;
+    }
+    if (text == "outside") {
+        return StrokePosition::Outside;
+    }
+    return Unexpected(std::string("unknown stroke position: " + text));
+}
+
 Expected<LineJoin, std::string> lineJoinFromString(const std::string &text) {
     if (text == "miter") {
         return LineJoin::Miter;

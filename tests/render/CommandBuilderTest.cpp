@@ -32,8 +32,8 @@ EvaluatedShapeItem MakeStrokeItem(BlendMode blendMode = BlendMode::Normal) {
     item.path.vertices.push_back({{0, 0}, {}, {}});
     item.path.vertices.push_back({{10, 10}, {}, {}});
     item.paint = Paint{Color{0, 0, 1, 1}, motion::FillRule::NonZero, blendMode};
-    item.strokeWidth = 3;
-    item.cap = LineCap::Round;
+    item.stroke.width = 3;
+    item.stroke.cap = LineCap::Round;
     return item;
 }
 
@@ -96,8 +96,8 @@ TEST(CommandBuilderTest, StrokeItemCarriesStrokeParameters) {
     auto commands = BuildCommands(state);
     ASSERT_EQ(commands.size(), 5u);
     EXPECT_EQ(commands[3].type, DrawCommandType::StrokePath);
-    EXPECT_FLOAT_EQ(commands[3].strokeWidth, 3.0f);
-    EXPECT_EQ(commands[3].cap, LineCap::Round);
+    EXPECT_FLOAT_EQ(commands[3].stroke.width, 3.0f);
+    EXPECT_EQ(commands[3].stroke.cap, LineCap::Round);
     EXPECT_EQ(commands[3].paint.color, (Color{0, 0, 1, 1}));
 }
 
@@ -127,8 +127,8 @@ TEST(CommandBuilderTest, SelectionOutlineBuildsStrokeForSelectedLayerBounds) {
     ASSERT_EQ(commands.size(), 1u);
     EXPECT_EQ(commands[0].type, DrawCommandType::StrokePath);
     EXPECT_EQ(commands[0].paint.color, (Color{0.0f, 0.47843137f, 1.0f, 1.0f}));
-    EXPECT_FLOAT_EQ(commands[0].strokeWidth, 1.5f);
-    EXPECT_EQ(commands[0].join, LineJoin::Round);
+    EXPECT_FLOAT_EQ(commands[0].stroke.width, 1.5f);
+    EXPECT_EQ(commands[0].stroke.join, LineJoin::Round);
     ASSERT_EQ(commands[0].path.vertices.size(), 4u);
     EXPECT_EQ(commands[0].path.vertices[0].point.x, -0.75f);
     EXPECT_EQ(commands[0].path.vertices[0].point.y, -0.75f);

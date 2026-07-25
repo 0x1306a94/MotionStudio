@@ -145,7 +145,7 @@ struct FlattenedShapeItem {
 };
 
 bool HitTestShapeItem(const EvaluatedShapeItem &item, const std::vector<Vec2> &points, Vec2 point, float tolerance) {
-    const float strokeTolerance = std::max(tolerance, item.strokeWidth * 0.5f + tolerance);
+    const float strokeTolerance = std::max(tolerance, item.stroke.width * 0.5f + tolerance);
     if (item.isStroke) {
         return IsNearPolyline(points, item.path.closed, point, strokeTolerance);
     }
@@ -175,7 +175,7 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
         if (flattened.points.empty()) {
             continue;
         }
-        const float padding = item.isStroke ? item.strokeWidth * 0.5f + safeTolerance : safeTolerance;
+        const float padding = item.isStroke ? item.stroke.width * 0.5f + safeTolerance : safeTolerance;
         ExpandBounds(flattened.points, padding, minPoint, maxPoint);
         hasBounds = true;
         flattenedItems.push_back(std::move(flattened));

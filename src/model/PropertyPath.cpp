@@ -161,6 +161,15 @@ AnimatableBase *resolveStyleProperty(LayerStyle *style, const std::string &name)
             if (name == "width") {
                 return &stroke->width;
             }
+            if (name == "trimStart") {
+                return &stroke->trimStart;
+            }
+            if (name == "trimEnd") {
+                return &stroke->trimEnd;
+            }
+            if (name == "trimOffset") {
+                return &stroke->trimOffset;
+            }
             break;
         }
     }

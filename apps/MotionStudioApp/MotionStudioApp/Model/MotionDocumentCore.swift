@@ -290,9 +290,14 @@ final class MotionDocumentCore {
         ms_layer_style_type_at(handle, layerID, Int32(index))
     }
 
-    /// MS_BLEND_* blend mode tag of the fill at index; -1 when out of range or not a fill.
+    /// MS_BLEND_* blend mode tag of the style at index; -1 when out of range.
     func styleBlendMode(layerID: UInt64, index: Int) -> Int32 {
         ms_layer_style_blend_mode_at(handle, layerID, Int32(index))
+    }
+
+    /// MS_STROKE_POSITION_* tag of the stroke at index; -1 when not a stroke.
+    func strokePosition(layerID: UInt64, index: Int) -> Int32 {
+        ms_layer_style_stroke_position_at(handle, layerID, Int32(index))
     }
 
     // MARK: - Property queries
@@ -500,9 +505,20 @@ final class MotionDocumentCore {
         changed()
     }
 
-    /// blendMode: MS_BLEND_* tag. Only applies to fill styles.
+    func addStrokeStyle(layerID: UInt64) {
+        ms_command_add_stroke_style(handle, layerID)
+        changed()
+    }
+
+    /// blendMode: MS_BLEND_* tag. Applies to fill and stroke styles.
     func setStyleBlendMode(layerID: UInt64, index: Int, blendMode: Int32) {
         ms_command_set_style_blend_mode(handle, layerID, Int32(index), blendMode)
+        changed()
+    }
+
+    /// position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
+    func setStrokePosition(layerID: UInt64, index: Int, position: Int32) {
+        ms_command_set_stroke_position(handle, layerID, Int32(index), position)
         changed()
     }
 

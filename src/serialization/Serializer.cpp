@@ -846,7 +846,12 @@ json LayerStyleToJson(const LayerStyle &style) {
                     {"width", AnimatableToJson(stroke.width)},
                     {"cap", dto::ToString(stroke.cap)},
                     {"join", dto::ToString(stroke.join)},
-                    {"miterLimit", stroke.miterLimit}};
+                    {"miterLimit", stroke.miterLimit},
+                    {"blendMode", dto::ToString(stroke.blendMode)},
+                    {"position", dto::ToString(stroke.position)},
+                    {"trimStart", AnimatableToJson(stroke.trimStart)},
+                    {"trimEnd", AnimatableToJson(stroke.trimEnd)},
+                    {"trimOffset", AnimatableToJson(stroke.trimOffset)}};
         }
     }
     return json::object();
@@ -918,6 +923,41 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
         stroke->cap = *cap;
         stroke->join = *join;
         stroke->miterLimit = *miterLimit;
+        // blendMode/position/trim are optional: documents saved before strokes
+        // had them default to Normal/Center/full range.
+        Expected<std::string, std::string> blendText = ParseField<std::string>(node, "blendMode");
+        if (blendText) {
+            Expected<BlendMode, std::string> blendMode = dto::blendModeFromString(*blendText);
+            if (!blendMode) {
+                return Unexpected(blendMode.error());
+            }
+            stroke->blendMode = *blendMode;
+        }
+        Expected<std::string, std::string> positionText =
+            ParseField<std::string>(node, "position");
+        if (positionText) {
+            Expected<StrokePosition, std::string> position =
+                dto::strokePositionFromString(*positionText);
+            if (!position) {
+                return Unexpected(position.error());
+            }
+            stroke->position = *position;
+        }
+        const std::pair<const char *, Animatable<float> *> trimFields[] = {
+            {"trimStart", &stroke->trimStart},
+            {"trimEnd", &stroke->trimEnd},
+            {"trimOffset", &stroke->trimOffset},
+        };
+        for (const auto &[fieldName, target] : trimFields) {
+            Expected<const json *, std::string> trimNode = Child(node, fieldName);
+            if (!trimNode) {
+                continue;
+            }
+            result = AnimatableFromJson(**trimNode, *target);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+        }
         style = std::move(stroke);
     } else {
         return Unexpected(std::string("unknown layer style type: " + *typeText));

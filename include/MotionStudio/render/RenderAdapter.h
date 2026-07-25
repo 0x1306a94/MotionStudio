@@ -5,11 +5,10 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
-#include "MotionStudio/model/LineCap.h"
-#include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/render/DrawCommand.h"
 #include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/PreviewBackdrop.h"
+#include "MotionStudio/render/StrokeOptions.h"
 
 namespace motion {
 
@@ -53,11 +52,9 @@ class RenderAdapter {
     // Strokes a path.
     // path: path to stroke.
     // paint: stroke paint.
-    // width: stroke width.
-    // cap: line cap style.
-    // join: line join style.
-    virtual void strokePath(const BezierPath &path, const Paint &paint, float width,
-                            LineCap cap, LineJoin join) = 0;
+    // options: pen geometry, alignment and trim window.
+    virtual void strokePath(const BezierPath &path, const Paint &paint,
+                            const StrokeOptions &options) = 0;
 
     // Intersects the current clip with a path.
     // path: clip path.

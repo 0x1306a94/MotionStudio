@@ -11,6 +11,7 @@
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeType.h"
+#include "MotionStudio/model/StrokePosition.h"
 
 // Enum ↔ string mappings for the JSON v1 schema (camelCase, aligned with the
 // Lottie ecosystem). File layout is defined in Serializer.cpp; migration
@@ -35,6 +36,9 @@ Expected<LineCap, std::string> lineCapFromString(const std::string &text);
 
 const char *ToString(LineJoin join);
 Expected<LineJoin, std::string> lineJoinFromString(const std::string &text);
+
+const char *ToString(StrokePosition position);
+Expected<StrokePosition, std::string> strokePositionFromString(const std::string &text);
 
 const char *ToString(BlendMode mode);
 Expected<BlendMode, std::string> blendModeFromString(const std::string &text);

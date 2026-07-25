@@ -7,6 +7,7 @@
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
+#include "MotionStudio/model/StrokePosition.h"
 
 namespace motion {
 
@@ -56,6 +57,11 @@ class StrokeStyle : public LayerStyle {
     LineCap cap = LineCap::Butt;
     LineJoin join = LineJoin::Miter;
     float miterLimit = 4.0f;
+    BlendMode blendMode = BlendMode::Normal;
+    StrokePosition position = StrokePosition::Center;
+    Animatable<float> trimStart{0.0f};   // 0.0 ~ 1.0 fraction of path length
+    Animatable<float> trimEnd{1.0f};     // 0.0 ~ 1.0 fraction of path length
+    Animatable<float> trimOffset{0.0f};  // degrees, rotates the trim window
 };
 
 }  // namespace motion

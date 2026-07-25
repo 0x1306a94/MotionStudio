@@ -1,4 +1,4 @@
-#include "MotionStudio/undo/AddFillStyleCommand.h"
+#include "MotionStudio/undo/AddLayerStyleCommand.h"
 
 #include <utility>
 
@@ -7,13 +7,14 @@
 
 namespace motion {
 
-AddFillStyleCommand::AddFillStyleCommand(EntityId layerId)
+AddLayerStyleCommand::AddLayerStyleCommand(EntityId layerId,
+                                           std::unique_ptr<LayerStyle> style)
     : layerId_(layerId)
-    , style_(std::make_unique<FillStyle>()) {
+    , style_(std::move(style)) {
     styleId_ = style_->id;
 }
 
-void AddFillStyleCommand::execute(Document &document) {
+void AddLayerStyleCommand::execute(Document &document) {
     if (!style_) {
         return;
     }
@@ -24,7 +25,7 @@ void AddFillStyleCommand::execute(Document &document) {
     layer->styles.push_back(std::move(style_));
 }
 
-void AddFillStyleCommand::undo(Document &document) {
+void AddLayerStyleCommand::undo(Document &document) {
     Layer *layer = document.entityIndex().findLayer(layerId_);
     if (layer == nullptr) {
         return;
@@ -38,11 +39,14 @@ void AddFillStyleCommand::undo(Document &document) {
     }
 }
 
-CommandKind AddFillStyleCommand::kind() const {
-    return CommandKind::AddFillStyle;
+CommandKind AddLayerStyleCommand::kind() const {
+    return CommandKind::AddLayerStyle;
 }
 
-std::string AddFillStyleCommand::describe() const {
+std::string AddLayerStyleCommand::describe() const {
+    if (style_ && style_->type() == LayerStyleType::Stroke) {
+        return "Add Stroke";
+    }
     return "Add Fill";
 }
 

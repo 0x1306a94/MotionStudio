@@ -147,7 +147,7 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
                 color.a *= alpha;
                 const Paint paint{color, fill.fillRule, fill.blendMode};
                 for (const BezierPath &path : paths) {
-                    items.push_back({path, paint, false, 0, LineCap::Butt, LineJoin::Miter});
+                    items.push_back({path, paint, false, {}});
                 }
                 break;
             }
@@ -155,11 +155,16 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
                 const auto &stroke = static_cast<const StrokeStyle &>(*style);
                 Color color = stroke.color.evaluatePreview(time);
                 color.a *= alpha;
-                // Strokes have no blend mode of their own; they keep the layer's.
-                const Paint paint{color, FillRule::NonZero, layer.blendMode};
-                const float width = stroke.width.evaluatePreview(time);
+                const Paint paint{color, FillRule::NonZero, stroke.blendMode};
+                const StrokeOptions options{stroke.width.evaluatePreview(time),
+                                            stroke.cap,
+                                            stroke.join,
+                                            stroke.position,
+                                            stroke.trimStart.evaluatePreview(time),
+                                            stroke.trimEnd.evaluatePreview(time),
+                                            stroke.trimOffset.evaluatePreview(time)};
                 for (const BezierPath &path : paths) {
-                    items.push_back({path, paint, true, width, stroke.cap, stroke.join});
+                    items.push_back({path, paint, true, options});
                 }
                 break;
             }

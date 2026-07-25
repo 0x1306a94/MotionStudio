@@ -5,9 +5,9 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/TextContent.h"
-#include "MotionStudio/undo/AddFillStyleCommand.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
+#include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
@@ -15,12 +15,13 @@
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
+#include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
-using motion::AddFillStyleCommand;
 using motion::AddKeyframeCommand;
 using motion::AddLayerCommand;
+using motion::AddLayerStyleCommand;
 using motion::Animatable;
 using motion::Color;
 using motion::Composition;
@@ -41,6 +42,7 @@ using motion::RemoveLayerCommand;
 using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
 using motion::SetStaticValueCommand;
+using motion::SetStrokePositionCommand;
 using motion::SetStyleBlendModeCommand;
 using motion::UndoManager;
 using motion::Vec2;
@@ -343,10 +345,10 @@ TEST(CommandsTest, SkipWhenTargetEntityDeleted) {
     EXPECT_FALSE(scene.layer->transform.position.isAnimated());
 }
 
-TEST(AddFillStyleCommandTest, AddUndoRedo) {
+TEST(AddLayerStyleCommandTest, AddFillUndoRedo) {
     Scene scene;
 
-    scene.execute<AddFillStyleCommand>(scene.layer->id);
+    scene.execute<AddLayerStyleCommand>(scene.layer->id, std::make_unique<FillStyle>());
     ASSERT_EQ(scene.layer->styles.size(), 1u);
     EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Fill);
     const EntityId styleId = scene.layer->styles[0]->id;
@@ -359,9 +361,9 @@ TEST(AddFillStyleCommandTest, AddUndoRedo) {
     EXPECT_EQ(scene.layer->styles[0]->id, styleId);
 }
 
-TEST(AddFillStyleCommandTest, ExecuteSkipsMissingLayer) {
+TEST(AddLayerStyleCommandTest, ExecuteSkipsMissingLayer) {
     Scene scene;
-    scene.execute<AddFillStyleCommand>(EntityId{999});
+    scene.execute<AddLayerStyleCommand>(EntityId{999}, std::make_unique<FillStyle>());
     scene.undo.undo(scene.document);
     EXPECT_TRUE(scene.layer->styles.empty());
 }
@@ -434,19 +436,87 @@ TEST(SetStyleBlendModeCommandTest, MergesSameTargetKeepsOriginalValue) {
     EXPECT_EQ(fill->blendMode, motion::BlendMode::Normal);
 }
 
-TEST(SetStyleBlendModeCommandTest, NonFillStyleIsNoOp) {
+TEST(SetStyleBlendModeCommandTest, StrokeStyleBlendSetAndUndo) {
     Scene scene;
     scene.layer->styles.push_back(std::make_unique<motion::StrokeStyle>());
+    auto *stroke = static_cast<motion::StrokeStyle *>(scene.layer->styles[0].get());
 
     scene.execute<SetStyleBlendModeCommand>(scene.layer->id, 0, motion::BlendMode::Multiply);
+    EXPECT_EQ(stroke->blendMode, motion::BlendMode::Multiply);
+
     scene.undo.undo(scene.document);
-    ASSERT_EQ(scene.layer->styles.size(), 1u);
-    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Stroke);
+    EXPECT_EQ(stroke->blendMode, motion::BlendMode::Normal);
 }
 
 TEST(SetStyleBlendModeCommandTest, ExecuteSkipsMissingLayer) {
     Scene scene;
     scene.execute<SetStyleBlendModeCommand>(EntityId{999}, 0, motion::BlendMode::Add);
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->styles.empty());
+}
+
+TEST(AddLayerStyleCommandTest, AddStrokeUndoRedo) {
+    Scene scene;
+
+    scene.execute<AddLayerStyleCommand>(scene.layer->id,
+                                        std::make_unique<motion::StrokeStyle>());
+    ASSERT_EQ(scene.layer->styles.size(), 1u);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Stroke);
+    const EntityId styleId = scene.layer->styles[0]->id;
+
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->styles.empty());
+
+    scene.undo.redo(scene.document);
+    ASSERT_EQ(scene.layer->styles.size(), 1u);
+    EXPECT_EQ(scene.layer->styles[0]->id, styleId);
+}
+
+TEST(SetStrokePositionCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<motion::StrokeStyle>());
+    auto *stroke = static_cast<motion::StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokePositionCommand>(scene.layer->id, 0,
+                                            motion::StrokePosition::Inside);
+    EXPECT_EQ(stroke->position, motion::StrokePosition::Inside);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(stroke->position, motion::StrokePosition::Center);
+
+    scene.undo.redo(scene.document);
+    EXPECT_EQ(stroke->position, motion::StrokePosition::Inside);
+}
+
+TEST(SetStrokePositionCommandTest, MergesSameTargetKeepsOriginalValue) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<motion::StrokeStyle>());
+    auto *stroke = static_cast<motion::StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokePositionCommand>(scene.layer->id, 0,
+                                            motion::StrokePosition::Inside);
+    scene.execute<SetStrokePositionCommand>(scene.layer->id, 0,
+                                            motion::StrokePosition::Outside);
+    EXPECT_EQ(stroke->position, motion::StrokePosition::Outside);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(stroke->position, motion::StrokePosition::Center);
+}
+
+TEST(SetStrokePositionCommandTest, NonStrokeStyleIsNoOp) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+
+    scene.execute<SetStrokePositionCommand>(scene.layer->id, 0,
+                                            motion::StrokePosition::Outside);
+    scene.undo.undo(scene.document);
+    ASSERT_EQ(scene.layer->styles.size(), 1u);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Fill);
+}
+
+TEST(SetStrokePositionCommandTest, ExecuteSkipsMissingLayer) {
+    Scene scene;
+    scene.execute<SetStrokePositionCommand>(EntityId{999}, 0, motion::StrokePosition::Inside);
     scene.undo.undo(scene.document);
     EXPECT_TRUE(scene.layer->styles.empty());
 }

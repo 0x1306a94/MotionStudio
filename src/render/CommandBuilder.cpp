@@ -41,7 +41,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
         blend.blendMode = layer.blendMode;
         commands.push_back(blend);
 
-        // Each fill carries its own blend mode; emit a SetBlendMode whenever
+        // Each style carries its own blend mode; emit a SetBlendMode whenever
         // the upcoming item's blend differs from the current state.
         BlendMode currentBlend = layer.blendMode;
         for (const EvaluatedShapeItem &item : layer.shapeItems) {
@@ -56,9 +56,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
             draw.type = item.isStroke ? DrawCommandType::StrokePath : DrawCommandType::DrawPath;
             draw.path = item.path;
             draw.paint = item.paint;
-            draw.strokeWidth = item.strokeWidth;
-            draw.cap = item.cap;
-            draw.join = item.join;
+            draw.stroke = item.stroke;
             commands.push_back(std::move(draw));
         }
 
@@ -108,9 +106,8 @@ DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
         outline.type = DrawCommandType::StrokePath;
         outline.path = RectPath(minPoint, maxPoint);
         outline.paint = Paint{kSelectionOutlineColor, FillRule::NonZero};
-        outline.strokeWidth = safeStrokeWidth;
-        outline.cap = LineCap::Butt;
-        outline.join = LineJoin::Round;
+        outline.stroke.width = safeStrokeWidth;
+        outline.stroke.join = LineJoin::Round;
         commands.push_back(std::move(outline));
     }
     return commands;

@@ -48,8 +48,8 @@ class TgfxCanvasAdapter : public RenderAdapter {
     void setOpacity(float opacity) override;
     void setBlendMode(BlendMode mode) override;
     void drawPath(const BezierPath &path, const Paint &paint) override;
-    void strokePath(const BezierPath &path, const Paint &paint, float width, LineCap cap,
-                    LineJoin join) override;
+    void strokePath(const BezierPath &path, const Paint &paint,
+                    const StrokeOptions &options) override;
     void clipPath(const BezierPath &path, FillRule rule) override;
 
   protected:

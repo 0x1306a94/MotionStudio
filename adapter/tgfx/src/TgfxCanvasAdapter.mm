@@ -9,8 +9,10 @@
 #include <tgfx/core/Matrix.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Path.h>
+#include <tgfx/core/PathEffect.h>
 #include <tgfx/core/PathTypes.h>
 #include <tgfx/core/Rect.h>
+#include <tgfx/core/Stroke.h>
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Device.h>
 
@@ -159,6 +161,35 @@ tgfx::Matrix ToTgfxMatrix(const Mat3 &matrix) {
     return result;
 }
 
+bool NeedsTrim(const StrokeOptions &options) {
+    return options.trimEnd - options.trimStart < 1.0f;
+}
+
+// Cuts the [trimStart, trimEnd] window (rotated by trimOffset degrees) out of
+// the path, matching AE trim paths. MakeTrim accepts values outside [0, 1]
+// and wraps them cyclically over the total length of all contours, so the
+// offset is simply folded into start/end. When start > end the window wraps
+// through the path start ([start, 1] + [0, end]), expressed as [start, end+1].
+// An empty window (start == end) makes the effect reset the path to empty.
+tgfx::Path TrimmedPath(const tgfx::Path &path, float trimStart, float trimEnd,
+                       float trimOffset) {
+    const float shift = trimOffset / 360.0f;
+    float start = trimStart + shift;
+    float end = trimEnd + shift;
+    const float base = std::floor(start);
+    start -= base;
+    end -= base;
+    if (end < start) {
+        end += 1.0f;
+    }
+    tgfx::Path result = path;
+    auto effect = tgfx::PathEffect::MakeTrim(start, end);
+    if (effect != nullptr) {
+        effect->filterPath(&result);
+    }
+    return result;
+}
+
 }  // namespace
 
 TgfxCanvasAdapter::TgfxCanvasAdapter() = default;
@@ -290,21 +321,53 @@ void TgfxCanvasAdapter::drawPath(const BezierPath &path, const Paint &paint) {
     surface_->getCanvas()->drawPath(ToTgfxPath(path, paint.fillRule), tgfxPaint);
 }
 
-void TgfxCanvasAdapter::strokePath(const BezierPath &path, const Paint &paint, float width, LineCap cap, LineJoin join) {
+void TgfxCanvasAdapter::strokePath(const BezierPath &path, const Paint &paint,
+                                   const StrokeOptions &options) {
     if (!surface_) {
         return;
     }
+    tgfx::Canvas *canvas = surface_->getCanvas();
+    const tgfx::Path fullPath = ToTgfxPath(path, paint.fillRule);
+    tgfx::Path strokeGeometry = fullPath;
+    if (NeedsTrim(options)) {
+        strokeGeometry = TrimmedPath(fullPath, options.trimStart, options.trimEnd,
+                                     options.trimOffset);
+    }
+    // An empty trim window (start == end) draws nothing; tgfx asserts on
+    // empty-geometry draws downstream.
+    if (strokeGeometry.isEmpty()) {
+        return;
+    }
+
     tgfx::Paint tgfxPaint;
     tgfxPaint.setAntiAlias(true);
-    tgfxPaint.setStyle(tgfx::PaintStyle::Stroke);
-    tgfxPaint.setStrokeWidth(width);
-    tgfxPaint.setLineCap(ToTgfxLineCap(cap));
-    tgfxPaint.setLineJoin(ToTgfxLineJoin(join));
     Color color = paint.color;
     color.a *= opacity_;
     tgfxPaint.setColor(ToTgfxColor(color));
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-    surface_->getCanvas()->drawPath(ToTgfxPath(path, paint.fillRule), tgfxPaint);
+
+    if (options.position == StrokePosition::Center) {
+        tgfxPaint.setStyle(tgfx::PaintStyle::Stroke);
+        tgfxPaint.setStrokeWidth(options.width);
+        tgfxPaint.setLineCap(ToTgfxLineCap(options.cap));
+        tgfxPaint.setLineJoin(ToTgfxLineJoin(options.join));
+        canvas->drawPath(strokeGeometry, tgfxPaint);
+        return;
+    }
+    // Inside/outside strokes draw at double width with the unwanted half cut
+    // off by a boolean op against the source path, mirroring tgfx ShapeLayer.
+    tgfx::Stroke stroke(options.width * 2, ToTgfxLineCap(options.cap),
+                        ToTgfxLineJoin(options.join));
+    tgfx::Path outline = strokeGeometry;
+    if (!stroke.applyToPath(&outline)) {
+        return;
+    }
+    outline.addPath(fullPath, options.position == StrokePosition::Inside ? tgfx::PathOp::Intersect : tgfx::PathOp::Difference);
+    if (outline.isEmpty()) {
+        return;
+    }
+    tgfxPaint.setStyle(tgfx::PaintStyle::Fill);
+    canvas->drawPath(outline, tgfxPaint);
 }
 
 void TgfxCanvasAdapter::clipPath(const BezierPath &path, FillRule rule) {

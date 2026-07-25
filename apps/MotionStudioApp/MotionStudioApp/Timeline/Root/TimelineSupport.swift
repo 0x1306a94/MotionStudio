@@ -30,22 +30,37 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: timelineShapeSizePath).isEmpty {
         paths.append(timelineShapeSizePath)
     }
-    paths.append(contentsOf: timelineFillColorTracks(core: core, layerID: layerID).map(\.path))
+    paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     return paths
 }
 
-/// Animated fill color tracks of a shape layer, fills numbered like the inspector.
-func timelineFillColorTracks(core: MotionDocumentCore,
-                             layerID: UInt64) -> [(path: String, label: String)]
+/// Animated style tracks of a shape layer: fill colors and stroke
+/// color/width/trim, fills and strokes numbered like the inspector.
+func timelineStyleTracks(core: MotionDocumentCore,
+                         layerID: UInt64) -> [(path: String, label: String)]
 {
     var fillPosition = 0
+    var strokePosition = 0
     var tracks: [(path: String, label: String)] = []
     for index in 0 ..< core.styleCount(layerID: layerID) {
-        guard core.styleType(layerID: layerID, index: index) == MS_STYLE_FILL else { continue }
-        fillPosition += 1
-        let path = "styles[\(index)].color"
-        if !core.keyframes(entityID: layerID, path: path).isEmpty {
-            tracks.append((path, "Fill \(fillPosition) Color"))
+        let styleType = core.styleType(layerID: layerID, index: index)
+        var candidates: [(path: String, label: String)] = []
+        if styleType == MS_STYLE_FILL {
+            fillPosition += 1
+            candidates = [("styles[\(index)].color", "Fill \(fillPosition) Color")]
+        } else if styleType == MS_STYLE_STROKE {
+            strokePosition += 1
+            let name = "Stroke \(strokePosition)"
+            candidates = [("styles[\(index)].color", "\(name) Color"),
+                          ("styles[\(index)].width", "\(name) Width"),
+                          ("styles[\(index)].trimStart", "\(name) Trim Start"),
+                          ("styles[\(index)].trimEnd", "\(name) Trim End"),
+                          ("styles[\(index)].trimOffset", "\(name) Trim Offset")]
+        }
+        for candidate in candidates
+            where !core.keyframes(entityID: layerID, path: candidate.path).isEmpty
+        {
+            tracks.append(candidate)
         }
     }
     return tracks
@@ -82,7 +97,7 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             path: timelineShapeSizePath,
                                             label: ShapeProperty.size.actionLabel))
         }
-        for track in timelineFillColorTracks(core: core, layerID: layerID) {
+        for track in timelineStyleTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: track.path,

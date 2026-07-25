@@ -57,6 +57,11 @@ struct InspectorView: View {
                                            playheadFrame: editorState.playheadFrame,
                                            isEditable: isEditable,
                                            perform: perform)
+                            StrokesInspector(core: core,
+                                             layerID: layerID,
+                                             playheadFrame: editorState.playheadFrame,
+                                             isEditable: isEditable,
+                                             perform: perform)
                         }
                     }
                     .padding(10)

@@ -20,9 +20,9 @@
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/serialization/Serializer.h"
-#include "MotionStudio/undo/AddFillStyleCommand.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
+#include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
@@ -35,6 +35,7 @@
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
+#include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
@@ -61,6 +62,7 @@ using motion::Serializer;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
 using motion::ShapeRect;
+using motion::StrokeStyle;
 using motion::UndoManager;
 using motion::Vec2;
 
@@ -151,6 +153,14 @@ motion::BlendMode MakeBlendMode(int blendMode) {
 
 int BlendModeTag(motion::BlendMode blendMode) {
     return static_cast<int>(blendMode);
+}
+
+motion::StrokePosition MakeStrokePosition(int position) {
+    // Bridge tags mirror the motion::StrokePosition ordinals.
+    if (position < MS_STROKE_POSITION_CENTER || position > MS_STROKE_POSITION_OUTSIDE) {
+        return motion::StrokePosition::Center;
+    }
+    return static_cast<motion::StrokePosition>(position);
 }
 
 Easing MakeEasing(int easingType, float inX, float inY, float outX, float outY) {
@@ -553,10 +563,29 @@ int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int ind
         return -1;
     }
     motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
-    if (style->type() != motion::LayerStyleType::Fill) {
+    switch (style->type()) {
+        case motion::LayerStyleType::Fill: {
+            return BlendModeTag(static_cast<FillStyle *>(style)->blendMode);
+        }
+        case motion::LayerStyleType::Stroke: {
+            return BlendModeTag(static_cast<StrokeStyle *>(style)->blendMode);
+        }
+    }
+    return -1;
+}
+
+int ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->styles.size()) {
         return -1;
     }
-    return BlendModeTag(static_cast<FillStyle *>(style)->blendMode);
+    motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
+    if (style->type() != motion::LayerStyleType::Stroke) {
+        return -1;
+    }
+    return static_cast<int>(static_cast<StrokeStyle *>(style)->position);
 }
 
 /* ============================ property queries ============================ */
@@ -916,7 +945,12 @@ void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool lo
 
 void ms_command_add_fill_style(MSDocument *document, uint64_t layerId) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::AddFillStyleCommand>(EntityId{layerId}));
+    Execute(document, std::make_unique<motion::AddLayerStyleCommand>(EntityId{layerId}, std::make_unique<motion::FillStyle>()));
+}
+
+void ms_command_add_stroke_style(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerStyleCommand>(EntityId{layerId}, std::make_unique<motion::StrokeStyle>()));
 }
 
 void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index) {
@@ -927,4 +961,9 @@ void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index) 
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStyleBlendModeCommand>(EntityId{layerId}, index, MakeBlendMode(blendMode)));
+}
+
+void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
 }

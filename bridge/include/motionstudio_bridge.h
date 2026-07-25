@@ -52,6 +52,13 @@ enum {
     MS_STYLE_STROKE = 1,
 };
 
+// Stroke position tag, mirrors motion::StrokePosition.
+enum {
+    MS_STROKE_POSITION_CENTER = 0,
+    MS_STROKE_POSITION_INSIDE = 1,
+    MS_STROKE_POSITION_OUTSIDE = 2,
+};
+
 // Blend mode tag, mirrors motion::BlendMode ordinals (Lottie "bm" value set).
 enum {
     MS_BLEND_NORMAL = 0,
@@ -183,6 +190,8 @@ int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index);
 // Blend mode tag (MS_BLEND_*) of the fill at index, -1 when out of range or
 // the style is not a fill.
 int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
+// Stroke position of the style at index, or -1 when not a stroke.
+int ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
 
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
@@ -249,10 +258,15 @@ void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool lo
 
 // Appends a default fill (black, normal blend) to the layer's style list.
 void ms_command_add_fill_style(MSDocument *document, uint64_t layerId);
+// Appends a default stroke (black, width 2, normal blend, center) to the
+// layer's style list.
+void ms_command_add_stroke_style(MSDocument *document, uint64_t layerId);
 // Removes the style at index from the layer's style list.
 void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index);
-// blendMode: MS_BLEND_* tag. Only applies to fill styles.
+// blendMode: MS_BLEND_* tag. Applies to fill and stroke styles.
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode);
+// position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
+void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position);
 
 #if defined(__APPLE__)
 

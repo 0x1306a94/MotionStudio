@@ -30,8 +30,7 @@ void PlayCommands(const DrawCommandList &commands, RenderAdapter &adapter) {
                 break;
             }
             case DrawCommandType::StrokePath: {
-                adapter.strokePath(command.path, command.paint, command.strokeWidth,
-                                   command.cap, command.join);
+                adapter.strokePath(command.path, command.paint, command.stroke);
                 break;
             }
             case DrawCommandType::ClipPath: {

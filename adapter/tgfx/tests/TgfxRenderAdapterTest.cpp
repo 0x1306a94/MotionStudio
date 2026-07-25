@@ -137,8 +137,8 @@ TEST(TgfxRenderAdapterTest, StrokeDrawsAlongPath) {
     item.path.vertices.push_back({{20, 50}, {}, {}});
     item.path.vertices.push_back({{80, 50}, {}, {}});
     item.paint = Paint{Color{0, 0, 1, 1}};
-    item.strokeWidth = 6;
-    item.cap = LineCap::Butt;
+    item.stroke.width = 6;
+    item.stroke.cap = LineCap::Butt;
     layer.shapeItems.push_back(item);
     state.layers.push_back(std::move(layer));
 

@@ -101,6 +101,18 @@ std::unique_ptr<Document> BuildRichDocument() {
     fillStyle->blendMode = motion::BlendMode::Overlay;
     shapeLayer->styles.push_back(std::move(fillStyle));
 
+    auto strokeStyle = std::make_unique<motion::StrokeStyle>();
+    strokeStyle->width.setStaticValue(4.0f);
+    strokeStyle->blendMode = motion::BlendMode::Multiply;
+    strokeStyle->position = motion::StrokePosition::Inside;
+    strokeStyle->trimStart.setStaticValue(0.25f);
+    strokeStyle->trimEnd.setStaticValue(0.75f);
+    Keyframe<float> trimOffsetKeyframe;
+    trimOffsetKeyframe.time = 20;
+    trimOffsetKeyframe.value = 90.0f;
+    strokeStyle->trimOffset.addKeyframe(trimOffsetKeyframe);
+    shapeLayer->styles.push_back(std::move(strokeStyle));
+
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
 
     auto group = std::make_unique<ShapeGroup>();
@@ -167,6 +179,10 @@ TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
     for (auto &layer : json["compositions"][1]["layers"]) {
         for (auto &style : layer["styles"]) {
             style.erase("blendMode");
+            style.erase("position");
+            style.erase("trimStart");
+            style.erase("trimEnd");
+            style.erase("trimOffset");
         }
     }
 
@@ -174,9 +190,16 @@ TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
         Serializer::deserialize(json.dump());
     ASSERT_TRUE(restored.hasValue());
     const Layer &shapes = *(*restored)->compositions[1]->layers[0];
-    ASSERT_EQ(shapes.styles.size(), 1u);
+    ASSERT_EQ(shapes.styles.size(), 2u);
     const auto *fillStyle = static_cast<const FillStyle *>(shapes.styles[0].get());
     EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Normal);
+    const auto *strokeStyle =
+        static_cast<const motion::StrokeStyle *>(shapes.styles[1].get());
+    EXPECT_EQ(strokeStyle->blendMode, motion::BlendMode::Normal);
+    EXPECT_EQ(strokeStyle->position, motion::StrokePosition::Center);
+    EXPECT_EQ(strokeStyle->trimStart.staticValue(), 0.0f);
+    EXPECT_EQ(strokeStyle->trimEnd.staticValue(), 1.0f);
+    EXPECT_EQ(strokeStyle->trimOffset.staticValue(), 0.0f);
 }
 
 TEST(SerializerTest, ColorSerializesAsHexString) {
@@ -232,11 +255,21 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     EXPECT_TRUE(shapes.transform.position.isAnimated());
     EXPECT_EQ(shapes.transform.position.keyframes()[0].easing, Easing::EaseIn());
     EXPECT_EQ(shapes.transform.rotation.staticValue(), 45.0f);
-    ASSERT_EQ(shapes.styles.size(), 1u);
+    ASSERT_EQ(shapes.styles.size(), 2u);
     const auto *fillStyle = static_cast<const FillStyle *>(shapes.styles[0].get());
     EXPECT_TRUE(fillStyle->color.isAnimated());
     EXPECT_EQ(fillStyle->color.evaluate(10), (Color{0.2f, 0.4f, 0.6f, 1}));
     EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Overlay);
+    ASSERT_EQ(shapes.styles.size(), 2u);
+    const auto *strokeStyle =
+        static_cast<const motion::StrokeStyle *>(shapes.styles[1].get());
+    EXPECT_EQ(strokeStyle->width.staticValue(), 4.0f);
+    EXPECT_EQ(strokeStyle->blendMode, motion::BlendMode::Multiply);
+    EXPECT_EQ(strokeStyle->position, motion::StrokePosition::Inside);
+    EXPECT_EQ(strokeStyle->trimStart.staticValue(), 0.25f);
+    EXPECT_EQ(strokeStyle->trimEnd.staticValue(), 0.75f);
+    EXPECT_TRUE(strokeStyle->trimOffset.isAnimated());
+    EXPECT_EQ(strokeStyle->trimOffset.evaluate(20), 90.0f);
 
     // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);

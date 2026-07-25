@@ -57,7 +57,7 @@ TEST(HitTestTest, HitsStrokeWithinTolerance) {
     layer.id = EntityId{1};
     EvaluatedShapeItem item;
     item.isStroke = true;
-    item.strokeWidth = 4;
+    item.stroke.width = 4;
     item.path.closed = false;
     item.path.vertices.push_back({{0, 0}, {}, {}});
     item.path.vertices.push_back({{100, 0}, {}, {}});

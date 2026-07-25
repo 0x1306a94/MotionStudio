@@ -75,6 +75,29 @@ enum FillBlendMode: Int32, CaseIterable, Identifiable {
     }
 }
 
+/// Stroke alignment editable on a stroke style; raw values mirror the bridge
+/// MS_STROKE_POSITION_* tags.
+enum StrokePositionTag: Int32, CaseIterable, Identifiable {
+    case center = 0
+    case inside = 1
+    case outside = 2
+
+    var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .center:
+            "Center"
+        case .inside:
+            "Inside"
+        case .outside:
+            "Outside"
+        }
+    }
+}
+
 extension MotionColor {
     init(_ color: Color) {
         #if canImport(UIKit)

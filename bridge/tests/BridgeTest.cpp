@@ -434,6 +434,60 @@ TEST(BridgeTest, NullHandlesAreSafe) {
     EXPECT_EQ(ms_document_load(nullptr, 0, nullptr), nullptr);
     ms_canvas_draw_frame(nullptr, nullptr, 0, 0);
     ms_command_add_keyframe_float(nullptr, 0, "transform.position", 0, 0.0f);
+    ms_command_add_stroke_style(nullptr, 0);
+    ms_command_set_stroke_position(nullptr, 0, 0, MS_STROKE_POSITION_INSIDE);
+    EXPECT_EQ(ms_layer_style_stroke_position_at(nullptr, 0, 0), -1);
+}
+
+TEST(BridgeCommandTest, StrokeStyleLifecycle) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+
+    // Rect layers start with one default fill; append a stroke.
+    ASSERT_EQ(ms_layer_style_count(document, layerId), 1);
+    ms_command_add_stroke_style(document, layerId);
+    ASSERT_EQ(ms_layer_style_count(document, layerId), 2);
+    EXPECT_EQ(ms_layer_style_type_at(document, layerId, 1), MS_STYLE_STROKE);
+    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
+              MS_STROKE_POSITION_CENTER);
+    // Position query on a fill reports -1.
+    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 0), -1);
+
+    ms_command_set_stroke_position(document, layerId, 1, MS_STROKE_POSITION_INSIDE);
+    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
+              MS_STROKE_POSITION_INSIDE);
+    // Out-of-range position tags fall back to Center.
+    ms_command_set_stroke_position(document, layerId, 1, 99);
+    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
+              MS_STROKE_POSITION_CENTER);
+
+    // Strokes carry their own blend mode.
+    ms_command_set_style_blend_mode(document, layerId, 1, MS_BLEND_MULTIPLY);
+    EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_MULTIPLY);
+
+    // Width and trim properties animate through the generic float channel.
+    ms_command_add_keyframe_float(document, layerId, "styles[1].width", 0, 2.0f);
+    ms_command_add_keyframe_float(document, layerId, "styles[1].trimStart", 0, 0.25f);
+    ms_command_add_keyframe_float(document, layerId, "styles[1].trimOffset", 10, 90.0f);
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "styles[1].width"));
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "styles[1].trimStart"));
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "styles[1].trimOffset"));
+    EXPECT_FLOAT_EQ(ms_property_evaluate_float(document, layerId, "styles[1].trimStart", 5),
+                    0.25f);
+
+    // Undo walks back every stroke edit in reverse order; the two
+    // consecutive position sets merge into a single undo step.
+    EXPECT_TRUE(ms_document_undo(document));  // trimOffset keyframe
+    EXPECT_TRUE(ms_document_undo(document));  // trimStart keyframe
+    EXPECT_TRUE(ms_document_undo(document));  // width keyframe
+    EXPECT_TRUE(ms_document_undo(document));  // blend mode
+    EXPECT_TRUE(ms_document_undo(document));  // position (merged)
+    EXPECT_TRUE(ms_document_undo(document));  // add stroke
+    EXPECT_EQ(ms_layer_style_count(document, layerId), 1);
+    EXPECT_FALSE(ms_property_is_animated(document, layerId, "styles[1].width"));
+
+    ms_document_destroy(document);
 }
 
 }  // namespace

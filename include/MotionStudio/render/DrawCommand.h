@@ -6,9 +6,8 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
-#include "MotionStudio/model/LineCap.h"
-#include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/render/Paint.h"
+#include "MotionStudio/render/StrokeOptions.h"
 
 namespace motion {
 
@@ -32,9 +31,7 @@ struct DrawCommand {
     BlendMode blendMode = BlendMode::Normal;  // SetBlendMode
     BezierPath path;                          // DrawPath / StrokePath / ClipPath
     Paint paint;                              // DrawPath / StrokePath
-    float strokeWidth = 0;                    // StrokePath
-    LineCap cap = LineCap::Butt;              // StrokePath
-    LineJoin join = LineJoin::Miter;          // StrokePath
+    StrokeOptions stroke;                     // StrokePath
     FillRule fillRule = FillRule::NonZero;    // ClipPath
 };
 
