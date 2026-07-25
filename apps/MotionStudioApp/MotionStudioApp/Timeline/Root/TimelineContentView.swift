@@ -28,7 +28,7 @@ struct TimelineContentView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let trackViewportWidth = max(1, proxy.size.width - layerColumnWidth - splitDividerWidth - trackLeadingInset)
+            let trackViewportWidth = max(1, proxy.size.width - layerColumnWidth - splitDividerWidth - trackLeadingInset * 2)
             let pointsPerFrame = resolvedPointsPerFrame(duration: duration,
                                                         availableWidth: trackViewportWidth)
             let trackWidth = max(CGFloat(duration) * pointsPerFrame, trackViewportWidth)
@@ -38,7 +38,7 @@ struct TimelineContentView: View {
                                                     pointsPerFrame: pointsPerFrame,
                                                     scrollX: scrollX)
             let contentPlayheadX = trackLeadingInset + visiblePlayheadX
-            let contentViewportWidth = trackLeadingInset + trackViewportWidth
+            let contentViewportWidth = trackLeadingInset * 2 + trackViewportWidth
 
             VStack(alignment: .leading, spacing: 0) {
                 TimelineControls(editorState: editorState, duration: duration)
