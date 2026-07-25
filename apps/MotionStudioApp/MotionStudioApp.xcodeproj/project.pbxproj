@@ -6,11 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		3C3F0237300F47BB00C76B6A /* libmotionstudio_core.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C3F0234300F47BB00C76B6A /* libmotionstudio_core.a */; };
-		3C3F0238300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C3F0235300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a */; settings = {ATTRIBUTES = (Required, ); }; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		3C3F0206300F477900C76B6A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -35,6 +30,9 @@
 		3C3F0234300F47BB00C76B6A /* libmotionstudio_core.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_core.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C3F0235300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_tgfx_adapter.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C3F0236300F47BB00C76B6A /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BA6486A3014522F00A310A7 /* libmotionstudio_bridge.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_bridge.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BA6486C3014527C00A310A7 /* libmotionstudio_core.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_core.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BA6486D3014527C00A310A7 /* libmotionstudio_tgfx_adapter.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_tgfx_adapter.a; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -83,8 +81,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3C3F0238300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a in Frameworks */,
-				3C3F0237300F47BB00C76B6A /* libmotionstudio_core.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +127,9 @@
 		3C3F0233300F47BB00C76B6A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4BA6486C3014527C00A310A7 /* libmotionstudio_core.a */,
+				4BA6486D3014527C00A310A7 /* libmotionstudio_tgfx_adapter.a */,
+				4BA6486A3014522F00A310A7 /* libmotionstudio_bridge.a */,
 				3C3F0234300F47BB00C76B6A /* libmotionstudio_core.a */,
 				3C3F0235300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a */,
 				3C3F0236300F47BB00C76B6A /* tgfx.a */,

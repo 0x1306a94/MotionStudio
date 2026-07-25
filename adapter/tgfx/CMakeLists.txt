@@ -109,20 +109,23 @@ add_files_by_extension(TGFX_ADAPTER_PUBLIC_HEADERS ".h"
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-add_library(motionstudio_tgfx_adapter STATIC ${TGFX_ADAPTER_PUBLIC_HEADERS} ${TGFX_ADAPTER_SOURCES})
+add_library(tgfx_adapter STATIC ${TGFX_ADAPTER_PUBLIC_HEADERS} ${TGFX_ADAPTER_SOURCES})
+set_target_properties(tgfx_adapter PROPERTIES OUTPUT_NAME motionstudio_tgfx_adapter)
+
+add_library(motionstudio_tgfx_adapter ALIAS tgfx_adapter)
 add_source_group(TGFX_ADAPTER_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src "Sources")
 
-target_include_directories(motionstudio_tgfx_adapter
+target_include_directories(tgfx_adapter
                            PUBLIC
                            "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
-target_include_directories(motionstudio_tgfx_adapter
+target_include_directories(tgfx_adapter
                            PRIVATE
                            "${CMAKE_CURRENT_SOURCE_DIR}/src"
                            "${TGFX_INCLUDE_DIR}")
 
-target_link_libraries(motionstudio_tgfx_adapter
-                      PUBLIC
+target_link_libraries(tgfx_adapter
+                      PRIVATE
                       core
                       "-framework Metal"
                       "-framework MetalKit"
@@ -135,14 +138,14 @@ target_link_libraries(motionstudio_tgfx_adapter
 
 # Xcode / gen_mac: Mac destination is Catalyst (UIKit). Native mac Cocoa is Ninja-only.
 if(NOT CMAKE_GENERATOR MATCHES "Xcode")
-  target_link_libraries(motionstudio_tgfx_adapter
-                        PUBLIC
+  target_link_libraries(tgfx_adapter
+                        PRIVATE
                         "-framework ApplicationServices"
                         "-framework Cocoa")
 endif()
 
-motionstudio_add_tgfx_prebuild(motionstudio_tgfx_adapter)
-motionstudio_link_prebuilt_tgfx(motionstudio_tgfx_adapter)
+motionstudio_add_tgfx_prebuild(tgfx_adapter)
+motionstudio_link_prebuilt_tgfx(tgfx_adapter)
 
 include(GoogleTest)
 add_files_by_extension(TGFX_ADAPTER_TEST_SOURCES ".h;.cpp"

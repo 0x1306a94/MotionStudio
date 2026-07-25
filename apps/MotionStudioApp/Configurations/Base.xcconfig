@@ -23,15 +23,15 @@ SWIFT_OBJC_BRIDGING_HEADER = $(SRCROOT)/MotionStudioApp/Bridge/MotionStudio-Brid
 // Mac destination is Mac Catalyst only — sdk=macosx* means ios-macabi (no native macOS).
 // Include both Products/$(CONFIGURATION) and *-maccatalyst: CMake may use either layout.
 LIBRARY_SEARCH_PATHS = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)
-LIBRARY_SEARCH_PATHS[sdk=macosx*] = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)-maccatalyst $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/catalyst/arm64
-LIBRARY_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)-iphoneos $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64
-LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) $(SRCROOT)/../gen_xcode/Products/$(CONFIGURATION)-iphonesimulator $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64-simulator
+LIBRARY_SEARCH_PATHS[sdk=macosx*] = $(inherited) $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/catalyst/arm64
+LIBRARY_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64
+LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64-simulator
 
 // Core + bridge + tgfx adapter + prebuilt tgfx, and their framework deps.
 CORE_LINK_FLAGS = -lmotionstudio_bridge -lmotionstudio_core -lmotionstudio_tgfx_adapter -ltgfx -lc++ -liconv -framework Metal -framework MetalKit -framework Foundation -framework QuartzCore -framework CoreMedia -framework CoreVideo -framework ImageIO
 OTHER_LDFLAGS = $(inherited) $(CORE_LINK_FLAGS)
-OTHER_LDFLAGS[sdk=macosx*] = $(inherited) $(CORE_LINK_FLAGS) -framework UIKit -framework CoreGraphics
-OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) $(CORE_LINK_FLAGS) -framework UIKit -framework CoreGraphics
-OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) $(CORE_LINK_FLAGS) -framework UIKit -framework CoreGraphics
+OTHER_LDFLAGS[sdk=macosx*] = $(inherited) -framework UIKit -framework CoreGraphics
+OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) -framework UIKit -framework CoreGraphics
+OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) -framework UIKit -framework CoreGraphics
 
 #include? "Developer.xcconfig"

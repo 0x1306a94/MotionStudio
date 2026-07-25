@@ -23,6 +23,9 @@ message(STATUS "BRIDGE_ALL_SOURCES: ${BRIDGE_ALL_SOURCES}")
 message(STATUS "BRIDGE_LINK_LIBRARIES: ${BRIDGE_LINK_LIBRARIES}")
 
 add_library(bridge STATIC ${BRIDGE_PUBLIC_HEADERS} ${BRIDGE_ALL_SOURCES})
+set_target_properties(bridge PROPERTIES OUTPUT_NAME motionstudio_bridge)
+
+add_library(motionstudio_bridge ALIAS bridge)
 
 add_source_group(BRIDGE_ALL_SOURCES ${CMAKE_CURRENT_LIST_DIR}/src "Sources")
 add_source_group(BRIDGE_PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/include "Headers")
@@ -30,9 +33,8 @@ add_source_group(BRIDGE_PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/include "Header
 target_include_directories(bridge PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../adapter/tgfx/src")
-target_link_libraries(bridge PUBLIC ${BRIDGE_LINK_LIBRARIES})
+target_link_libraries(bridge PRIVATE ${BRIDGE_LINK_LIBRARIES})
 target_compile_options(bridge PRIVATE -Wall -Wextra)
-set_target_properties(bridge PROPERTIES OUTPUT_NAME motionstudio_bridge)
 
 
 include(GoogleTest)
