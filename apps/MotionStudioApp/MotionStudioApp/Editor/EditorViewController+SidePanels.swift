@@ -115,6 +115,20 @@ extension EditorViewController {
         updatePanelToggleButton(inspectorToggleButton, isActive: isInspectorPanelVisible)
     }
 
+    /// Unobscured canvas area insets from the current panel/toolbar/timeline frames.
+    func currentCanvasViewportInsets() -> UIEdgeInsets {
+        var insets = UIEdgeInsets.zero
+        if isProjectPanelVisible {
+            insets.left = projectPanel.frame.maxX
+        }
+        if isInspectorPanelVisible {
+            insets.right = view.bounds.width - inspectorPanel.frame.minX
+        }
+        insets.top = topToolbar.frame.maxY
+        insets.bottom = view.bounds.height - timelinePanel.frame.minY
+        return insets
+    }
+
     func updatePanelToggleButton(_ button: UIButton, isActive: Bool) {
         button.backgroundColor = isActive ? Palette.buttonBackground : .clear
         button.tintColor = isActive ? Palette.buttonTint : .secondaryLabel

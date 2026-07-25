@@ -12,7 +12,6 @@ import UIKit
 extension EditorViewController {
     func configureCanvas() {
         canvasViewport.translatesAutoresizingMaskIntoConstraints = false
-        canvasViewport.backgroundColor = .black
         canvasViewport.clipsToBounds = false
         view.addSubview(canvasViewport)
 
@@ -24,6 +23,9 @@ extension EditorViewController {
                                                     registerEdit: { [weak self] actionName in
                                                         self?.registerEdit(actionName)
                                                     })
+        canvasController.viewportInsetsProvider = { [weak self] in
+            self?.currentCanvasViewportInsets() ?? .zero
+        }
         canvasController.view.translatesAutoresizingMaskIntoConstraints = false
         addChild(canvasController)
         canvasViewport.addSubview(canvasController.view)

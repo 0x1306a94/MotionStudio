@@ -18,9 +18,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private let clearSelection: () -> Void
     private let registerEdit: (String) -> Void
 
-    private var metalView: MTKView {
-        view as! MTKView
-    }
+    private var metalView: MTKView!
 
     private nonisolated(unsafe) var canvas: OpaquePointer?
     private var compositionID: UInt64 = 0
@@ -51,6 +49,11 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     // User view transform on top of fit (zoom 1 = fit to drawable).
     private var canvasZoom: CGFloat = 1
     private var canvasPan: CGPoint = .zero
+    /// Current unobscured area insets (panels/toolbar/timeline), queried each
+    /// time the composition is re-fitted (initial display, double-tap reset).
+    var viewportInsetsProvider: (() -> UIEdgeInsets)?
+    private var viewDidAppearOnce = false
+    private var didApplyInitialFit = false
     private var lastPinchScale: CGFloat = 1
     private var lastTouchPanTranslation: CGPoint = .zero
     private var lastScrollTranslation: CGPoint = .zero
@@ -63,6 +66,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private static let maxCanvasZoom: CGFloat = 64
     private static let scrollZoomSensitivity: CGFloat = 0.01
     private static let hitTolerancePoints: CGFloat = 6
+    private static let viewportFitMargin: CGFloat = 12
 
     private struct LayerDrag {
         let layerID: UInt64
@@ -125,15 +129,40 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         // never begin without it.
         view.isMultipleTouchEnabled = true
         view.delegate = self
+        view.clearColor = MTLClearColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
         self.view = view
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
+        setupMetalView()
         configureCanvasGestures()
         syncFromState()
         observeStateChanges()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        viewDidAppearOnce = true
+        applyInitialFitIfNeeded()
+    }
+
+    private func setupMetalView() {
+        metalView = MTKView(frame: view.bounds)
+        metalView.device = MTLCreateSystemDefaultDevice()
+        metalView.isPaused = true
+        metalView.enableSetNeedsDisplay = true
+        metalView.framebufferOnly = true
+        metalView.autoResizeDrawable = true
+        // Multi-touch delivery is off by default; pinch and two-finger pan
+        // never begin without it.
+        metalView.isMultipleTouchEnabled = true
+        metalView.delegate = self
+        metalView.isHidden = true
+        metalView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        view.addSubview(metalView)
     }
 
     private func configureCanvasGestures() {
@@ -232,10 +261,14 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     func mtkView(_: MTKView, drawableSizeWillChange size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
+        applyInitialFitIfNeeded()
         requestDraw()
     }
 
     func draw(in view: MTKView) {
+        // First frame is held back until the initial panel-aware fit, so the
+        // composition never flashes centered on the full canvas.
+        guard didApplyInitialFit else { return }
         let drawStartTime = CACurrentMediaTime()
         let syncToDrawMilliseconds = lastSyncTime.map { (drawStartTime - $0) * 1000 }
         let requestToDrawMilliseconds = lastDrawRequestTime.map { (drawStartTime - $0) * 1000 }
@@ -254,6 +287,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         updateSelectionOutline()
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
         let profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
+        // Reveal only after the first frame is presented; an empty CAMetalLayer
+        // would otherwise flash black.
+        metalView.isHidden = false
         logSlowFrame(profile)
         logDrawScheduling(syncToDrawMilliseconds: syncToDrawMilliseconds,
                           requestToDrawMilliseconds: requestToDrawMilliseconds,
@@ -355,9 +391,64 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     // MARK: - Canvas view transform (zoom & pan)
 
+    /// Applies the panel-aware fit once, after the view appeared with a valid drawable.
+    func applyInitialFitIfNeeded() {
+        guard !didApplyInitialFit,
+              viewDidAppearOnce,
+              view.bounds.width > 0,
+              view.bounds.height > 0,
+              metalView.drawableSize.width > 0,
+              metalView.drawableSize.height > 0
+        else {
+            return
+        }
+        didApplyInitialFit = true
+        resetViewTransform()
+    }
+
     @objc private func handleCanvasDoubleTap() {
-        canvasZoom = 1
-        canvasPan = .zero
+        resetViewTransform()
+    }
+
+    private func resetViewTransform() {
+        let compositionSize = document.core.size(compositionID: compositionID)
+        let drawableSize = metalView.drawableSize
+        let freeRect = view.bounds
+            .inset(by: viewportInsetsProvider?() ?? .zero)
+            .insetBy(dx: Self.viewportFitMargin, dy: Self.viewportFitMargin)
+        guard compositionSize.width > 0,
+              compositionSize.height > 0,
+              drawableSize.width > 0,
+              drawableSize.height > 0,
+              view.bounds.width > 0,
+              freeRect.width > 0,
+              freeRect.height > 0
+        else {
+            canvasZoom = 1
+            canvasPan = .zero
+            pushViewTransform()
+            return
+        }
+        // Base fit mirroring the adapter's on-screen transform, then re-solve
+        // zoom/pan so the composition lands fully inside the unobscured rect.
+        let fitScale = min(1, min(drawableSize.width / compositionSize.width,
+                                  drawableSize.height / compositionSize.height))
+        let destWidth = max(1, floor(compositionSize.width * fitScale + 0.000001))
+        let destHeight = max(1, floor(compositionSize.height * fitScale + 0.000001))
+        let fitScaleX = destWidth / compositionSize.width
+        let fitScaleY = destHeight / compositionSize.height
+        let offsetX = floor((drawableSize.width - destWidth) * 0.5)
+        let offsetY = floor((drawableSize.height - destHeight) * 0.5)
+        let contentsScale = drawableSize.width / view.bounds.width
+
+        let targetScale = min(1, min(freeRect.width * contentsScale / compositionSize.width,
+                                     freeRect.height * contentsScale / compositionSize.height))
+        let zoom = min(targetScale / fitScaleX, targetScale / fitScaleY)
+        canvasZoom = min(max(zoom, Self.minCanvasZoom), Self.maxCanvasZoom)
+        let displayedWidth = compositionSize.width * canvasZoom * fitScaleX / contentsScale
+        let displayedHeight = compositionSize.height * canvasZoom * fitScaleY / contentsScale
+        canvasPan = CGPoint(x: freeRect.midX - displayedWidth * 0.5 - canvasZoom * offsetX / contentsScale,
+                            y: freeRect.midY - displayedHeight * 0.5 - canvasZoom * offsetY / contentsScale)
         pushViewTransform()
     }
 
@@ -365,10 +456,12 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         switch gesture.state {
         case .began:
             lastPinchScale = gesture.scale
+
         case .changed:
             let delta = gesture.scale / lastPinchScale
             lastPinchScale = gesture.scale
             applyZoom(delta: delta, anchor: gesture.location(in: view))
+
         default:
             break
         }
@@ -378,11 +471,13 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         switch gesture.state {
         case .began:
             lastTouchPanTranslation = .zero
+
         case .changed:
             let translation = gesture.translation(in: view)
             applyPan(delta: CGPoint(x: translation.x - lastTouchPanTranslation.x,
                                     y: translation.y - lastTouchPanTranslation.y))
             lastTouchPanTranslation = translation
+
         default:
             lastTouchPanTranslation = .zero
         }
@@ -407,6 +502,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         switch gesture.state {
         case .began:
             lastScrollTranslation = .zero
+
         case .changed:
             let translation = gesture.translation(in: view)
             let delta = CGPoint(x: translation.x - lastScrollTranslation.x,
@@ -421,6 +517,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             } else {
                 applyPan(delta: delta)
             }
+
         default:
             lastScrollTranslation = .zero
         }
@@ -443,10 +540,11 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func pushViewTransform() {
-        guard let canvas else {
-            return
+        // The canvas is created lazily in draw(in:) and picks up the current
+        // zoom/pan there; the draw must still be scheduled before it exists.
+        if let canvas {
+            ms_canvas_set_view_transform(canvas, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
         }
-        ms_canvas_set_view_transform(canvas, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
         requestDraw()
     }
 
@@ -585,8 +683,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
         let fitScale = min(1, min(drawableSize.width / compositionSize.width,
                                   drawableSize.height / compositionSize.height))
-        let destWidth = max(1, floor(compositionSize.width * fitScale + 0.000_001))
-        let destHeight = max(1, floor(compositionSize.height * fitScale + 0.000_001))
+        let destWidth = max(1, floor(compositionSize.width * fitScale + 0.000001))
+        let destHeight = max(1, floor(compositionSize.height * fitScale + 0.000001))
         let fitScaleX = destWidth / compositionSize.width
         let fitScaleY = destHeight / compositionSize.height
         let offsetX = floor((drawableSize.width - destWidth) * 0.5)
