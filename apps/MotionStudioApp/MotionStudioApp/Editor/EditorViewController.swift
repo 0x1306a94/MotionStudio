@@ -72,6 +72,7 @@ final class EditorViewController: UIViewController {
     var timelineDragStartHeight = Metrics.timelinePreferredHeight
     var isProjectPanelVisible = true
     var isInspectorPanelVisible = true
+    var saveAsTemporaryDirectoryURL: URL?
 
     init(document: MotionProjectDocument) {
         self.document = document

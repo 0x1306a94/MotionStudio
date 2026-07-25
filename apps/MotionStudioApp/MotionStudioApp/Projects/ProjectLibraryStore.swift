@@ -76,11 +76,6 @@ enum ProjectLibraryStore {
         try uniqueProjectURL(baseName: "Untitled")
     }
 
-    static func makeProjectCopyURL(for url: URL) throws -> URL {
-        let baseName = url.deletingPathExtension().lastPathComponent
-        return try uniqueProjectURL(baseName: "\(baseName) Copy")
-    }
-
     static func importProjectIfNeeded(from sourceURL: URL) throws -> URL {
         if isInProjectLibrary(sourceURL) {
             return sourceURL
