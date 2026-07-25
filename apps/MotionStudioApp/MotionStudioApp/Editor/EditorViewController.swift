@@ -46,11 +46,13 @@ final class EditorViewController: UIViewController {
 
     let document: MotionProjectDocument
     let editorState = EditorState()
-    private let editorUndoManager = UndoManager()
+    let editorUndoManager = UndoManager()
 
     let canvasViewport = UIView()
     let topToolbar = UIVisualEffectView(effect: nil)
     let saveButton = UIButton(type: .system)
+    let undoButton = UIButton(type: .system)
+    let redoButton = UIButton(type: .system)
     let documentStatusView = UIView()
     let documentDirtyIndicator = UIView()
     let documentStatusLabel = UILabel()
@@ -95,6 +97,10 @@ final class EditorViewController: UIViewController {
         configureCreationToolbar()
         initializeSaveStateIfNeeded()
         becomeFirstResponder()
+        #if !targetEnvironment(macCatalyst)
+            observeUndoManagerNotifications()
+            updateUndoButtonStates()
+        #endif
     }
 
     override func viewWillAppear(_ animated: Bool) {

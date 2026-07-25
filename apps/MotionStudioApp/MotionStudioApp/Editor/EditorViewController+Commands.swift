@@ -37,6 +37,35 @@ extension EditorViewController {
         editorState.isPlaying.toggle()
     }
 
+    @objc func performUndoFromButton() {
+        editorUndoManager.undo()
+    }
+
+    @objc func performRedoFromButton() {
+        editorUndoManager.redo()
+    }
+
+    func observeUndoManagerNotifications() {
+        let center = NotificationCenter.default
+        center.addObserver(self,
+                           selector: #selector(updateUndoButtonStates),
+                           name: .NSUndoManagerDidCloseUndoGroup,
+                           object: editorUndoManager)
+        center.addObserver(self,
+                           selector: #selector(updateUndoButtonStates),
+                           name: .NSUndoManagerDidUndoChange,
+                           object: editorUndoManager)
+        center.addObserver(self,
+                           selector: #selector(updateUndoButtonStates),
+                           name: .NSUndoManagerDidRedoChange,
+                           object: editorUndoManager)
+    }
+
+    @objc func updateUndoButtonStates() {
+        undoButton.isEnabled = editorUndoManager.canUndo
+        redoButton.isEnabled = editorUndoManager.canRedo
+    }
+
     @objc func addRectangleLayer() {
         let compositionID = document.core.firstCompositionID
         perform("Add Rectangle") {

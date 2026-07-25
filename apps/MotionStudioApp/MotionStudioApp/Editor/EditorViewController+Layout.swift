@@ -15,14 +15,11 @@ extension EditorViewController {
         canvasViewport.clipsToBounds = false
         view.addSubview(canvasViewport)
 
-        let canvasController = CanvasViewController(document: document.modelDocument,
-                                                    editorState: editorState,
-                                                    clearSelection: { [weak self] in
-                                                        self?.clearSelection()
-                                                    },
-                                                    registerEdit: { [weak self] actionName in
-                                                        self?.registerEdit(actionName)
-                                                    })
+        let canvasController = CanvasViewController(document: document.modelDocument, editorState: editorState, clearSelection: { [weak self] in
+            self?.clearSelection()
+        }, registerEdit: { [weak self] actionName in
+            self?.registerEdit(actionName)
+        })
         canvasController.viewportInsetsProvider = { [weak self] in
             self?.currentCanvasViewportInsets() ?? .zero
         }
@@ -77,9 +74,24 @@ extension EditorViewController {
                                action: #selector(toggleInspectorPanel))
 
         #if !targetEnvironment(macCatalyst)
+            configureToolbarButton(undoButton,
+                                   systemName: "arrow.uturn.left",
+                                   accessibilityLabel: "Undo",
+                                   action: #selector(performUndoFromButton))
+            configureToolbarButton(redoButton,
+                                   systemName: "arrow.uturn.right",
+                                   accessibilityLabel: "Redo",
+                                   action: #selector(performRedoFromButton))
+        #endif
+
+        #if !targetEnvironment(macCatalyst)
             contentStack.addArrangedSubview(saveButton)
         #endif
         contentStack.addArrangedSubview(projectToggleButton)
+        #if !targetEnvironment(macCatalyst)
+            contentStack.addArrangedSubview(undoButton)
+            contentStack.addArrangedSubview(redoButton)
+        #endif
         contentStack.addArrangedSubview(UIView())
         contentStack.addArrangedSubview(inspectorToggleButton)
 
