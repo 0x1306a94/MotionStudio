@@ -16,7 +16,7 @@ alwaysApply: true
 
 ## 提交
 
-- 提交前必须执行 `./codeformat.sh`：格式化产生的改动随本次提交入库，重跑脚本无 diff 后方可提交
+- 源码格式化由 git hook `pre-commit` 在提交时自动处理（仅暂存的 C++/ObjC/Swift）；无需在每次提交前手动跑 `./codeformat.sh`。`./codeformat.sh` 仅用于需要全量格式化时的手动执行
 - **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
 
 ### 自动提交

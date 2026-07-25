@@ -36,11 +36,10 @@ ctest --test-dir build -R 'SerializerTest' --output-on-failure
 ctest --test-dir build -L benchmark
 ```
 
-代码格式化（clang-format 14，经 pipx 安装；Swift 用 swiftformat；产生 diff 即失败，它同时是 CI 的格式门禁，提交前必跑且重跑无 diff）：
+代码格式化（clang-format 14，经 pipx 安装；Swift 用 swiftformat）：
 
-```bash
-./codeformat.sh
-```
+- **提交时**：由 git hook `pre-commit` 自动格式化本次暂存的 C++/ObjC/Swift 源码（`git_hooks/pre-commit`，经 `./sync_deps.sh` 安装到 `.git/hooks/pre-commit`）。日常提交无需再手动跑全量脚本。
+- **全量格式化**：需要时手动执行 `./codeformat.sh`（扫描约定源码目录并 in-place 格式化；仅用于手动全量整理，不是提交流程门禁）。
 
 应用层（Apple 平台）：
 
@@ -49,7 +48,15 @@ ctest --test-dir build -L benchmark
 apps/gen_mac
 
 # 之后用 MotionStudio.xcworkspace 构建 / 运行 MotionStudioApp
+```
 
+编译 Xcode 工程时**优先使用 Xcode MCP**，不可用再回退 `xcodebuild`：
+
+1. **检查 MCP 是否可用**：探测 `user-xcode`（或等价 Xcode MCP）是否 `ready`；可用则先调 `XcodeListWindows` 确认已打开 `MotionStudio.xcworkspace` 并拿到 `tabIdentifier`。若 server 为 `needsAuth` / `error` / `loading`、无窗口、或工具调用失败，视为不可用。
+2. **优先路径（MCP）**：对目标 tab 调用 `BuildProject`；失败时用 `GetBuildLog` 取错误。scheme / destination 以 Xcode 当前活动配置为准（需 Mac Catalyst 或 iPad Simulator 时，先在 Xcode 里选好再编）。
+3. **回退路径（`xcodebuild`）**：仅当 MCP 不可用时使用：
+
+```bash
 # 编译 Mac Catalyst
 xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configuration Debug -destination "generic/platform=macOS,variant=Mac Catalyst,name=Any Mac" ARCHS="arm64"
 
@@ -95,7 +102,7 @@ CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ni
 
 ## 项目规范
 
-`.claude/rules/` 下的规范（自动加载，必须遵守）：`coding-style.md`（命名/禁异常与 dynamic_cast/注释约定等）、`git-workflow.md`（分支命名、commit 信息、提交前跑 `./codeformat.sh`、自动提交规则）、`testing.md`（GoogleTest 约定：不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()` 断言、death test、round-trip 与 undo 一致性等专项模式）、`codegraph.md`（CodeGraph MCP 工具的使用规范）。
+`.claude/rules/` 下的规范（自动加载，必须遵守）：`coding-style.md`（命名/禁异常与 dynamic_cast/注释约定等）、`git-workflow.md`（分支命名、commit 信息、pre-commit 格式化、自动提交规则）、`testing.md`（GoogleTest 约定：不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()` 断言、death test、round-trip 与 undo 一致性等专项模式）、`codegraph.md`（CodeGraph MCP 工具的使用规范）。
 
 <!-- CODEGRAPH_START -->
 CodeGraph 使用规范见 `.claude/rules/codegraph.md`。

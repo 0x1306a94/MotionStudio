@@ -22,6 +22,14 @@
       }
     ]
   },
+  "linkfiles": {
+    "common": [
+      {
+        "src": "git_hooks/pre-commit",
+        "dest": ".git/hooks/pre-commit"
+      }
+    ]
+  },
   "actions": {
     "common": [
       {
