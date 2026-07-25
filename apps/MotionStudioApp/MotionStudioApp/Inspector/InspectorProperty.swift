@@ -16,7 +16,20 @@ enum FillBlendMode: Int32, CaseIterable, Identifiable {
     case normal = 0
     case multiply = 1
     case screen = 2
-    case add = 3
+    case overlay = 3
+    case darken = 4
+    case lighten = 5
+    case colorDodge = 6
+    case colorBurn = 7
+    case hardLight = 8
+    case softLight = 9
+    case difference = 10
+    case exclusion = 11
+    case hue = 12
+    case saturation = 13
+    case color = 14
+    case luminosity = 15
+    case add = 16
 
     var id: Int32 {
         rawValue
@@ -30,6 +43,32 @@ enum FillBlendMode: Int32, CaseIterable, Identifiable {
             "Multiply"
         case .screen:
             "Screen"
+        case .overlay:
+            "Overlay"
+        case .darken:
+            "Darken"
+        case .lighten:
+            "Lighten"
+        case .colorDodge:
+            "Color Dodge"
+        case .colorBurn:
+            "Color Burn"
+        case .hardLight:
+            "Hard Light"
+        case .softLight:
+            "Soft Light"
+        case .difference:
+            "Difference"
+        case .exclusion:
+            "Exclusion"
+        case .hue:
+            "Hue"
+        case .saturation:
+            "Saturation"
+        case .color:
+            "Color"
+        case .luminosity:
+            "Luminosity"
         case .add:
             "Add"
         }

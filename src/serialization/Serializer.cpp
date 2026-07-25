@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -155,22 +156,72 @@ Expected<Vec2, std::string> Vec2FromJson(const json &node) {
     return Vec2{*x, *y};
 }
 
+uint8_t ColorChannelToByte(float value) {
+    const float clamped = std::fmin(std::fmax(value, 0.0f), 1.0f);
+    return static_cast<uint8_t>(std::lroundf(clamped * 255.0f));
+}
+
+int HexDigitValue(char digit) {
+    if (digit >= '0' && digit <= '9') {
+        return digit - '0';
+    }
+    if (digit >= 'a' && digit <= 'f') {
+        return digit - 'a' + 10;
+    }
+    if (digit >= 'A' && digit <= 'F') {
+        return digit - 'A' + 10;
+    }
+    return -1;
+}
+
+Expected<uint8_t, std::string> HexByteAt(const std::string &text, size_t offset) {
+    const int high = HexDigitValue(text[offset]);
+    const int low = HexDigitValue(text[offset + 1]);
+    if (high < 0 || low < 0) {
+        return Unexpected(std::string("Color hex string has a non-hex digit"));
+    }
+    return static_cast<uint8_t>(high * 16 + low);
+}
+
 json ColorToJson(Color value) {
-    return json::array({value.r, value.g, value.b, value.a});
+    // #RRGGBBAA keeps the file readable and round-trip stable; colors are
+    // quantized to 8 bits per channel.
+    char text[10];
+    std::snprintf(text, sizeof(text), "#%02X%02X%02X%02X",
+                  ColorChannelToByte(value.r), ColorChannelToByte(value.g),
+                  ColorChannelToByte(value.b), ColorChannelToByte(value.a));
+    return std::string(text);
 }
 
 Expected<Color, std::string> ColorFromJson(const json &node) {
-    if (!node.is_array() || node.size() != 4) {
-        return Unexpected(std::string("Color must be a 4-element array"));
+    if (node.is_string()) {
+        const std::string text = node.get<std::string>();
+        if (text.size() != 9 || text[0] != '#') {
+            return Unexpected(std::string("Color must be a #RRGGBBAA hex string"));
+        }
+        uint8_t channels[4] = {};
+        for (size_t index = 0; index < 4; ++index) {
+            Expected<uint8_t, std::string> byte = HexByteAt(text, 1 + index * 2);
+            if (!byte) {
+                return Unexpected(byte.error());
+            }
+            channels[index] = *byte;
+        }
+        return Color{channels[0] / 255.0f, channels[1] / 255.0f,
+                     channels[2] / 255.0f, channels[3] / 255.0f};
     }
-    Expected<float, std::string> r = AsFloat(node[0]);
-    Expected<float, std::string> g = AsFloat(node[1]);
-    Expected<float, std::string> b = AsFloat(node[2]);
-    Expected<float, std::string> a = AsFloat(node[3]);
-    if (!r || !g || !b || !a) {
-        return Unexpected(std::string("Color component is not a number"));
+    // Legacy format: 4-element float array [r, g, b, a].
+    if (node.is_array() && node.size() == 4) {
+        Expected<float, std::string> r = AsFloat(node[0]);
+        Expected<float, std::string> g = AsFloat(node[1]);
+        Expected<float, std::string> b = AsFloat(node[2]);
+        Expected<float, std::string> a = AsFloat(node[3]);
+        if (!r || !g || !b || !a) {
+            return Unexpected(std::string("Color component is not a number"));
+        }
+        return Color{*r, *g, *b, *a};
     }
-    return Color{*r, *g, *b, *a};
+    return Unexpected(std::string("Color must be a #RRGGBBAA hex string"));
 }
 
 json BezierPathToJson(const BezierPath &path) {

@@ -142,38 +142,15 @@ PropertyPath MakePath(uint64_t entityId, const char *path) {
 }
 
 motion::BlendMode MakeBlendMode(int blendMode) {
-    switch (blendMode) {
-        case MS_BLEND_MULTIPLY: {
-            return motion::BlendMode::Multiply;
-        }
-        case MS_BLEND_SCREEN: {
-            return motion::BlendMode::Screen;
-        }
-        case MS_BLEND_ADD: {
-            return motion::BlendMode::Add;
-        }
-        default: {
-            return motion::BlendMode::Normal;
-        }
+    // Bridge tags mirror the motion::BlendMode ordinals.
+    if (blendMode < MS_BLEND_NORMAL || blendMode > MS_BLEND_ADD) {
+        return motion::BlendMode::Normal;
     }
+    return static_cast<motion::BlendMode>(blendMode);
 }
 
 int BlendModeTag(motion::BlendMode blendMode) {
-    switch (blendMode) {
-        case motion::BlendMode::Normal: {
-            return MS_BLEND_NORMAL;
-        }
-        case motion::BlendMode::Multiply: {
-            return MS_BLEND_MULTIPLY;
-        }
-        case motion::BlendMode::Screen: {
-            return MS_BLEND_SCREEN;
-        }
-        case motion::BlendMode::Add: {
-            return MS_BLEND_ADD;
-        }
-    }
-    return MS_BLEND_NORMAL;
+    return static_cast<int>(blendMode);
 }
 
 Easing MakeEasing(int easingType, float inX, float inY, float outX, float outY) {
@@ -786,6 +763,27 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
     }
 }
 
+void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *r, float *g, float *b, float *a) {
+    DocumentLock guard(document);
+    const Animatable<Color> *property = AsColor(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return;
+    }
+    const Color value = property->evaluate(static_cast<FrameTime>(frame));
+    if (r != nullptr) {
+        *r = value.r;
+    }
+    if (g != nullptr) {
+        *g = value.g;
+    }
+    if (b != nullptr) {
+        *b = value.b;
+    }
+    if (a != nullptr) {
+        *a = value.a;
+    }
+}
+
 /* ============================ commands ============================ */
 
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value) {
@@ -864,6 +862,11 @@ void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, cons
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec2{x, y}))));
+}
+
+void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Color{r, g, b, a}))));
 }
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {

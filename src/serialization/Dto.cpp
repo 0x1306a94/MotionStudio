@@ -163,6 +163,45 @@ const char *ToString(BlendMode mode) {
         case BlendMode::Screen: {
             return "screen";
         }
+        case BlendMode::Overlay: {
+            return "overlay";
+        }
+        case BlendMode::Darken: {
+            return "darken";
+        }
+        case BlendMode::Lighten: {
+            return "lighten";
+        }
+        case BlendMode::ColorDodge: {
+            return "color-dodge";
+        }
+        case BlendMode::ColorBurn: {
+            return "color-burn";
+        }
+        case BlendMode::HardLight: {
+            return "hard-light";
+        }
+        case BlendMode::SoftLight: {
+            return "soft-light";
+        }
+        case BlendMode::Difference: {
+            return "difference";
+        }
+        case BlendMode::Exclusion: {
+            return "exclusion";
+        }
+        case BlendMode::Hue: {
+            return "hue";
+        }
+        case BlendMode::Saturation: {
+            return "saturation";
+        }
+        case BlendMode::Color: {
+            return "color";
+        }
+        case BlendMode::Luminosity: {
+            return "luminosity";
+        }
         case BlendMode::Add: {
             return "add";
         }
@@ -179,6 +218,45 @@ Expected<BlendMode, std::string> blendModeFromString(const std::string &text) {
     }
     if (text == "screen") {
         return BlendMode::Screen;
+    }
+    if (text == "overlay") {
+        return BlendMode::Overlay;
+    }
+    if (text == "darken") {
+        return BlendMode::Darken;
+    }
+    if (text == "lighten") {
+        return BlendMode::Lighten;
+    }
+    if (text == "color-dodge") {
+        return BlendMode::ColorDodge;
+    }
+    if (text == "color-burn") {
+        return BlendMode::ColorBurn;
+    }
+    if (text == "hard-light") {
+        return BlendMode::HardLight;
+    }
+    if (text == "soft-light") {
+        return BlendMode::SoftLight;
+    }
+    if (text == "difference") {
+        return BlendMode::Difference;
+    }
+    if (text == "exclusion") {
+        return BlendMode::Exclusion;
+    }
+    if (text == "hue") {
+        return BlendMode::Hue;
+    }
+    if (text == "saturation") {
+        return BlendMode::Saturation;
+    }
+    if (text == "color") {
+        return BlendMode::Color;
+    }
+    if (text == "luminosity") {
+        return BlendMode::Luminosity;
     }
     if (text == "add") {
         return BlendMode::Add;

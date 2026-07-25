@@ -98,7 +98,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     styleColorKeyframe.time = 10;
     styleColorKeyframe.value = Color{0.2f, 0.4f, 0.6f, 1};
     fillStyle->color.addKeyframe(styleColorKeyframe);
-    fillStyle->blendMode = motion::BlendMode::Screen;
+    fillStyle->blendMode = motion::BlendMode::Overlay;
     shapeLayer->styles.push_back(std::move(fillStyle));
 
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
@@ -179,6 +179,37 @@ TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
     EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Normal);
 }
 
+TEST(SerializerTest, ColorSerializesAsHexString) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->backgroundColor = Color{1, 0, 0.5f, 1};
+
+    const auto json = nlohmann::json::parse(Serializer::serialize(document));
+    EXPECT_EQ(json["compositions"][0]["backgroundColor"], "#FF0080FF");
+}
+
+TEST(SerializerTest, LegacyColorArrayStillAccepted) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    json["compositions"][1]["backgroundColor"] = {0.2, 0.4, 0.6, 1.0};
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(restored.hasValue());
+    EXPECT_EQ((*restored)->compositions[1]->backgroundColor,
+              (Color{0.2f, 0.4f, 0.6f, 1.0f}));
+}
+
+TEST(SerializerTest, InvalidColorHexRejected) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    json["compositions"][1]["backgroundColor"] = "#GGGGGGGG";
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    EXPECT_FALSE(restored.hasValue());
+}
+
 TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     auto document = BuildRichDocument();
     Expected<std::unique_ptr<Document>, std::string> restored =
@@ -205,7 +236,7 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     const auto *fillStyle = static_cast<const FillStyle *>(shapes.styles[0].get());
     EXPECT_TRUE(fillStyle->color.isAnimated());
     EXPECT_EQ(fillStyle->color.evaluate(10), (Color{0.2f, 0.4f, 0.6f, 1}));
-    EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Screen);
+    EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Overlay);
 
     // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);

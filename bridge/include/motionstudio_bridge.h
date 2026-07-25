@@ -52,12 +52,25 @@ enum {
     MS_STYLE_STROKE = 1,
 };
 
-// Blend mode tag, mirrors motion::BlendMode.
+// Blend mode tag, mirrors motion::BlendMode ordinals (Lottie "bm" value set).
 enum {
     MS_BLEND_NORMAL = 0,
     MS_BLEND_MULTIPLY = 1,
     MS_BLEND_SCREEN = 2,
-    MS_BLEND_ADD = 3,
+    MS_BLEND_OVERLAY = 3,
+    MS_BLEND_DARKEN = 4,
+    MS_BLEND_LIGHTEN = 5,
+    MS_BLEND_COLOR_DODGE = 6,
+    MS_BLEND_COLOR_BURN = 7,
+    MS_BLEND_HARD_LIGHT = 8,
+    MS_BLEND_SOFT_LIGHT = 9,
+    MS_BLEND_DIFFERENCE = 10,
+    MS_BLEND_EXCLUSION = 11,
+    MS_BLEND_HUE = 12,
+    MS_BLEND_SATURATION = 13,
+    MS_BLEND_COLOR = 14,
+    MS_BLEND_LUMINOSITY = 15,
+    MS_BLEND_ADD = 16,
 };
 
 // Animatable value type tag, mirrors motion::AnimatableType.
@@ -200,6 +213,7 @@ int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, cons
 // Value of the property evaluated at the given frame.
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y);
+void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *r, float *g, float *b, float *a);
 
 /* ============================ commands ============================ */
 // Every function below executes a command through the document's undo
@@ -217,6 +231,7 @@ void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compos
 // Adds a keyframe holding the property's given value at frame.
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value);
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
+void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a);
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.

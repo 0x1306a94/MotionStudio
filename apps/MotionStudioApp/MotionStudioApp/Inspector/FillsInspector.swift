@@ -7,12 +7,13 @@
 
 import SwiftUI
 
-/// One row per fill (color, blend mode, delete) plus an add button in the
-/// section header. Fills are addressed by their index in the layer's style
-/// list, matching the "styles[N]" property paths.
+/// One row per fill (color with keyframe toggle, blend mode, delete) plus an
+/// add button in the section header. Fills are addressed by their index in the
+/// layer's style list, matching the "styles[N]" property paths.
 struct FillsInspector: View {
     let core: MotionDocumentCore
     let layerID: UInt64
+    let playheadFrame: Int64
     let isEditable: Bool
     let perform: (String, () -> Void) -> Void
 
@@ -33,9 +34,11 @@ struct FillsInspector: View {
             .disabled(!isEditable)
         }
         ForEach(Array(fills.enumerated()), id: \.element) { position, styleIndex in
+            let hasKeyframe = hasKeyframe(styleIndex: styleIndex)
             HStack(spacing: 8) {
                 ColorPicker("Fill \(position + 1)",
-                            selection: colorBinding(styleIndex: styleIndex),
+                            selection: colorBinding(styleIndex: styleIndex,
+                                                    hasKeyframe: hasKeyframe),
                             supportsOpacity: true)
                     .font(.callout)
                 Picker("", selection: blendBinding(styleIndex: styleIndex)) {
@@ -46,6 +49,14 @@ struct FillsInspector: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .fixedSize()
+                Button {
+                    toggleKeyframe(styleIndex: styleIndex, hasKeyframe: hasKeyframe)
+                } label: {
+                    Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
+                        .foregroundStyle(hasKeyframe ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .help(hasKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
                 Button(role: .destructive) {
                     removeFill(styleIndex: styleIndex)
                 } label: {
@@ -66,15 +77,26 @@ struct FillsInspector: View {
         "styles[\(styleIndex)].color"
     }
 
-    private func colorBinding(styleIndex: Int) -> Binding<Color> {
+    private func hasKeyframe(styleIndex: Int) -> Bool {
+        core.keyframeFrames(entityID: layerID, path: fillColorPath(styleIndex: styleIndex))
+            .contains(playheadFrame)
+    }
+
+    private func colorBinding(styleIndex: Int, hasKeyframe: Bool) -> Binding<Color> {
         Binding {
-            core.staticColor(entityID: layerID, path: fillColorPath(styleIndex: styleIndex)).swiftUIColor
+            core.evaluateColor(entityID: layerID, path: fillColorPath(styleIndex: styleIndex),
+                               frame: playheadFrame).swiftUIColor
         } set: { newValue in
             guard isEditable else { return }
+            let path = fillColorPath(styleIndex: styleIndex)
+            let value = MotionColor(newValue).clampedChannels()
             perform("Set Fill Color") {
-                core.setStaticColor(entityID: layerID,
-                                    path: fillColorPath(styleIndex: styleIndex),
-                                    value: MotionColor(newValue).clampedChannels())
+                if hasKeyframe {
+                    core.addKeyframeColor(entityID: layerID, path: path,
+                                          frame: playheadFrame, value: value)
+                } else {
+                    core.setStaticColor(entityID: layerID, path: path, value: value)
+                }
                 core.endDrag()
             }
         }
@@ -88,6 +110,22 @@ struct FillsInspector: View {
             perform("Set Fill Blend Mode") {
                 core.setStyleBlendMode(layerID: layerID, index: styleIndex,
                                        blendMode: newValue.rawValue)
+            }
+        }
+    }
+
+    private func toggleKeyframe(styleIndex: Int, hasKeyframe: Bool) {
+        guard isEditable else { return }
+        let path = fillColorPath(styleIndex: styleIndex)
+        if hasKeyframe {
+            perform("Delete Keyframe") {
+                core.removeKeyframe(entityID: layerID, path: path, frame: playheadFrame)
+            }
+        } else {
+            let value = core.evaluateColor(entityID: layerID, path: path, frame: playheadFrame)
+            perform("Add Keyframe") {
+                core.addKeyframeColor(entityID: layerID, path: path,
+                                      frame: playheadFrame, value: value)
             }
         }
     }

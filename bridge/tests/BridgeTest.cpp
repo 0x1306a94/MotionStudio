@@ -131,6 +131,14 @@ TEST(BridgeCommandTest, FillStyleLifecycle) {
     ms_command_set_style_blend_mode(document, layerId, 1, MS_BLEND_SCREEN);
     EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_SCREEN);
 
+    ms_command_set_style_blend_mode(document, layerId, 1, MS_BLEND_OVERLAY);
+    EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_OVERLAY);
+
+    // Out-of-range blend tags fall back to Normal.
+    ms_command_set_style_blend_mode(document, layerId, 1, 99);
+    EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_NORMAL);
+
+    ms_command_set_style_blend_mode(document, layerId, 1, MS_BLEND_SCREEN);
     EXPECT_TRUE(ms_document_undo(document));
     EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_NORMAL);
 
@@ -140,6 +148,34 @@ TEST(BridgeCommandTest, FillStyleLifecycle) {
     EXPECT_EQ(ms_layer_style_count(document, layerId), 2);
     EXPECT_TRUE(ms_document_redo(document));
     EXPECT_EQ(ms_layer_style_count(document, layerId), 1);
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCommandTest, ColorKeyframeLifecycle) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+
+    EXPECT_FALSE(ms_property_is_animated(document, layerId, "styles[0].color"));
+    ms_command_add_keyframe_color(document, layerId, "styles[0].color", 10, 1.0f, 0, 0, 1.0f);
+    ms_command_add_keyframe_color(document, layerId, "styles[0].color", 20, 0, 0, 1.0f, 1.0f);
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "styles[0].color"));
+    EXPECT_EQ(ms_property_keyframe_count(document, layerId, "styles[0].color"), 2);
+
+    // Midpoint between the two linear keyframes blends the colors.
+    float r = 0, g = 0, b = 0, a = 0;
+    ms_property_evaluate_color(document, layerId, "styles[0].color", 15, &r, &g, &b, &a);
+    EXPECT_FLOAT_EQ(r, 0.5f);
+    EXPECT_FLOAT_EQ(g, 0.0f);
+    EXPECT_FLOAT_EQ(b, 0.5f);
+    EXPECT_FLOAT_EQ(a, 1.0f);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_FALSE(ms_property_is_animated(document, layerId, "styles[0].color"));
+    EXPECT_TRUE(ms_document_redo(document));
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "styles[0].color"));
 
     ms_document_destroy(document);
 }

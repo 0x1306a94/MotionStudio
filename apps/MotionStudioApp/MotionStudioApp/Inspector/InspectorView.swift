@@ -54,6 +54,7 @@ struct InspectorView: View {
                         if core.layerType(layerID) == MS_LAYER_SHAPE {
                             FillsInspector(core: core,
                                            layerID: layerID,
+                                           playheadFrame: editorState.playheadFrame,
                                            isEditable: isEditable,
                                            perform: perform)
                         }

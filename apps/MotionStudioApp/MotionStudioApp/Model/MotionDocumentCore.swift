@@ -359,6 +359,21 @@ final class MotionDocumentCore {
         return CGVector(dx: CGFloat(x), dy: CGFloat(y))
     }
 
+    func evaluateColor(entityID: UInt64, path: String, frame: Int64) -> MotionColor {
+        var r: Float = 0
+        var g: Float = 0
+        var b: Float = 0
+        var a: Float = 0
+        ms_property_evaluate_color(handle, entityID, path, frame, &r, &g, &b, &a)
+        return MotionColor(r: r, g: g, b: b, a: a)
+    }
+
+    /// Frames of all keyframes on the property, ascending. Type-agnostic.
+    func keyframeFrames(entityID: UInt64, path: String) -> [Int64] {
+        let count = ms_property_keyframe_count(handle, entityID, path)
+        return (0 ..< Int(count)).map { ms_property_keyframe_time_at(handle, entityID, path, Int32($0)) }
+    }
+
     // MARK: - Undoable edits
 
     // Every method below runs a command through the core undo manager and
@@ -419,6 +434,12 @@ final class MotionDocumentCore {
     func addKeyframeVec2(entityID: UInt64, path: String, frame: Int64, value: CGVector) {
         ms_command_add_keyframe_vec2(handle, entityID, path, frame,
                                      Float(value.dx), Float(value.dy))
+        changed()
+    }
+
+    func addKeyframeColor(entityID: UInt64, path: String, frame: Int64, value: MotionColor) {
+        ms_command_add_keyframe_color(handle, entityID, path, frame,
+                                      value.r, value.g, value.b, value.a)
         changed()
     }
 

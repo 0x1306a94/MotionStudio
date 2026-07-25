@@ -44,6 +44,45 @@ tgfx::BlendMode ToTgfxBlendMode(BlendMode mode) {
         case BlendMode::Screen: {
             return tgfx::BlendMode::Screen;
         }
+        case BlendMode::Overlay: {
+            return tgfx::BlendMode::Overlay;
+        }
+        case BlendMode::Darken: {
+            return tgfx::BlendMode::Darken;
+        }
+        case BlendMode::Lighten: {
+            return tgfx::BlendMode::Lighten;
+        }
+        case BlendMode::ColorDodge: {
+            return tgfx::BlendMode::ColorDodge;
+        }
+        case BlendMode::ColorBurn: {
+            return tgfx::BlendMode::ColorBurn;
+        }
+        case BlendMode::HardLight: {
+            return tgfx::BlendMode::HardLight;
+        }
+        case BlendMode::SoftLight: {
+            return tgfx::BlendMode::SoftLight;
+        }
+        case BlendMode::Difference: {
+            return tgfx::BlendMode::Difference;
+        }
+        case BlendMode::Exclusion: {
+            return tgfx::BlendMode::Exclusion;
+        }
+        case BlendMode::Hue: {
+            return tgfx::BlendMode::Hue;
+        }
+        case BlendMode::Saturation: {
+            return tgfx::BlendMode::Saturation;
+        }
+        case BlendMode::Color: {
+            return tgfx::BlendMode::Color;
+        }
+        case BlendMode::Luminosity: {
+            return tgfx::BlendMode::Luminosity;
+        }
         case BlendMode::Add: {
             return tgfx::BlendMode::PlusLighter;
         }
