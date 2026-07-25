@@ -54,16 +54,17 @@ TEST(CommandBuilderTest, LayerExpandsToScopedDrawSequence) {
     state.layers.push_back(std::move(layer));
 
     auto commands = BuildCommands(state);
-    ASSERT_EQ(commands.size(), 6u);
+    ASSERT_EQ(commands.size(), 7u);
     EXPECT_EQ(commands[0].type, DrawCommandType::Save);
-    EXPECT_EQ(commands[1].type, DrawCommandType::SetOpacity);
-    EXPECT_FLOAT_EQ(commands[1].opacity, 0.5f);
-    EXPECT_EQ(commands[2].type, DrawCommandType::SetBlendMode);
-    EXPECT_EQ(commands[2].blendMode, BlendMode::Screen);
-    EXPECT_EQ(commands[3].type, DrawCommandType::DrawPath);
-    EXPECT_EQ(commands[3].paint.color, (Color{1, 0, 0, 1}));
-    EXPECT_EQ(commands[4].type, DrawCommandType::StrokePath);
-    EXPECT_EQ(commands[5].type, DrawCommandType::Restore);
+    EXPECT_EQ(commands[1].type, DrawCommandType::ConcatTransform);
+    EXPECT_EQ(commands[2].type, DrawCommandType::SetOpacity);
+    EXPECT_FLOAT_EQ(commands[2].opacity, 0.5f);
+    EXPECT_EQ(commands[3].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[3].blendMode, BlendMode::Screen);
+    EXPECT_EQ(commands[4].type, DrawCommandType::DrawPath);
+    EXPECT_EQ(commands[4].paint.color, (Color{1, 0, 0, 1}));
+    EXPECT_EQ(commands[5].type, DrawCommandType::StrokePath);
+    EXPECT_EQ(commands[6].type, DrawCommandType::Restore);
 }
 
 TEST(CommandBuilderTest, ItemBlendModeEmitsSetBlendModeOnChange) {
@@ -75,16 +76,16 @@ TEST(CommandBuilderTest, ItemBlendModeEmitsSetBlendModeOnChange) {
 
     auto commands = BuildCommands(state);
     // Layer-level SetBlendMode, then a blend switch before each diverging item.
-    ASSERT_EQ(commands.size(), 8u);
-    EXPECT_EQ(commands[2].type, DrawCommandType::SetBlendMode);
-    EXPECT_EQ(commands[2].blendMode, BlendMode::Normal);
+    ASSERT_EQ(commands.size(), 9u);
     EXPECT_EQ(commands[3].type, DrawCommandType::SetBlendMode);
-    EXPECT_EQ(commands[3].blendMode, BlendMode::Add);
-    EXPECT_EQ(commands[4].type, DrawCommandType::DrawPath);
-    EXPECT_EQ(commands[5].type, DrawCommandType::SetBlendMode);
-    EXPECT_EQ(commands[5].blendMode, BlendMode::Normal);
-    EXPECT_EQ(commands[6].type, DrawCommandType::StrokePath);
-    EXPECT_EQ(commands[7].type, DrawCommandType::Restore);
+    EXPECT_EQ(commands[3].blendMode, BlendMode::Normal);
+    EXPECT_EQ(commands[4].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[4].blendMode, BlendMode::Add);
+    EXPECT_EQ(commands[5].type, DrawCommandType::DrawPath);
+    EXPECT_EQ(commands[6].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[6].blendMode, BlendMode::Normal);
+    EXPECT_EQ(commands[7].type, DrawCommandType::StrokePath);
+    EXPECT_EQ(commands[8].type, DrawCommandType::Restore);
 }
 
 TEST(CommandBuilderTest, StrokeItemCarriesStrokeParameters) {
@@ -94,11 +95,11 @@ TEST(CommandBuilderTest, StrokeItemCarriesStrokeParameters) {
     state.layers.push_back(std::move(layer));
 
     auto commands = BuildCommands(state);
-    ASSERT_EQ(commands.size(), 5u);
-    EXPECT_EQ(commands[3].type, DrawCommandType::StrokePath);
-    EXPECT_FLOAT_EQ(commands[3].stroke.width, 3.0f);
-    EXPECT_EQ(commands[3].stroke.cap, LineCap::Round);
-    EXPECT_EQ(commands[3].paint.color, (Color{0, 0, 1, 1}));
+    ASSERT_EQ(commands.size(), 6u);
+    EXPECT_EQ(commands[4].type, DrawCommandType::StrokePath);
+    EXPECT_FLOAT_EQ(commands[4].stroke.width, 3.0f);
+    EXPECT_EQ(commands[4].stroke.cap, LineCap::Round);
+    EXPECT_EQ(commands[4].paint.color, (Color{0, 0, 1, 1}));
 }
 
 TEST(CommandBuilderTest, MultipleLayersKeepRenderOrder) {
@@ -107,12 +108,12 @@ TEST(CommandBuilderTest, MultipleLayersKeepRenderOrder) {
     state.layers.push_back(EvaluatedLayer{});
 
     auto commands = BuildCommands(state);
-    // Two empty layers: (Save/SetOpacity/SetBlendMode/Restore) x 2.
-    ASSERT_EQ(commands.size(), 8u);
+    // Two empty layers: (Save/ConcatTransform/SetOpacity/SetBlendMode/Restore) x 2.
+    ASSERT_EQ(commands.size(), 10u);
     EXPECT_EQ(commands[0].type, DrawCommandType::Save);
-    EXPECT_EQ(commands[3].type, DrawCommandType::Restore);
-    EXPECT_EQ(commands[4].type, DrawCommandType::Save);
-    EXPECT_EQ(commands[7].type, DrawCommandType::Restore);
+    EXPECT_EQ(commands[4].type, DrawCommandType::Restore);
+    EXPECT_EQ(commands[5].type, DrawCommandType::Save);
+    EXPECT_EQ(commands[9].type, DrawCommandType::Restore);
 }
 
 TEST(CommandBuilderTest, SelectionOutlineBuildsStrokeForSelectedLayerBounds) {

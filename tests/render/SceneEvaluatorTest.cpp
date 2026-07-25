@@ -2,11 +2,11 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
@@ -18,11 +18,11 @@ using motion::Expected;
 using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
+using motion::Mat3;
 using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
-using motion::ShapeGroup;
 using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::Vec2;
@@ -88,7 +88,7 @@ TEST(SceneEvaluatorTest, EmptyCompositionProducesViewportAndBackground) {
     EXPECT_TRUE(result->layers.empty());
 }
 
-TEST(SceneEvaluatorTest, RectFillProducesOneWorldSpaceItem) {
+TEST(SceneEvaluatorTest, RectFillProducesOneLocalSpaceItem) {
     RectScene scene;
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
@@ -96,6 +96,7 @@ TEST(SceneEvaluatorTest, RectFillProducesOneWorldSpaceItem) {
     const auto &evaluated = result->layers[0];
     EXPECT_EQ(evaluated.id, scene.layer->id);
     EXPECT_FLOAT_EQ(evaluated.opacity, 1.0f);
+    EXPECT_EQ(evaluated.worldTransform, Mat3::Identity());
     ASSERT_EQ(evaluated.shapeItems.size(), 1u);
     const auto &item = evaluated.shapeItems[0];
     EXPECT_FALSE(item.isStroke);
@@ -165,13 +166,14 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesPositionAndTrim) {
     EXPECT_FLOAT_EQ(strokeItem.stroke.trimOffset, 90.0f);
 }
 
-TEST(SceneEvaluatorTest, LayerTransformAppliesToPath) {
+TEST(SceneEvaluatorTest, LayerTransformStoredSeparatelyFromPath) {
     RectScene scene;
     scene.layer->transform.position.setStaticValue(Vec2{10, 20});
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto &item = result->layers[0].shapeItems[0];
-    EXPECT_EQ(item.path.vertices[0].point, (Vec2{90, 60}));
+    const auto &evaluated = result->layers[0];
+    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{10, 20}));
+    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
 }
 
 TEST(SceneEvaluatorTest, ParentTransformChain) {
@@ -185,8 +187,9 @@ TEST(SceneEvaluatorTest, ParentTransformChain) {
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);  // Group parent produces no items
-    const auto &item = result->layers[0].shapeItems[0];
-    EXPECT_EQ(item.path.vertices[0].point, (Vec2{180, 40}));
+    const auto &evaluated = result->layers[0];
+    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{100, 0}));
+    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
 }
 
 TEST(SceneEvaluatorTest, OpacityInheritsFromParent) {
@@ -229,22 +232,22 @@ TEST(SceneEvaluatorTest, InvisibleLayerSkipped) {
     EXPECT_TRUE(result->layers.empty());
 }
 
-TEST(SceneEvaluatorTest, GroupTransformComposesIntoPath) {
+TEST(SceneEvaluatorTest, LayerGroupParentKeepsChildPathLocal) {
     RectScene scene;
-    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
-    auto group = std::make_unique<ShapeGroup>();
-    group->transform.position.setStaticValue(Vec2{5, 5});
-    auto rect = std::make_unique<ShapeRect>();
-    rect->position.setStaticValue(Vec2{0, 0});
-    rect->size.setStaticValue(Vec2{10, 10});
-    group->elements.push_back(std::move(rect));
-    content->geometry = std::move(group);
+    scene.rect->position.setStaticValue(Vec2{0, 0});
+    scene.rect->size.setStaticValue(Vec2{10, 10});
+    Layer *parent =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    parent->outPoint = 100;
+    parent->transform.position.setStaticValue(Vec2{5, 5});
+    scene.layer->parentId = parent->id;
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto &item = result->layers[0].shapeItems[0];
-    EXPECT_EQ(item.path.vertices[0].point, (Vec2{0, 0}));
-    EXPECT_EQ(item.path.vertices[2].point, (Vec2{10, 10}));
+    const auto &evaluated = result->layers[0];
+    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{5, 5}));
+    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
+    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[2].point, (Vec2{5, 5}));
 }
 
 TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
@@ -295,8 +298,9 @@ TEST(SceneEvaluatorTest, AnimatedTransformEvaluatedAtTime) {
 
     Expected<SceneState, std::string> mid = scene.Evaluate(5);
     ASSERT_TRUE(mid.hasValue());
-    const auto &item = mid->layers[0].shapeItems[0];
-    EXPECT_EQ(item.path.vertices[0].point, (Vec2{130, 40}));
+    const auto &evaluated = mid->layers[0];
+    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{50, 0}));
+    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
 }
 
 TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
@@ -312,6 +316,7 @@ TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
 
     Expected<SceneState, std::string> quarter = scene.EvaluatePreview(2.5);
     ASSERT_TRUE(quarter.hasValue());
-    const auto &item = quarter->layers[0].shapeItems[0];
-    EXPECT_EQ(item.path.vertices[0].point, (Vec2{105, 40}));
+    const auto &evaluated = quarter->layers[0];
+    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{25, 0}));
+    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
 }

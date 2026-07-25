@@ -1,21 +1,10 @@
 #include "MotionStudio/model/Document.h"
 
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeGroup.h"
 
 namespace motion {
 
 void Document::refreshEntityIndex() {
-    auto registerShapeTree = [this](auto &self, ShapeElement *element) -> void {
-        entityIndex_.registerShape(element);
-        if (element->type() == ShapeType::Group) {
-            auto *group = static_cast<ShapeGroup *>(element);
-            for (auto &child : group->elements) {
-                self(self, child.get());
-            }
-        }
-    };
-
     entityIndex_.clear();
     for (auto &composition : compositions) {
         entityIndex_.registerComposition(composition.get());
@@ -24,7 +13,7 @@ void Document::refreshEntityIndex() {
             if (layer->content->type() == LayerType::Shape) {
                 auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
                 if (shapeContent->geometry) {
-                    registerShapeTree(registerShapeTree, shapeContent->geometry.get());
+                    entityIndex_.registerShape(shapeContent->geometry.get());
                 }
             }
         }

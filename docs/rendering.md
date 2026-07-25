@@ -14,8 +14,8 @@ FrameTime t
 └────────┬─────────┘
          ▼
 ┌──────────────────┐
-│ CommandBuilder   │  扁平化为绘制指令序列（展开 ShapeGroup、
-│ → DrawCommandList│  压入 save/restore、transform、opacity、clip）
+│ CommandBuilder   │  扁平化为绘制指令序列（每层 ConcatTransform、
+│ → DrawCommandList│  压入 save/restore、opacity、clip；path 保持 layer 局部）
 └────────┬─────────┘
          ▼
 ┌──────────────────┐
@@ -30,7 +30,7 @@ FrameTime t
 
 ```cpp
 struct EvaluatedShapeItem {
-    BezierPath path;        // 已应用所有 shape transform 的世界空间路径
+    BezierPath path;        // layer 局部坐标；世界位置由 EvaluatedLayer::worldTransform 表达
     Paint paint;            // 纯色（M3 首版），后续扩展渐变
     bool isStroke;
     float strokeWidth;
@@ -40,10 +40,10 @@ struct EvaluatedShapeItem {
 
 struct EvaluatedLayer {
     EntityId id;            // 保留 ID 供 UI 命中检测
-    Mat3 worldTransform;
+    Mat3 worldTransform;    // CommandBuilder 发成 ConcatTransform
     float opacity;          // 已继承父级 opacity
     BlendMode blendMode;
-    std::vector<EvaluatedShapeItem> shapeItems;  // ShapeGroup 已展开
+    std::vector<EvaluatedShapeItem> shapeItems;
 };
 
 struct SceneState {

@@ -4,7 +4,6 @@
 
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapeRect.h"
 
 using motion::Composition;
@@ -12,7 +11,6 @@ using motion::Document;
 using motion::Layer;
 using motion::LayerType;
 using motion::ShapeContent;
-using motion::ShapeGroup;
 using motion::ShapeRect;
 
 namespace {
@@ -71,19 +69,17 @@ TEST(DocumentTest, TakeLayerUnregistersSubtree) {
     Layer *layer = AddShapeLayer(document, composition->id);
 
     auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
-    auto group = std::make_unique<ShapeGroup>();
-    auto nestedRect = std::make_unique<ShapeRect>();
-    const motion::EntityId nestedId = nestedRect->id;
-    group->elements.push_back(std::move(nestedRect));
-    shapeContent->geometry = std::move(group);
+    auto rect = std::make_unique<ShapeRect>();
+    const motion::EntityId shapeId = rect->id;
+    shapeContent->geometry = std::move(rect);
     document.refreshEntityIndex();
-    ASSERT_NE(document.entityIndex().findShape(nestedId), nullptr);
+    ASSERT_NE(document.entityIndex().findShape(shapeId), nullptr);
 
     std::unique_ptr<Layer> taken = document.takeLayer(composition->id, layer->id);
     ASSERT_NE(taken, nullptr);
     EXPECT_EQ(taken->id, layer->id);
     EXPECT_EQ(document.entityIndex().findLayer(layer->id), nullptr);
-    EXPECT_EQ(document.entityIndex().findShape(nestedId), nullptr);
+    EXPECT_EQ(document.entityIndex().findShape(shapeId), nullptr);
     EXPECT_TRUE(composition->layers.empty());
 }
 

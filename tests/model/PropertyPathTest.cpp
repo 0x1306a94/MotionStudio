@@ -8,7 +8,6 @@
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/ShapeContent.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TextContent.h"
 
@@ -23,7 +22,6 @@ using motion::ParsePropertyPath;
 using motion::PropertyPath;
 using motion::ResolveAnimatable;
 using motion::ShapeContent;
-using motion::ShapeGroup;
 using motion::ShapeRect;
 using motion::StrokeStyle;
 
@@ -57,23 +55,15 @@ struct ShapeScene {
     Composition *composition;
     Layer *layer;
     ShapeRect *rect = nullptr;
-    ShapeGroup *group = nullptr;
-    ShapeRect *nestedRect = nullptr;
 
     ShapeScene() {
         composition = document.addComposition(std::make_unique<Composition>());
         layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
         auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
 
-        auto groupElement = std::make_unique<ShapeGroup>();
-        group = groupElement.get();
         auto rectElement = std::make_unique<ShapeRect>();
         rect = rectElement.get();
-        groupElement->elements.push_back(std::move(rectElement));
-        auto nestedRectElement = std::make_unique<ShapeRect>();
-        nestedRect = nestedRectElement.get();
-        groupElement->elements.push_back(std::move(nestedRectElement));
-        shapeContent->geometry = std::move(groupElement);
+        shapeContent->geometry = std::move(rectElement);
 
         document.refreshEntityIndex();
     }
@@ -93,13 +83,6 @@ TEST(ResolveAnimatableTest, ResolvesShapeById) {
     ShapeScene scene;
     AnimatableBase *resolved = ResolveAnimatable(scene.document, {scene.rect->id, "size"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.rect->size));
-}
-
-TEST(ResolveAnimatableTest, ResolvesNestedShapeById) {
-    ShapeScene scene;
-    AnimatableBase *resolved =
-        ResolveAnimatable(scene.document, {scene.nestedRect->id, "cornerRadius"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.nestedRect->cornerRadius));
 }
 
 TEST(ResolveAnimatableTest, ResolvesPrimaryShapePropertyFromLayer) {
@@ -134,13 +117,6 @@ TEST(ResolveAnimatableTest, ResolvesLayerStyleProperty) {
         ResolveAnimatable(scene.document, {scene.layer->id, "styles[1].width"});
     EXPECT_EQ(color, static_cast<AnimatableBase *>(&fillStyle->color));
     EXPECT_EQ(width, static_cast<AnimatableBase *>(&strokeStyle->width));
-}
-
-TEST(ResolveAnimatableTest, ResolvesGroupTransform) {
-    ShapeScene scene;
-    AnimatableBase *resolved = ResolveAnimatable(
-        scene.document, {scene.group->id, "transform.opacity"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&scene.group->transform.opacity));
 }
 
 TEST(ResolveAnimatableTest, ResolvesTextContent) {

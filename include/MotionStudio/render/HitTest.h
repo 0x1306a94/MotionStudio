@@ -7,8 +7,8 @@
 
 namespace motion {
 
-// Returns true when point is inside any filled shape or close enough to any
-// stroked shape in the already-evaluated, world-space layer geometry.
+// Returns true when point (scene space) hits any filled/stroked shape on the
+// layer. Layer-local paths are transformed by EvaluatedLayer::worldTransform.
 bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance);
 
 // Returns the axis-aligned scene-space bounds of the evaluated layer geometry.

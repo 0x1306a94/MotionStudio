@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/animation/Keyframe.h"
+#include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
@@ -18,6 +19,7 @@ using motion::FillStyle;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
+using motion::Mat3;
 using motion::PrecompContent;
 using motion::SceneEvaluator;
 using motion::SceneState;
@@ -63,7 +65,8 @@ TEST(PrecompTest, FlattensSublayerKeepingItsId) {
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
     EXPECT_EQ(result->layers[0].id, rectLayer->id);  // sublayer id preserved
-    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{95, -5}));
+    EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{100, 0}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
 }
 
 TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
@@ -86,11 +89,12 @@ TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
     precomp->startTime = 5;
     precomp->timeStretch = 2;
 
-    // outer 15 -> inner (15-10)*2+5 = 15 -> position x = 75 -> rect left = 70.
+    // outer 15 -> inner (15-10)*2+5 = 15 -> layer position x = 75; path stays local.
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 15);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
-    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{70, -5}));
+    EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{75, 0}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
 }
 
 TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
@@ -111,8 +115,9 @@ TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
-    // rect left = 0 + 10 + 20 - 5
-    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{25, -5}));
+    // Nested precomp transforms compose into worldTransform; path stays local.
+    EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{30, 0}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
     EXPECT_FLOAT_EQ(result->layers[0].opacity, 0.25f);
 }
 

@@ -7,7 +7,6 @@
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
@@ -137,9 +136,6 @@ AnimatableBase *resolveShapeProperty(ShapeElement *element, const std::string &n
             }
             break;
         }
-        case ShapeType::Group: {
-            break;
-        }
     }
     return nullptr;
 }
@@ -180,11 +176,6 @@ AnimatableBase *resolveShapeElementPath(ShapeElement *element,
                                         const std::vector<PathSegment> &segments) {
     if (segments.size() == 1) {
         return resolveShapeProperty(element, segments[0].name);
-    }
-    if (segments.size() == 2 && segments[0].name == "transform" &&
-        element->type() == ShapeType::Group) {
-        auto *group = static_cast<ShapeGroup *>(element);
-        return resolveTransformProperty(group->transform, segments[1].name);
     }
     return nullptr;
 }

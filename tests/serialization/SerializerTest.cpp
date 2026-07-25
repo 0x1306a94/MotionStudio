@@ -9,7 +9,6 @@
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
@@ -35,7 +34,6 @@ using motion::SchemaMigrator;
 using motion::Serializer;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
-using motion::ShapeGroup;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::ShapeTrimPath;
@@ -115,23 +113,31 @@ std::unique_ptr<Document> BuildRichDocument() {
 
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
 
-    auto group = std::make_unique<ShapeGroup>();
-    group->transform.position.setStaticValue(Vec2{5, 5});
-
     auto path = std::make_unique<ShapePath>();
     motion::BezierPath bezier;
     bezier.closed = true;
     bezier.vertices.push_back({{0, 0}, {-1, 0}, {1, 0}});
     bezier.vertices.push_back({{10, 0}, {-1, 0}, {1, 0}});
     path->path.setStaticValue(bezier);
-    group->elements.push_back(std::move(path));
-    group->elements.push_back(std::make_unique<ShapeRect>());
-    group->elements.push_back(std::make_unique<ShapeEllipse>());
-    group->elements.push_back(std::make_unique<ShapeTrimPath>());
-    const motion::EntityId geometryId = group->id;
-    shapeContent->geometry = std::move(group);
+    shapeContent->geometry = std::move(path);
 
     composition->layers.push_back(std::move(shapeLayer));
+
+    // Additional shape layers cover the other geometry variants (one geometry per layer).
+    auto rectLayer = std::make_unique<Layer>(LayerType::Shape);
+    static_cast<ShapeContent *>(rectLayer->content.get())->geometry =
+        std::make_unique<ShapeRect>();
+    composition->layers.push_back(std::move(rectLayer));
+
+    auto ellipseLayer = std::make_unique<Layer>(LayerType::Shape);
+    static_cast<ShapeContent *>(ellipseLayer->content.get())->geometry =
+        std::make_unique<ShapeEllipse>();
+    composition->layers.push_back(std::move(ellipseLayer));
+
+    auto trimLayer = std::make_unique<Layer>(LayerType::Shape);
+    static_cast<ShapeContent *>(trimLayer->content.get())->geometry =
+        std::make_unique<ShapeTrimPath>();
+    composition->layers.push_back(std::move(trimLayer));
 
     // Group parent layer + child layer referencing it.
     auto nullLayer = std::make_unique<Layer>(LayerType::Group);
@@ -241,7 +247,7 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
 
     ASSERT_EQ((*restored)->compositions.size(), 2u);
     const Composition &main = *(*restored)->compositions[1];
-    ASSERT_EQ(main.layers.size(), 5u);
+    ASSERT_EQ(main.layers.size(), 8u);
     EXPECT_EQ(main.frameRate, (motion::FrameRate{30000, 1001}));
 
     const Layer &shapes = *main.layers[0];
@@ -278,9 +284,9 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     ASSERT_NE(originalContent->geometry, nullptr);
     EXPECT_NE((*restored)->entityIndex().findShape(originalContent->geometry->id), nullptr);
 
-    // Parent-child relationship preserved.
-    const Layer &textLayer = *main.layers[2];
-    EXPECT_EQ(textLayer.parentId, main.layers[1]->id);
+    // Parent-child relationship preserved (null group at index 4, text at 5).
+    const Layer &textLayer = *main.layers[5];
+    EXPECT_EQ(textLayer.parentId, main.layers[4]->id);
 }
 
 TEST(SerializerTest, AnimatableJsonShape) {

@@ -11,7 +11,7 @@ class Document;
 
 // Walks a composition at a given time and flattens it into a SceneState:
 // world transforms, parent chains, opacity inheritance, in/outPoint clipping,
-// ShapeGroup expansion and precomp recursion with time remapping.
+// and precomp recursion with time remapping. Geometry paths stay layer-local.
 class SceneEvaluator {
   public:
     // Evaluates a composition into an immutable scene snapshot.

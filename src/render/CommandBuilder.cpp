@@ -31,6 +31,11 @@ DrawCommandList BuildCommands(const SceneState &state) {
         save.type = DrawCommandType::Save;
         commands.push_back(save);
 
+        DrawCommand transform;
+        transform.type = DrawCommandType::ConcatTransform;
+        transform.transform = layer.worldTransform;
+        commands.push_back(transform);
+
         DrawCommand opacity;
         opacity.type = DrawCommandType::SetOpacity;
         opacity.opacity = layer.opacity;

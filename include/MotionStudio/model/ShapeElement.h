@@ -6,8 +6,8 @@
 namespace motion {
 
 // Base class for shape geometry elements. Fill/Stroke live on Layer as styles.
-// Concrete geometry types: ShapePath, ShapeGroup, ShapeRect, ShapeEllipse, ShapeTrimPath.
-// Elements are rendered in the order they appear in their parent list.
+// Concrete geometry types: ShapePath, ShapeRect, ShapeEllipse, ShapeTrimPath.
+// Nesting / shared transforms use the Layer tree (LayerType::Group + parentId).
 class ShapeElement {
   public:
     // type: which shape element variant this instance represents.

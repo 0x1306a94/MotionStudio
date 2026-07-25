@@ -56,7 +56,7 @@ cmake -B build -G Ninja && cmake --build build && cd build && ctest   # 全绿
 
 **交付物**
 - `animation/`：贝塞尔缓动求解器（牛顿 + 二分）、空间贝塞尔插值
-- `render/`：SceneEvaluator（世界变换、parent 链、opacity 继承、in/outPoint 裁剪、ShapeGroup 展开）、SceneState
+- `render/`：SceneEvaluator（世界变换、parent 链、opacity 继承、in/outPoint 裁剪、layer-local path）、SceneState
 - Precomp 递归求值与时间映射
 - BezierPath 顶点自动匹配（短路径边上插点）
 - 性能基准测试

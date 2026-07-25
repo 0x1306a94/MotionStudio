@@ -167,7 +167,7 @@ Mat3 Layer::worldTransform(FrameTime t, const Document& doc) const {
 
 ```cpp
 class ShapeContent : public LayerContent {
-    std::vector<std::unique_ptr<ShapeElement>> elements;  // 有序
+    std::unique_ptr<ShapeElement> geometry;  // 单几何：Path / Rect / Ellipse / TrimPath
 };
 class ImageContent : public LayerContent {
     EntityId assetId;                       // 引用 Document 级 Asset
@@ -183,30 +183,20 @@ class PrecompContent : public LayerContent {
 };
 ```
 
-### 3.5 Shape 模型（参考 Lottie，更精简）
+### 3.5 Shape 模型
+
+每个 Shape Layer 持有**一个**几何（`ShapeContent::geometry`）。Fill/Stroke 在 `Layer::styles`。
+需要共享 transform 的多几何用 `LayerType::Group` + `parentId` 组织，不在形状树内嵌套。
 
 ```cpp
 class ShapePath : public ShapeElement {
-    Animatable<BezierPath> path;            // 整条路径作为可动画值
-};
-class ShapeFill : public ShapeElement {
-    Animatable<Color> color;
-    Animatable<float> opacity{1};
-    FillRule fillRule = FillRule::NonZero;
-};
-class ShapeStroke : public ShapeElement {
-    Animatable<Color> color;
-    Animatable<float> width{2};
-    Animatable<float> opacity{1};
-    LineCap cap; LineJoin join; float miterLimit = 4;
-};
-class ShapeGroup : public ShapeElement {    // 组，可含自己的 Transform
-    Transform transform;
-    std::vector<std::unique_ptr<ShapeElement>> elements;
+    Animatable<BezierPath> path;            // 整条路径作为可动画值（layer 局部）
 };
 class ShapeRect    : public ShapeElement { /* position, size, cornerRadius */ };
 class ShapeEllipse : public ShapeElement { /* position, size */ };
 class ShapeTrimPath : public ShapeElement { /* start, end, offset */ };
+// Fill / Stroke → LayerStyle（挂在 Layer::styles）
+// 组变换 → LayerType::Group（NullContent）+ parentId
 ```
 
 ## 4. Animatable\<T\>——可动画属性
@@ -335,7 +325,7 @@ private:
 ```cpp
 struct PropertyPath {
     EntityId entityId;      // Layer 或 ShapeElement 的 ID
-    std::string path;       // "transform.position"、"elements[0].fill.color"
+    std::string path;       // "transform.position"、"styles[0].color"、"size"
 };
 
 class MoveKeyframeCommand : public Command {

@@ -9,8 +9,8 @@
 
 namespace motion {
 
-// A visible layer evaluated at one point in time. ShapeGroups are already
-// expanded into shapeItems; precomp layers are flattened into the layer list.
+// A visible layer evaluated at one point in time. Paths in shapeItems are
+// layer-local; precomp layers are flattened into the layer list.
 struct EvaluatedLayer {
     EntityId id;  // kept for UI hit-testing
     Mat3 worldTransform;

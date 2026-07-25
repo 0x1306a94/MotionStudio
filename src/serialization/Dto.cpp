@@ -47,9 +47,6 @@ const char *ToString(ShapeType type) {
         case ShapeType::Path: {
             return "path";
         }
-        case ShapeType::Group: {
-            return "group";
-        }
         case ShapeType::Rect: {
             return "rect";
         }
@@ -66,9 +63,6 @@ const char *ToString(ShapeType type) {
 Expected<ShapeType, std::string> shapeTypeFromString(const std::string &text) {
     if (text == "path") {
         return ShapeType::Path;
-    }
-    if (text == "group") {
-        return ShapeType::Group;
     }
     if (text == "rect") {
         return ShapeType::Rect;

@@ -20,7 +20,6 @@
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
@@ -641,20 +640,12 @@ Expected<Mask, std::string> MaskFromJson(const json &node) {
 
 // ---- Shape elements (discriminant field "type") ----
 
-json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>> &elements);
-
 json ShapeToJson(const ShapeElement &element) {
     json node{{"id", IdToString(element.id)}, {"type", dto::ToString(element.type())}};
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
             node["path"] = AnimatableToJson(shape.path);
-            break;
-        }
-        case ShapeType::Group: {
-            const auto &shape = static_cast<const ShapeGroup &>(element);
-            node["transform"] = TransformToJson(shape.transform);
-            node["elements"] = ShapesToJson(shape.elements);
             break;
         }
         case ShapeType::Rect: {
@@ -681,14 +672,6 @@ json ShapeToJson(const ShapeElement &element) {
     return node;
 }
 
-json ShapesToJson(const std::vector<std::unique_ptr<ShapeElement>> &elements) {
-    json nodes = json::array();
-    for (const auto &element : elements) {
-        nodes.push_back(ShapeToJson(*element));
-    }
-    return nodes;
-}
-
 Expected<std::unique_ptr<ShapeElement>, std::string> ShapeFromJson(const json &node) {
     Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
     if (!typeText) {
@@ -709,30 +692,6 @@ Expected<std::unique_ptr<ShapeElement>, std::string> ShapeFromJson(const json &n
             Expected<void, std::string> result = AnimatableFromJson(**pathNode, shape->path);
             if (!result) {
                 return Unexpected(result.error());
-            }
-            element = std::move(shape);
-            break;
-        }
-        case ShapeType::Group: {
-            auto shape = std::make_unique<ShapeGroup>();
-            Expected<const json *, std::string> transformNode = Child(node, "transform");
-            if (!transformNode) {
-                return Unexpected(transformNode.error());
-            }
-            Expected<void, std::string> result = TransformFromJson(**transformNode, shape->transform);
-            if (!result) {
-                return Unexpected(result.error());
-            }
-            const json *elementsNode = FindChild(node, "elements");
-            if (!elementsNode || !elementsNode->is_array()) {
-                return Unexpected(std::string("Group is missing the elements array"));
-            }
-            for (const json &childNode : *elementsNode) {
-                Expected<std::unique_ptr<ShapeElement>, std::string> child = ShapeFromJson(childNode);
-                if (!child) {
-                    return Unexpected(child.error());
-                }
-                shape->elements.push_back(std::move(*child));
             }
             element = std::move(shape);
             break;

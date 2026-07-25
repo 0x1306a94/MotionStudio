@@ -8,7 +8,7 @@ namespace motion {
 
 // One flattened draw primitive produced by scene evaluation.
 struct EvaluatedShapeItem {
-    BezierPath path;  // world-space path, all shape transforms applied
+    BezierPath path;  // layer-local path; world placement via EvaluatedLayer::worldTransform
     Paint paint;
     bool isStroke = false;
     StrokeOptions stroke;

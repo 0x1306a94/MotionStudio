@@ -144,6 +144,15 @@ struct FlattenedShapeItem {
     std::vector<Vec2> points;
 };
 
+// Flatten layer-local path, then map samples into scene space for hit/bounds.
+std::vector<Vec2> FlattenPathInWorld(const BezierPath &path, const Mat3 &worldTransform) {
+    std::vector<Vec2> points = FlattenPath(path);
+    for (Vec2 &point : points) {
+        point = worldTransform.transformPoint(point);
+    }
+    return points;
+}
+
 bool HitTestShapeItem(const EvaluatedShapeItem &item, const std::vector<Vec2> &points, Vec2 point, float tolerance) {
     const float strokeTolerance = std::max(tolerance, item.stroke.width * 0.5f + tolerance);
     if (item.isStroke) {
@@ -171,7 +180,7 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
         FlattenedShapeItem flattened;
         flattened.item = &item;
-        flattened.points = FlattenPath(item.path);
+        flattened.points = FlattenPathInWorld(item.path, layer.worldTransform);
         if (flattened.points.empty()) {
             continue;
         }
@@ -201,7 +210,7 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
     maxPoint = {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
     bool hasBounds = false;
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
-        std::vector<Vec2> points = FlattenPath(item.path);
+        std::vector<Vec2> points = FlattenPathInWorld(item.path, layer.worldTransform);
         if (points.empty()) {
             continue;
         }

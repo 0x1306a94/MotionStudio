@@ -10,7 +10,6 @@
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
-#include "MotionStudio/model/ShapeGroup.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 
@@ -26,19 +25,6 @@ Mat3 LocalMatrixOf(const Transform &transform, PreviewTime time) {
         Mat3::Rotate(transform.rotation.evaluatePreview(time)) *
         Mat3::Scale(transform.scale.evaluatePreview(time)) *
         Mat3::Translate(-transform.anchorPoint.evaluatePreview(time));
-}
-
-// Applies the matrix to a path; tangents take the linear part only.
-BezierPath TransformPath(const BezierPath &path, const Mat3 &matrix) {
-    BezierPath result;
-    result.closed = path.closed;
-    result.vertices.reserve(path.vertices.size());
-    for (const BezierPath::Vertex &vertex : path.vertices) {
-        result.vertices.push_back({matrix.transformPoint(vertex.point),
-                                   matrix.transformVector(vertex.inTangent),
-                                   matrix.transformVector(vertex.outTangent)});
-    }
-    return result;
 }
 
 // Rect centered at position (Lottie convention), corners clockwise from
@@ -95,39 +81,21 @@ BezierPath EllipseToPath(const ShapeEllipse &ellipse, PreviewTime time) {
 }
 
 void CollectGeometryPath(const ShapeElement &element, PreviewTime time,
-                         const Mat3 &transform, std::vector<BezierPath> &paths);
-
-void CollectGeometryPaths(const std::vector<std::unique_ptr<ShapeElement>> &elements,
-                          PreviewTime time, const Mat3 &transform,
-                          std::vector<BezierPath> &paths) {
-    for (const auto &element : elements) {
-        CollectGeometryPath(*element, time, transform, paths);
-    }
-}
-
-void CollectGeometryPath(const ShapeElement &element, PreviewTime time,
-                         const Mat3 &transform, std::vector<BezierPath> &paths) {
+                         std::vector<BezierPath> &paths) {
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
-            paths.push_back(TransformPath(shape.path.evaluatePreview(time), transform));
+            paths.push_back(shape.path.evaluatePreview(time));
             break;
         }
         case ShapeType::Rect: {
             const auto &shape = static_cast<const ShapeRect &>(element);
-            paths.push_back(TransformPath(RectToPath(shape, time), transform));
+            paths.push_back(RectToPath(shape, time));
             break;
         }
         case ShapeType::Ellipse: {
             const auto &shape = static_cast<const ShapeEllipse &>(element);
-            paths.push_back(TransformPath(EllipseToPath(shape, time), transform));
-            break;
-        }
-        case ShapeType::Group: {
-            const auto &group = static_cast<const ShapeGroup &>(element);
-            CollectGeometryPaths(group.elements, time,
-                                 transform * LocalMatrixOf(group.transform, time),
-                                 paths);
+            paths.push_back(EllipseToPath(shape, time));
             break;
         }
         case ShapeType::TrimPath: {
@@ -229,8 +197,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         return;
     }
     std::vector<EntityId> visiting;
-    const Mat3 world =
-        WorldTransformOf(document, layer, time, contextTransform, visiting);
+    const Mat3 world = WorldTransformOf(document, layer, time, contextTransform, visiting);
     visiting.clear();
     const float opacity = WorldOpacityOf(document, layer, time, contextOpacity, visiting);
 
@@ -264,7 +231,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     if (!layer.styles.empty()) {
         std::vector<BezierPath> paths;
         if (shapeContent.geometry) {
-            CollectGeometryPath(*shapeContent.geometry, time, world, paths);
+            CollectGeometryPath(*shapeContent.geometry, time, paths);
         }
         ApplyLayerStyles(layer, time, 1.0f, paths, evaluated.shapeItems);
     }
