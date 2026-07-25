@@ -7,7 +7,7 @@ import Foundation
 import SwiftUI
 
 /// Numeric field with a toggle keyframe button. The draft mirrors the model
-/// value until the user commits with Return.
+/// value until the user commits with Return or the field loses focus.
 struct NumberPropertyRow: View {
     let label: String
     let value: Float
@@ -19,6 +19,7 @@ struct NumberPropertyRow: View {
 
     @State private var draft = ""
     @State private var hasInvalidDraft = false
+    @FocusState private var isFieldFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
@@ -35,9 +36,20 @@ struct NumberPropertyRow: View {
                 .overlay(fieldBorder)
                 .onSubmit(commitDraft)
                 .disabled(!isEditable)
+                .focused($isFieldFocused)
                 .onChange(of: draft) { _, newValue in
+                    let filtered = filteredNumericDraft(newValue)
+                    if filtered != newValue {
+                        draft = filtered
+                        return
+                    }
                     if hasInvalidDraft, newValue != formattedValue(value) {
                         hasInvalidDraft = false
+                    }
+                }
+                .onChange(of: isFieldFocused) { _, focused in
+                    if !focused {
+                        commitDraftOnFocusLoss()
                     }
                 }
             if showsKeyframeButton {
@@ -93,6 +105,27 @@ struct NumberPropertyRow: View {
         if committedValue != value {
             onCommit(committedValue)
         }
+    }
+
+    private func commitDraftOnFocusLoss() {
+        commitDraft()
+        hasInvalidDraft = false
+    }
+
+    private func filteredNumericDraft(_ input: String) -> String {
+        var filtered = ""
+        var hasDecimalPoint = false
+        for character in input {
+            if character.isASCII, character.isNumber {
+                filtered.append(character)
+            } else if character == ".", !hasDecimalPoint {
+                hasDecimalPoint = true
+                filtered.append(character)
+            } else if character == "-", filtered.isEmpty {
+                filtered.append(character)
+            }
+        }
+        return filtered
     }
 
     private func toggleKeyframe() {
