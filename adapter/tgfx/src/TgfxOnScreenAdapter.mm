@@ -88,10 +88,6 @@ float TgfxOnScreenAdapter::sceneUnitsPerViewPoint(int sceneWidth, int sceneHeigh
     return pointScale / std::max(scale, 0.001f);
 }
 
-bool TgfxOnScreenAdapter::compositionBackgroundSrcOver() const {
-    return previewBackdrop() == PreviewBackdrop::Transparent;
-}
-
 bool TgfxOnScreenAdapter::acquireTarget(int /*width*/, int /*height*/) {
     // The drawable size is authoritative on screen; the requested size only
     // matters for the offscreen adapter. Reuse the surface across frames and

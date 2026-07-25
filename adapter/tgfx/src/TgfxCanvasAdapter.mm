@@ -143,10 +143,6 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
     tgfx::Paint paint;
     paint.setStyle(tgfx::PaintStyle::Fill);
     paint.setColor(ToTgfxColor(backgroundColor));
-    // Black chrome: Src replaces coverage cleanly. Transparency grid: SrcOver
-    // so AA edges blend into the checkerboard instead of writing translucent
-    // pixels that composite against the MTKView's black clear.
-    paint.setBlendMode(compositionBackgroundSrcOver() ? tgfx::BlendMode::SrcOver : tgfx::BlendMode::Src);
     if (radius > 0.0f) {
         canvas->drawRoundRect(compositionBounds, radius, radius, paint);
         canvas->save();

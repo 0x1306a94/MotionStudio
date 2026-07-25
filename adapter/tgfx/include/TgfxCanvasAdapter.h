@@ -75,12 +75,6 @@ class TgfxCanvasAdapter : public RenderAdapter {
     virtual void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
                               float cornerRadius);
 
-    // Blend mode for the composition background rect. Black preview chrome uses
-    // Src; the transparency grid needs SrcOver to avoid dark AA fringes.
-    virtual bool compositionBackgroundSrcOver() const {
-        return false;
-    }
-
     std::shared_ptr<tgfx::Device> device_;
     std::shared_ptr<tgfx::Surface> surface_;
     TgfxEndFrameProfile endFrameProfile_;
