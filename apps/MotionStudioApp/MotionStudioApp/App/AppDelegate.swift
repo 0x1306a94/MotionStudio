@@ -59,8 +59,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // MARK: Finder / external document open
 
-    func application(_: UIApplication, open urls: [URL], options _: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        MotionStudioEditorRouter.openProjectURLs(urls)
+    func application(_: UIApplication, open url: URL, options _: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        MotionStudioEditorRouter.openProjectURLs([url])
         return true
     }
 }

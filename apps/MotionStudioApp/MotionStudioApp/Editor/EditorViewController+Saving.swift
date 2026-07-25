@@ -53,19 +53,26 @@ extension EditorViewController {
         }
     }
 
-    func saveDocument(to url: URL, operation: UIDocument.SaveOperation, completion: ((Bool) -> Void)? = nil) {
+    func saveDocument(to url: URL, operation: UIDocument.SaveOperation,
+                      completion: (@MainActor (Bool) -> Void)? = nil)
+    {
         let shouldStopAccessing = url.startAccessingSecurityScopedResource()
         document.save(to: url, for: operation) { [weak self] success in
-            guard let self else { return }
-            if shouldStopAccessing {
-                url.stopAccessingSecurityScopedResource()
+            Task { @MainActor in
+                guard let self else {
+                    completion?(false)
+                    return
+                }
+                if shouldStopAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+                if success {
+                    self.markSaved(at: url)
+                } else {
+                    self.presentSaveError(CocoaError(.fileWriteUnknown))
+                }
+                completion?(success)
             }
-            if success {
-                markSaved(at: url)
-            } else {
-                presentSaveError(CocoaError(.fileWriteUnknown))
-            }
-            completion?(success)
         }
     }
 

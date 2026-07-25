@@ -67,9 +67,4 @@ Vec2 EvaluateSpatial(const Keyframe<Vec2> &from, const Keyframe<Vec2> &to,
                             to.value + *to.spatialInTangent, to.value, easedProgress);
 }
 
-template struct Interpolator<float>;
-template struct Interpolator<Vec2>;
-template struct Interpolator<Color>;
-template struct Interpolator<BezierPath>;
-
 }  // namespace motion
