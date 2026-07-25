@@ -125,7 +125,7 @@ target_include_directories(tgfx_adapter
                            "${TGFX_INCLUDE_DIR}")
 
 target_link_libraries(tgfx_adapter
-                      PRIVATE
+                      PUBLIC
                       core
                       "-framework Metal"
                       "-framework MetalKit"
@@ -134,12 +134,13 @@ target_link_libraries(tgfx_adapter
                       "-framework CoreMedia"
                       "-framework CoreVideo"
                       "-framework ImageIO"
+                      "-framework CoreGraphics"
                       iconv)
 
 # Xcode / gen_mac: Mac destination is Catalyst (UIKit). Native mac Cocoa is Ninja-only.
 if(NOT CMAKE_GENERATOR MATCHES "Xcode")
   target_link_libraries(tgfx_adapter
-                        PRIVATE
+                        PUBLIC
                         "-framework ApplicationServices"
                         "-framework Cocoa")
 endif()

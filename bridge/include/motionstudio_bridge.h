@@ -46,6 +46,20 @@ enum {
     MS_LAYER_PRECOMP = 4,
 };
 
+// Layer style type tag, mirrors motion::LayerStyleType.
+enum {
+    MS_STYLE_FILL = 0,
+    MS_STYLE_STROKE = 1,
+};
+
+// Blend mode tag, mirrors motion::BlendMode.
+enum {
+    MS_BLEND_NORMAL = 0,
+    MS_BLEND_MULTIPLY = 1,
+    MS_BLEND_SCREEN = 2,
+    MS_BLEND_ADD = 3,
+};
+
 // Animatable value type tag, mirrors motion::AnimatableType.
 enum {
     MS_VALUE_FLOAT = 0,
@@ -147,6 +161,16 @@ uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId);
 bool ms_layer_visible(MSDocument *document, uint64_t layerId);
 bool ms_layer_locked(MSDocument *document, uint64_t layerId);
 
+/* ============================ layer style queries ============================ */
+
+// Number of styles (fills/strokes) on the layer; 0 when the layer does not exist.
+int ms_layer_style_count(MSDocument *document, uint64_t layerId);
+// Style type tag (MS_STYLE_*) at index, -1 when out of range.
+int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index);
+// Blend mode tag (MS_BLEND_*) of the fill at index, -1 when out of range or
+// the style is not a fill.
+int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
+
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
 // path: dot-separated property path. Layer examples: "transform.position", "size", "styles[0].color".
@@ -207,6 +231,13 @@ void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint6
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked);
+
+// Appends a default fill (black, normal blend) to the layer's style list.
+void ms_command_add_fill_style(MSDocument *document, uint64_t layerId);
+// Removes the style at index from the layer's style list.
+void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index);
+// blendMode: MS_BLEND_* tag. Only applies to fill styles.
+void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode);
 
 #if defined(__APPLE__)
 

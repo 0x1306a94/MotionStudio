@@ -41,6 +41,7 @@ struct InspectorView: View {
                                                isEditable: isEditable,
                                                perform: perform)
                         }
+
                         Text("Transform")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -49,6 +50,13 @@ struct InspectorView: View {
                                            playheadFrame: editorState.playheadFrame,
                                            isEditable: isEditable,
                                            perform: perform)
+
+                        if core.layerType(layerID) == MS_LAYER_SHAPE {
+                            FillsInspector(core: core,
+                                           layerID: layerID,
+                                           isEditable: isEditable,
+                                           perform: perform)
+                        }
                     }
                     .padding(10)
                     .padding(.bottom, inspectorKeyboardOverlap(keyboardFrame: keyboardFrame, in: proxy))

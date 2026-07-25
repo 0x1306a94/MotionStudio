@@ -784,7 +784,8 @@ json LayerStyleToJson(const LayerStyle &style) {
             return {{"id", IdToString(fill.id)},
                     {"type", "fill"},
                     {"color", AnimatableToJson(fill.color)},
-                    {"fillRule", dto::ToString(fill.fillRule)}};
+                    {"fillRule", dto::ToString(fill.fillRule)},
+                    {"blendMode", dto::ToString(fill.blendMode)}};
         }
         case LayerStyleType::Stroke: {
             const auto &stroke = static_cast<const StrokeStyle &>(style);
@@ -826,6 +827,16 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
             return Unexpected(fillRule.error());
         }
         fill->fillRule = *fillRule;
+        // blendMode is optional: documents saved before fills had blend modes
+        // default to Normal.
+        Expected<std::string, std::string> blendText = ParseField<std::string>(node, "blendMode");
+        if (blendText) {
+            Expected<BlendMode, std::string> blendMode = dto::blendModeFromString(*blendText);
+            if (!blendMode) {
+                return Unexpected(blendMode.error());
+            }
+            fill->blendMode = *blendMode;
+        }
         style = std::move(fill);
     } else if (*typeText == "stroke") {
         auto stroke = std::make_unique<StrokeStyle>();

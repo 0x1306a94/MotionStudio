@@ -17,21 +17,21 @@ using motion::SceneState;
 
 namespace {
 
-EvaluatedShapeItem MakeFillItem() {
+EvaluatedShapeItem MakeFillItem(BlendMode blendMode = BlendMode::Normal) {
     EvaluatedShapeItem item;
     item.path.closed = true;
     item.path.vertices.push_back({{0, 0}, {}, {}});
     item.path.vertices.push_back({{10, 0}, {}, {}});
-    item.paint = Paint{Color{1, 0, 0, 1}};
+    item.paint = Paint{Color{1, 0, 0, 1}, motion::FillRule::NonZero, blendMode};
     return item;
 }
 
-EvaluatedShapeItem MakeStrokeItem() {
+EvaluatedShapeItem MakeStrokeItem(BlendMode blendMode = BlendMode::Normal) {
     EvaluatedShapeItem item;
     item.isStroke = true;
     item.path.vertices.push_back({{0, 0}, {}, {}});
     item.path.vertices.push_back({{10, 10}, {}, {}});
-    item.paint = Paint{Color{0, 0, 1, 1}};
+    item.paint = Paint{Color{0, 0, 1, 1}, motion::FillRule::NonZero, blendMode};
     item.strokeWidth = 3;
     item.cap = LineCap::Round;
     return item;
@@ -49,8 +49,8 @@ TEST(CommandBuilderTest, LayerExpandsToScopedDrawSequence) {
     EvaluatedLayer layer;
     layer.opacity = 0.5f;
     layer.blendMode = BlendMode::Screen;
-    layer.shapeItems.push_back(MakeFillItem());
-    layer.shapeItems.push_back(MakeStrokeItem());
+    layer.shapeItems.push_back(MakeFillItem(BlendMode::Screen));
+    layer.shapeItems.push_back(MakeStrokeItem(BlendMode::Screen));
     state.layers.push_back(std::move(layer));
 
     auto commands = BuildCommands(state);
@@ -64,6 +64,27 @@ TEST(CommandBuilderTest, LayerExpandsToScopedDrawSequence) {
     EXPECT_EQ(commands[3].paint.color, (Color{1, 0, 0, 1}));
     EXPECT_EQ(commands[4].type, DrawCommandType::StrokePath);
     EXPECT_EQ(commands[5].type, DrawCommandType::Restore);
+}
+
+TEST(CommandBuilderTest, ItemBlendModeEmitsSetBlendModeOnChange) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem(BlendMode::Add));
+    layer.shapeItems.push_back(MakeStrokeItem());
+    state.layers.push_back(std::move(layer));
+
+    auto commands = BuildCommands(state);
+    // Layer-level SetBlendMode, then a blend switch before each diverging item.
+    ASSERT_EQ(commands.size(), 8u);
+    EXPECT_EQ(commands[2].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[2].blendMode, BlendMode::Normal);
+    EXPECT_EQ(commands[3].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[3].blendMode, BlendMode::Add);
+    EXPECT_EQ(commands[4].type, DrawCommandType::DrawPath);
+    EXPECT_EQ(commands[5].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[5].blendMode, BlendMode::Normal);
+    EXPECT_EQ(commands[6].type, DrawCommandType::StrokePath);
+    EXPECT_EQ(commands[7].type, DrawCommandType::Restore);
 }
 
 TEST(CommandBuilderTest, StrokeItemCarriesStrokeParameters) {

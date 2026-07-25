@@ -98,6 +98,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     styleColorKeyframe.time = 10;
     styleColorKeyframe.value = Color{0.2f, 0.4f, 0.6f, 1};
     fillStyle->color.addKeyframe(styleColorKeyframe);
+    fillStyle->blendMode = motion::BlendMode::Screen;
     shapeLayer->styles.push_back(std::move(fillStyle));
 
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
@@ -160,6 +161,24 @@ TEST(SerializerTest, RoundTripIsJsonStable) {
     EXPECT_EQ(first, second);
 }
 
+TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    for (auto &layer : json["compositions"][1]["layers"]) {
+        for (auto &style : layer["styles"]) {
+            style.erase("blendMode");
+        }
+    }
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(restored.hasValue());
+    const Layer &shapes = *(*restored)->compositions[1]->layers[0];
+    ASSERT_EQ(shapes.styles.size(), 1u);
+    const auto *fillStyle = static_cast<const FillStyle *>(shapes.styles[0].get());
+    EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Normal);
+}
+
 TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     auto document = BuildRichDocument();
     Expected<std::unique_ptr<Document>, std::string> restored =
@@ -186,6 +205,7 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     const auto *fillStyle = static_cast<const FillStyle *>(shapes.styles[0].get());
     EXPECT_TRUE(fillStyle->color.isAnimated());
     EXPECT_EQ(fillStyle->color.evaluate(10), (Color{0.2f, 0.4f, 0.6f, 1}));
+    EXPECT_EQ(fillStyle->blendMode, motion::BlendMode::Screen);
 
     // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);

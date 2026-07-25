@@ -3,6 +3,7 @@
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
@@ -40,6 +41,7 @@ class FillStyle : public LayerStyle {
 
     Animatable<Color> color{Color{0, 0, 0, 1}};
     FillRule fillRule = FillRule::NonZero;
+    BlendMode blendMode = BlendMode::Normal;
 };
 
 class StrokeStyle : public LayerStyle {

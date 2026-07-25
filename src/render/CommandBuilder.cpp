@@ -41,7 +41,17 @@ DrawCommandList BuildCommands(const SceneState &state) {
         blend.blendMode = layer.blendMode;
         commands.push_back(blend);
 
+        // Each fill carries its own blend mode; emit a SetBlendMode whenever
+        // the upcoming item's blend differs from the current state.
+        BlendMode currentBlend = layer.blendMode;
         for (const EvaluatedShapeItem &item : layer.shapeItems) {
+            if (item.paint.blendMode != currentBlend) {
+                DrawCommand itemBlend;
+                itemBlend.type = DrawCommandType::SetBlendMode;
+                itemBlend.blendMode = item.paint.blendMode;
+                commands.push_back(itemBlend);
+                currentBlend = item.paint.blendMode;
+            }
             DrawCommand draw;
             draw.type = item.isStroke ? DrawCommandType::StrokePath : DrawCommandType::DrawPath;
             draw.path = item.path;

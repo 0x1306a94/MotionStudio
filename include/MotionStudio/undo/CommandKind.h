@@ -18,6 +18,9 @@ enum class CommandKind {
     SetCompositionBackgroundColor,
     SetCompositionCornerRadius,
     SetCompositionSettings,
+    AddFillStyle,
+    RemoveStyle,
+    SetStyleBlendMode,
     Composite,
 };
 

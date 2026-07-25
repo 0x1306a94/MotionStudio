@@ -20,12 +20,14 @@
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/serialization/Serializer.h"
+#include "MotionStudio/undo/AddFillStyleCommand.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetCompositionBackgroundColorCommand.h"
 #include "MotionStudio/undo/SetCompositionCornerRadiusCommand.h"
 #include "MotionStudio/undo/SetCompositionSettingsCommand.h"
@@ -33,6 +35,7 @@
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
+#include "MotionStudio/undo/SetStyleBlendModeCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 #include "DocumentLock.h"
@@ -136,6 +139,41 @@ void Execute(MSDocument *handle, std::unique_ptr<motion::Command> command) {
 
 PropertyPath MakePath(uint64_t entityId, const char *path) {
     return PropertyPath{EntityId{entityId}, path != nullptr ? path : ""};
+}
+
+motion::BlendMode MakeBlendMode(int blendMode) {
+    switch (blendMode) {
+        case MS_BLEND_MULTIPLY: {
+            return motion::BlendMode::Multiply;
+        }
+        case MS_BLEND_SCREEN: {
+            return motion::BlendMode::Screen;
+        }
+        case MS_BLEND_ADD: {
+            return motion::BlendMode::Add;
+        }
+        default: {
+            return motion::BlendMode::Normal;
+        }
+    }
+}
+
+int BlendModeTag(motion::BlendMode blendMode) {
+    switch (blendMode) {
+        case motion::BlendMode::Normal: {
+            return MS_BLEND_NORMAL;
+        }
+        case motion::BlendMode::Multiply: {
+            return MS_BLEND_MULTIPLY;
+        }
+        case motion::BlendMode::Screen: {
+            return MS_BLEND_SCREEN;
+        }
+        case motion::BlendMode::Add: {
+            return MS_BLEND_ADD;
+        }
+    }
+    return MS_BLEND_NORMAL;
 }
 
 Easing MakeEasing(int easingType, float inX, float inY, float outX, float outY) {
@@ -504,6 +542,46 @@ bool ms_layer_locked(MSDocument *document, uint64_t layerId) {
     return layer != nullptr && layer->locked;
 }
 
+/* ============================ layer style queries ============================ */
+
+int ms_layer_style_count(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? static_cast<int>(layer->styles.size()) : 0;
+}
+
+int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->styles.size()) {
+        return -1;
+    }
+    switch (layer->styles[static_cast<size_t>(index)]->type()) {
+        case motion::LayerStyleType::Fill: {
+            return MS_STYLE_FILL;
+        }
+        case motion::LayerStyleType::Stroke: {
+            return MS_STYLE_STROKE;
+        }
+    }
+    return -1;
+}
+
+int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->styles.size()) {
+        return -1;
+    }
+    motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
+    if (style->type() != motion::LayerStyleType::Fill) {
+        return -1;
+    }
+    return BlendModeTag(static_cast<FillStyle *>(style)->blendMode);
+}
+
 /* ============================ property queries ============================ */
 
 int ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
@@ -831,4 +909,19 @@ void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool v
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetLayerLockedCommand>(EntityId{layerId}, locked));
+}
+
+void ms_command_add_fill_style(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddFillStyleCommand>(EntityId{layerId}));
+}
+
+void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveStyleCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStyleBlendModeCommand>(EntityId{layerId}, index, MakeBlendMode(blendMode)));
 }

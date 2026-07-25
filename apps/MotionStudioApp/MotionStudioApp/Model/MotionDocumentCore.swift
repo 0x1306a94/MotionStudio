@@ -278,6 +278,23 @@ final class MotionDocumentCore {
         ms_layer_type(handle, layerID)
     }
 
+    // MARK: - Layer style queries
+
+    /// Number of styles (fills/strokes) on the layer.
+    func styleCount(layerID: UInt64) -> Int {
+        Int(ms_layer_style_count(handle, layerID))
+    }
+
+    /// MS_STYLE_* type tag of the style at index; -1 when out of range.
+    func styleType(layerID: UInt64, index: Int) -> Int32 {
+        ms_layer_style_type_at(handle, layerID, Int32(index))
+    }
+
+    /// MS_BLEND_* blend mode tag of the fill at index; -1 when out of range or not a fill.
+    func styleBlendMode(layerID: UInt64, index: Int) -> Int32 {
+        ms_layer_style_blend_mode_at(handle, layerID, Int32(index))
+    }
+
     // MARK: - Property queries
 
     /// Whether the entity exposes the given property path at all.
@@ -294,6 +311,15 @@ final class MotionDocumentCore {
         var y: Float = 0
         ms_property_static_vec2(handle, entityID, path, &x, &y)
         return CGVector(dx: CGFloat(x), dy: CGFloat(y))
+    }
+
+    func staticColor(entityID: UInt64, path: String) -> MotionColor {
+        var r: Float = 0
+        var g: Float = 0
+        var b: Float = 0
+        var a: Float = 0
+        ms_property_static_color(handle, entityID, path, &r, &g, &b, &a)
+        return MotionColor(r: r, g: g, b: b, a: a)
     }
 
     func isAnimated(entityID: UInt64, path: String) -> Bool {
@@ -438,6 +464,24 @@ final class MotionDocumentCore {
 
     func setLayerLocked(_ layerID: UInt64, locked: Bool) {
         ms_command_set_layer_locked(handle, layerID, locked)
+        changed()
+    }
+
+    /// Appends a default fill to the layer's style list.
+    func addFillStyle(layerID: UInt64) {
+        ms_command_add_fill_style(handle, layerID)
+        changed()
+    }
+
+    /// Removes the style at index from the layer's style list.
+    func removeStyle(layerID: UInt64, index: Int) {
+        ms_command_remove_style(handle, layerID, Int32(index))
+        changed()
+    }
+
+    /// blendMode: MS_BLEND_* tag. Only applies to fill styles.
+    func setStyleBlendMode(layerID: UInt64, index: Int, blendMode: Int32) {
+        ms_command_set_style_blend_mode(handle, layerID, Int32(index), blendMode)
         changed()
     }
 

@@ -108,6 +108,43 @@ TEST(SceneEvaluatorTest, RectFillProducesOneWorldSpaceItem) {
     EXPECT_EQ(item.path.vertices[3].point, (Vec2{80, 60}));
 }
 
+TEST(SceneEvaluatorTest, MultipleFillsProduceItemsWithOwnBlendModes) {
+    RectScene scene;
+    auto secondFill = std::make_unique<FillStyle>();
+    secondFill->color.setStaticValue(Color{0, 0, 1, 1});
+    secondFill->blendMode = motion::BlendMode::Screen;
+    scene.layer->styles.push_back(std::move(secondFill));
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers.size(), 1u);
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
+    const auto &first = result->layers[0].shapeItems[0];
+    const auto &second = result->layers[0].shapeItems[1];
+    EXPECT_EQ(first.paint.color, (Color{1, 0, 0, 1}));
+    EXPECT_EQ(first.paint.blendMode, motion::BlendMode::Normal);
+    EXPECT_EQ(second.paint.color, (Color{0, 0, 1, 1}));
+    EXPECT_EQ(second.paint.blendMode, motion::BlendMode::Screen);
+}
+
+TEST(SceneEvaluatorTest, StrokeItemKeepsLayerBlendMode) {
+    RectScene scene;
+    scene.layer->blendMode = motion::BlendMode::Multiply;
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->width.setStaticValue(4.0f);
+    scene.layer->styles.push_back(std::move(stroke));
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
+    const auto &fillItem = result->layers[0].shapeItems[0];
+    const auto &strokeItem = result->layers[0].shapeItems[1];
+    EXPECT_FALSE(fillItem.isStroke);
+    EXPECT_EQ(fillItem.paint.blendMode, motion::BlendMode::Normal);
+    EXPECT_TRUE(strokeItem.isStroke);
+    EXPECT_EQ(strokeItem.paint.blendMode, motion::BlendMode::Multiply);
+}
+
 TEST(SceneEvaluatorTest, LayerTransformAppliesToPath) {
     RectScene scene;
     scene.layer->transform.position.setStaticValue(Vec2{10, 20});

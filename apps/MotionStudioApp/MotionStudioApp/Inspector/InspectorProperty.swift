@@ -6,6 +6,73 @@
 //
 
 import Foundation
+import SwiftUI
+#if canImport(UIKit)
+    import UIKit
+#endif
+
+/// Blend modes editable on a fill style; raw values mirror the bridge MS_BLEND_* tags.
+enum FillBlendMode: Int32, CaseIterable, Identifiable {
+    case normal = 0
+    case multiply = 1
+    case screen = 2
+    case add = 3
+
+    var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .normal:
+            "Normal"
+        case .multiply:
+            "Multiply"
+        case .screen:
+            "Screen"
+        case .add:
+            "Add"
+        }
+    }
+}
+
+extension MotionColor {
+    init(_ color: Color) {
+        #if canImport(UIKit)
+            let uiColor = UIColor(color)
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 1
+            if uiColor.getRed(&r, green: &g, blue: &b, alpha: &a) {
+                self.init(r: Float(r), g: Float(g), b: Float(b), a: Float(a))
+            } else {
+                self = .black
+            }
+        #else
+            self = .black
+        #endif
+    }
+
+    var swiftUIColor: Color {
+        let clamped = clampedChannels()
+        return Color(red: Double(clamped.r),
+                     green: Double(clamped.g),
+                     blue: Double(clamped.b),
+                     opacity: Double(clamped.a))
+    }
+
+    func clampedChannels() -> MotionColor {
+        MotionColor(r: Self.clampedChannel(r),
+                    g: Self.clampedChannel(g),
+                    b: Self.clampedChannel(b),
+                    a: Self.clampedChannel(a))
+    }
+
+    static func clampedChannel(_ value: Float) -> Float {
+        min(max(value, 0), 1)
+    }
+}
 
 enum TransformProperty: String, CaseIterable {
     case position = "transform.position"

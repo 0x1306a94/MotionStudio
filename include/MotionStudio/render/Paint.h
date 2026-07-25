@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MotionStudio/common/Color.h"
+#include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 
 namespace motion {
@@ -9,6 +10,7 @@ namespace motion {
 struct Paint {
     Color color;
     FillRule fillRule = FillRule::NonZero;
+    BlendMode blendMode = BlendMode::Normal;
 };
 
 }  // namespace motion
