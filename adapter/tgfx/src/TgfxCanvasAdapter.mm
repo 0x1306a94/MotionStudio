@@ -773,15 +773,17 @@ void TgfxCanvasAdapter::drawMaskPath(const ShapeGeometry &geometry, MaskMode mod
     tgfx::Canvas *canvas = layer.maskCanvas;
     tgfx::Path path = pathCache_->Resolve(geometry, FillRule::NonZero);
     if (expansion != 0.0f) {
-        tgfx::Stroke stroke(std::abs(expansion) * 2.0f, tgfx::LineCap::Round, tgfx::LineJoin::Round);
-        tgfx::Path expanded = path;
-        if (stroke.applyToPath(&expanded)) {
+        // Miter/Butt keep hard corners; Round made shrink look like residual feather.
+        tgfx::Stroke stroke(std::abs(expansion) * 2.0f, tgfx::LineCap::Butt, tgfx::LineJoin::Miter);
+        tgfx::Path stroked = path;
+        if (stroke.applyToPath(&stroked)) {
             if (expansion > 0.0f) {
-                path.addPath(expanded, tgfx::PathOp::Union);
+                path.addPath(stroked, tgfx::PathOp::Union);
             } else {
-                path = expanded;
-                path.addPath(pathCache_->Resolve(geometry, FillRule::NonZero),
-                             tgfx::PathOp::Intersect);
+                // Shrink: keep the inner half of the stroke band.
+                tgfx::Path original = path;
+                path = stroked;
+                path.addPath(original, tgfx::PathOp::Intersect);
             }
         }
     }

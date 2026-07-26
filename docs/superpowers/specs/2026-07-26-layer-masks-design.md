@@ -247,9 +247,12 @@ Composition
 
 1. 选中 **Ellipse**；Track Matte → **None**。
 2. Inspector → **Masks** → `+`。
-3. **Expansion** → **-40**（或更负）→ Ellipse 边缘被明显裁小。
-4. 勾选 **Inv** → 方框外/挖空类效果；取消 → 恢复。
-5. **Feather** → **20~40** → 边缘变软。
+3. **Expansion** → **-40**（或更负）→ Ellipse 边缘被明显裁小。  
+   - 正数 = 扩张 mask；若 mask 已完全盖住图层内容，正数**看不出变化**（先缩再扩可验证）。  
+   - Inv 按钮选中时应有高亮描边/底色。
+4. 勾选 **Inv** → 方框外/挖空类效果；再点取消 → 恢复，按钮高亮同步消失。
+5. **Feather** → **20~40** → 边缘变软；再改回 **0** → 硬边恢复。  
+   - 若该属性已有关键帧，改值必须打在当前时间关键帧上（菱形应立即高亮）。
 6. Mask **Opacity** → **0.3** → 裁切区半透（不是整层 opacity）。
 7. 可选：再 `+` 第二条；Mode → **Subtract** / **Intersect**，配合不同 Expansion，确认挖洞或取交。
 8. 可选：给 Mask Opacity / Feather 打关键帧 → 时间轴出现 `Mask 1 Opacity` 等子行。
