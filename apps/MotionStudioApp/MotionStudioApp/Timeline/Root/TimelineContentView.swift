@@ -100,6 +100,7 @@ struct TimelineContentView: View {
                                                     trackWidth: trackWidth),
                                   rows: rows,
                                   perform: perform,
+                                  registerEdit: registerEdit,
                                   clearSelection: clearSelection)
             }
             GeometryReader { proxy in
@@ -455,7 +456,10 @@ private struct TimelineBodyStrip<Graph: View, SplitDivider: View>: View {
     let graph: Graph
     let rows: [TimelineRow]
     let perform: (String, () -> Void) -> Void
+    let registerEdit: (String) -> Void
     let clearSelection: () -> Void
+
+    @State private var verticalScroller = TimelineVerticalScroller()
 
     var body: some View {
         GeometryReader { scrollProxy in
@@ -463,7 +467,9 @@ private struct TimelineBodyStrip<Graph: View, SplitDivider: View>: View {
                 HStack(alignment: .top, spacing: 0) {
                     LayerColumn(rows: rows,
                                 perform: perform,
-                                clearSelection: clearSelection)
+                                registerEdit: registerEdit,
+                                clearSelection: clearSelection,
+                                verticalScroller: verticalScroller)
                         .frame(width: layerColumnWidth)
                         .frame(maxHeight: .infinity, alignment: .top)
                     splitDivider
@@ -471,7 +477,12 @@ private struct TimelineBodyStrip<Graph: View, SplitDivider: View>: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: scrollProxy.size.height,
                        alignment: .topLeading)
+                .background {
+                    TimelineScrollViewBridge(scroller: verticalScroller)
+                        .frame(width: 0, height: 0)
+                }
             }
+            .coordinateSpace(name: timelineLayerListViewportCoordinateSpace)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

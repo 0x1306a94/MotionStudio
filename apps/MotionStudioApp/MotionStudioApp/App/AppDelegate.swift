@@ -41,6 +41,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         builder.replaceChildren(ofMenu: .close) { _ in
             [closeCommand]
         }
+
+        let bringToFront = UIKeyCommand(title: "Bring to Front",
+                                        image: nil,
+                                        action: #selector(EditorViewController.bringLayersToFront),
+                                        input: "]",
+                                        modifierFlags: [.command, .alternate])
+        let bringForward = UIKeyCommand(title: "Bring Forward",
+                                        image: nil,
+                                        action: #selector(EditorViewController.bringLayersForward),
+                                        input: "]",
+                                        modifierFlags: .command)
+        let sendBackward = UIKeyCommand(title: "Send Backward",
+                                        image: nil,
+                                        action: #selector(EditorViewController.sendLayersBackward),
+                                        input: "[",
+                                        modifierFlags: .command)
+        let sendToBack = UIKeyCommand(title: "Send to Back",
+                                      image: nil,
+                                      action: #selector(EditorViewController.sendLayersToBack),
+                                      input: "[",
+                                      modifierFlags: [.command, .alternate])
+        let arrangeMenu = UIMenu(title: "Arrange",
+                                 children: [bringToFront, bringForward, sendBackward, sendToBack])
+        builder.insertSibling(arrangeMenu, afterMenu: .edit)
     }
 
     // MARK: UISceneSession Lifecycle

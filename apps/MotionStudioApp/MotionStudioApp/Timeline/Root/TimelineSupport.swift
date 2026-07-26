@@ -21,6 +21,12 @@ let maxLayerColumnWidth: CGFloat = 400
 let layerActionIconSize: CGFloat = 16
 let layerActionButtonSize: CGFloat = 22
 let timelineEndpointHandleWidth: CGFloat = 11
+/// Vertical ScrollView viewport for layer-list reorder auto-scroll.
+/// Must not collide with graphStrip's "timelineViewport" used by playhead drag.
+let timelineLayerListViewportCoordinateSpace = "timelineLayerListViewport"
+let layerColumnCoordinateSpace = "layerColumn"
+let layerReorderAutoScrollEdge: CGFloat = 36
+let layerReorderAutoScrollMaxSpeed: CGFloat = 400
 
 func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) -> [String] {
     var paths = TransformProperty.allCases

@@ -11,6 +11,10 @@ struct LayerRow: View {
 
     let layerID: UInt64
     let perform: (String, () -> Void) -> Void
+    let arrange: (UInt64, LayerArrangeAction) -> Void
+    /// Reports finger Y in the timeline viewport coordinate space.
+    let onReorderDragChanged: (UInt64, CGFloat) -> Void
+    let onReorderDragEnded: () -> Void
 
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
@@ -58,6 +62,22 @@ struct LayerRow: View {
         .contentShape(Rectangle())
         .onTapGesture {
             editorState.selectLayer(layerID, additive: KeyboardModifiers.shiftPressed)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 4,
+                        coordinateSpace: .named(timelineLayerListViewportCoordinateSpace))
+                .onChanged { value in
+                    onReorderDragChanged(layerID, value.location.y)
+                }
+                .onEnded { _ in
+                    onReorderDragEnded()
+                },
+        )
+        .contextMenu {
+            Button("Bring to Front") { arrange(layerID, .bringToFront) }
+            Button("Bring Forward") { arrange(layerID, .bringForward) }
+            Button("Send Backward") { arrange(layerID, .sendBackward) }
+            Button("Send to Back") { arrange(layerID, .sendToBack) }
         }
     }
 

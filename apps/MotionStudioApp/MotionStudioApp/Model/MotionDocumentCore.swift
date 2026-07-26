@@ -525,6 +525,23 @@ final class MotionDocumentCore {
         changed()
     }
 
+    func moveLayer(compositionID: UInt64, fromIndex: Int, toIndex: Int) {
+        ms_command_move_layer(handle, compositionID, Int32(fromIndex), Int32(toIndex))
+        changed()
+    }
+
+    /// Applies an absolute model-order (bottom → top). No-op when already equal.
+    func applyLayerOrder(compositionID: UInt64, desired: [UInt64]) {
+        let current = layerIDs(compositionID: compositionID)
+        guard current != desired else {
+            return
+        }
+        for step in TimelineReorder.moveSteps(from: current, to: desired) {
+            ms_command_move_layer(handle, compositionID, Int32(step.from), Int32(step.to))
+        }
+        changed()
+    }
+
     func setLayerVisible(_ layerID: UInt64, visible: Bool) {
         ms_command_set_layer_visible(handle, layerID, visible)
         changed()

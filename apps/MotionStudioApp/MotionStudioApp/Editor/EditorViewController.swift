@@ -136,6 +136,10 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "i", modifierFlags: [.command, .shift], action: #selector(addImageLayer)),
             UIKeyCommand(input: "1", modifierFlags: [.command, .alternate], action: #selector(toggleProjectPanel)),
             UIKeyCommand(input: "2", modifierFlags: [.command, .alternate], action: #selector(toggleInspectorPanel)),
+            UIKeyCommand(input: "]", modifierFlags: [.command], action: #selector(bringLayersForward)),
+            UIKeyCommand(input: "[", modifierFlags: [.command], action: #selector(sendLayersBackward)),
+            UIKeyCommand(input: "]", modifierFlags: [.command, .alternate], action: #selector(bringLayersToFront)),
+            UIKeyCommand(input: "[", modifierFlags: [.command, .alternate], action: #selector(sendLayersToBack)),
         ]
     }
 
@@ -153,6 +157,14 @@ final class EditorViewController: UIViewController {
              #selector(renameCurrentProject),
              #selector(togglePlayback):
             true
+        case #selector(bringLayersToFront):
+            canArrangeSelection(.bringToFront)
+        case #selector(bringLayersForward):
+            canArrangeSelection(.bringForward)
+        case #selector(sendLayersBackward):
+            canArrangeSelection(.sendBackward)
+        case #selector(sendLayersToBack):
+            canArrangeSelection(.sendToBack)
         default:
             super.canPerformAction(action, withSender: sender)
         }
