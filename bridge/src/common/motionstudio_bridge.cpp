@@ -9,15 +9,18 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/animation/Easing.h"
+#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/SelectionHandles.h"
@@ -25,10 +28,13 @@
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
+#include "MotionStudio/undo/AddMaskCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetCompositionBackgroundColorCommand.h"
 #include "MotionStudio/undo/SetCompositionCornerRadiusCommand.h"
@@ -36,9 +42,12 @@
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
+#include "MotionStudio/undo/SetMaskInvertedCommand.h"
+#include "MotionStudio/undo/SetMaskModeCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
+#include "MotionStudio/undo/SetTrackMatteCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 #include "DocumentLock.h"
@@ -163,6 +172,40 @@ motion::StrokePosition MakeStrokePosition(int position) {
         return motion::StrokePosition::Center;
     }
     return static_cast<motion::StrokePosition>(position);
+}
+
+motion::MaskMode MakeMaskMode(int mode) {
+    if (mode < MS_MASK_ADD || mode > MS_MASK_INTERSECT) {
+        return motion::MaskMode::Add;
+    }
+    return static_cast<motion::MaskMode>(mode);
+}
+
+int MaskModeTag(motion::MaskMode mode) {
+    return static_cast<int>(mode);
+}
+
+motion::TrackMatteType MakeTrackMatteType(int type) {
+    if (type < MS_TRACK_MATTE_NONE || type > MS_TRACK_MATTE_LUMA_INVERTED) {
+        return motion::TrackMatteType::None;
+    }
+    return static_cast<motion::TrackMatteType>(type);
+}
+
+int TrackMatteTypeTag(motion::TrackMatteType type) {
+    return static_cast<int>(type);
+}
+
+motion::Mask MakeDefaultMask() {
+    motion::Mask mask;
+    motion::BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{-100, -100}, {}, {}});
+    path.vertices.push_back({{100, -100}, {}, {}});
+    path.vertices.push_back({{100, 100}, {}, {}});
+    path.vertices.push_back({{-100, 100}, {}, {}});
+    mask.path.setStaticValue(std::move(path));
+    return mask;
 }
 
 Easing MakeEasing(int easingType, float inX, float inY, float outX, float outY) {
@@ -698,6 +741,52 @@ int ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, in
     return static_cast<int>(static_cast<StrokeStyle *>(style)->position);
 }
 
+/* ============================ mask / track matte queries ============================ */
+
+int ms_layer_mask_count(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? static_cast<int>(layer->masks.size()) : 0;
+}
+
+int ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->masks.size()) {
+        return -1;
+    }
+    return MaskModeTag(layer->masks[static_cast<size_t>(index)].mode);
+}
+
+bool ms_layer_mask_inverted_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->masks.size()) {
+        return false;
+    }
+    return layer->masks[static_cast<size_t>(index)].inverted;
+}
+
+int ms_layer_track_matte_type(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return MS_TRACK_MATTE_NONE;
+    }
+    return TrackMatteTypeTag(layer->trackMatteType);
+}
+
+uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return 0;
+    }
+    return layer->trackMatteLayerId.value;
+}
+
 /* ============================ property queries ============================ */
 
 int ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
@@ -1076,4 +1165,38 @@ void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
+}
+
+void ms_command_add_mask(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddMaskCommand>(EntityId{layerId}, MakeDefaultMask()));
+}
+
+void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveMaskCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::MoveMaskCommand>(EntityId{layerId}, fromIndex, toIndex));
+}
+
+void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, int mode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetMaskModeCommand>(EntityId{layerId}, index, MakeMaskMode(mode)));
+}
+
+void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int index,
+                                  bool inverted) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::SetMaskInvertedCommand>(EntityId{layerId}, index, inverted));
+}
+
+void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,
+                                int type) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetTrackMatteCommand>(EntityId{layerId}, EntityId{matteLayerId}, MakeTrackMatteType(type)));
 }

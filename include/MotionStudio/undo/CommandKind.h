@@ -22,6 +22,12 @@ enum class CommandKind {
     RemoveStyle,
     SetStyleBlendMode,
     SetStrokePosition,
+    AddMask,
+    RemoveMask,
+    MoveMask,
+    SetMaskMode,
+    SetMaskInverted,
+    SetTrackMatte,
     Composite,
 };
 

@@ -1,7 +1,7 @@
 # Layer Masks + Track Matte — 设计说明
 
 日期：2026-07-26  
-状态：实现中（Core / 渲染已合入分支；Bridge + UI 待做）  
+状态：实现中（Core / Bridge 已合入分支；SwiftUI 待人工验证）
 分支：`feature/0x1306a94_layer_masks`
 
 ## 实现进度
@@ -13,8 +13,8 @@
 | 3. DrawCommand + CommandBuilder | **已完成** | `BeginLayer/EndLayer/BeginMask/EndMask/DrawMaskPath` |
 | 4. tgfx 离屏 PathCoverage | **已完成** | Picture 隔离 + MaskFilter；Add / feather 快照测试通过 |
 | 5. Track Matte 端到端（渲染） | **已完成** | Alpha matte 快照测试通过；Luma/反相走同一 coverage 路径 |
-| 6. Bridge + Undo | **未开始** | 增删 mask、设 track matte 的 C API / 命令 |
-| 7. SwiftUI 编辑 UI | **未开始** | Inspector / 时间轴；**需人工验证通过后再提交** |
+| 6. Bridge + Undo | **已完成** | 增删/移动 mask、mode/inverted、set track matte；undo + bridge_test |
+| 7. SwiftUI 编辑 UI | **进行中** | Inspector / 时间轴；**需人工验证通过后再提交** |
 
 提交策略：Core / 适配器 / 测试 / 文档可自动提交；含 UI 交互的改动等人工验证后再提交。
 

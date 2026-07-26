@@ -114,6 +114,42 @@ TEST(BridgeCommandTest, EllipseAndRectLayersCycleNames) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, MaskAndTrackMatteLifecycle) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t matteId = ms_command_add_ellipse_layer(document, compositionId);
+
+    EXPECT_EQ(ms_layer_mask_count(document, layerId), 0);
+    ms_command_add_mask(document, layerId);
+    ASSERT_EQ(ms_layer_mask_count(document, layerId), 1);
+    EXPECT_EQ(ms_layer_mask_mode_at(document, layerId, 0), MS_MASK_ADD);
+    EXPECT_FALSE(ms_layer_mask_inverted_at(document, layerId, 0));
+
+    ms_command_set_mask_mode(document, layerId, 0, MS_MASK_SUBTRACT);
+    EXPECT_EQ(ms_layer_mask_mode_at(document, layerId, 0), MS_MASK_SUBTRACT);
+    ms_command_set_mask_inverted(document, layerId, 0, true);
+    EXPECT_TRUE(ms_layer_mask_inverted_at(document, layerId, 0));
+
+    ms_command_add_mask(document, layerId);
+    ms_command_move_mask(document, layerId, 0, 1);
+    EXPECT_EQ(ms_layer_mask_mode_at(document, layerId, 1), MS_MASK_SUBTRACT);
+
+    ms_command_set_track_matte(document, layerId, matteId, MS_TRACK_MATTE_ALPHA);
+    EXPECT_EQ(ms_layer_track_matte_type(document, layerId), MS_TRACK_MATTE_ALPHA);
+    EXPECT_EQ(ms_layer_track_matte_layer_id(document, layerId), matteId);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_layer_track_matte_type(document, layerId), MS_TRACK_MATTE_NONE);
+
+    ms_command_remove_mask(document, layerId, 0);
+    EXPECT_EQ(ms_layer_mask_count(document, layerId), 1);
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_layer_mask_count(document, layerId), 2);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, FillStyleLifecycle) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

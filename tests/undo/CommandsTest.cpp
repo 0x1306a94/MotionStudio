@@ -2,27 +2,38 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TextContent.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
+#include "MotionStudio/undo/AddMaskCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetMaskInvertedCommand.h"
+#include "MotionStudio/undo/SetMaskModeCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
+#include "MotionStudio/undo/SetTrackMatteCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::AddKeyframeCommand;
 using motion::AddLayerCommand;
 using motion::AddLayerStyleCommand;
+using motion::AddMaskCommand;
 using motion::Animatable;
+using motion::BezierPath;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -33,17 +44,25 @@ using motion::Keyframe;
 using motion::KeyframeData;
 using motion::Layer;
 using motion::LayerType;
+using motion::Mask;
+using motion::MaskMode;
 using motion::MoveKeyframeCommand;
 using motion::MoveLayerCommand;
+using motion::MoveMaskCommand;
 using motion::PropertyPath;
 using motion::PropertyValue;
 using motion::RemoveKeyframeCommand;
 using motion::RemoveLayerCommand;
+using motion::RemoveMaskCommand;
 using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
+using motion::SetMaskInvertedCommand;
+using motion::SetMaskModeCommand;
 using motion::SetStaticValueCommand;
 using motion::SetStrokePositionCommand;
 using motion::SetStyleBlendModeCommand;
+using motion::SetTrackMatteCommand;
+using motion::TrackMatteType;
 using motion::UndoManager;
 using motion::Vec2;
 
@@ -519,4 +538,119 @@ TEST(SetStrokePositionCommandTest, ExecuteSkipsMissingLayer) {
     scene.execute<SetStrokePositionCommand>(EntityId{999}, 0, motion::StrokePosition::Inside);
     scene.undo.undo(scene.document);
     EXPECT_TRUE(scene.layer->styles.empty());
+}
+
+namespace {
+
+Mask MakeTestMask(MaskMode mode) {
+    Mask mask;
+    mask.mode = mode;
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{10, 0}, {}, {}});
+    path.vertices.push_back({{10, 10}, {}, {}});
+    mask.path.setStaticValue(path);
+    return mask;
+}
+
+}  // namespace
+
+TEST(AddMaskCommandTest, AddUndoRedo) {
+    Scene scene;
+    scene.execute<AddMaskCommand>(scene.layer->id, MakeTestMask(MaskMode::Subtract));
+    ASSERT_EQ(scene.layer->masks.size(), 1u);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Subtract);
+
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->masks.empty());
+
+    scene.undo.redo(scene.document);
+    ASSERT_EQ(scene.layer->masks.size(), 1u);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Subtract);
+}
+
+TEST(RemoveMaskCommandTest, RemoveUndoRedo) {
+    Scene scene;
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Add));
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Intersect));
+
+    scene.execute<RemoveMaskCommand>(scene.layer->id, 0);
+    ASSERT_EQ(scene.layer->masks.size(), 1u);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Intersect);
+
+    scene.undo.undo(scene.document);
+    ASSERT_EQ(scene.layer->masks.size(), 2u);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Add);
+}
+
+TEST(MoveMaskCommandTest, ReordersMasks) {
+    Scene scene;
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Add));
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Subtract));
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Intersect));
+
+    scene.execute<MoveMaskCommand>(scene.layer->id, 0, 2);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Subtract);
+    EXPECT_EQ(scene.layer->masks[2].mode, MaskMode::Add);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Add);
+}
+
+TEST(SetMaskModeCommandTest, SetAndMerge) {
+    Scene scene;
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Add));
+
+    scene.execute<SetMaskModeCommand>(scene.layer->id, 0, MaskMode::Subtract);
+    scene.execute<SetMaskModeCommand>(scene.layer->id, 0, MaskMode::Intersect);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Intersect);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->masks[0].mode, MaskMode::Add);
+}
+
+TEST(SetMaskInvertedCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->masks.push_back(MakeTestMask(MaskMode::Add));
+
+    scene.execute<SetMaskInvertedCommand>(scene.layer->id, 0, true);
+    EXPECT_TRUE(scene.layer->masks[0].inverted);
+
+    scene.undo.undo(scene.document);
+    EXPECT_FALSE(scene.layer->masks[0].inverted);
+}
+
+TEST(SetTrackMatteCommandTest, SetAndClear) {
+    Scene scene;
+    Layer *matte =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+
+    scene.execute<SetTrackMatteCommand>(scene.layer->id, matte->id, TrackMatteType::Alpha);
+    EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::Alpha);
+    EXPECT_EQ(scene.layer->trackMatteLayerId, matte->id);
+
+    // Close the timed merge window so clear is a separate undo unit.
+    scene.undo.endMergeGroup();
+
+    scene.execute<SetTrackMatteCommand>(scene.layer->id, EntityId{}, TrackMatteType::None);
+    EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::None);
+    EXPECT_FALSE(scene.layer->trackMatteLayerId.isValid());
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::Alpha);
+}
+
+TEST(SetTrackMatteCommandTest, ConsecutiveSetsMerge) {
+    Scene scene;
+    Layer *matte =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+
+    scene.execute<SetTrackMatteCommand>(scene.layer->id, matte->id, TrackMatteType::Alpha);
+    scene.execute<SetTrackMatteCommand>(scene.layer->id, matte->id, TrackMatteType::Luma);
+    EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::Luma);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::None);
+    EXPECT_FALSE(scene.layer->trackMatteLayerId.isValid());
 }

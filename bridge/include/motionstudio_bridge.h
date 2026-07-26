@@ -52,6 +52,22 @@ enum {
     MS_STYLE_STROKE = 1,
 };
 
+// Path mask mode tag, mirrors motion::MaskMode.
+enum {
+    MS_MASK_ADD = 0,
+    MS_MASK_SUBTRACT = 1,
+    MS_MASK_INTERSECT = 2,
+};
+
+// Track matte type tag, mirrors motion::TrackMatteType.
+enum {
+    MS_TRACK_MATTE_NONE = 0,
+    MS_TRACK_MATTE_ALPHA = 1,
+    MS_TRACK_MATTE_ALPHA_INVERTED = 2,
+    MS_TRACK_MATTE_LUMA = 3,
+    MS_TRACK_MATTE_LUMA_INVERTED = 4,
+};
+
 // Stroke position tag, mirrors motion::StrokePosition.
 enum {
     MS_STROKE_POSITION_CENTER = 0,
@@ -242,6 +258,16 @@ int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index);
 // Blend mode tag (MS_BLEND_*) of the fill at index, -1 when out of range or
 // the style is not a fill.
 int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
+
+// Path masks on a layer.
+int ms_layer_mask_count(MSDocument *document, uint64_t layerId);
+// Mask mode tag (MS_MASK_*) at index, -1 when out of range.
+int ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index);
+bool ms_layer_mask_inverted_at(MSDocument *document, uint64_t layerId, int index);
+
+// Track matte on a layer. type is MS_TRACK_MATTE_*; source id is 0 when none.
+int ms_layer_track_matte_type(MSDocument *document, uint64_t layerId);
+uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId);
 // Stroke position of the style at index, or -1 when not a stroke.
 int ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
 
@@ -319,6 +345,17 @@ void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index);
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode);
 // position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position);
+
+// Appends a default rectangular path mask (Add mode) to the layer.
+void ms_command_add_mask(MSDocument *document, uint64_t layerId);
+void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index);
+void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex);
+// mode: MS_MASK_* tag.
+void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, int mode);
+void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int index, bool inverted);
+// type: MS_TRACK_MATTE_*. matteLayerId may be 0 when type is NONE.
+void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,
+                                int type);
 
 #if defined(__APPLE__)
 

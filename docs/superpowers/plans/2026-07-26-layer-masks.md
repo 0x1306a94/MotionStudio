@@ -18,7 +18,7 @@
 - Core / 适配器 / 测试 / 文档：任务完成后可自动提交（不推送）。
 - Bridge + SwiftUI：实现后先留本地，**UI 人工验证通过后再提交**。
 
-**进度（2026-07-26）：** Task 1–7、Task 10 文档部分已完成；Task 8–9 未开始。
+**进度（2026-07-26）：** Task 1–8、Task 10 文档部分已完成；Task 9（SwiftUI）进行中，待人工验证后再提交。
 
 ## File Map
 
@@ -150,9 +150,9 @@
 - 新增或复用 undo 命令设 track matte、增删 mask
 - Test: `tests` / bridge_test
 
-- [ ] **Step 1:** C API：add/remove/reorder mask；set track matte
-- [ ] **Step 2:** undo 覆盖
-- [ ] **Step 3:** bridge_test 通过
+- [x] **Step 1:** C API：add/remove/reorder mask；set track matte
+- [x] **Step 2:** undo 覆盖
+- [x] **Step 3:** bridge_test 通过
 
 ---
 
