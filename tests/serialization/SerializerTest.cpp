@@ -214,6 +214,34 @@ TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
     EXPECT_EQ(strokeStyle->trimOffset.staticValue(), 0.0f);
 }
 
+TEST(SerializerTest, LayerWithoutTrackMatteDefaultsToNone) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    for (auto &layer : json["compositions"][1]["layers"]) {
+        layer.erase("trackMatteType");
+        layer.erase("trackMatteLayerId");
+        for (auto &mask : layer["masks"]) {
+            // Legacy mask path was a bare BezierPath object.
+            if (mask.contains("path") && mask["path"].contains("static")) {
+                mask["path"] = mask["path"]["static"];
+            }
+            mask.erase("feather");
+            mask.erase("expansion");
+        }
+    }
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(restored.hasValue()) << restored.error();
+    const Layer &shapes = *(*restored)->compositions[1]->layers[0];
+    EXPECT_EQ(shapes.trackMatteType, motion::TrackMatteType::None);
+    EXPECT_FALSE(shapes.trackMatteLayerId.isValid());
+    ASSERT_EQ(shapes.masks.size(), 1u);
+    EXPECT_FALSE(shapes.masks[0].path.staticValue().vertices.empty());
+    EXPECT_EQ(shapes.masks[0].feather.staticValue(), 0.0f);
+    EXPECT_EQ(shapes.masks[0].expansion.staticValue(), 0.0f);
+}
+
 TEST(SerializerTest, ColorSerializesAsHexString) {
     Document document;
     Composition *composition = document.addComposition(std::make_unique<Composition>());

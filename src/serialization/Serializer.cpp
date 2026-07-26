@@ -623,9 +623,20 @@ Expected<Mask, std::string> MaskFromJson(const json &node) {
     if (!pathNode) {
         return Unexpected(pathNode.error());
     }
-    Expected<void, std::string> result = AnimatableFromJson(**pathNode, mask.path);
-    if (!result) {
-        return Unexpected(result.error());
+    // Current form is Animatable JSON; older docs stored a bare BezierPath.
+    Expected<void, std::string> result;
+    if (FindChild(**pathNode, "static") != nullptr ||
+        FindChild(**pathNode, "keyframes") != nullptr) {
+        result = AnimatableFromJson(**pathNode, mask.path);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+    } else {
+        Expected<BezierPath, std::string> path = BezierPathFromJson(**pathNode);
+        if (!path) {
+            return Unexpected(path.error());
+        }
+        mask.path.setStaticValue(std::move(*path));
     }
     Expected<const json *, std::string> opacityNode = Child(node, "opacity");
     if (!opacityNode) {
@@ -640,21 +651,19 @@ Expected<Mask, std::string> MaskFromJson(const json &node) {
         return Unexpected(inverted.error());
     }
     mask.inverted = *inverted;
-    Expected<const json *, std::string> featherNode = Child(node, "feather");
-    if (!featherNode) {
-        return Unexpected(featherNode.error());
+    // feather/expansion are optional: documents saved before these fields
+    // existed default to 0.
+    if (const json *featherNode = FindChild(node, "feather")) {
+        result = AnimatableFromJson(*featherNode, mask.feather);
+        if (!result) {
+            return Unexpected(result.error());
+        }
     }
-    result = AnimatableFromJson(**featherNode, mask.feather);
-    if (!result) {
-        return Unexpected(result.error());
-    }
-    Expected<const json *, std::string> expansionNode = Child(node, "expansion");
-    if (!expansionNode) {
-        return Unexpected(expansionNode.error());
-    }
-    result = AnimatableFromJson(**expansionNode, mask.expansion);
-    if (!result) {
-        return Unexpected(result.error());
+    if (const json *expansionNode = FindChild(node, "expansion")) {
+        result = AnimatableFromJson(*expansionNode, mask.expansion);
+        if (!result) {
+            return Unexpected(result.error());
+        }
     }
     return mask;
 }
@@ -1196,17 +1205,18 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
         }
     }
 
+    // trackMatteType is optional: documents saved before track matte existed
+    // default to None / invalid source id.
     Expected<std::string, std::string> trackMatteTypeText =
         ParseField<std::string>(node, "trackMatteType");
-    if (!trackMatteTypeText) {
-        return Unexpected(trackMatteTypeText.error());
+    if (trackMatteTypeText) {
+        Expected<TrackMatteType, std::string> trackMatteType =
+            dto::trackMatteTypeFromString(*trackMatteTypeText);
+        if (!trackMatteType) {
+            return Unexpected(trackMatteType.error());
+        }
+        layer->trackMatteType = *trackMatteType;
     }
-    Expected<TrackMatteType, std::string> trackMatteType =
-        dto::trackMatteTypeFromString(*trackMatteTypeText);
-    if (!trackMatteType) {
-        return Unexpected(trackMatteType.error());
-    }
-    layer->trackMatteType = *trackMatteType;
     const json *trackMatteLayerNode = FindChild(node, "trackMatteLayerId");
     if (trackMatteLayerNode && !trackMatteLayerNode->is_null()) {
         Expected<std::string, std::string> matteIdText = AsString(*trackMatteLayerNode);
