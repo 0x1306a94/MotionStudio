@@ -14,6 +14,8 @@ class Surface;
 
 namespace motion {
 
+struct TgfxPathCache;
+
 struct TgfxEndFrameProfile {
     double canvasRestoreMs = 0;
     double presentTargetMs = 0;
@@ -47,10 +49,10 @@ class TgfxCanvasAdapter : public RenderAdapter {
     void concatTransform(const Mat3 &matrix) override;
     void setOpacity(float opacity) override;
     void setBlendMode(BlendMode mode) override;
-    void drawPath(const BezierPath &path, const Paint &paint) override;
-    void strokePath(const BezierPath &path, const Paint &paint,
+    void drawPath(const ShapeGeometry &geometry, const Paint &paint) override;
+    void strokePath(const ShapeGeometry &geometry, const Paint &paint,
                     const StrokeOptions &options) override;
-    void clipPath(const BezierPath &path, FillRule rule) override;
+    void clipPath(const ShapeGeometry &geometry, FillRule rule) override;
 
   protected:
     TgfxCanvasAdapter();
@@ -88,6 +90,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // Spans beginFrame→endFrame; restores canvas state when the frame ends.
     // Declared after surface_ so destruction still has a live canvas.
     std::unique_ptr<tgfx::AutoCanvasRestore> frameRestore_;
+    std::unique_ptr<TgfxPathCache> pathCache_;
 };
 
 }  // namespace motion

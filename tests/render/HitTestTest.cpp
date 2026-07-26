@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/render/HitTest.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::BezierPath;
 using motion::EntityId;
@@ -8,27 +9,21 @@ using motion::EvaluatedLayer;
 using motion::EvaluatedShapeItem;
 using motion::HitTestLayer;
 using motion::HitTestLayerAtPoint;
+using motion::MakePathGeometry;
+using motion::MakeRectGeometry;
 using motion::Paint;
 using motion::SceneState;
 using motion::Vec2;
 
 namespace {
 
-BezierPath RectPath(float left, float top, float right, float bottom) {
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{left, top}, {}, {}});
-    path.vertices.push_back({{right, top}, {}, {}});
-    path.vertices.push_back({{right, bottom}, {}, {}});
-    path.vertices.push_back({{left, bottom}, {}, {}});
-    return path;
-}
-
 EvaluatedLayer LayerWithRect(uint64_t id, float left, float top, float right, float bottom) {
     EvaluatedLayer layer;
     layer.id = EntityId{id};
     EvaluatedShapeItem item;
-    item.path = RectPath(left, top, right, bottom);
+    const Vec2 center{(left + right) * 0.5f, (top + bottom) * 0.5f};
+    const Vec2 size{right - left, bottom - top};
+    item.geometry = MakeRectGeometry(center, size);
     item.paint = Paint{{1, 1, 1, 1}};
     layer.shapeItems.push_back(item);
     return layer;
@@ -58,9 +53,11 @@ TEST(HitTestTest, HitsStrokeWithinTolerance) {
     EvaluatedShapeItem item;
     item.isStroke = true;
     item.stroke.width = 4;
-    item.path.closed = false;
-    item.path.vertices.push_back({{0, 0}, {}, {}});
-    item.path.vertices.push_back({{100, 0}, {}, {}});
+    BezierPath path;
+    path.closed = false;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{100, 0}, {}, {}});
+    item.geometry = MakePathGeometry(std::move(path));
     layer.shapeItems.push_back(item);
 
     EXPECT_TRUE(HitTestLayer(layer, Vec2{50, 4}, 2));

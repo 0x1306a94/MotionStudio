@@ -12,13 +12,13 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 
 namespace motion {
 
 namespace {
 
 constexpr int kMaxPrecompDepth = 1024;
-constexpr float kEllipseKappa = 0.5522847498f;
 
 Mat3 LocalMatrixOf(const Transform &transform, PreviewTime time) {
     return Mat3::Translate(transform.position.evaluatePreview(time)) *
@@ -27,75 +27,29 @@ Mat3 LocalMatrixOf(const Transform &transform, PreviewTime time) {
         Mat3::Translate(-transform.anchorPoint.evaluatePreview(time));
 }
 
-// Rect centered at position (Lottie convention), corners clockwise from
-// top-left; rounded corners split each corner into an arc pair.
-BezierPath RectToPath(const ShapeRect &rect, PreviewTime time) {
-    const Vec2 center = rect.position.evaluatePreview(time);
-    const Vec2 size = rect.size.evaluatePreview(time);
-    const float halfWidth = std::max(size.x * 0.5f, 0.0f);
-    const float halfHeight = std::max(size.y * 0.5f, 0.0f);
-    const float radius = std::clamp(rect.cornerRadius.evaluatePreview(time), 0.0f,
-                                    std::min(halfWidth, halfHeight));
-    const float left = center.x - halfWidth;
-    const float right = center.x + halfWidth;
-    const float top = center.y - halfHeight;
-    const float bottom = center.y + halfHeight;
-
-    BezierPath path;
-    path.closed = true;
-    if (radius <= 0) {
-        path.vertices.push_back({{left, top}, {}, {}});
-        path.vertices.push_back({{right, top}, {}, {}});
-        path.vertices.push_back({{right, bottom}, {}, {}});
-        path.vertices.push_back({{left, bottom}, {}, {}});
-        return path;
-    }
-    const float k = kEllipseKappa * radius;
-    path.vertices.push_back({{left, top + radius}, {}, {0, -k}});
-    path.vertices.push_back({{left + radius, top}, {-k, 0}, {}});
-    path.vertices.push_back({{right - radius, top}, {}, {k, 0}});
-    path.vertices.push_back({{right, top + radius}, {0, -k}, {}});
-    path.vertices.push_back({{right, bottom - radius}, {}, {0, k}});
-    path.vertices.push_back({{right - radius, bottom}, {k, 0}, {}});
-    path.vertices.push_back({{left + radius, bottom}, {}, {-k, 0}});
-    path.vertices.push_back({{left, bottom - radius}, {0, k}, {}});
-    return path;
-}
-
-// Ellipse centered at position, approximated by 4 cubic segments.
-BezierPath EllipseToPath(const ShapeEllipse &ellipse, PreviewTime time) {
-    const Vec2 center = ellipse.position.evaluatePreview(time);
-    const Vec2 size = ellipse.size.evaluatePreview(time);
-    const float halfWidth = std::max(size.x * 0.5f, 0.0f);
-    const float halfHeight = std::max(size.y * 0.5f, 0.0f);
-    const float kx = kEllipseKappa * halfWidth;
-    const float ky = kEllipseKappa * halfHeight;
-
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{center.x + halfWidth, center.y}, {0, -ky}, {0, ky}});
-    path.vertices.push_back({{center.x, center.y + halfHeight}, {kx, 0}, {-kx, 0}});
-    path.vertices.push_back({{center.x - halfWidth, center.y}, {0, ky}, {0, -ky}});
-    path.vertices.push_back({{center.x, center.y - halfHeight}, {-kx, 0}, {kx, 0}});
-    return path;
-}
-
-void CollectGeometryPath(const ShapeElement &element, PreviewTime time,
-                         std::vector<BezierPath> &paths) {
+void CollectGeometry(const ShapeElement &element, PreviewTime time,
+                     std::vector<ShapeGeometry> &geometries) {
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
-            paths.push_back(shape.path.evaluatePreview(time));
+            geometries.push_back(MakePathGeometry(shape.path.evaluatePreview(time)));
             break;
         }
         case ShapeType::Rect: {
             const auto &shape = static_cast<const ShapeRect &>(element);
-            paths.push_back(RectToPath(shape, time));
+            const Vec2 center = shape.position.evaluatePreview(time);
+            const Vec2 size = shape.size.evaluatePreview(time);
+            const float halfWidth = std::max(size.x * 0.5f, 0.0f);
+            const float halfHeight = std::max(size.y * 0.5f, 0.0f);
+            const float cornerRadius = std::clamp(shape.cornerRadius.evaluatePreview(time), 0.0f,
+                                                  std::min(halfWidth, halfHeight));
+            geometries.push_back(MakeRectGeometry(center, size, cornerRadius));
             break;
         }
         case ShapeType::Ellipse: {
             const auto &shape = static_cast<const ShapeEllipse &>(element);
-            paths.push_back(EllipseToPath(shape, time));
+            geometries.push_back(MakeEllipseGeometry(shape.position.evaluatePreview(time),
+                                                     shape.size.evaluatePreview(time)));
             break;
         }
         case ShapeType::TrimPath: {
@@ -105,7 +59,7 @@ void CollectGeometryPath(const ShapeElement &element, PreviewTime time,
 }
 
 void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
-                      const std::vector<BezierPath> &paths,
+                      const std::vector<ShapeGeometry> &geometries,
                       std::vector<EvaluatedShapeItem> &items) {
     for (const auto &style : layer.styles) {
         switch (style->type()) {
@@ -114,8 +68,8 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
                 Color color = fill.color.evaluatePreview(time);
                 color.a *= alpha;
                 const Paint paint{color, fill.fillRule, fill.blendMode};
-                for (const BezierPath &path : paths) {
-                    items.push_back({path, paint, false, {}});
+                for (const ShapeGeometry &geometry : geometries) {
+                    items.push_back({geometry, paint, false, {}});
                 }
                 break;
             }
@@ -131,8 +85,8 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
                                             stroke.trimStart.evaluatePreview(time),
                                             stroke.trimEnd.evaluatePreview(time),
                                             stroke.trimOffset.evaluatePreview(time)};
-                for (const BezierPath &path : paths) {
-                    items.push_back({path, paint, true, options});
+                for (const ShapeGeometry &geometry : geometries) {
+                    items.push_back({geometry, paint, true, options});
                 }
                 break;
             }
@@ -229,11 +183,11 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     evaluated.opacity = opacity;
     evaluated.blendMode = layer.blendMode;
     if (!layer.styles.empty()) {
-        std::vector<BezierPath> paths;
+        std::vector<ShapeGeometry> geometries;
         if (shapeContent.geometry) {
-            CollectGeometryPath(*shapeContent.geometry, time, paths);
+            CollectGeometry(*shapeContent.geometry, time, geometries);
         }
-        ApplyLayerStyles(layer, time, 1.0f, paths, evaluated.shapeItems);
+        ApplyLayerStyles(layer, time, 1.0f, geometries, evaluated.shapeItems);
     }
     if (!evaluated.shapeItems.empty()) {
         out.push_back(std::move(evaluated));

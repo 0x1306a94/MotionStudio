@@ -9,6 +9,7 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/render/SceneEvaluator.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::Color;
 using motion::Composition;
@@ -101,12 +102,10 @@ TEST(SceneEvaluatorTest, RectFillProducesOneLocalSpaceItem) {
     const auto &item = evaluated.shapeItems[0];
     EXPECT_FALSE(item.isStroke);
     EXPECT_EQ(item.paint.color, (Color{1, 0, 0, 1}));
-    ASSERT_EQ(item.path.vertices.size(), 4u);
-    EXPECT_TRUE(item.path.closed);
-    EXPECT_EQ(item.path.vertices[0].point, (Vec2{80, 40}));
-    EXPECT_EQ(item.path.vertices[1].point, (Vec2{120, 40}));
-    EXPECT_EQ(item.path.vertices[2].point, (Vec2{120, 60}));
-    EXPECT_EQ(item.path.vertices[3].point, (Vec2{80, 60}));
+    EXPECT_EQ(item.geometry.kind, motion::ShapeGeometryKind::Rect);
+    EXPECT_EQ(item.geometry.center, (Vec2{100, 50}));
+    EXPECT_EQ(item.geometry.size, (Vec2{40, 20}));
+    EXPECT_FLOAT_EQ(item.geometry.cornerRadius, 0.0f);
 }
 
 TEST(SceneEvaluatorTest, MultipleFillsProduceItemsWithOwnBlendModes) {
@@ -173,7 +172,8 @@ TEST(SceneEvaluatorTest, LayerTransformStoredSeparatelyFromPath) {
     ASSERT_TRUE(result.hasValue());
     const auto &evaluated = result->layers[0];
     EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{10, 20}));
-    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.kind, motion::ShapeGeometryKind::Rect);
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{100, 50}));
 }
 
 TEST(SceneEvaluatorTest, ParentTransformChain) {
@@ -189,7 +189,7 @@ TEST(SceneEvaluatorTest, ParentTransformChain) {
     ASSERT_EQ(result->layers.size(), 1u);  // Group parent produces no items
     const auto &evaluated = result->layers[0];
     EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{100, 0}));
-    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{100, 50}));
 }
 
 TEST(SceneEvaluatorTest, OpacityInheritsFromParent) {
@@ -246,8 +246,9 @@ TEST(SceneEvaluatorTest, LayerGroupParentKeepsChildPathLocal) {
     ASSERT_TRUE(result.hasValue());
     const auto &evaluated = result->layers[0];
     EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{5, 5}));
-    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
-    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[2].point, (Vec2{5, 5}));
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.kind, motion::ShapeGeometryKind::Rect);
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{0, 0}));
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.size, (Vec2{10, 10}));
 }
 
 TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
@@ -266,7 +267,7 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {
     EXPECT_EQ(strokeItem.stroke.cap, motion::LineCap::Round);
 }
 
-TEST(SceneEvaluatorTest, EllipseProducesFourVertexClosedPath) {
+TEST(SceneEvaluatorTest, EllipseKeepsParametricGeometry) {
     RectScene scene;
     auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
     auto ellipse = std::make_unique<ShapeEllipse>();
@@ -276,13 +277,10 @@ TEST(SceneEvaluatorTest, EllipseProducesFourVertexClosedPath) {
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto &path = result->layers[0].shapeItems[0].path;
-    ASSERT_EQ(path.vertices.size(), 4u);
-    EXPECT_TRUE(path.closed);
-    EXPECT_TRUE(motion::ApproxEqual(path.vertices[0].point, Vec2{10, 0}));
-    EXPECT_TRUE(motion::ApproxEqual(path.vertices[1].point, Vec2{0, 5}));
-    EXPECT_TRUE(motion::ApproxEqual(path.vertices[2].point, Vec2{-10, 0}));
-    EXPECT_TRUE(motion::ApproxEqual(path.vertices[3].point, Vec2{0, -5}));
+    const auto &geometry = result->layers[0].shapeItems[0].geometry;
+    EXPECT_EQ(geometry.kind, motion::ShapeGeometryKind::Ellipse);
+    EXPECT_EQ(geometry.center, (Vec2{0, 0}));
+    EXPECT_EQ(geometry.size, (Vec2{20, 10}));
 }
 
 TEST(SceneEvaluatorTest, AnimatedTransformEvaluatedAtTime) {
@@ -300,7 +298,7 @@ TEST(SceneEvaluatorTest, AnimatedTransformEvaluatedAtTime) {
     ASSERT_TRUE(mid.hasValue());
     const auto &evaluated = mid->layers[0];
     EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{50, 0}));
-    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{100, 50}));
 }
 
 TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
@@ -318,5 +316,5 @@ TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
     ASSERT_TRUE(quarter.hasValue());
     const auto &evaluated = quarter->layers[0];
     EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{25, 0}));
-    EXPECT_EQ(evaluated.shapeItems[0].path.vertices[0].point, (Vec2{80, 40}));
+    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{100, 50}));
 }

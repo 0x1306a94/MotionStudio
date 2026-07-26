@@ -11,6 +11,8 @@
 #include "MotionStudio/render/CommandBuilder.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
+#include "MotionStudio/render/ShapeGeometry.h"
+
 #include "TgfxRenderAdapter.h"
 
 using motion::BezierPath;
@@ -24,6 +26,8 @@ using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
 using motion::LineCap;
+using motion::MakePathGeometry;
+using motion::MakeRectGeometry;
 using motion::Paint;
 using motion::PlayCommands;
 using motion::SceneEvaluator;
@@ -48,16 +52,6 @@ Pixel PixelAt(const std::vector<uint8_t> &pixels, int width, int x, int y) {
     return {pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]};
 }
 
-BezierPath MakeRectPath(float left, float top, float right, float bottom) {
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{left, top}, {}, {}});
-    path.vertices.push_back({{right, top}, {}, {}});
-    path.vertices.push_back({{right, bottom}, {}, {}});
-    path.vertices.push_back({{left, bottom}, {}, {}});
-    return path;
-}
-
 }  // namespace
 
 TEST(TgfxRenderAdapterTest, FillsRectOverBackground) {
@@ -72,7 +66,7 @@ TEST(TgfxRenderAdapterTest, FillsRectOverBackground) {
     state.backgroundColor = Color{0, 0, 0, 1};
     EvaluatedLayer layer;
     EvaluatedShapeItem item;
-    item.path = MakeRectPath(30, 30, 70, 70);
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{40, 40});
     item.paint = Paint{Color{1, 0, 0, 1}};
     layer.shapeItems.push_back(item);
     state.layers.push_back(std::move(layer));
@@ -107,7 +101,7 @@ TEST(TgfxRenderAdapterTest, LayerOpacityBlendsWithBackground) {
     EvaluatedLayer layer;
     layer.opacity = 0.5f;
     EvaluatedShapeItem item;
-    item.path = MakeRectPath(20, 20, 80, 80);
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{60, 60});
     item.paint = Paint{Color{0, 1, 0, 1}};
     layer.shapeItems.push_back(item);
     state.layers.push_back(std::move(layer));
@@ -134,8 +128,10 @@ TEST(TgfxRenderAdapterTest, StrokeDrawsAlongPath) {
     EvaluatedLayer layer;
     EvaluatedShapeItem item;
     item.isStroke = true;
-    item.path.vertices.push_back({{20, 50}, {}, {}});
-    item.path.vertices.push_back({{80, 50}, {}, {}});
+    BezierPath path;
+    path.vertices.push_back({{20, 50}, {}, {}});
+    path.vertices.push_back({{80, 50}, {}, {}});
+    item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{0, 0, 1, 1}};
     item.stroke.width = 6;
     item.stroke.cap = LineCap::Butt;

@@ -66,7 +66,8 @@ TEST(PrecompTest, FlattensSublayerKeepingItsId) {
     ASSERT_EQ(result->layers.size(), 1u);
     EXPECT_EQ(result->layers[0].id, rectLayer->id);  // sublayer id preserved
     EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{100, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.center, (Vec2{0, 0}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.size, (Vec2{10, 10}));
 }
 
 TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
@@ -94,7 +95,7 @@ TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result->layers.size(), 1u);
     EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{75, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.center, (Vec2{0, 0}));
 }
 
 TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
@@ -117,7 +118,7 @@ TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
     ASSERT_EQ(result->layers.size(), 1u);
     // Nested precomp transforms compose into worldTransform; path stays local.
     EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{30, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].path.vertices[0].point, (Vec2{-5, -5}));
+    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.center, (Vec2{0, 0}));
     EXPECT_FLOAT_EQ(result->layers[0].opacity, 0.25f);
 }
 

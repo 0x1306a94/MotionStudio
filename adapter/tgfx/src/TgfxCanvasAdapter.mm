@@ -3,6 +3,11 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
+#include <list>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/Color.h>
@@ -122,9 +127,28 @@ tgfx::LineJoin ToTgfxLineJoin(LineJoin join) {
     return tgfx::LineJoin::Miter;
 }
 
+// Zero relative tangents mean a straight segment; emit lineTo so tgfx can
+// recognize axis-aligned rectangles via Path::isRect and take the drawRect
+// fast path instead of generic cubic triangulation.
+bool IsStraightSegment(const BezierPath::Vertex &from, const BezierPath::Vertex &to) {
+    return from.outTangent.x == 0.0f && from.outTangent.y == 0.0f && to.inTangent.x == 0.0f &&
+        to.inTangent.y == 0.0f;
+}
+
+void AppendBezierSegment(tgfx::Path &result, const BezierPath::Vertex &from,
+                         const BezierPath::Vertex &to) {
+    if (IsStraightSegment(from, to)) {
+        result.lineTo(to.point.x, to.point.y);
+        return;
+    }
+    result.cubicTo(from.point.x + from.outTangent.x, from.point.y + from.outTangent.y,
+                   to.point.x + to.inTangent.x, to.point.y + to.inTangent.y, to.point.x,
+                   to.point.y);
+}
+
 // Converts a BezierPath (relative tangents) into a tgfx path with absolute
 // control points.
-tgfx::Path ToTgfxPath(const BezierPath &path, FillRule fillRule) {
+tgfx::Path BezierToTgfxPath(const BezierPath &path, FillRule fillRule) {
     tgfx::Path result;
     if (path.vertices.empty()) {
         result.setFillType(fillRule == FillRule::EvenOdd ? tgfx::PathFillType::EvenOdd
@@ -134,24 +158,101 @@ tgfx::Path ToTgfxPath(const BezierPath &path, FillRule fillRule) {
     const BezierPath::Vertex &first = path.vertices.front();
     result.moveTo(first.point.x, first.point.y);
     for (size_t i = 1; i < path.vertices.size(); ++i) {
-        const BezierPath::Vertex &previous = path.vertices[i - 1];
-        const BezierPath::Vertex &current = path.vertices[i];
-        result.cubicTo(previous.point.x + previous.outTangent.x,
-                       previous.point.y + previous.outTangent.y,
-                       current.point.x + current.inTangent.x,
-                       current.point.y + current.inTangent.y, current.point.x,
-                       current.point.y);
+        AppendBezierSegment(result, path.vertices[i - 1], path.vertices[i]);
     }
     if (path.closed && path.vertices.size() > 1) {
-        const BezierPath::Vertex &last = path.vertices.back();
-        result.cubicTo(last.point.x + last.outTangent.x, last.point.y + last.outTangent.y,
-                       first.point.x + first.inTangent.x, first.point.y + first.inTangent.y,
-                       first.point.x, first.point.y);
+        AppendBezierSegment(result, path.vertices.back(), first);
         result.close();
     }
     result.setFillType(fillRule == FillRule::EvenOdd ? tgfx::PathFillType::EvenOdd
                                                      : tgfx::PathFillType::Winding);
     return result;
+}
+
+tgfx::PathFillType ToTgfxFillType(FillRule fillRule) {
+    return fillRule == FillRule::EvenOdd ? tgfx::PathFillType::EvenOdd
+                                         : tgfx::PathFillType::Winding;
+}
+
+tgfx::Rect CenteredBounds(Vec2 center, Vec2 size) {
+    const float halfWidth = std::max(size.x * 0.5f, 0.0f);
+    const float halfHeight = std::max(size.y * 0.5f, 0.0f);
+    return tgfx::Rect::MakeXYWH(center.x - halfWidth, center.y - halfHeight, halfWidth * 2.0f,
+                                halfHeight * 2.0f);
+}
+
+tgfx::Path BuildTgfxPath(const ShapeGeometry &geometry, FillRule fillRule) {
+    tgfx::Path result;
+    switch (geometry.kind) {
+        case ShapeGeometryKind::Path: {
+            return BezierToTgfxPath(geometry.path, fillRule);
+        }
+        case ShapeGeometryKind::Rect: {
+            const tgfx::Rect bounds = CenteredBounds(geometry.center, geometry.size);
+            const float maxRadius = std::min(bounds.width(), bounds.height()) * 0.5f;
+            const float radius = std::clamp(geometry.cornerRadius, 0.0f, maxRadius);
+            if (radius > 0.0f) {
+                result.addRoundRect(bounds, radius, radius);
+            } else {
+                result.addRect(bounds);
+            }
+            break;
+        }
+        case ShapeGeometryKind::Ellipse: {
+            result.addOval(CenteredBounds(geometry.center, geometry.size));
+            break;
+        }
+    }
+    result.setFillType(ToTgfxFillType(fillRule));
+    return result;
+}
+
+uint64_t MixHash(uint64_t hash, uint64_t value) {
+    hash ^= value + 0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
+    return hash;
+}
+
+uint64_t FloatBits(float value) {
+    uint32_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(value), "float size mismatch");
+    std::memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+
+uint64_t HashGeometry(const ShapeGeometry &geometry, FillRule fillRule) {
+    uint64_t hash = static_cast<uint64_t>(geometry.kind);
+    hash = MixHash(hash, static_cast<uint64_t>(fillRule));
+    switch (geometry.kind) {
+        case ShapeGeometryKind::Path: {
+            hash = MixHash(hash, geometry.path.closed ? 1ULL : 0ULL);
+            hash = MixHash(hash, geometry.path.vertices.size());
+            for (const BezierPath::Vertex &vertex : geometry.path.vertices) {
+                hash = MixHash(hash, FloatBits(vertex.point.x));
+                hash = MixHash(hash, FloatBits(vertex.point.y));
+                hash = MixHash(hash, FloatBits(vertex.inTangent.x));
+                hash = MixHash(hash, FloatBits(vertex.inTangent.y));
+                hash = MixHash(hash, FloatBits(vertex.outTangent.x));
+                hash = MixHash(hash, FloatBits(vertex.outTangent.y));
+            }
+            break;
+        }
+        case ShapeGeometryKind::Rect: {
+            hash = MixHash(hash, FloatBits(geometry.center.x));
+            hash = MixHash(hash, FloatBits(geometry.center.y));
+            hash = MixHash(hash, FloatBits(geometry.size.x));
+            hash = MixHash(hash, FloatBits(geometry.size.y));
+            hash = MixHash(hash, FloatBits(geometry.cornerRadius));
+            break;
+        }
+        case ShapeGeometryKind::Ellipse: {
+            hash = MixHash(hash, FloatBits(geometry.center.x));
+            hash = MixHash(hash, FloatBits(geometry.center.y));
+            hash = MixHash(hash, FloatBits(geometry.size.x));
+            hash = MixHash(hash, FloatBits(geometry.size.y));
+            break;
+        }
+    }
+    return hash;
 }
 
 tgfx::Matrix ToTgfxMatrix(const Mat3 &matrix) {
@@ -190,9 +291,59 @@ tgfx::Path TrimmedPath(const tgfx::Path &path, float trimStart, float trimEnd,
     return result;
 }
 
+struct PathCacheKey {
+    ShapeGeometryKind kind = ShapeGeometryKind::Path;
+    FillRule fillRule = FillRule::NonZero;
+    uint64_t contentHash = 0;
+
+    bool operator==(const PathCacheKey &other) const {
+        return kind == other.kind && fillRule == other.fillRule && contentHash == other.contentHash;
+    }
+};
+
+struct PathCacheKeyHash {
+    size_t operator()(const PathCacheKey &key) const {
+        uint64_t hash = static_cast<uint64_t>(key.kind);
+        hash = MixHash(hash, static_cast<uint64_t>(key.fillRule));
+        hash = MixHash(hash, key.contentHash);
+        return static_cast<size_t>(hash);
+    }
+};
+
 }  // namespace
 
-TgfxCanvasAdapter::TgfxCanvasAdapter() = default;
+struct TgfxPathCache {
+    // Front = most recently used. Capacity covers a few animated size variants
+    // without unbounded growth across long playback sessions.
+    static constexpr size_t kCapacity = 512;
+
+    using EntryList = std::list<std::pair<PathCacheKey, tgfx::Path>>;
+    EntryList order;
+    std::unordered_map<PathCacheKey, EntryList::iterator, PathCacheKeyHash> index;
+
+    tgfx::Path Resolve(const ShapeGeometry &geometry, FillRule fillRule) {
+        PathCacheKey key;
+        key.kind = geometry.kind;
+        key.fillRule = fillRule;
+        key.contentHash = HashGeometry(geometry, fillRule);
+        const auto found = index.find(key);
+        if (found != index.end()) {
+            order.splice(order.begin(), order, found->second);
+            return found->second->second;
+        }
+        if (order.size() >= kCapacity) {
+            index.erase(order.back().first);
+            order.pop_back();
+        }
+        order.push_front({key, BuildTgfxPath(geometry, fillRule)});
+        index.emplace(key, order.begin());
+        return order.front().second;
+    }
+};
+
+TgfxCanvasAdapter::TgfxCanvasAdapter()
+    : pathCache_(std::make_unique<TgfxPathCache>()) {
+}
 
 TgfxCanvasAdapter::~TgfxCanvasAdapter() {
     frameRestore_.reset();
@@ -307,8 +458,8 @@ void TgfxCanvasAdapter::setBlendMode(BlendMode mode) {
     blendMode_ = mode;
 }
 
-void TgfxCanvasAdapter::drawPath(const BezierPath &path, const Paint &paint) {
-    if (!surface_) {
+void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &paint) {
+    if (!surface_ || !pathCache_) {
         return;
     }
     tgfx::Paint tgfxPaint;
@@ -318,16 +469,16 @@ void TgfxCanvasAdapter::drawPath(const BezierPath &path, const Paint &paint) {
     color.a *= opacity_;
     tgfxPaint.setColor(ToTgfxColor(color));
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-    surface_->getCanvas()->drawPath(ToTgfxPath(path, paint.fillRule), tgfxPaint);
+    surface_->getCanvas()->drawPath(pathCache_->Resolve(geometry, paint.fillRule), tgfxPaint);
 }
 
-void TgfxCanvasAdapter::strokePath(const BezierPath &path, const Paint &paint,
+void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &paint,
                                    const StrokeOptions &options) {
-    if (!surface_) {
+    if (!surface_ || !pathCache_) {
         return;
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
-    const tgfx::Path fullPath = ToTgfxPath(path, paint.fillRule);
+    const tgfx::Path fullPath = pathCache_->Resolve(geometry, paint.fillRule);
     tgfx::Path strokeGeometry = fullPath;
     if (NeedsTrim(options)) {
         strokeGeometry = TrimmedPath(fullPath, options.trimStart, options.trimEnd,
@@ -370,11 +521,11 @@ void TgfxCanvasAdapter::strokePath(const BezierPath &path, const Paint &paint,
     canvas->drawPath(outline, tgfxPaint);
 }
 
-void TgfxCanvasAdapter::clipPath(const BezierPath &path, FillRule rule) {
-    if (!surface_) {
+void TgfxCanvasAdapter::clipPath(const ShapeGeometry &geometry, FillRule rule) {
+    if (!surface_ || !pathCache_) {
         return;
     }
-    surface_->getCanvas()->clipPath(ToTgfxPath(path, rule));
+    surface_->getCanvas()->clipPath(pathCache_->Resolve(geometry, rule));
 }
 
 }  // namespace motion

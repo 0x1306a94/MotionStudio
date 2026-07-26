@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 
+using motion::BezierPath;
 using motion::BlendMode;
 using motion::BuildCommands;
 using motion::BuildSelectionOutlineCommands;
@@ -12,16 +14,20 @@ using motion::EvaluatedLayer;
 using motion::EvaluatedShapeItem;
 using motion::LineCap;
 using motion::LineJoin;
+using motion::MakePathGeometry;
 using motion::Paint;
 using motion::SceneState;
+using motion::ShapeGeometryKind;
 
 namespace {
 
 EvaluatedShapeItem MakeFillItem(BlendMode blendMode = BlendMode::Normal) {
     EvaluatedShapeItem item;
-    item.path.closed = true;
-    item.path.vertices.push_back({{0, 0}, {}, {}});
-    item.path.vertices.push_back({{10, 0}, {}, {}});
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{10, 0}, {}, {}});
+    item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{1, 0, 0, 1}, motion::FillRule::NonZero, blendMode};
     return item;
 }
@@ -29,8 +35,10 @@ EvaluatedShapeItem MakeFillItem(BlendMode blendMode = BlendMode::Normal) {
 EvaluatedShapeItem MakeStrokeItem(BlendMode blendMode = BlendMode::Normal) {
     EvaluatedShapeItem item;
     item.isStroke = true;
-    item.path.vertices.push_back({{0, 0}, {}, {}});
-    item.path.vertices.push_back({{10, 10}, {}, {}});
+    BezierPath path;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{10, 10}, {}, {}});
+    item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{0, 0, 1, 1}, motion::FillRule::NonZero, blendMode};
     item.stroke.width = 3;
     item.stroke.cap = LineCap::Round;
@@ -130,11 +138,11 @@ TEST(CommandBuilderTest, SelectionOutlineBuildsStrokeForSelectedLayerBounds) {
     EXPECT_EQ(commands[0].paint.color, (Color{0.0f, 0.47843137f, 1.0f, 1.0f}));
     EXPECT_FLOAT_EQ(commands[0].stroke.width, 1.5f);
     EXPECT_EQ(commands[0].stroke.join, LineJoin::Round);
-    ASSERT_EQ(commands[0].path.vertices.size(), 4u);
-    EXPECT_EQ(commands[0].path.vertices[0].point.x, -0.75f);
-    EXPECT_EQ(commands[0].path.vertices[0].point.y, -0.75f);
-    EXPECT_EQ(commands[0].path.vertices[2].point.x, 10.75f);
-    EXPECT_EQ(commands[0].path.vertices[2].point.y, 0.75f);
+    EXPECT_EQ(commands[0].geometry.kind, ShapeGeometryKind::Rect);
+    EXPECT_FLOAT_EQ(commands[0].geometry.center.x, 5.0f);
+    EXPECT_FLOAT_EQ(commands[0].geometry.center.y, 0.0f);
+    EXPECT_FLOAT_EQ(commands[0].geometry.size.x, 11.5f);
+    EXPECT_FLOAT_EQ(commands[0].geometry.size.y, 1.5f);
 }
 
 TEST(CommandBuilderTest, SelectionOutlineSkipsMissingLayers) {

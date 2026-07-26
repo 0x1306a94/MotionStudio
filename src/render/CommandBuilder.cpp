@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "MotionStudio/render/HitTest.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 
 namespace motion {
 
@@ -12,14 +13,10 @@ namespace {
 
 constexpr Color kSelectionOutlineColor{0.0f, 0.47843137f, 1.0f, 1.0f};
 
-BezierPath RectPath(Vec2 minPoint, Vec2 maxPoint) {
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{minPoint.x, minPoint.y}, {}, {}});
-    path.vertices.push_back({{maxPoint.x, minPoint.y}, {}, {}});
-    path.vertices.push_back({{maxPoint.x, maxPoint.y}, {}, {}});
-    path.vertices.push_back({{minPoint.x, maxPoint.y}, {}, {}});
-    return path;
+ShapeGeometry SelectionRectGeometry(Vec2 minPoint, Vec2 maxPoint) {
+    const Vec2 center{(minPoint.x + maxPoint.x) * 0.5f, (minPoint.y + maxPoint.y) * 0.5f};
+    const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
+    return MakeRectGeometry(center, size);
 }
 
 }  // namespace
@@ -59,7 +56,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
             }
             DrawCommand draw;
             draw.type = item.isStroke ? DrawCommandType::StrokePath : DrawCommandType::DrawPath;
-            draw.path = item.path;
+            draw.geometry = item.geometry;
             draw.paint = item.paint;
             draw.stroke = item.stroke;
             commands.push_back(std::move(draw));
@@ -109,7 +106,7 @@ DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
 
         DrawCommand outline;
         outline.type = DrawCommandType::StrokePath;
-        outline.path = RectPath(minPoint, maxPoint);
+        outline.geometry = SelectionRectGeometry(minPoint, maxPoint);
         outline.paint = Paint{kSelectionOutlineColor, FillRule::NonZero};
         outline.stroke.width = safeStrokeWidth;
         outline.stroke.join = LineJoin::Round;

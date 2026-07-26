@@ -2,11 +2,11 @@
 
 #include <vector>
 
-#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/render/Paint.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 #include "MotionStudio/render/StrokeOptions.h"
 
 namespace motion {
@@ -29,7 +29,7 @@ struct DrawCommand {
     Mat3 transform;                           // ConcatTransform
     float opacity = 1;                        // SetOpacity
     BlendMode blendMode = BlendMode::Normal;  // SetBlendMode
-    BezierPath path;                          // DrawPath / StrokePath / ClipPath
+    ShapeGeometry geometry;                   // DrawPath / StrokePath / ClipPath
     Paint paint;                              // DrawPath / StrokePath
     StrokeOptions stroke;                     // StrokePath
     FillRule fillRule = FillRule::NonZero;    // ClipPath

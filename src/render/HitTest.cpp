@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 
 namespace motion {
 
@@ -155,13 +156,14 @@ std::vector<Vec2> FlattenPathInWorld(const BezierPath &path, const Mat3 &worldTr
 
 bool HitTestShapeItem(const EvaluatedShapeItem &item, const std::vector<Vec2> &points, Vec2 point, float tolerance) {
     const float strokeTolerance = std::max(tolerance, item.stroke.width * 0.5f + tolerance);
+    const bool closed = ShapeGeometryIsClosed(item.geometry);
     if (item.isStroke) {
-        return IsNearPolyline(points, item.path.closed, point, strokeTolerance);
+        return IsNearPolyline(points, closed, point, strokeTolerance);
     }
     if (ContainsPoint(points, item.paint.fillRule, point)) {
         return true;
     }
-    return IsNearPolyline(points, item.path.closed, point, tolerance);
+    return IsNearPolyline(points, closed, point, tolerance);
 }
 
 }  // namespace
@@ -180,7 +182,8 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
         FlattenedShapeItem flattened;
         flattened.item = &item;
-        flattened.points = FlattenPathInWorld(item.path, layer.worldTransform);
+        flattened.points =
+            FlattenPathInWorld(ShapeGeometryToBezierPath(item.geometry), layer.worldTransform);
         if (flattened.points.empty()) {
             continue;
         }
@@ -210,7 +213,8 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
     maxPoint = {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
     bool hasBounds = false;
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
-        std::vector<Vec2> points = FlattenPathInWorld(item.path, layer.worldTransform);
+        std::vector<Vec2> points =
+            FlattenPathInWorld(ShapeGeometryToBezierPath(item.geometry), layer.worldTransform);
         if (points.empty()) {
             continue;
         }

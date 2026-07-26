@@ -26,15 +26,15 @@ void PlayCommands(const DrawCommandList &commands, RenderAdapter &adapter) {
                 break;
             }
             case DrawCommandType::DrawPath: {
-                adapter.drawPath(command.path, command.paint);
+                adapter.drawPath(command.geometry, command.paint);
                 break;
             }
             case DrawCommandType::StrokePath: {
-                adapter.strokePath(command.path, command.paint, command.stroke);
+                adapter.strokePath(command.geometry, command.paint, command.stroke);
                 break;
             }
             case DrawCommandType::ClipPath: {
-                adapter.clipPath(command.path, command.fillRule);
+                adapter.clipPath(command.geometry, command.fillRule);
                 break;
             }
         }
