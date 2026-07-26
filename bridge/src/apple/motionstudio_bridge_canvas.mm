@@ -6,8 +6,10 @@
 #include "../common/DocumentLock.h"
 #include "../common/MSDocument.h"
 
+#include "MotionStudio/common/Color.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/PathOverlay.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
 #include "TgfxOnScreenAdapter.h"
@@ -119,13 +121,20 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
     const float outlineWidth = 1.5f * viewUnit;
     const float handleSize = 7.0f * viewUnit;
+    // Yellow path chrome (distinct from blue selection handles).
+    constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
+    const std::vector<motion::PathOverlayItem> pathOverlays =
+        motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
+    motion::DrawCommandList pathOverlayCommands =
+        motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
     const motion::EntityId primaryLayerId =
         canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
     motion::DrawCommandList selectionCommands = motion::BuildSelectionOutlineCommands(
         state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize);
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
-    profile.drawCommandCount = commands.size() + selectionCommands.size();
+    profile.drawCommandCount =
+        commands.size() + pathOverlayCommands.size() + selectionCommands.size();
 
     const auto beginFrameStart = ProfileClock::now();
     canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight, state.backgroundColor, state.cornerRadius);
@@ -134,9 +143,14 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
     const auto playCommandsStart = ProfileClock::now();
     motion::PlayCommands(commands, *canvas->adapter);
-    if (!selectionCommands.empty()) {
+    if (!pathOverlayCommands.empty() || !selectionCommands.empty()) {
         canvas->adapter->restoreCompositionClip();
-        motion::PlayCommands(selectionCommands, *canvas->adapter);
+        if (!pathOverlayCommands.empty()) {
+            motion::PlayCommands(pathOverlayCommands, *canvas->adapter);
+        }
+        if (!selectionCommands.empty()) {
+            motion::PlayCommands(selectionCommands, *canvas->adapter);
+        }
     }
     const auto playCommandsEnd = ProfileClock::now();
     profile.playCommandsMs = Milliseconds(playCommandsStart, playCommandsEnd);

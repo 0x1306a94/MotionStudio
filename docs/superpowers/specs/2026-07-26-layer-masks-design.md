@@ -15,7 +15,8 @@
 | 4. tgfx 离屏 PathCoverage         | **已完成** | Picture 隔离 + MaskFilter；Add / feather 快照测试通过                   |
 | 5. Track Matte 端到端（渲染）          | **已完成** | Alpha matte 快照测试通过；Luma/反相走同一 coverage 路径                      |
 | 6. Bridge + Undo                | **已完成** | 增删/移动 mask、mode/inverted、set track matte；undo + bridge_test    |
-| 7. SwiftUI 编辑 UI                | **待验证** | Inspector Masks + Track Matte + 时间轴 mask 属性行已实现；**人工验证通过后再提交** |
+| 7. SwiftUI 编辑 UI                | **已完成** | Inspector Masks + Track Matte + 时间轴；Add Mask 形状烘焙 |
+| 8. 选中层 mask path 描边          | **已完成** | 通用 `PathOverlay`；钢笔编辑后续 |
 
 
 提交策略：Core / 适配器 / 测试 / 文档可自动提交；含 UI 交互的改动等人工验证后再提交。
@@ -201,7 +202,7 @@ Restore
 - Undo：mask 增删与属性变更走现有 Command / SetStaticValue / Keyframe；track matte 用专用小命令或 Set 层字段命令
 - Inspector：Masks 列表（mode / inverted / opacity / feather / expansion）；Track Matte 选择层 + 类型
 - **Add Mask 默认 path**：按当前 playhead **烘焙**层形状几何（Rect/Ellipse/Path → `BezierPath` 快照）；非 Shape 层回退 200×200 中心矩形。与形状之后**不联动**（AE 语义）。
-- 画布：选中层可显示/编辑 mask 路径（首版可用检查器 + 简单路径工具；顶点拖拽可跟 Shape path 编辑对齐）
+- 画布：选中层显示 mask 路径描边（通用 `PathOverlay`；编辑 / 钢笔后续）
 - 时间轴：mask 可动画属性出现在属性子行（与 transform 一致）
 
 ---
