@@ -15,11 +15,14 @@ namespace motion {
 // state: evaluated scene snapshot.
 DrawCommandList BuildCommands(const SceneState &state);
 
-// Builds preview-only selection chrome as scene-space outline commands.
-// selectedLayerIds: selected layer IDs; missing or invisible layers are skipped.
-// strokeWidth: outline stroke width in scene units.
+// Builds preview-only selection chrome (oriented box, scale handles, anchor)
+// for selectedLayerIds. primaryLayerId is the AE primary selection; when
+// invalid, the last id in selectedLayerIds is used.
+// strokeWidth / handleSize: chrome sizes in scene units.
 DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
                                               const std::vector<EntityId> &selectedLayerIds,
-                                              float strokeWidth);
+                                              EntityId primaryLayerId,
+                                              float strokeWidth,
+                                              float handleSize);
 
 }  // namespace motion

@@ -15,7 +15,7 @@ struct LayerRow: View {
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.revision
-        let selected = editorState.selectedLayerID == layerID
+        let selected = editorState.isLayerSelected(layerID)
         let visible = core.layerIsVisible(layerID)
         let locked = core.layerIsLocked(layerID)
         HStack(spacing: 6) {
@@ -57,9 +57,7 @@ struct LayerRow: View {
         .background(selected ? Color.accentColor.opacity(0.25) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture {
-            editorState.selectedLayerID = layerID
-            editorState.selectedTimelineProperty = nil
-            editorState.selectedTimelineSegment = nil
+            editorState.selectLayer(layerID, additive: KeyboardModifiers.shiftPressed)
         }
     }
 

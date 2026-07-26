@@ -58,6 +58,28 @@ Vec2 Mat3::transformVector(Vec2 vector) const {
             values[3] * vector.x + values[4] * vector.y};
 }
 
+bool Mat3::tryInvert(Mat3 &out) const {
+    const float a = values[0];
+    const float b = values[1];
+    const float c = values[3];
+    const float d = values[4];
+    const float tx = values[2];
+    const float ty = values[5];
+    const float det = a * d - b * c;
+    if (std::fabs(det) <= 1e-8f) {
+        return false;
+    }
+    const float invDet = 1.0f / det;
+    out = Identity();
+    out.values[0] = d * invDet;
+    out.values[1] = -b * invDet;
+    out.values[3] = -c * invDet;
+    out.values[4] = a * invDet;
+    out.values[2] = -(out.values[0] * tx + out.values[1] * ty);
+    out.values[5] = -(out.values[3] * tx + out.values[4] * ty);
+    return true;
+}
+
 bool Mat3::operator==(const Mat3 &other) const {
     for (int i = 0; i < 9; ++i) {
         if (values[i] != other.values[i]) {

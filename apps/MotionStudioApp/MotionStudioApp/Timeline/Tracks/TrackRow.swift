@@ -23,7 +23,7 @@ struct TrackRow: View {
                                duration: duration,
                                pointsPerFrame: pointsPerFrame,
                                scrollX: scrollX,
-                               isSelected: editorState.selectedLayerID == row.layerID,
+                               isSelected: isLayerSelected,
                                isTimeRangeDragging: $isTimeRangeDragging,
                                registerEdit: registerEdit)
 
@@ -48,6 +48,6 @@ struct TrackRow: View {
     }
 
     private var isLayerSelected: Bool {
-        editorState.selectedLayerID == row.layerID
+        editorState.isLayerSelected(row.layerID)
     }
 }

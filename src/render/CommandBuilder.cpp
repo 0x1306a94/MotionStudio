@@ -1,25 +1,10 @@
 #include "MotionStudio/render/CommandBuilder.h"
 
-#include <algorithm>
-#include <unordered_set>
 #include <utility>
 
-#include "MotionStudio/render/HitTest.h"
-#include "MotionStudio/render/ShapeGeometry.h"
+#include "MotionStudio/render/SelectionHandles.h"
 
 namespace motion {
-
-namespace {
-
-constexpr Color kSelectionOutlineColor{0.0f, 0.47843137f, 1.0f, 1.0f};
-
-ShapeGeometry SelectionRectGeometry(Vec2 minPoint, Vec2 maxPoint) {
-    const Vec2 center{(minPoint.x + maxPoint.x) * 0.5f, (minPoint.y + maxPoint.y) * 0.5f};
-    const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
-    return MakeRectGeometry(center, size);
-}
-
-}  // namespace
 
 DrawCommandList BuildCommands(const SceneState &state) {
     DrawCommandList commands;
@@ -71,48 +56,14 @@ DrawCommandList BuildCommands(const SceneState &state) {
 
 DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
                                               const std::vector<EntityId> &selectedLayerIds,
-                                              float strokeWidth) {
-    DrawCommandList commands;
-    if (selectedLayerIds.empty()) {
-        return commands;
+                                              EntityId primaryLayerId,
+                                              float strokeWidth,
+                                              float handleSize) {
+    SelectionHandles handles;
+    if (!BuildSelectionHandles(state, selectedLayerIds, primaryLayerId, handles)) {
+        return {};
     }
-
-    std::unordered_set<EntityId> selected;
-    selected.reserve(selectedLayerIds.size());
-    for (EntityId id : selectedLayerIds) {
-        if (id.isValid()) {
-            selected.insert(id);
-        }
-    }
-    if (selected.empty()) {
-        return commands;
-    }
-
-    const float safeStrokeWidth = std::max(strokeWidth, 0.0f);
-    const float padding = safeStrokeWidth * 0.5f;
-    for (const EvaluatedLayer &layer : state.layers) {
-        if (selected.find(layer.id) == selected.end()) {
-            continue;
-        }
-        Vec2 minPoint;
-        Vec2 maxPoint;
-        if (!BoundsOfLayer(layer, minPoint, maxPoint)) {
-            continue;
-        }
-        minPoint.x -= padding;
-        minPoint.y -= padding;
-        maxPoint.x += padding;
-        maxPoint.y += padding;
-
-        DrawCommand outline;
-        outline.type = DrawCommandType::StrokePath;
-        outline.geometry = SelectionRectGeometry(minPoint, maxPoint);
-        outline.paint = Paint{kSelectionOutlineColor, FillRule::NonZero};
-        outline.stroke.width = safeStrokeWidth;
-        outline.stroke.join = LineJoin::Round;
-        commands.push_back(std::move(outline));
-    }
-    return commands;
+    return BuildSelectionHandleCommands(handles, strokeWidth, handleSize);
 }
 
 }  // namespace motion

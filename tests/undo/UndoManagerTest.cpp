@@ -176,6 +176,25 @@ TEST(UndoManagerTest, DifferentMergeKeysDoNotMerge) {
     EXPECT_EQ(counter, 0);
 }
 
+TEST(UndoManagerTest, BeginMergeGroupPacksMixedCommands) {
+    Document document;
+    UndoManager manager;
+    int counter = 0;
+
+    manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "before"));
+    manager.beginMergeGroup();
+    manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "a"));
+    manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "b"));
+    manager.execute(document, std::make_unique<AdjustCommand>(&counter, 1, "a"));
+    manager.endMergeGroup();
+
+    EXPECT_EQ(counter, 4);
+    manager.undo(document);
+    EXPECT_EQ(counter, 1);
+    manager.undo(document);
+    EXPECT_EQ(counter, 0);
+}
+
 TEST(UndoManagerTest, EndMergeGroupPreventsFurtherMerging) {
     Document document;
     UndoManager manager;

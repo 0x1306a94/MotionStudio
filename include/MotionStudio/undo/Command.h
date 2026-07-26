@@ -30,6 +30,12 @@ class Command {
         return false;
     }
 
+    // Non-null only for CompositeCommand; used by UndoManager drag packing
+    // without dynamic_cast (CommandKind::Composite is not unique in tests).
+    virtual class CompositeCommand *asComposite() {
+        return nullptr;
+    }
+
     virtual std::string describe() const = 0;  // "Move Keyframe"
 };
 

@@ -224,6 +224,24 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
     return hasBounds;
 }
 
+bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) {
+    if (layer.opacity <= 0.0f || layer.shapeItems.empty()) {
+        return false;
+    }
+    minPoint = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+    maxPoint = {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
+    bool hasBounds = false;
+    for (const EvaluatedShapeItem &item : layer.shapeItems) {
+        std::vector<Vec2> points = FlattenPath(ShapeGeometryToBezierPath(item.geometry));
+        if (points.empty()) {
+            continue;
+        }
+        ExpandBounds(points, minPoint, maxPoint);
+        hasBounds = true;
+    }
+    return hasBounds;
+}
+
 EntityId HitTestLayerAtPoint(const SceneState &state, Vec2 point, float tolerance) {
     for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
         if (HitTestLayer(*it, point, tolerance)) {

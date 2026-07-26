@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/animation/Easing.h"
@@ -19,6 +20,7 @@
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
+#include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/serialization/Serializer.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
@@ -324,6 +326,13 @@ char *ms_document_redo_description(MSDocument *document) {
     return strdup(document->undoManager->redoDescription().c_str());
 }
 
+void ms_document_begin_merge_group(MSDocument *document) {
+    DocumentLock guard(document);
+    if (document != nullptr) {
+        document->undoManager->beginMergeGroup();
+    }
+}
+
 void ms_document_end_merge_group(MSDocument *document) {
     DocumentLock guard(document);
     if (document != nullptr) {
@@ -465,6 +474,107 @@ bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, u
         return true;
     }
     return false;
+}
+
+bool ms_composition_selection_handles(MSDocument *document, uint64_t compositionId, double frameTime,
+                                      const uint64_t *layerIds, size_t count, uint64_t primaryLayerId,
+                                      MSSelectionHandles *out) {
+    if (out != nullptr) {
+        *out = {};
+    }
+    DocumentLock guard(document);
+    Document *doc = Doc(document);
+    if (doc == nullptr || (count > 0 && layerIds == nullptr)) {
+        return false;
+    }
+    auto result =
+        SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    if (!result.hasValue()) {
+        return false;
+    }
+    std::vector<EntityId> selected;
+    selected.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+        selected.push_back(EntityId{layerIds[index]});
+    }
+    motion::SelectionHandles handles;
+    if (!motion::BuildSelectionHandles(result.value(), selected, EntityId{primaryLayerId}, handles)) {
+        return false;
+    }
+    if (out == nullptr) {
+        return true;
+    }
+    out->valid = handles.valid ? 1 : 0;
+    out->isOriented = handles.isOriented ? 1 : 0;
+    for (int index = 0; index < 4; ++index) {
+        out->cornersX[index] = handles.corners[index].x;
+        out->cornersY[index] = handles.corners[index].y;
+        out->edgeMidsX[index] = handles.edgeMids[index].x;
+        out->edgeMidsY[index] = handles.edgeMids[index].y;
+    }
+    out->centerX = handles.center.x;
+    out->centerY = handles.center.y;
+    out->anchorX = handles.anchor.x;
+    out->anchorY = handles.anchor.y;
+    out->primaryLayerId = handles.primaryLayerId.value;
+    out->boxRotationDegrees = handles.boxRotationDegrees;
+    out->localMinX = handles.localMin.x;
+    out->localMinY = handles.localMin.y;
+    out->localMaxX = handles.localMax.x;
+    out->localMaxY = handles.localMax.y;
+    return true;
+}
+
+int ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, float y,
+                                  float handleHitRadius, float rotateInner, float rotateOuter) {
+    if (handles == nullptr || handles->valid == 0) {
+        return MS_SELECTION_HANDLE_NONE;
+    }
+    motion::SelectionHandles coreHandles;
+    coreHandles.valid = true;
+    coreHandles.isOriented = handles->isOriented != 0;
+    for (int index = 0; index < 4; ++index) {
+        coreHandles.corners[index] = {handles->cornersX[index], handles->cornersY[index]};
+        coreHandles.edgeMids[index] = {handles->edgeMidsX[index], handles->edgeMidsY[index]};
+    }
+    coreHandles.center = {handles->centerX, handles->centerY};
+    coreHandles.anchor = {handles->anchorX, handles->anchorY};
+    coreHandles.primaryLayerId = EntityId{handles->primaryLayerId};
+    coreHandles.boxRotationDegrees = handles->boxRotationDegrees;
+    coreHandles.localMin = {handles->localMinX, handles->localMinY};
+    coreHandles.localMax = {handles->localMaxX, handles->localMaxY};
+    switch (motion::HitTestSelectionHandle(coreHandles, Vec2{x, y}, handleHitRadius, rotateInner,
+                                           rotateOuter)) {
+        case motion::SelectionHandleKind::None:
+            return MS_SELECTION_HANDLE_NONE;
+        case motion::SelectionHandleKind::Anchor:
+            return MS_SELECTION_HANDLE_ANCHOR;
+        case motion::SelectionHandleKind::ScaleCorner0:
+            return MS_SELECTION_HANDLE_SCALE_CORNER0;
+        case motion::SelectionHandleKind::ScaleCorner1:
+            return MS_SELECTION_HANDLE_SCALE_CORNER1;
+        case motion::SelectionHandleKind::ScaleCorner2:
+            return MS_SELECTION_HANDLE_SCALE_CORNER2;
+        case motion::SelectionHandleKind::ScaleCorner3:
+            return MS_SELECTION_HANDLE_SCALE_CORNER3;
+        case motion::SelectionHandleKind::ScaleEdge0:
+            return MS_SELECTION_HANDLE_SCALE_EDGE0;
+        case motion::SelectionHandleKind::ScaleEdge1:
+            return MS_SELECTION_HANDLE_SCALE_EDGE1;
+        case motion::SelectionHandleKind::ScaleEdge2:
+            return MS_SELECTION_HANDLE_SCALE_EDGE2;
+        case motion::SelectionHandleKind::ScaleEdge3:
+            return MS_SELECTION_HANDLE_SCALE_EDGE3;
+        case motion::SelectionHandleKind::Rotate0:
+            return MS_SELECTION_HANDLE_ROTATE0;
+        case motion::SelectionHandleKind::Rotate1:
+            return MS_SELECTION_HANDLE_ROTATE1;
+        case motion::SelectionHandleKind::Rotate2:
+            return MS_SELECTION_HANDLE_ROTATE2;
+        case motion::SelectionHandleKind::Rotate3:
+            return MS_SELECTION_HANDLE_ROTATE3;
+    }
+    return MS_SELECTION_HANDLE_NONE;
 }
 
 char *ms_composition_name(MSDocument *document, uint64_t compositionId) {

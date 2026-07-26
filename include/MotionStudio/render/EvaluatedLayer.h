@@ -4,6 +4,7 @@
 
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/render/EvaluatedShapeItem.h"
 
@@ -14,6 +15,8 @@ namespace motion {
 struct EvaluatedLayer {
     EntityId id;  // kept for UI hit-testing
     Mat3 worldTransform;
+    // World-space location of transform.anchorPoint (parent * position).
+    Vec2 worldAnchor;
     float opacity = 1;  // inherited from ancestors
     BlendMode blendMode = BlendMode::Normal;
     std::vector<EvaluatedShapeItem> shapeItems;

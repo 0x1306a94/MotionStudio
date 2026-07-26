@@ -14,6 +14,9 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance);
 // Returns the axis-aligned scene-space bounds of the evaluated layer geometry.
 bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint);
 
+// Returns the axis-aligned layer-local bounds of the evaluated layer geometry.
+bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint);
+
 // Returns the topmost layer containing point, or an invalid EntityId if none hit.
 EntityId HitTestLayerAtPoint(const SceneState &state, Vec2 point, float tolerance);
 

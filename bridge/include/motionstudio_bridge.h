@@ -143,6 +143,9 @@ char *ms_document_redo_description(MSDocument *document);
 
 // Closes the merge window so the next command starts a new undo unit.
 // Call on drag end.
+// Opens a drag transaction: mixed property edits pack into one undo unit
+// until ms_document_end_merge_group.
+void ms_document_begin_merge_group(MSDocument *document);
 void ms_document_end_merge_group(MSDocument *document);
 
 /* ============================ composition queries ============================ */
@@ -161,6 +164,55 @@ float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId)
 uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositionId, double frameTime, float x, float y, float tolerance);
 bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
                                  float *minX, float *minY, float *maxX, float *maxY);
+
+// Selection chrome geometry in scene space for free-transform hit-testing.
+// corners / edgeMids are TL,TR,BR,BL and top,right,bottom,left respectively.
+// primaryLayerId selects the anchor owner (AE primary). Returns false when
+// nothing selected has bounds; out may be null.
+typedef struct MSSelectionHandles {
+    int valid;
+    int isOriented;
+    float cornersX[4];
+    float cornersY[4];
+    float edgeMidsX[4];
+    float edgeMidsY[4];
+    float centerX;
+    float centerY;
+    float anchorX;
+    float anchorY;
+    uint64_t primaryLayerId;
+    float boxRotationDegrees;
+    float localMinX;
+    float localMinY;
+    float localMaxX;
+    float localMaxY;
+} MSSelectionHandles;
+
+bool ms_composition_selection_handles(MSDocument *document, uint64_t compositionId, double frameTime,
+                                      const uint64_t *layerIds, size_t count, uint64_t primaryLayerId,
+                                      MSSelectionHandles *out);
+
+// Hit-tests selection chrome. Returns MS_SELECTION_HANDLE_* (0 = none).
+// Radii are scene units.
+enum {
+    MS_SELECTION_HANDLE_NONE = 0,
+    MS_SELECTION_HANDLE_ANCHOR = 1,
+    MS_SELECTION_HANDLE_SCALE_CORNER0 = 2,
+    MS_SELECTION_HANDLE_SCALE_CORNER1 = 3,
+    MS_SELECTION_HANDLE_SCALE_CORNER2 = 4,
+    MS_SELECTION_HANDLE_SCALE_CORNER3 = 5,
+    MS_SELECTION_HANDLE_SCALE_EDGE0 = 6,
+    MS_SELECTION_HANDLE_SCALE_EDGE1 = 7,
+    MS_SELECTION_HANDLE_SCALE_EDGE2 = 8,
+    MS_SELECTION_HANDLE_SCALE_EDGE3 = 9,
+    MS_SELECTION_HANDLE_ROTATE0 = 10,
+    MS_SELECTION_HANDLE_ROTATE1 = 11,
+    MS_SELECTION_HANDLE_ROTATE2 = 12,
+    MS_SELECTION_HANDLE_ROTATE3 = 13,
+};
+int ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, float y,
+                                  float handleHitRadius, float rotateInner, float rotateOuter);
+
 // Composition name (malloc'd).
 char *ms_composition_name(MSDocument *document, uint64_t compositionId);
 

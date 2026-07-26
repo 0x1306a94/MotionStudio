@@ -174,6 +174,11 @@ final class MotionDocumentCore {
         }
     }
 
+    /// Opens a drag transaction so mixed property edits become one undo unit.
+    func beginDrag() {
+        ms_document_begin_merge_group(handle)
+    }
+
     /// Closes the core's merge window (call on drag end).
     func endDrag() {
         ms_document_end_merge_group(handle)
@@ -228,6 +233,43 @@ final class MotionDocumentCore {
                                                     Float(point.x), Float(point.y),
                                                     Float(max(tolerance, 0)))
         return layerID == 0 ? nil : layerID
+    }
+
+    func selectionHandles(compositionID: UInt64,
+                          frameTime: Double,
+                          layerIDs: [UInt64],
+                          primaryLayerID: UInt64) -> SelectionHandlesSnapshot?
+    {
+        var handles = MSSelectionHandles()
+        let ok = layerIDs.withUnsafeBufferPointer { buffer in
+            ms_composition_selection_handles(handle,
+                                             compositionID,
+                                             frameTime,
+                                             buffer.baseAddress,
+                                             buffer.count,
+                                             primaryLayerID,
+                                             &handles)
+        }
+        guard ok else {
+            return nil
+        }
+        return SelectionHandlesSnapshot(handles)
+    }
+
+    func hitTestSelectionHandle(_ snapshot: SelectionHandlesSnapshot,
+                                point: CGPoint,
+                                handleHitRadius: CGFloat,
+                                rotateInner: CGFloat,
+                                rotateOuter: CGFloat) -> SelectionHandleHit
+    {
+        var handles = snapshot.bridgeValue
+        let raw = ms_selection_handles_hit_test(&handles,
+                                                Float(point.x),
+                                                Float(point.y),
+                                                Float(handleHitRadius),
+                                                Float(rotateInner),
+                                                Float(rotateOuter))
+        return SelectionHandleHit(rawValue: raw) ?? .none
     }
 
     func layerBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double) -> CGRect? {

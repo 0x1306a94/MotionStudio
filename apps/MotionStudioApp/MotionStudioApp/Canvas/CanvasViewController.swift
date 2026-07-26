@@ -59,21 +59,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var lastScrollTranslation: CGPoint = .zero
     private var lastPointerLocation: CGPoint?
     private var pinchGesture: UIPinchGestureRecognizer?
-    private var layerDrag: LayerDrag?
-    private var layerDragDidMove = false
+    private var freeTransformDrag: FreeTransformDrag?
+    private var freeTransformDidMove = false
 
     private static let minCanvasZoom: CGFloat = 0.02
     private static let maxCanvasZoom: CGFloat = 64
     private static let scrollZoomSensitivity: CGFloat = 0.01
     private static let hitTolerancePoints: CGFloat = 6
+    private static let handleHitPoints: CGFloat = 14
+    private static let rotateInnerPoints: CGFloat = 10
+    private static let rotateOuterPoints: CGFloat = 36
     private static let viewportFitMargin: CGFloat = 12
-
-    private struct LayerDrag {
-        let layerID: UInt64
-        let startScenePoint: CGPoint
-        let startPosition: CGVector
-        let writesKeyframe: Bool
-    }
 
     init(document: MotionProjectState,
          editorState: EditorState,
@@ -218,7 +214,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private func observeStateChanges() {
         withObservationTracking {
             _ = document.core.revision
-            _ = editorState.selectedLayerID
+            _ = editorState.selectedLayerIDs
             _ = editorState.playheadFrame
             _ = editorState.isPlaying
             _ = editorState.previewBackdrop
@@ -380,9 +376,11 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     @objc private func handleCanvasTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else { return }
-        if let layerID = hitTestLayer(at: gesture.location(in: view)) {
-            selectLayer(layerID)
-        } else {
+        let viewPoint = gesture.location(in: view)
+        let additive = gesture.modifierFlags.contains(.shift) || KeyboardModifiers.shiftPressed
+        if let layerID = hitTestLayer(at: viewPoint) {
+            selectLayer(layerID, additive: additive)
+        } else if !additive {
             clearSelection()
             updateSelectionOutline()
             requestDraw()
@@ -548,85 +546,148 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         requestDraw()
     }
 
-    // MARK: - Layer selection & movement
+    // MARK: - Layer selection & free transform
 
     @objc private func handleLayerDrag(_ gesture: UIPanGestureRecognizer) {
         guard !isPlaying else { return }
+        let shift = gesture.modifierFlags.contains(.shift) || KeyboardModifiers.shiftPressed
+        let alternate = gesture.modifierFlags.contains(.alternate) || KeyboardModifiers.alternatePressed
         switch gesture.state {
         case .began:
-            beginLayerDrag(at: gesture.location(in: view))
+            beginFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
         case .changed:
-            updateLayerDrag(at: gesture.location(in: view))
+            updateFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
         case .ended, .cancelled, .failed:
-            endLayerDrag()
+            endFreeTransform()
         default:
             break
         }
     }
 
-    private func beginLayerDrag(at viewPoint: CGPoint) {
-        guard let layerID = hitTestLayer(at: viewPoint),
-              !document.core.layerIsLocked(layerID),
-              let scenePoint = scenePoint(fromViewPoint: viewPoint)
-        else {
-            layerDrag = nil
-            layerDragDidMove = false
+    private func beginFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
+        freeTransformDrag = nil
+        freeTransformDidMove = false
+        guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
             return
         }
-        selectLayer(layerID)
-        layerDrag = LayerDrag(layerID: layerID,
-                              startScenePoint: scenePoint,
-                              startPosition: document.core.evaluateVec2(entityID: layerID,
-                                                                        path: TransformProperty.position.path,
-                                                                        frame: playheadFrame),
-                              writesKeyframe: document.core.isAnimated(entityID: layerID,
-                                                                       path: TransformProperty.position.path))
-        layerDragDidMove = false
+
+        let selectedIDs = editorState.selectedLayerIDs
+        if !selectedIDs.isEmpty,
+           let handles = currentSelectionHandles()
+        {
+            let hit = hitTestHandle(handles, atViewPoint: viewPoint)
+            if hit != .none {
+                beginHandleTransform(hit: hit,
+                                     handles: handles,
+                                     scenePoint: scenePoint,
+                                     alternate: alternate)
+                return
+            }
+        }
+
+        guard let layerID = hitTestLayer(at: viewPoint),
+              !document.core.layerIsLocked(layerID)
+        else {
+            return
+        }
+        selectLayer(layerID, additive: shift)
+        let layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsLocked($0) }
+        guard !layerIDs.isEmpty else {
+            return
+        }
+        let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: playheadFrame)
+        document.core.beginDrag()
+        freeTransformDrag = FreeTransformDrag(kind: .move,
+                                              layerStarts: starts,
+                                              startScenePoint: scenePoint,
+                                              startHandles: currentSelectionHandles() ?? SelectionHandlesSnapshot(),
+                                              pivotScene: .zero,
+                                              localPivotRelative: nil,
+                                              editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer")
     }
 
-    private func updateLayerDrag(at viewPoint: CGPoint) {
-        guard let layerDrag,
+    private func beginHandleTransform(hit: SelectionHandleHit,
+                                      handles: SelectionHandlesSnapshot,
+                                      scenePoint: CGPoint,
+                                      alternate: Bool)
+    {
+        let kind: FreeTransformKind
+        let editName: String
+        if hit == .anchor {
+            kind = .anchor
+            editName = "Move Anchor"
+        } else if hit.isRotate {
+            kind = .rotate
+            editName = editorState.selectedLayerIDs.count > 1 ? "Rotate Layers" : "Rotate Layer"
+        } else if let corner = hit.cornerIndex {
+            kind = .scaleCorner(corner)
+            editName = editorState.selectedLayerIDs.count > 1 ? "Scale Layers" : "Scale Layer"
+        } else if let edge = hit.edgeIndex {
+            kind = .scaleEdge(edge)
+            editName = editorState.selectedLayerIDs.count > 1 ? "Scale Layers" : "Scale Layer"
+        } else {
+            return
+        }
+
+        var layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsLocked($0) }
+        if hit == .anchor {
+            layerIDs = layerIDs.filter { $0 == handles.primaryLayerID }
+        }
+        guard !layerIDs.isEmpty else {
+            return
+        }
+        let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: playheadFrame)
+        let pivot = FreeTransformDrag.pivot(for: kind, handles: handles, alternate: alternate)
+        let localRel = starts.first.flatMap {
+            FreeTransformDrag.localPivotRelative(for: kind, handles: handles, start: $0, alternate: alternate)
+        }
+        document.core.beginDrag()
+        freeTransformDrag = FreeTransformDrag(kind: kind,
+                                              layerStarts: starts,
+                                              startScenePoint: scenePoint,
+                                              startHandles: handles,
+                                              pivotScene: pivot,
+                                              localPivotRelative: localRel,
+                                              editName: editName)
+    }
+
+    private func updateFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
+        guard let freeTransformDrag,
               let scenePoint = scenePoint(fromViewPoint: viewPoint)
         else {
             return
         }
-        let delta = CGPoint(x: scenePoint.x - layerDrag.startScenePoint.x,
-                            y: scenePoint.y - layerDrag.startScenePoint.y)
+        let delta = CGPoint(x: scenePoint.x - freeTransformDrag.startScenePoint.x,
+                            y: scenePoint.y - freeTransformDrag.startScenePoint.y)
         guard abs(delta.x) > 0.001 || abs(delta.y) > 0.001 else {
             return
         }
-        let position = CGVector(dx: layerDrag.startPosition.dx + delta.x,
-                                dy: layerDrag.startPosition.dy + delta.y)
-        if layerDrag.writesKeyframe {
-            document.core.addKeyframeVec2(entityID: layerDrag.layerID,
-                                          path: TransformProperty.position.path,
-                                          frame: playheadFrame,
-                                          value: position)
-        } else {
-            document.core.setStaticVec2(entityID: layerDrag.layerID,
-                                        path: TransformProperty.position.path,
-                                        value: position)
-        }
-        layerDragDidMove = true
+        freeTransformDrag.apply(core: document.core,
+                                frame: playheadFrame,
+                                scenePoint: scenePoint,
+                                shift: shift,
+                                alternate: alternate)
+        freeTransformDidMove = true
         requestDraw()
     }
 
-    private func endLayerDrag() {
+    private func endFreeTransform() {
         defer {
-            layerDrag = nil
-            layerDragDidMove = false
+            freeTransformDrag = nil
+            freeTransformDidMove = false
         }
-        guard layerDragDidMove else {
+        guard let freeTransformDrag else {
             return
         }
         document.core.endDrag()
-        registerEdit("Move Layer")
+        guard freeTransformDidMove else {
+            return
+        }
+        registerEdit(freeTransformDrag.editName)
     }
 
-    private func selectLayer(_ layerID: UInt64) {
-        editorState.selectedLayerID = layerID
-        editorState.selectedTimelineProperty = nil
-        editorState.selectedTimelineSegment = nil
+    private func selectLayer(_ layerID: UInt64, additive: Bool = false) {
+        editorState.selectLayer(layerID, additive: additive)
         updateSelectionOutline()
         requestDraw()
     }
@@ -641,6 +702,68 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                           tolerance: hitToleranceSceneUnits())
     }
 
+    private func currentSelectionHandles() -> SelectionHandlesSnapshot? {
+        let layerIDs = editorState.selectedLayerIDs
+        guard !layerIDs.isEmpty else {
+            return nil
+        }
+        return document.core.selectionHandles(compositionID: compositionID,
+                                              frameTime: previewFrame,
+                                              layerIDs: layerIDs,
+                                              primaryLayerID: layerIDs.last ?? 0)
+    }
+
+    /// Hit-tests selection chrome in view points so handle size matches what is drawn.
+    private func hitTestHandle(_ handles: SelectionHandlesSnapshot, atViewPoint viewPoint: CGPoint) -> SelectionHandleHit {
+        guard handles.valid, let transform = currentScreenTransform() else {
+            return .none
+        }
+        let radius = Self.handleHitPoints
+        func isNear(_ scenePoint: CGPoint) -> Bool {
+            let point = transform.viewPoint(fromScenePoint: scenePoint)
+            let dx = point.x - viewPoint.x
+            let dy = point.y - viewPoint.y
+            return dx * dx + dy * dy <= radius * radius
+        }
+        if isNear(handles.anchor) {
+            return .anchor
+        }
+        let cornerHits: [SelectionHandleHit] = [.scaleCorner0, .scaleCorner1, .scaleCorner2, .scaleCorner3]
+        for index in 0 ..< 4 where isNear(handles.corners[index]) {
+            return cornerHits[index]
+        }
+        let edgeHits: [SelectionHandleHit] = [.scaleEdge0, .scaleEdge1, .scaleEdge2, .scaleEdge3]
+        for index in 0 ..< 4 where isNear(handles.edgeMids[index]) {
+            return edgeHits[index]
+        }
+
+        let centerView = transform.viewPoint(fromScenePoint: handles.center)
+        let rotateHits: [SelectionHandleHit] = [.rotate0, .rotate1, .rotate2, .rotate3]
+        for index in 0 ..< 4 {
+            let cornerView = transform.viewPoint(fromScenePoint: handles.corners[index])
+            let outwardX = cornerView.x - centerView.x
+            let outwardY = cornerView.y - centerView.y
+            let length = hypot(outwardX, outwardY)
+            guard length > 0.001 else {
+                continue
+            }
+            let axisX = outwardX / length
+            let axisY = outwardY / length
+            let deltaX = viewPoint.x - cornerView.x
+            let deltaY = viewPoint.y - cornerView.y
+            let along = deltaX * axisX + deltaY * axisY
+            if along < Self.rotateInnerPoints || along > Self.rotateOuterPoints {
+                continue
+            }
+            let lateralX = deltaX - axisX * along
+            let lateralY = deltaY - axisY * along
+            if hypot(lateralX, lateralY) <= radius {
+                return rotateHits[index]
+            }
+        }
+        return .none
+    }
+
     private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {
         guard let transform = currentScreenTransform() else {
             return nil
@@ -653,20 +776,21 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard let canvas else {
             return
         }
-        var selectedLayerIDs: [UInt64] = []
-        if let selectedLayerID = editorState.selectedLayerID {
-            selectedLayerIDs.append(selectedLayerID)
-        }
+        let selectedLayerIDs = editorState.selectedLayerIDs
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
     }
 
     private func hitToleranceSceneUnits() -> CGFloat {
+        Self.hitTolerancePoints * viewPointSceneUnits()
+    }
+
+    private func viewPointSceneUnits() -> CGFloat {
         guard let transform = currentScreenTransform() else {
-            return Self.hitTolerancePoints
+            return 1
         }
-        return Self.hitTolerancePoints * transform.contentsScale / max(min(abs(transform.scaleX), abs(transform.scaleY)), 0.001)
+        return transform.contentsScale / max(min(abs(transform.scaleX), abs(transform.scaleY)), 0.001)
     }
 
     private func currentScreenTransform() -> CanvasScreenTransform? {

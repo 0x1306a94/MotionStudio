@@ -115,9 +115,14 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
     const auto buildStart = ProfileClock::now();
     motion::DrawCommandList commands = motion::BuildCommands(state);
-    const float outlineWidth = 1.5f * canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
-    motion::DrawCommandList selectionCommands =
-        motion::BuildSelectionOutlineCommands(state, canvas->selectedLayerIds, outlineWidth);
+    const float viewUnit =
+        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    const float outlineWidth = 1.5f * viewUnit;
+    const float handleSize = 7.0f * viewUnit;
+    const motion::EntityId primaryLayerId =
+        canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
+    motion::DrawCommandList selectionCommands = motion::BuildSelectionOutlineCommands(
+        state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize);
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
     profile.drawCommandCount = commands.size() + selectionCommands.size();

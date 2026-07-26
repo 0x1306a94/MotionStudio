@@ -180,6 +180,8 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     EvaluatedLayer evaluated;
     evaluated.id = layer.id;
     evaluated.worldTransform = world;
+    evaluated.worldAnchor =
+        world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
     evaluated.opacity = opacity;
     evaluated.blendMode = layer.blendMode;
     if (!layer.styles.empty()) {

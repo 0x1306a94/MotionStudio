@@ -89,9 +89,7 @@ extension EditorViewController {
     }
 
     func clearSelection() {
-        editorState.selectedLayerID = nil
-        editorState.selectedTimelineProperty = nil
-        editorState.selectedTimelineSegment = nil
+        editorState.clearLayerSelection()
     }
 
     func perform(_ actionName: String, edit: () -> Void) {

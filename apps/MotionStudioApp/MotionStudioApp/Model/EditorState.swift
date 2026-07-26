@@ -65,8 +65,21 @@ enum PreviewBackdrop: Int32 {
 @MainActor
 @Observable
 final class EditorState {
-    /// Selected layer ID (nil = no selection).
-    var selectedLayerID: UInt64?
+    /// Ordered multi-selection. Last entry is the AE primary selection
+    /// (Inspector / anchor handle follow it).
+    var selectedLayerIDs: [UInt64] = []
+
+    /// Primary selected layer (last in `selectedLayerIDs`), or nil.
+    var selectedLayerID: UInt64? {
+        get { selectedLayerIDs.last }
+        set {
+            if let newValue {
+                selectedLayerIDs = [newValue]
+            } else {
+                selectedLayerIDs = []
+            }
+        }
+    }
 
     var selectedTimelineProperty: TimelinePropertySelection?
 
@@ -82,4 +95,29 @@ final class EditorState {
     var timelinePointsPerFrame: Double = 6
 
     var timelineScrollX: Double = 0
+
+    func isLayerSelected(_ layerID: UInt64) -> Bool {
+        selectedLayerIDs.contains(layerID)
+    }
+
+    /// Selects a layer. When `additive` is true, toggles membership (Shift).
+    func selectLayer(_ layerID: UInt64, additive: Bool = false) {
+        if additive {
+            if let index = selectedLayerIDs.firstIndex(of: layerID) {
+                selectedLayerIDs.remove(at: index)
+            } else {
+                selectedLayerIDs.append(layerID)
+            }
+        } else {
+            selectedLayerIDs = [layerID]
+        }
+        selectedTimelineProperty = nil
+        selectedTimelineSegment = nil
+    }
+
+    func clearLayerSelection() {
+        selectedLayerIDs = []
+        selectedTimelineProperty = nil
+        selectedTimelineSegment = nil
+    }
 }

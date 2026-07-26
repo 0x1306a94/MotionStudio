@@ -41,6 +41,10 @@ struct Mat3 {
     // vector: the direction vector to transform.
     Vec2 transformVector(Vec2 vector) const;
 
+    // Writes the affine inverse into out when the linear part is invertible.
+    // Returns false when the determinant is near zero.
+    bool tryInvert(Mat3 &out) const;
+
     bool operator==(const Mat3 &other) const;
     bool operator!=(const Mat3 &other) const;
 };

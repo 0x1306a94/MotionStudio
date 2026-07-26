@@ -137,6 +137,7 @@ extension MotionColor {
 }
 
 enum TransformProperty: String, CaseIterable {
+    case anchorPoint = "transform.anchorPoint"
     case position = "transform.position"
     case scale = "transform.scale"
     case rotation = "transform.rotation"
@@ -148,6 +149,8 @@ enum TransformProperty: String, CaseIterable {
 
     var actionLabel: String {
         switch self {
+        case .anchorPoint:
+            "Anchor"
         case .position:
             "Position"
         case .scale:
@@ -179,6 +182,8 @@ enum ShapeProperty: String, CaseIterable {
 }
 
 enum TransformField {
+    case anchorX
+    case anchorY
     case positionX
     case positionY
     case scaleX
@@ -188,6 +193,8 @@ enum TransformField {
 
     var property: TransformProperty {
         switch self {
+        case .anchorX, .anchorY:
+            .anchorPoint
         case .positionX, .positionY:
             .position
         case .scaleX, .scaleY:
@@ -201,6 +208,10 @@ enum TransformField {
 
     var label: String {
         switch self {
+        case .anchorX:
+            "Anchor X"
+        case .anchorY:
+            "Anchor Y"
         case .positionX:
             "Position X"
         case .positionY:

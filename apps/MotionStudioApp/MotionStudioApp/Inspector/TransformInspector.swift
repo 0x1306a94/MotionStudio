@@ -15,12 +15,35 @@ struct TransformInspector: View {
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.revision
+        let anchor = core.evaluateVec2(entityID: layerID,
+                                       path: TransformProperty.anchorPoint.path,
+                                       frame: playheadFrame)
         let position = core.evaluateVec2(entityID: layerID,
                                          path: TransformProperty.position.path,
                                          frame: playheadFrame)
         let scale = core.evaluateVec2(entityID: layerID,
                                       path: TransformProperty.scale.path,
                                       frame: playheadFrame)
+
+        NumberPropertyRow(label: TransformField.anchorX.label,
+                          value: Float(anchor.dx),
+                          hasKeyframeAtPlayhead: hasKeyframe(.anchorPoint),
+                          isEditable: isEditable)
+        { newValue in
+            setVec2Property(.anchorPoint, value: CGVector(dx: CGFloat(newValue), dy: anchor.dy))
+        } onToggleKeyframe: { _ in
+            toggleVec2Keyframe(.anchorPoint)
+        }
+
+        NumberPropertyRow(label: TransformField.anchorY.label,
+                          value: Float(anchor.dy),
+                          hasKeyframeAtPlayhead: hasKeyframe(.anchorPoint),
+                          isEditable: isEditable)
+        { newValue in
+            setVec2Property(.anchorPoint, value: CGVector(dx: anchor.dx, dy: CGFloat(newValue)))
+        } onToggleKeyframe: { _ in
+            toggleVec2Keyframe(.anchorPoint)
+        }
 
         NumberPropertyRow(label: TransformField.positionX.label,
                           value: Float(position.dx),

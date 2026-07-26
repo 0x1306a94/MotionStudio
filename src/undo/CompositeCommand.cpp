@@ -28,6 +28,17 @@ void CompositeCommand::undo(Document &document) {
     }
 }
 
+bool CompositeCommand::mergeWith(const Command &other) {
+    if (commands_.empty()) {
+        return false;
+    }
+    return commands_.back()->mergeWith(other);
+}
+
+CompositeCommand *CompositeCommand::asComposite() {
+    return this;
+}
+
 CommandKind CompositeCommand::kind() const {
     return CommandKind::Composite;
 }

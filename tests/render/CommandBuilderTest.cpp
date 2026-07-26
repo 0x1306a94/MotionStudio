@@ -131,18 +131,13 @@ TEST(CommandBuilderTest, SelectionOutlineBuildsStrokeForSelectedLayerBounds) {
     layer.shapeItems.push_back(MakeFillItem());
     state.layers.push_back(std::move(layer));
 
-    auto commands = BuildSelectionOutlineCommands(state, {EntityId{42}}, 1.5f);
+    auto commands = BuildSelectionOutlineCommands(state, {EntityId{42}}, EntityId{42}, 1.5f, 7.0f);
 
-    ASSERT_EQ(commands.size(), 1u);
+    ASSERT_FALSE(commands.empty());
     EXPECT_EQ(commands[0].type, DrawCommandType::StrokePath);
     EXPECT_EQ(commands[0].paint.color, (Color{0.0f, 0.47843137f, 1.0f, 1.0f}));
     EXPECT_FLOAT_EQ(commands[0].stroke.width, 1.5f);
-    EXPECT_EQ(commands[0].stroke.join, LineJoin::Round);
-    EXPECT_EQ(commands[0].geometry.kind, ShapeGeometryKind::Rect);
-    EXPECT_FLOAT_EQ(commands[0].geometry.center.x, 5.0f);
-    EXPECT_FLOAT_EQ(commands[0].geometry.center.y, 0.0f);
-    EXPECT_FLOAT_EQ(commands[0].geometry.size.x, 11.5f);
-    EXPECT_FLOAT_EQ(commands[0].geometry.size.y, 1.5f);
+    EXPECT_EQ(commands[0].geometry.kind, ShapeGeometryKind::Path);
 }
 
 TEST(CommandBuilderTest, SelectionOutlineSkipsMissingLayers) {
@@ -152,5 +147,5 @@ TEST(CommandBuilderTest, SelectionOutlineSkipsMissingLayers) {
     layer.shapeItems.push_back(MakeFillItem());
     state.layers.push_back(std::move(layer));
 
-    EXPECT_TRUE(BuildSelectionOutlineCommands(state, {EntityId{7}}, 1.5f).empty());
+    EXPECT_TRUE(BuildSelectionOutlineCommands(state, {EntityId{7}}, EntityId{7}, 1.5f, 7.0f).empty());
 }

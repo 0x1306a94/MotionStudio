@@ -21,14 +21,16 @@ let maxLayerColumnWidth: CGFloat = 400
 let layerActionIconSize: CGFloat = 16
 let layerActionButtonSize: CGFloat = 22
 let timelineEndpointHandleWidth: CGFloat = 11
-let timelineShapeSizePath = ShapeProperty.size.path
 
 func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) -> [String] {
     var paths = TransformProperty.allCases
         .map(\.path)
         .filter { !core.keyframes(entityID: layerID, path: $0).isEmpty }
-    if !core.keyframes(entityID: layerID, path: timelineShapeSizePath).isEmpty {
-        paths.append(timelineShapeSizePath)
+    if !core.keyframes(entityID: layerID, path: ShapeProperty.size.path).isEmpty {
+        paths.append(ShapeProperty.size.path)
+    }
+    if !core.keyframes(entityID: layerID, path: ShapeProperty.cornerRadius.path).isEmpty {
+        paths.append(ShapeProperty.cornerRadius.path)
     }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     return paths
@@ -91,11 +93,17 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             path: property.path,
                                             label: property.actionLabel))
         }
-        if animatedPaths.contains(timelineShapeSizePath) {
+        if animatedPaths.contains(ShapeProperty.size.path) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
-                                            path: timelineShapeSizePath,
+                                            path: ShapeProperty.size.path,
                                             label: ShapeProperty.size.actionLabel))
+        }
+        if animatedPaths.contains(ShapeProperty.cornerRadius.path) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: ShapeProperty.cornerRadius.path,
+                                            label: ShapeProperty.cornerRadius.actionLabel))
         }
         for track in timelineStyleTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,
