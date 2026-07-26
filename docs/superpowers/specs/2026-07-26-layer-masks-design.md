@@ -202,3 +202,67 @@ Restore
 4. Track Matte 端到端  
 5. Bridge + Undo + UI  
 6. 快照测试补齐与硬边 ClipPath 快路径（可选）
+
+---
+
+## §6 手动验证（UI）
+
+示例图层树（下文步骤均按此）：
+
+```
+Composition
+  Ellipse
+  Rectangle
+```
+
+两种能力不要混验：验 Path Mask 前先把 Track Matte 设为 None；验 Track Matte 前可先删掉本层 Masks。
+
+### 6.1 Track Matte（用另一层裁切）
+
+目标：用 **Rectangle** 裁切 **Ellipse**。
+
+1. 选中 **Ellipse**（被裁切层）。
+2. Inspector → **Track Matte**：
+   - Type → **Alpha**
+   - Source → **Rectangle**
+3. 预期：
+   - Ellipse 只在 Rectangle 覆盖区域内显示。
+   - Rectangle 作为 matte 源后**不再单独绘制**（`usedAsMatteOnly`）。
+4. 可选：Type 改为 **Alpha Inverted** → 显示区域对调（挖空矩形区域）。
+5. **Luma** 说明（可选）：
+   - Luma 看 matte 源的**颜色亮度**，不是 alpha。
+   - 默认形状填充是彩色（非纯白），亮度常约 0.5，Ellipse 会像半透明——**符合预期**。
+   - 实色形状层硬裁切请用 **Alpha**；或把 Rectangle 填成纯白再用 Luma。
+6. Type → **None** 清除；Undo 可恢复。
+
+| 目标 | 选中谁 | 设置 |
+|---|---|---|
+| Rectangle 裁 Ellipse | Ellipse | Track Matte → Alpha，Source = Rectangle |
+| Ellipse 自己裁自己 | Ellipse | Masks → `+`（见下节） |
+
+### 6.2 Path Masks（本层路径遮罩）
+
+目标：在 **Ellipse** 上加路径遮罩并看到裁切。  
+默认 `Masks +` 追加的是层局部 **200×200** 方框（与默认形状同尺寸），Mode=Add 时画面可能几乎不变——属正常，需调 Expansion / Feather / Inv 才能明显看出。
+
+1. 选中 **Ellipse**；Track Matte → **None**。
+2. Inspector → **Masks** → `+`。
+3. **Expansion** → **-40**（或更负）→ Ellipse 边缘被明显裁小。
+4. 勾选 **Inv** → 方框外/挖空类效果；取消 → 恢复。
+5. **Feather** → **20~40** → 边缘变软。
+6. Mask **Opacity** → **0.3** → 裁切区半透（不是整层 opacity）。
+7. 可选：再 `+` 第二条；Mode → **Subtract** / **Intersect**，配合不同 Expansion，确认挖洞或取交。
+8. 可选：给 Mask Opacity / Feather 打关键帧 → 时间轴出现 `Mask 1 Opacity` 等子行。
+9. 点 mask 行 `-` 删除 → 裁切消失；Undo 可恢复。
+
+**Rectangle 层**：Path Mask 与它无关；若也要自裁切，选中 Rectangle 后同样 Masks → `+` → 调 Expansion。
+
+### 6.3 验收清单
+
+- [ ] Track Matte Alpha：Rectangle 裁 Ellipse，源层不上屏
+- [ ] Track Matte 清除 / Undo
+- [ ]（可选）Luma：彩色源变淡；纯白源接近不透明
+- [ ] Path Mask：Expansion 负值可见裁小
+- [ ] Path Mask：Inv / Feather / Opacity
+- [ ] Path Mask：删除与 Undo
+- [ ]（可选）时间轴 mask 属性关键帧子行

@@ -166,7 +166,7 @@
 
 - [x] **Step 1:** Inspector Masks 段 + Track Matte 控件（本地未提交）
 - [x] **Step 2:** 时间轴暴露 mask 可动画 path（本地未提交）
-- [ ] **Step 3:** 手动验证：加 mask → 画布裁切 → undo（验证通过后再 commit）
+- [ ] **Step 3:** 手动验证（步骤见 spec §6）：Track Matte + Path Mask → 通过后再 commit UI
 
 ---
 
