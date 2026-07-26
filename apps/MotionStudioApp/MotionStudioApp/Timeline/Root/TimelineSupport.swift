@@ -39,6 +39,7 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
         paths.append(ShapeProperty.cornerRadius.path)
     }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
+    paths.append(contentsOf: timelineMaskTracks(core: core, layerID: layerID).map(\.path))
     return paths
 }
 
@@ -69,6 +70,27 @@ func timelineStyleTracks(core: MotionDocumentCore,
             where !core.keyframes(entityID: layerID, path: candidate.path).isEmpty
         {
             tracks.append(candidate)
+        }
+    }
+    return tracks
+}
+
+/// Animated mask scalar tracks (opacity / feather / expansion).
+func timelineMaskTracks(core: MotionDocumentCore,
+                        layerID: UInt64) -> [(path: String, label: String)]
+{
+    var tracks: [(path: String, label: String)] = []
+    for index in 0 ..< core.maskCount(layerID: layerID) {
+        let name = "Mask \(index + 1)"
+        let candidates = [
+            ("masks[\(index)].opacity", "\(name) Opacity"),
+            ("masks[\(index)].feather", "\(name) Feather"),
+            ("masks[\(index)].expansion", "\(name) Expansion"),
+        ]
+        for candidate in candidates
+            where !core.keyframes(entityID: layerID, path: candidate.0).isEmpty
+        {
+            tracks.append((path: candidate.0, label: candidate.1))
         }
     }
     return tracks
@@ -112,6 +134,12 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             label: ShapeProperty.cornerRadius.actionLabel))
         }
         for track in timelineStyleTracks(core: core, layerID: layerID) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: track.path,
+                                            label: track.label))
+        }
+        for track in timelineMaskTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: track.path,

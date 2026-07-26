@@ -121,7 +121,7 @@ TEST(BridgeCommandTest, MaskAndTrackMatteLifecycle) {
     const uint64_t matteId = ms_command_add_ellipse_layer(document, compositionId);
 
     EXPECT_EQ(ms_layer_mask_count(document, layerId), 0);
-    ms_command_add_mask(document, layerId);
+    ms_command_add_mask(document, layerId, 0);
     ASSERT_EQ(ms_layer_mask_count(document, layerId), 1);
     EXPECT_EQ(ms_layer_mask_mode_at(document, layerId, 0), MS_MASK_ADD);
     EXPECT_FALSE(ms_layer_mask_inverted_at(document, layerId, 0));
@@ -131,7 +131,7 @@ TEST(BridgeCommandTest, MaskAndTrackMatteLifecycle) {
     ms_command_set_mask_inverted(document, layerId, 0, true);
     EXPECT_TRUE(ms_layer_mask_inverted_at(document, layerId, 0));
 
-    ms_command_add_mask(document, layerId);
+    ms_command_add_mask(document, layerId, 0);
     ms_command_move_mask(document, layerId, 0, 1);
     EXPECT_EQ(ms_layer_mask_mode_at(document, layerId, 1), MS_MASK_SUBTRACT);
 

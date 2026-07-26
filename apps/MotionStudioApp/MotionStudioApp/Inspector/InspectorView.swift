@@ -63,6 +63,17 @@ struct InspectorView: View {
                                              isEditable: isEditable,
                                              perform: perform)
                         }
+
+                        MasksInspector(core: core,
+                                       layerID: layerID,
+                                       playheadFrame: editorState.playheadFrame,
+                                       isEditable: isEditable,
+                                       perform: perform)
+                        TrackMatteInspector(core: core,
+                                            compositionID: core.firstCompositionID,
+                                            layerID: layerID,
+                                            isEditable: isEditable,
+                                            perform: perform)
                     }
                     .padding(10)
                     .padding(.bottom, inspectorKeyboardOverlap(keyboardFrame: keyboardFrame, in: proxy))

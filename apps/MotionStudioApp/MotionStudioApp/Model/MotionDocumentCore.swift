@@ -342,6 +342,31 @@ final class MotionDocumentCore {
         ms_layer_style_stroke_position_at(handle, layerID, Int32(index))
     }
 
+    // MARK: - Mask / track matte queries
+
+    func maskCount(layerID: UInt64) -> Int {
+        Int(ms_layer_mask_count(handle, layerID))
+    }
+
+    /// MS_MASK_* tag at index; -1 when out of range.
+    func maskMode(layerID: UInt64, index: Int) -> Int32 {
+        ms_layer_mask_mode_at(handle, layerID, Int32(index))
+    }
+
+    func maskInverted(layerID: UInt64, index: Int) -> Bool {
+        ms_layer_mask_inverted_at(handle, layerID, Int32(index))
+    }
+
+    /// MS_TRACK_MATTE_* tag; None when the layer has no track matte.
+    func trackMatteType(layerID: UInt64) -> Int32 {
+        ms_layer_track_matte_type(handle, layerID)
+    }
+
+    /// Matte source layer id; 0 when none.
+    func trackMatteLayerID(layerID: UInt64) -> UInt64 {
+        ms_layer_track_matte_layer_id(handle, layerID)
+    }
+
     // MARK: - Property queries
 
     /// Whether the entity exposes the given property path at all.
@@ -578,6 +603,39 @@ final class MotionDocumentCore {
     /// position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
     func setStrokePosition(layerID: UInt64, index: Int, position: Int32) {
         ms_command_set_stroke_position(handle, layerID, Int32(index), position)
+        changed()
+    }
+
+    /// Appends a path mask baked from the layer's shape at `frame` (Add mode).
+    func addMask(layerID: UInt64, frame: Int64) {
+        ms_command_add_mask(handle, layerID, frame)
+        changed()
+    }
+
+    func removeMask(layerID: UInt64, index: Int) {
+        ms_command_remove_mask(handle, layerID, Int32(index))
+        changed()
+    }
+
+    func moveMask(layerID: UInt64, fromIndex: Int, toIndex: Int) {
+        ms_command_move_mask(handle, layerID, Int32(fromIndex), Int32(toIndex))
+        changed()
+    }
+
+    /// mode: MS_MASK_* tag.
+    func setMaskMode(layerID: UInt64, index: Int, mode: Int32) {
+        ms_command_set_mask_mode(handle, layerID, Int32(index), mode)
+        changed()
+    }
+
+    func setMaskInverted(layerID: UInt64, index: Int, inverted: Bool) {
+        ms_command_set_mask_inverted(handle, layerID, Int32(index), inverted)
+        changed()
+    }
+
+    /// type: MS_TRACK_MATTE_*. matteLayerID may be 0 when type is None.
+    func setTrackMatte(layerID: UInt64, matteLayerID: UInt64, type: Int32) {
+        ms_command_set_track_matte(handle, layerID, matteLayerID, type)
         changed()
     }
 

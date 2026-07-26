@@ -58,6 +58,8 @@ struct NumberPropertyRow: View {
                 } label: {
                     Image(systemName: hasKeyframeAtPlayhead ? "diamond.fill" : "diamond")
                         .foregroundStyle(hasKeyframeAtPlayhead ? .yellow : .secondary)
+                        // Force SF Symbol refresh when the playhead keyframe state flips.
+                        .id(hasKeyframeAtPlayhead)
                 }
                 .buttonStyle(.plain)
                 .disabled(!isEditable)
@@ -72,6 +74,13 @@ struct NumberPropertyRow: View {
         .onChange(of: value, initial: true) { _, newValue in
             draft = formattedValue(newValue)
             hasInvalidDraft = false
+        }
+        .onChange(of: hasKeyframeAtPlayhead) { _, _ in
+            // Keep draft in sync when undo/redo or external edits change keyframe state.
+            if !isFieldFocused {
+                draft = formattedValue(value)
+                hasInvalidDraft = false
+            }
         }
     }
 

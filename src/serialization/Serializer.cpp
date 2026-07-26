@@ -1207,11 +1207,9 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
 
     // trackMatteType is optional: documents saved before track matte existed
     // default to None / invalid source id.
-    Expected<std::string, std::string> trackMatteTypeText =
-        ParseField<std::string>(node, "trackMatteType");
+    Expected<std::string, std::string> trackMatteTypeText = ParseField<std::string>(node, "trackMatteType");
     if (trackMatteTypeText) {
-        Expected<TrackMatteType, std::string> trackMatteType =
-            dto::trackMatteTypeFromString(*trackMatteTypeText);
+        Expected<TrackMatteType, std::string> trackMatteType = dto::trackMatteTypeFromString(*trackMatteTypeText);
         if (!trackMatteType) {
             return Unexpected(trackMatteType.error());
         }

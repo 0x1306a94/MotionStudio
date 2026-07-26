@@ -144,8 +144,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
         blend.blendMode = layer.blendMode;
         commands.push_back(blend);
 
-        const bool needsIsolation =
-            !layer.masks.empty() || layer.trackMatteType != TrackMatteType::None;
+        const bool needsIsolation = !layer.masks.empty() || layer.trackMatteType != TrackMatteType::None;
         if (needsIsolation) {
             DrawCommand beginLayer;
             beginLayer.type = DrawCommandType::BeginLayer;

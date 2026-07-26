@@ -75,6 +75,56 @@ enum FillBlendMode: Int32, CaseIterable, Identifiable {
     }
 }
 
+/// Path mask mode; raw values mirror the bridge MS_MASK_* tags.
+enum MaskModeTag: Int32, CaseIterable, Identifiable {
+    case add = 0
+    case subtract = 1
+    case intersect = 2
+
+    var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .add:
+            "Add"
+        case .subtract:
+            "Subtract"
+        case .intersect:
+            "Intersect"
+        }
+    }
+}
+
+/// Track matte type; raw values mirror the bridge MS_TRACK_MATTE_* tags.
+enum TrackMatteTypeTag: Int32, CaseIterable, Identifiable {
+    case none = 0
+    case alpha = 1
+    case alphaInverted = 2
+    case luma = 3
+    case lumaInverted = 4
+
+    var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .none:
+            "None"
+        case .alpha:
+            "Alpha"
+        case .alphaInverted:
+            "Alpha Inverted"
+        case .luma:
+            "Luma"
+        case .lumaInverted:
+            "Luma Inverted"
+        }
+    }
+}
+
 /// Stroke alignment editable on a stroke style; raw values mirror the bridge
 /// MS_STROKE_POSITION_* tags.
 enum StrokePositionTag: Int32, CaseIterable, Identifiable {

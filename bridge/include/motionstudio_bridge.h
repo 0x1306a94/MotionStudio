@@ -346,8 +346,9 @@ void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int
 // position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position);
 
-// Appends a default rectangular path mask (Add mode) to the layer.
-void ms_command_add_mask(MSDocument *document, uint64_t layerId);
+// Appends a path mask (Add mode) baked from the layer's shape at `frame`.
+// Non-shape layers fall back to a 200x200 centered rectangle.
+void ms_command_add_mask(MSDocument *document, uint64_t layerId, int64_t frame);
 void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index);
 void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex);
 // mode: MS_MASK_* tag.

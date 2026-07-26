@@ -22,6 +22,7 @@
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/HitTest.h"
+#include "MotionStudio/render/MaskPathBake.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/serialization/Serializer.h"
@@ -196,15 +197,9 @@ int TrackMatteTypeTag(motion::TrackMatteType type) {
     return static_cast<int>(type);
 }
 
-motion::Mask MakeDefaultMask() {
+motion::Mask MakeMaskFromLayer(const Layer &layer, int64_t frame) {
     motion::Mask mask;
-    motion::BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{-100, -100}, {}, {}});
-    path.vertices.push_back({{100, -100}, {}, {}});
-    path.vertices.push_back({{100, 100}, {}, {}});
-    path.vertices.push_back({{-100, 100}, {}, {}});
-    mask.path.setStaticValue(std::move(path));
+    mask.path.setStaticValue(motion::BakeMaskPathFromLayer(layer, frame));
     return mask;
 }
 
@@ -1167,9 +1162,13 @@ void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int 
     Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
 }
 
-void ms_command_add_mask(MSDocument *document, uint64_t layerId) {
+void ms_command_add_mask(MSDocument *document, uint64_t layerId, int64_t frame) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::AddMaskCommand>(EntityId{layerId}, MakeDefaultMask()));
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return;
+    }
+    Execute(document, std::make_unique<motion::AddMaskCommand>(EntityId{layerId}, MakeMaskFromLayer(*layer, frame)));
 }
 
 void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index) {
@@ -1179,8 +1178,7 @@ void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index) {
 
 void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::MoveMaskCommand>(EntityId{layerId}, fromIndex, toIndex));
+    Execute(document, std::make_unique<motion::MoveMaskCommand>(EntityId{layerId}, fromIndex, toIndex));
 }
 
 void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, int mode) {
@@ -1191,8 +1189,7 @@ void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index,
 void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int index,
                                   bool inverted) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::SetMaskInvertedCommand>(EntityId{layerId}, index, inverted));
+    Execute(document, std::make_unique<motion::SetMaskInvertedCommand>(EntityId{layerId}, index, inverted));
 }
 
 void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,

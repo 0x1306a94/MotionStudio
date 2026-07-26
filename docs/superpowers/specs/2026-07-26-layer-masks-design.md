@@ -6,15 +6,17 @@
 
 ## 实现进度
 
-| 里程碑 | 状态 | 说明 |
-|---|---|---|
-| 1. 模型 + 序列化 + PropertyPath | **已完成** | `Animatable` path、feather/expansion、TrackMatte 字段；不升 schema |
-| 2. SceneEvaluator / SceneState | **已完成** | `EvaluatedMask`、matte 解析、`usedAsMatteOnly` |
-| 3. DrawCommand + CommandBuilder | **已完成** | `BeginLayer/EndLayer/BeginMask/EndMask/DrawMaskPath` |
-| 4. tgfx 离屏 PathCoverage | **已完成** | Picture 隔离 + MaskFilter；Add / feather 快照测试通过 |
-| 5. Track Matte 端到端（渲染） | **已完成** | Alpha matte 快照测试通过；Luma/反相走同一 coverage 路径 |
-| 6. Bridge + Undo | **已完成** | 增删/移动 mask、mode/inverted、set track matte；undo + bridge_test |
-| 7. SwiftUI 编辑 UI | **待验证** | Inspector Masks + Track Matte + 时间轴 mask 属性行已实现；**人工验证通过后再提交** |
+
+| 里程碑                             | 状态      | 说明                                                             |
+| ------------------------------- | ------- | -------------------------------------------------------------- |
+| 1. 模型 + 序列化 + PropertyPath      | **已完成** | `Animatable` path、feather/expansion、TrackMatte 字段；不升 schema    |
+| 2. SceneEvaluator / SceneState  | **已完成** | `EvaluatedMask`、matte 解析、`usedAsMatteOnly`                     |
+| 3. DrawCommand + CommandBuilder | **已完成** | `BeginLayer/EndLayer/BeginMask/EndMask/DrawMaskPath`           |
+| 4. tgfx 离屏 PathCoverage         | **已完成** | Picture 隔离 + MaskFilter；Add / feather 快照测试通过                   |
+| 5. Track Matte 端到端（渲染）          | **已完成** | Alpha matte 快照测试通过；Luma/反相走同一 coverage 路径                      |
+| 6. Bridge + Undo                | **已完成** | 增删/移动 mask、mode/inverted、set track matte；undo + bridge_test    |
+| 7. SwiftUI 编辑 UI                | **待验证** | Inspector Masks + Track Matte + 时间轴 mask 属性行已实现；**人工验证通过后再提交** |
+
 
 提交策略：Core / 适配器 / 测试 / 文档可自动提交；含 UI 交互的改动等人工验证后再提交。
 
@@ -30,13 +32,17 @@
 
 ## 现状
 
-| 层级 | 能力 |
-|---|---|
-| `Layer::masks` + `MaskMode` | 模型字段已有；path 为静态 `BezierPath`；无 feather/expansion |
-| 序列化 masks | 已有（静态 path） |
-| `DrawCommandType::ClipPath` / `RenderAdapter::clipPath` | 已有；CommandBuilder **未**对 masks 发指令 |
-| Track Matte | 无 |
-| 编辑 UI | 无 |
+
+| 层级                                                      | 能力                                               |
+| ------------------------------------------------------- | ------------------------------------------------ |
+| `Layer::masks` + `MaskMode`                             | 模型字段已有；path 为静态 `BezierPath`；无 feather/expansion |
+| 序列化 masks                                               | 已有（静态 path）                                      |
+| `DrawCommandType::ClipPath` / `RenderAdapter::clipPath` | 已有；CommandBuilder **未**对 masks 发指令               |
+| Track Matte                                             | 无                                                |
+| 编辑 UI                                                   | 无                                                |
+
+
+
 
 ## 非目标
 
@@ -47,7 +53,11 @@
 
 ---
 
+
+
 ## §1 数据模型
+
+
 
 ### Path Masks
 
@@ -86,6 +96,8 @@ TrackMatteType trackMatteType = TrackMatteType::None;
 - 可指定任意同 composition 层；无效 / 自引用 / 找不到 → 视为无 matte。
 - Path masks 与 Track Matte 可同时存在：先 path masks，再与 matte coverage **Intersect**。
 
+
+
 ### 序列化 / PropertyPath
 
 - **不升 schemaVersion**；直接改 JSON 字段。
@@ -95,7 +107,11 @@ TrackMatteType trackMatteType = TrackMatteType::None;
 
 ---
 
+
+
 ## §2 求值与 DrawCommand
+
+
 
 ### SceneState
 
@@ -162,6 +178,8 @@ Restore
 
 ---
 
+
+
 ## §3 适配器（tgfx）
 
 在 `TgfxCanvasAdapter` 实现离屏栈：
@@ -175,15 +193,20 @@ Restore
 
 ---
 
+
+
 ## §4 UI / Bridge
 
 - Bridge：增删改 mask；设 `trackMatteLayerId` / `trackMatteType`；PropertyPath 读写已有通道复用
 - Undo：mask 增删与属性变更走现有 Command / SetStaticValue / Keyframe；track matte 用专用小命令或 Set 层字段命令
 - Inspector：Masks 列表（mode / inverted / opacity / feather / expansion）；Track Matte 选择层 + 类型
+- **Add Mask 默认 path**：按当前 playhead **烘焙**层形状几何（Rect/Ellipse/Path → `BezierPath` 快照）；非 Shape 层回退 200×200 中心矩形。与形状之后**不联动**（AE 语义）。
 - 画布：选中层可显示/编辑 mask 路径（首版可用检查器 + 简单路径工具；顶点拖拽可跟 Shape path 编辑对齐）
 - 时间轴：mask 可动画属性出现在属性子行（与 transform 一致）
 
 ---
+
+
 
 ## §5 测试
 
@@ -194,16 +217,20 @@ Restore
 
 ---
 
+
+
 ## 里程碑顺序
 
-1. 模型 + 序列化 + PropertyPath  
-2. SceneState / Evaluator / CommandBuilder（指令形态）  
-3. RenderAdapter + tgfx 离屏 coverage  
-4. Track Matte 端到端  
-5. Bridge + Undo + UI  
+1. 模型 + 序列化 + PropertyPath
+2. SceneState / Evaluator / CommandBuilder（指令形态）
+3. RenderAdapter + tgfx 离屏 coverage
+4. Track Matte 端到端
+5. Bridge + Undo + UI
 6. 快照测试补齐与硬边 ClipPath 快路径（可选）
 
 ---
+
+
 
 ## §6 手动验证（UI）
 
@@ -223,36 +250,40 @@ Composition
 
 1. 选中 **Ellipse**（被裁切层）。
 2. Inspector → **Track Matte**：
-   - Type → **Alpha**
-   - Source → **Rectangle**
+  - Type → **Alpha**
+  - Source → **Rectangle**
 3. 预期：
-   - Ellipse 只在 Rectangle 覆盖区域内显示。
-   - Rectangle 作为 matte 源后**不再单独绘制**（`usedAsMatteOnly`）。
+  - Ellipse 只在 Rectangle 覆盖区域内显示。
+  - Rectangle 作为 matte 源后**不再单独绘制**（`usedAsMatteOnly`）。
 4. 可选：Type 改为 **Alpha Inverted** → 显示区域对调（挖空矩形区域）。
 5. **Luma** 说明（可选）：
-   - Luma 看 matte 源的**颜色亮度**，不是 alpha。
-   - 默认形状填充是彩色（非纯白），亮度常约 0.5，Ellipse 会像半透明——**符合预期**。
-   - 实色形状层硬裁切请用 **Alpha**；或把 Rectangle 填成纯白再用 Luma。
+  - Luma 看 matte 源的**颜色亮度**，不是 alpha。
+  - 默认形状填充是彩色（非纯白），亮度常约 0.5，Ellipse 会像半透明——**符合预期**。
+  - 实色形状层硬裁切请用 **Alpha**；或把 Rectangle 填成纯白再用 Luma。
 6. Type → **None** 清除；Undo 可恢复。
 
-| 目标 | 选中谁 | 设置 |
-|---|---|---|
+
+| 目标                  | 选中谁     | 设置                                     |
+| ------------------- | ------- | -------------------------------------- |
 | Rectangle 裁 Ellipse | Ellipse | Track Matte → Alpha，Source = Rectangle |
-| Ellipse 自己裁自己 | Ellipse | Masks → `+`（见下节） |
+| Ellipse 自己裁自己       | Ellipse | Masks → `+`（见下节）                       |
+
+
+
 
 ### 6.2 Path Masks（本层路径遮罩）
 
 目标：在 **Ellipse** 上加路径遮罩并看到裁切。  
-默认 `Masks +` 追加的是层局部 **200×200** 方框（与默认形状同尺寸），Mode=Add 时画面可能几乎不变——属正常，需调 Expansion / Feather / Inv 才能明显看出。
+默认 `Masks +` 会把**当前 playhead 下的层外形**烘焙成 mask path（椭圆→椭圆 path，矩形→矩形 path）。Mode=Add 且未改 Expansion 时，画面可能几乎不变——属正常；用 Expansion / Feather / Inv / Subtract 验证。
 
 1. 选中 **Ellipse**；Track Matte → **None**。
-2. Inspector → **Masks** → `+`。
-3. **Expansion** → **-40**（或更负）→ Ellipse 边缘被明显裁小。  
-   - 正数 = 扩张 mask；若 mask 已完全盖住图层内容，正数**看不出变化**（先缩再扩可验证）。  
-   - Inv 按钮选中时应有高亮描边/底色。
+2. Inspector → **Masks** → `+`（path 应为椭圆外形快照，非固定方框）。
+3. **Expansion** → **-40**（或更负）→ Ellipse 边缘被明显裁小。
+  - 正数 = 扩张 mask；若 mask 已完全盖住图层内容，正数**看不出变化**（先缩再扩可验证）。  
+  - Inv 按钮选中时应有高亮描边/底色。
 4. 勾选 **Inv** → 方框外/挖空类效果；再点取消 → 恢复，按钮高亮同步消失。
-5. **Feather** → **20~40** → 边缘变软；再改回 **0** → 硬边恢复。  
-   - 若该属性已有关键帧，改值必须打在当前时间关键帧上（菱形应立即高亮）。
+5. **Feather** → **20~40** → 边缘变软；再改回 **0** → 硬边恢复。
+  - 若该属性已有关键帧，改值必须打在当前时间关键帧上（菱形应立即高亮）。
 6. Mask **Opacity** → **0.3** → 裁切区半透（不是整层 opacity）。
 7. 可选：再 `+` 第二条；Mode → **Subtract** / **Intersect**，配合不同 Expansion，确认挖洞或取交。
 8. 可选：给 Mask Opacity / Feather 打关键帧 → 时间轴出现 `Mask 1 Opacity` 等子行。
@@ -262,10 +293,12 @@ Composition
 
 ### 6.3 验收清单
 
-- [ ] Track Matte Alpha：Rectangle 裁 Ellipse，源层不上屏
-- [ ] Track Matte 清除 / Undo
-- [ ]（可选）Luma：彩色源变淡；纯白源接近不透明
-- [ ] Path Mask：Expansion 负值可见裁小
-- [ ] Path Mask：Inv / Feather / Opacity
-- [ ] Path Mask：删除与 Undo
-- [ ]（可选）时间轴 mask 属性关键帧子行
+- [x] Track Matte Alpha：Rectangle 裁 Ellipse，源层不上屏
+- [x] Track Matte 清除 / Undo
+
+- [x] 可选Luma：彩色源变淡；纯白源接近不透明
+
+- [x] Path Mask：Expansion 负值可见裁小
+- [x] Path Mask：Inv / Feather / Opacity
+- [x] Path Mask：删除与 Undo
+- [x] 可选 时间轴 mask 属性关键帧子行
