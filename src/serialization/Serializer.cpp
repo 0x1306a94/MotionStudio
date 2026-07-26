@@ -600,17 +600,15 @@ Expected<void, std::string> TransformFromJson(const json &node, Transform &trans
 }
 
 json MaskToJson(const Mask &mask) {
-    return {{"path", BezierPathToJson(mask.path)},
+    return {{"path", AnimatableToJson(mask.path)},
             {"mode", dto::ToString(mask.mode)},
             {"opacity", AnimatableToJson(mask.opacity)},
-            {"inverted", mask.inverted}};
+            {"inverted", mask.inverted},
+            {"feather", AnimatableToJson(mask.feather)},
+            {"expansion", AnimatableToJson(mask.expansion)}};
 }
 
 Expected<Mask, std::string> MaskFromJson(const json &node) {
-    Expected<BezierPath, std::string> path = ParseField<BezierPath>(node, "path");
-    if (!path) {
-        return Unexpected(path.error());
-    }
     Expected<std::string, std::string> modeText = ParseField<std::string>(node, "mode");
     if (!modeText) {
         return Unexpected(modeText.error());
@@ -620,13 +618,20 @@ Expected<Mask, std::string> MaskFromJson(const json &node) {
         return Unexpected(mode.error());
     }
     Mask mask;
-    mask.path = std::move(*path);
     mask.mode = *mode;
+    Expected<const json *, std::string> pathNode = Child(node, "path");
+    if (!pathNode) {
+        return Unexpected(pathNode.error());
+    }
+    Expected<void, std::string> result = AnimatableFromJson(**pathNode, mask.path);
+    if (!result) {
+        return Unexpected(result.error());
+    }
     Expected<const json *, std::string> opacityNode = Child(node, "opacity");
     if (!opacityNode) {
         return Unexpected(opacityNode.error());
     }
-    Expected<void, std::string> result = AnimatableFromJson(**opacityNode, mask.opacity);
+    result = AnimatableFromJson(**opacityNode, mask.opacity);
     if (!result) {
         return Unexpected(result.error());
     }
@@ -635,6 +640,22 @@ Expected<Mask, std::string> MaskFromJson(const json &node) {
         return Unexpected(inverted.error());
     }
     mask.inverted = *inverted;
+    Expected<const json *, std::string> featherNode = Child(node, "feather");
+    if (!featherNode) {
+        return Unexpected(featherNode.error());
+    }
+    result = AnimatableFromJson(**featherNode, mask.feather);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    Expected<const json *, std::string> expansionNode = Child(node, "expansion");
+    if (!expansionNode) {
+        return Unexpected(expansionNode.error());
+    }
+    result = AnimatableFromJson(**expansionNode, mask.expansion);
+    if (!result) {
+        return Unexpected(result.error());
+    }
     return mask;
 }
 
@@ -1067,6 +1088,12 @@ json LayerToJson(const Layer &layer) {
         masks.push_back(MaskToJson(mask));
     }
     node["masks"] = std::move(masks);
+    node["trackMatteType"] = dto::ToString(layer.trackMatteType);
+    if (layer.trackMatteLayerId.isValid()) {
+        node["trackMatteLayerId"] = IdToString(layer.trackMatteLayerId);
+    } else {
+        node["trackMatteLayerId"] = nullptr;
+    }
     json styles = json::array();
     for (const auto &style : layer.styles) {
         styles.push_back(LayerStyleToJson(*style));
@@ -1168,6 +1195,31 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
             layer->masks.push_back(std::move(*mask));
         }
     }
+
+    Expected<std::string, std::string> trackMatteTypeText =
+        ParseField<std::string>(node, "trackMatteType");
+    if (!trackMatteTypeText) {
+        return Unexpected(trackMatteTypeText.error());
+    }
+    Expected<TrackMatteType, std::string> trackMatteType =
+        dto::trackMatteTypeFromString(*trackMatteTypeText);
+    if (!trackMatteType) {
+        return Unexpected(trackMatteType.error());
+    }
+    layer->trackMatteType = *trackMatteType;
+    const json *trackMatteLayerNode = FindChild(node, "trackMatteLayerId");
+    if (trackMatteLayerNode && !trackMatteLayerNode->is_null()) {
+        Expected<std::string, std::string> matteIdText = AsString(*trackMatteLayerNode);
+        if (!matteIdText) {
+            return Unexpected(matteIdText.error());
+        }
+        Expected<EntityId, std::string> matteLayerId = IdFromString(*matteIdText);
+        if (!matteLayerId) {
+            return Unexpected(matteLayerId.error());
+        }
+        layer->trackMatteLayerId = *matteLayerId;
+    }
+
     Expected<const json *, std::string> stylesNode = Child(node, "styles");
     if (!stylesNode) {
         return Unexpected(stylesNode.error());

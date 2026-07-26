@@ -2,7 +2,7 @@
 
 namespace motion {
 
-// How a mask contributes to the final mask region.
+// How a path mask contributes to the layer's coverage (AE Masks subset).
 enum class MaskMode {
     Add,
     Subtract,

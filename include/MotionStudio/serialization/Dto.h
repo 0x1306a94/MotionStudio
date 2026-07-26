@@ -12,6 +12,7 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/TrackMatteType.h"
 
 // Enum ↔ string mappings for the JSON v1 schema (camelCase, aligned with the
 // Lottie ecosystem). File layout is defined in Serializer.cpp; migration
@@ -45,6 +46,9 @@ Expected<BlendMode, std::string> blendModeFromString(const std::string &text);
 
 const char *ToString(MaskMode mode);
 Expected<MaskMode, std::string> maskModeFromString(const std::string &text);
+
+const char *ToString(TrackMatteType type);
+Expected<TrackMatteType, std::string> trackMatteTypeFromString(const std::string &text);
 
 const char *ToString(AssetType type);
 Expected<AssetType, std::string> assetTypeFromString(const std::string &text);

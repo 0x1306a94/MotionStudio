@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/TrackMatteType.h"
 
 using motion::ApproxEqual;
 using motion::Composition;
@@ -10,7 +11,9 @@ using motion::Document;
 using motion::EntityId;
 using motion::Layer;
 using motion::LayerType;
+using motion::Mask;
 using motion::Mat3;
+using motion::TrackMatteType;
 using motion::Vec2;
 
 namespace {
@@ -111,4 +114,19 @@ TEST(LayerTest, ConstructorCreatesMatchingContent) {
 
     Layer precompLayer{LayerType::Precomp};
     EXPECT_EQ(precompLayer.content->type(), motion::LayerType::Precomp);
+}
+
+TEST(LayerMaskTest, DefaultsHaveEmptyPathAndNoTrackMatte) {
+    Layer layer{LayerType::Shape};
+    EXPECT_TRUE(layer.masks.empty());
+    EXPECT_FALSE(layer.trackMatteLayerId.isValid());
+    EXPECT_EQ(layer.trackMatteType, TrackMatteType::None);
+
+    Mask mask;
+    EXPECT_FALSE(mask.path.isAnimated());
+    EXPECT_TRUE(mask.path.staticValue().vertices.empty());
+    EXPECT_FLOAT_EQ(mask.opacity.staticValue(), 1.0f);
+    EXPECT_FALSE(mask.inverted);
+    EXPECT_FLOAT_EQ(mask.feather.staticValue(), 0.0f);
+    EXPECT_FLOAT_EQ(mask.expansion.staticValue(), 0.0f);
 }

@@ -11,14 +11,22 @@
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/Color.h>
+#include <tgfx/core/ColorFilter.h>
+#include <tgfx/core/Image.h>
+#include <tgfx/core/ImageFilter.h>
+#include <tgfx/core/MaskFilter.h>
 #include <tgfx/core/Matrix.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Path.h>
 #include <tgfx/core/PathEffect.h>
 #include <tgfx/core/PathTypes.h>
+#include <tgfx/core/Picture.h>
+#include <tgfx/core/PictureRecorder.h>
 #include <tgfx/core/Rect.h>
+#include <tgfx/core/Shader.h>
 #include <tgfx/core/Stroke.h>
 #include <tgfx/core/Surface.h>
+#include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/Device.h>
 
 namespace motion {
@@ -341,8 +349,90 @@ struct TgfxPathCache {
     }
 };
 
+struct CoverageImage {
+    std::shared_ptr<tgfx::Image> image;
+    tgfx::Matrix localMatrix = tgfx::Matrix::I();
+    bool invertAlpha = false;
+};
+
+struct IsolationLayer {
+    tgfx::PictureRecorder contentRecorder;
+    tgfx::Canvas *contentCanvas = nullptr;
+    tgfx::PictureRecorder maskRecorder;
+    tgfx::Canvas *maskCanvas = nullptr;
+    bool masking = false;
+    MaskApplyMode maskApplyMode = MaskApplyMode::PathCoverage;
+    float savedOpacity = 1.0f;
+    std::vector<CoverageImage> coverages;
+};
+
+struct TgfxIsolationStack {
+    std::vector<IsolationLayer> layers;
+};
+
+tgfx::BlendMode ToMaskBlendMode(MaskMode mode) {
+    switch (mode) {
+        case MaskMode::Add: {
+            return tgfx::BlendMode::SrcOver;
+        }
+        case MaskMode::Subtract: {
+            return tgfx::BlendMode::DstOut;
+        }
+        case MaskMode::Intersect: {
+            return tgfx::BlendMode::DstIn;
+        }
+    }
+    return tgfx::BlendMode::SrcOver;
+}
+
+CoverageImage IntersectCoverageImages(tgfx::Context *context, const CoverageImage &base,
+                                      const CoverageImage &next) {
+    CoverageImage result;
+    if (context == nullptr || base.image == nullptr || next.image == nullptr) {
+        return result;
+    }
+    const tgfx::Rect baseBounds =
+        base.localMatrix.mapRect(tgfx::Rect::MakeWH(static_cast<float>(base.image->width()),
+                                                    static_cast<float>(base.image->height())));
+    const tgfx::Rect nextBounds =
+        next.localMatrix.mapRect(tgfx::Rect::MakeWH(static_cast<float>(next.image->width()),
+                                                    static_cast<float>(next.image->height())));
+    tgfx::Rect bounds = baseBounds;
+    bounds.join(nextBounds);
+    bounds.roundOut();
+    const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
+    const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
+    auto surface = tgfx::Surface::Make(context, width, height);
+    if (surface == nullptr) {
+        return result;
+    }
+    tgfx::Canvas *canvas = surface->getCanvas();
+    canvas->clear();
+    {
+        tgfx::Paint paint;
+        paint.setAntiAlias(true);
+        tgfx::Matrix matrix = base.localMatrix;
+        matrix.postTranslate(-bounds.left, -bounds.top);
+        canvas->setMatrix(matrix);
+        canvas->drawImage(base.image, &paint);
+    }
+    {
+        tgfx::Paint paint;
+        paint.setAntiAlias(true);
+        paint.setBlendMode(tgfx::BlendMode::DstIn);
+        tgfx::Matrix matrix = next.localMatrix;
+        matrix.postTranslate(-bounds.left, -bounds.top);
+        canvas->setMatrix(matrix);
+        canvas->drawImage(next.image, &paint);
+    }
+    result.image = surface->makeImageSnapshot();
+    result.localMatrix = tgfx::Matrix::MakeTrans(bounds.left, bounds.top);
+    return result;
+}
+
 TgfxCanvasAdapter::TgfxCanvasAdapter()
-    : pathCache_(std::make_unique<TgfxPathCache>()) {
+    : pathCache_(std::make_unique<TgfxPathCache>())
+    , isolationStack_(std::make_unique<TgfxIsolationStack>()) {
 }
 
 TgfxCanvasAdapter::~TgfxCanvasAdapter() {
@@ -395,6 +485,9 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
     blendMode_ = BlendMode::Normal;
     opacityStack_.clear();
     blendStack_.clear();
+    if (isolationStack_ != nullptr) {
+        isolationStack_->layers.clear();
+    }
 }
 
 void TgfxCanvasAdapter::endFrame() {
@@ -423,20 +516,35 @@ void TgfxCanvasAdapter::restoreCompositionClip() {
     compositionClipSaved_ = false;
 }
 
+tgfx::Canvas *TgfxCanvasAdapter::drawingCanvas() {
+    if (isolationStack_ != nullptr && !isolationStack_->layers.empty()) {
+        IsolationLayer &top = isolationStack_->layers.back();
+        if (top.masking && top.maskCanvas != nullptr) {
+            return top.maskCanvas;
+        }
+        if (top.contentCanvas != nullptr) {
+            return top.contentCanvas;
+        }
+    }
+    return surface_ != nullptr ? surface_->getCanvas() : nullptr;
+}
+
 void TgfxCanvasAdapter::save() {
-    if (!surface_) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr) {
         return;
     }
-    surface_->getCanvas()->save();
+    canvas->save();
     opacityStack_.push_back(opacity_);
     blendStack_.push_back(blendMode_);
 }
 
 void TgfxCanvasAdapter::restore() {
-    if (!surface_ || opacityStack_.empty()) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr || opacityStack_.empty()) {
         return;
     }
-    surface_->getCanvas()->restore();
+    canvas->restore();
     opacity_ = opacityStack_.back();
     opacityStack_.pop_back();
     blendMode_ = blendStack_.back();
@@ -444,10 +552,11 @@ void TgfxCanvasAdapter::restore() {
 }
 
 void TgfxCanvasAdapter::concatTransform(const Mat3 &matrix) {
-    if (!surface_) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr) {
         return;
     }
-    surface_->getCanvas()->concat(ToTgfxMatrix(matrix));
+    canvas->concat(ToTgfxMatrix(matrix));
 }
 
 void TgfxCanvasAdapter::setOpacity(float opacity) {
@@ -459,7 +568,8 @@ void TgfxCanvasAdapter::setBlendMode(BlendMode mode) {
 }
 
 void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &paint) {
-    if (!surface_ || !pathCache_) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr || !pathCache_) {
         return;
     }
     tgfx::Paint tgfxPaint;
@@ -469,15 +579,15 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
     color.a *= opacity_;
     tgfxPaint.setColor(ToTgfxColor(color));
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-    surface_->getCanvas()->drawPath(pathCache_->Resolve(geometry, paint.fillRule), tgfxPaint);
+    canvas->drawPath(pathCache_->Resolve(geometry, paint.fillRule), tgfxPaint);
 }
 
 void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &paint,
                                    const StrokeOptions &options) {
-    if (!surface_ || !pathCache_) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr || !pathCache_) {
         return;
     }
-    tgfx::Canvas *canvas = surface_->getCanvas();
     const tgfx::Path fullPath = pathCache_->Resolve(geometry, paint.fillRule);
     tgfx::Path strokeGeometry = fullPath;
     if (NeedsTrim(options)) {
@@ -522,10 +632,181 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
 }
 
 void TgfxCanvasAdapter::clipPath(const ShapeGeometry &geometry, FillRule rule) {
-    if (!surface_ || !pathCache_) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr || !pathCache_) {
         return;
     }
-    surface_->getCanvas()->clipPath(pathCache_->Resolve(geometry, rule));
+    canvas->clipPath(pathCache_->Resolve(geometry, rule));
+}
+
+void TgfxCanvasAdapter::beginLayer() {
+    if (isolationStack_ == nullptr) {
+        return;
+    }
+    // Emplace first: moving PictureRecorder invalidates any canvas* from
+    // beginRecording().
+    isolationStack_->layers.emplace_back();
+    IsolationLayer &layer = isolationStack_->layers.back();
+    layer.contentCanvas = layer.contentRecorder.beginRecording();
+}
+
+void TgfxCanvasAdapter::endLayer() {
+    if (isolationStack_ == nullptr || isolationStack_->layers.empty() || surface_ == nullptr) {
+        return;
+    }
+    // PictureRecorder is not safely movable; finish and pop in place.
+    IsolationLayer &layer = isolationStack_->layers.back();
+    layer.contentCanvas = nullptr;
+    std::shared_ptr<tgfx::Picture> content = layer.contentRecorder.finishRecordingAsPicture();
+
+    tgfx::Paint paint;
+    paint.setAntiAlias(true);
+    if (!layer.coverages.empty()) {
+        tgfx::Context *context = surface_->getContext();
+        CoverageImage combined = layer.coverages.front();
+        for (size_t i = 1; i < layer.coverages.size(); ++i) {
+            CoverageImage intersected =
+                IntersectCoverageImages(context, combined, layer.coverages[i]);
+            if (intersected.image == nullptr) {
+                continue;
+            }
+            combined = std::move(intersected);
+        }
+        if (combined.image != nullptr) {
+            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal,
+                                                        tgfx::TileMode::Decal);
+            if (shader != nullptr) {
+                shader = shader->makeWithMatrix(combined.localMatrix);
+                paint.setMaskFilter(tgfx::MaskFilter::MakeShader(shader, combined.invertAlpha));
+            }
+        }
+    }
+
+    isolationStack_->layers.pop_back();
+    tgfx::Canvas *parent = drawingCanvas();
+    if (parent == nullptr || content == nullptr) {
+        return;
+    }
+    parent->drawPicture(content, nullptr, &paint);
+}
+
+void TgfxCanvasAdapter::beginMask(MaskApplyMode mode) {
+    if (isolationStack_ == nullptr || isolationStack_->layers.empty()) {
+        return;
+    }
+    IsolationLayer &layer = isolationStack_->layers.back();
+    layer.maskApplyMode = mode;
+    layer.masking = true;
+    layer.savedOpacity = opacity_;
+    opacity_ = 1.0f;
+    // maskRecorder is already owned by the stack entry; begin after settle.
+    layer.maskCanvas = layer.maskRecorder.beginRecording();
+}
+
+void TgfxCanvasAdapter::endMask() {
+    if (isolationStack_ == nullptr || isolationStack_->layers.empty()) {
+        return;
+    }
+    IsolationLayer &layer = isolationStack_->layers.back();
+    if (!layer.masking) {
+        return;
+    }
+    layer.masking = false;
+    layer.maskCanvas = nullptr;
+    opacity_ = layer.savedOpacity;
+    std::shared_ptr<tgfx::Picture> maskPicture = layer.maskRecorder.finishRecordingAsPicture();
+    if (maskPicture == nullptr || surface_ == nullptr) {
+        return;
+    }
+
+    tgfx::Rect bounds = maskPicture->getBounds();
+    if (bounds.isEmpty()) {
+        return;
+    }
+    bounds.roundOut();
+    const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
+    const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
+    tgfx::Matrix pictureMatrix = tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top);
+    std::shared_ptr<tgfx::Image> image =
+        tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
+    if (image == nullptr) {
+        return;
+    }
+
+    bool invertAlpha = false;
+    switch (layer.maskApplyMode) {
+        case MaskApplyMode::PathCoverage:
+        case MaskApplyMode::AlphaMatte: {
+            break;
+        }
+        case MaskApplyMode::AlphaMatteInverted: {
+            invertAlpha = true;
+            break;
+        }
+        case MaskApplyMode::LumaMatte:
+        case MaskApplyMode::LumaMatteInverted: {
+            image = image->makeWithFilter(tgfx::ImageFilter::ColorFilter(tgfx::ColorFilter::Luma()));
+            invertAlpha = layer.maskApplyMode == MaskApplyMode::LumaMatteInverted;
+            break;
+        }
+    }
+    if (image == nullptr) {
+        return;
+    }
+
+    CoverageImage coverage;
+    coverage.image = std::move(image);
+    coverage.localMatrix = tgfx::Matrix::MakeTrans(bounds.left, bounds.top);
+    coverage.invertAlpha = invertAlpha;
+    layer.coverages.push_back(std::move(coverage));
+}
+
+void TgfxCanvasAdapter::drawMaskPath(const ShapeGeometry &geometry, MaskMode mode, float opacity,
+                                     bool inverted, float feather, float expansion) {
+    if (!pathCache_ || isolationStack_ == nullptr || isolationStack_->layers.empty()) {
+        return;
+    }
+    IsolationLayer &layer = isolationStack_->layers.back();
+    if (!layer.masking || layer.maskCanvas == nullptr) {
+        return;
+    }
+    tgfx::Canvas *canvas = layer.maskCanvas;
+    tgfx::Path path = pathCache_->Resolve(geometry, FillRule::NonZero);
+    if (expansion != 0.0f) {
+        tgfx::Stroke stroke(std::abs(expansion) * 2.0f, tgfx::LineCap::Round, tgfx::LineJoin::Round);
+        tgfx::Path expanded = path;
+        if (stroke.applyToPath(&expanded)) {
+            if (expansion > 0.0f) {
+                path.addPath(expanded, tgfx::PathOp::Union);
+            } else {
+                path = expanded;
+                path.addPath(pathCache_->Resolve(geometry, FillRule::NonZero),
+                             tgfx::PathOp::Intersect);
+            }
+        }
+    }
+    if (inverted) {
+        path.toggleInverseFillType();
+    }
+
+    auto drawContribution = [&](tgfx::Canvas *target) {
+        tgfx::Paint paint;
+        paint.setAntiAlias(true);
+        paint.setStyle(tgfx::PaintStyle::Fill);
+        paint.setColor(tgfx::Color::FromRGBA(255, 255, 255, ToByte(opacity)));
+        paint.setBlendMode(ToMaskBlendMode(mode));
+        target->drawPath(path, paint);
+    };
+
+    if (feather > 0.0f) {
+        tgfx::Paint layerPaint;
+        layerPaint.setImageFilter(tgfx::ImageFilter::Blur(feather, feather));
+        canvas->saveLayer(&layerPaint);
+        drawContribution(canvas);
+        canvas->restore();
+        return;
+    }
+    drawContribution(canvas);
 }
 
 }  // namespace motion

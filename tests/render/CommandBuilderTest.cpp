@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::BezierPath;
@@ -11,13 +14,19 @@ using motion::Color;
 using motion::DrawCommandType;
 using motion::EntityId;
 using motion::EvaluatedLayer;
+using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
 using motion::LineCap;
 using motion::LineJoin;
 using motion::MakePathGeometry;
+using motion::MaskApplyMode;
+using motion::MaskMode;
+using motion::Mat3;
 using motion::Paint;
 using motion::SceneState;
 using motion::ShapeGeometryKind;
+using motion::TrackMatteType;
+using motion::Vec2;
 
 namespace {
 
@@ -148,4 +157,120 @@ TEST(CommandBuilderTest, SelectionOutlineSkipsMissingLayers) {
     state.layers.push_back(std::move(layer));
 
     EXPECT_TRUE(BuildSelectionOutlineCommands(state, {EntityId{7}}, EntityId{7}, 1.5f, 7.0f).empty());
+}
+
+TEST(CommandBuilderTest, PathMasksEmitBeginLayerAndDrawMaskPath) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem());
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Subtract;
+    mask.opacity = 0.75f;
+    mask.inverted = true;
+    mask.feather = 4.0f;
+    mask.expansion = 1.0f;
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{5, 0}, {}, {}});
+    mask.path = path;
+    layer.masks.push_back(mask);
+    state.layers.push_back(std::move(layer));
+
+    auto commands = BuildCommands(state);
+    ASSERT_GE(commands.size(), 10u);
+    EXPECT_EQ(commands[4].type, DrawCommandType::BeginLayer);
+    EXPECT_EQ(commands[5].type, DrawCommandType::DrawPath);
+
+    bool sawBeginMask = false;
+    bool sawDrawMask = false;
+    bool sawEndMask = false;
+    bool sawEndLayer = false;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginMask) {
+            sawBeginMask = true;
+            EXPECT_EQ(command.maskApplyMode, MaskApplyMode::PathCoverage);
+        }
+        if (command.type == DrawCommandType::DrawMaskPath) {
+            sawDrawMask = true;
+            EXPECT_EQ(command.maskMode, MaskMode::Subtract);
+            EXPECT_FLOAT_EQ(command.maskOpacity, 0.75f);
+            EXPECT_TRUE(command.maskInverted);
+            EXPECT_FLOAT_EQ(command.maskFeather, 4.0f);
+            EXPECT_FLOAT_EQ(command.maskExpansion, 1.0f);
+        }
+        if (command.type == DrawCommandType::EndMask) {
+            sawEndMask = true;
+        }
+        if (command.type == DrawCommandType::EndLayer) {
+            sawEndLayer = true;
+        }
+    }
+    EXPECT_TRUE(sawBeginMask);
+    EXPECT_TRUE(sawDrawMask);
+    EXPECT_TRUE(sawEndMask);
+    EXPECT_TRUE(sawEndLayer);
+}
+
+TEST(CommandBuilderTest, SkipsUsedAsMatteOnlyLayers) {
+    SceneState state;
+    EvaluatedLayer source;
+    source.id = EntityId{1};
+    source.usedAsMatteOnly = true;
+    source.shapeItems.push_back(MakeFillItem());
+    EvaluatedLayer target;
+    target.id = EntityId{2};
+    target.shapeItems.push_back(MakeFillItem());
+    target.trackMatteType = TrackMatteType::Alpha;
+    target.matteSourceId = EntityId{1};
+    state.layers.push_back(std::move(source));
+    state.layers.push_back(std::move(target));
+
+    auto commands = BuildCommands(state);
+    int beginLayerCount = 0;
+    int alphaMatteCount = 0;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginLayer) {
+            ++beginLayerCount;
+        }
+        if (command.type == DrawCommandType::BeginMask &&
+            command.maskApplyMode == MaskApplyMode::AlphaMatte) {
+            ++alphaMatteCount;
+        }
+    }
+    EXPECT_EQ(beginLayerCount, 1);
+    EXPECT_EQ(alphaMatteCount, 1);
+}
+
+TEST(CommandBuilderTest, TrackMatteReplaysSourceWithRelativeTransform) {
+    SceneState state;
+    EvaluatedLayer source;
+    source.id = EntityId{1};
+    source.usedAsMatteOnly = true;
+    source.worldTransform = Mat3::Translate(Vec2{10, 0});
+    source.shapeItems.push_back(MakeFillItem());
+    EvaluatedLayer target;
+    target.id = EntityId{2};
+    target.worldTransform = Mat3::Translate(Vec2{30, 0});
+    target.shapeItems.push_back(MakeFillItem());
+    target.trackMatteType = TrackMatteType::LumaInverted;
+    target.matteSourceId = EntityId{1};
+    state.layers.push_back(std::move(source));
+    state.layers.push_back(std::move(target));
+
+    auto commands = BuildCommands(state);
+    bool foundRelative = false;
+    for (size_t i = 0; i + 1 < commands.size(); ++i) {
+        if (commands[i].type == DrawCommandType::BeginMask &&
+            commands[i].maskApplyMode == MaskApplyMode::LumaMatteInverted) {
+            // BeginMask, Save, ConcatTransform(relative), DrawPath, Restore, EndMask
+            ASSERT_LT(i + 3, commands.size());
+            EXPECT_EQ(commands[i + 1].type, DrawCommandType::Save);
+            EXPECT_EQ(commands[i + 2].type, DrawCommandType::ConcatTransform);
+            EXPECT_EQ(commands[i + 2].transform, Mat3::Translate(Vec2{-20, 0}));
+            foundRelative = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundRelative);
 }

@@ -13,6 +13,7 @@
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
 #include "MotionStudio/model/TextContent.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
 #include "MotionStudio/serialization/Serializer.h"
 
@@ -86,10 +87,15 @@ std::unique_ptr<Document> BuildRichDocument() {
 
     motion::Mask mask;
     mask.mode = MaskMode::Subtract;
-    mask.path.vertices.push_back({{0, 0}, {}, {}});
-    mask.path.closed = true;
+    motion::BezierPath maskPath;
+    maskPath.vertices.push_back({{0, 0}, {}, {}});
+    maskPath.closed = true;
+    mask.path.setStaticValue(maskPath);
     mask.inverted = true;
+    mask.feather.setStaticValue(2.0f);
+    mask.expansion.setStaticValue(-1.0f);
     shapeLayer->masks.push_back(mask);
+    shapeLayer->trackMatteType = motion::TrackMatteType::Alpha;
 
     auto fillStyle = std::make_unique<FillStyle>();
     Keyframe<Color> styleColorKeyframe;

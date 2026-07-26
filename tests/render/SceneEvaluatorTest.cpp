@@ -2,12 +2,15 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -317,4 +320,84 @@ TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
     const auto &evaluated = quarter->layers[0];
     EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{25, 0}));
     EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{100, 50}));
+}
+
+TEST(SceneEvaluatorTest, EvaluatesMaskScalars) {
+    RectScene scene;
+    motion::Mask mask;
+    motion::BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{10, 0}, {}, {}});
+    path.vertices.push_back({{10, 10}, {}, {}});
+    mask.path.setStaticValue(path);
+    mask.mode = motion::MaskMode::Intersect;
+    mask.opacity.setStaticValue(0.5f);
+    mask.inverted = true;
+    mask.feather.setStaticValue(3.0f);
+    mask.expansion.setStaticValue(-2.0f);
+    scene.layer->masks.push_back(mask);
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers.size(), 1u);
+    ASSERT_EQ(result->layers[0].masks.size(), 1u);
+    const auto &evaluatedMask = result->layers[0].masks[0];
+    EXPECT_EQ(evaluatedMask.mode, motion::MaskMode::Intersect);
+    EXPECT_FLOAT_EQ(evaluatedMask.opacity, 0.5f);
+    EXPECT_TRUE(evaluatedMask.inverted);
+    EXPECT_FLOAT_EQ(evaluatedMask.feather, 3.0f);
+    EXPECT_FLOAT_EQ(evaluatedMask.expansion, -2.0f);
+    EXPECT_EQ(evaluatedMask.path.vertices.size(), 3u);
+}
+
+TEST(SceneEvaluatorTest, ResolvesTrackMatteAndMarksSource) {
+    RectScene scene;
+    Layer *matteLayer =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+    matteLayer->outPoint = 100;
+    auto *matteContent = static_cast<ShapeContent *>(matteLayer->content.get());
+    auto rectElement = std::make_unique<ShapeRect>();
+    rectElement->size.setStaticValue(Vec2{20, 20});
+    matteContent->geometry = std::move(rectElement);
+    auto fillElement = std::make_unique<FillStyle>();
+    fillElement->color.setStaticValue(Color{1, 1, 1, 1});
+    matteLayer->styles.push_back(std::move(fillElement));
+
+    scene.layer->trackMatteType = motion::TrackMatteType::Alpha;
+    scene.layer->trackMatteLayerId = matteLayer->id;
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers.size(), 2u);
+
+    const motion::EvaluatedLayer *target = nullptr;
+    const motion::EvaluatedLayer *source = nullptr;
+    for (const auto &layer : result->layers) {
+        if (layer.id == scene.layer->id) {
+            target = &layer;
+        }
+        if (layer.id == matteLayer->id) {
+            source = &layer;
+        }
+    }
+    ASSERT_NE(target, nullptr);
+    ASSERT_NE(source, nullptr);
+    EXPECT_EQ(target->trackMatteType, motion::TrackMatteType::Alpha);
+    EXPECT_EQ(target->matteSourceId, matteLayer->id);
+    EXPECT_FALSE(target->usedAsMatteOnly);
+    EXPECT_TRUE(source->usedAsMatteOnly);
+}
+
+TEST(SceneEvaluatorTest, SelfTrackMatteIsIgnored) {
+    RectScene scene;
+    scene.layer->trackMatteType = motion::TrackMatteType::Luma;
+    scene.layer->trackMatteLayerId = scene.layer->id;
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers.size(), 1u);
+    EXPECT_EQ(result->layers[0].trackMatteType, motion::TrackMatteType::None);
+    EXPECT_FALSE(result->layers[0].matteSourceId.isValid());
+    EXPECT_FALSE(result->layers[0].usedAsMatteOnly);
 }

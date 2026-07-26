@@ -6,6 +6,8 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/BlendMode.h"
+#include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/EvaluatedMask.h"
 #include "MotionStudio/render/EvaluatedShapeItem.h"
 
 namespace motion {
@@ -20,6 +22,12 @@ struct EvaluatedLayer {
     float opacity = 1;  // inherited from ancestors
     BlendMode blendMode = BlendMode::Normal;
     std::vector<EvaluatedShapeItem> shapeItems;
+    std::vector<EvaluatedMask> masks;
+    TrackMatteType trackMatteType = TrackMatteType::None;
+    EntityId matteSourceId;
+    // True when another evaluated layer uses this layer as its track matte;
+    // CommandBuilder skips normal compositing for these layers.
+    bool usedAsMatteOnly = false;
 };
 
 }  // namespace motion

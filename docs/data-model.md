@@ -128,6 +128,21 @@ public:
 
     BlendMode blendMode = BlendMode::Normal;
     std::vector<Mask> masks;
+    EntityId trackMatteLayerId;              // 无效 = 无 track matte
+    TrackMatteType trackMatteType = None;    // Alpha / AlphaInverted / Luma / LumaInverted
+};
+```
+
+**Mask**（图层路径遮罩，AE Masks 子集）：
+
+```cpp
+struct Mask {
+    Animatable<BezierPath> path;     // layer 局部，可动画
+    MaskMode mode = Add;             // Add / Subtract / Intersect
+    Animatable<float> opacity{1};
+    bool inverted = false;
+    Animatable<float> feather{0};    // 羽化半径 px
+    Animatable<float> expansion{0};  // 扩张/收缩 px（可负）
 };
 ```
 

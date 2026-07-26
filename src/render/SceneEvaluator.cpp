@@ -184,6 +184,23 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
     evaluated.opacity = opacity;
     evaluated.blendMode = layer.blendMode;
+    for (const Mask &mask : layer.masks) {
+        EvaluatedMask evaluatedMask;
+        evaluatedMask.path = mask.path.evaluatePreview(time);
+        evaluatedMask.mode = mask.mode;
+        evaluatedMask.opacity = mask.opacity.evaluatePreview(time);
+        evaluatedMask.inverted = mask.inverted;
+        evaluatedMask.feather = mask.feather.evaluatePreview(time);
+        evaluatedMask.expansion = mask.expansion.evaluatePreview(time);
+        evaluated.masks.push_back(std::move(evaluatedMask));
+    }
+    if (layer.trackMatteType != TrackMatteType::None && layer.trackMatteLayerId.isValid() &&
+        layer.trackMatteLayerId != layer.id) {
+        if (document.entityIndex().findLayer(layer.trackMatteLayerId) != nullptr) {
+            evaluated.trackMatteType = layer.trackMatteType;
+            evaluated.matteSourceId = layer.trackMatteLayerId;
+        }
+    }
     if (!layer.styles.empty()) {
         std::vector<ShapeGeometry> geometries;
         if (shapeContent.geometry) {
@@ -193,6 +210,23 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     }
     if (!evaluated.shapeItems.empty()) {
         out.push_back(std::move(evaluated));
+    }
+}
+
+void MarkMatteSources(std::vector<EvaluatedLayer> &layers) {
+    std::vector<EntityId> matteSourceIds;
+    for (const EvaluatedLayer &layer : layers) {
+        if (layer.trackMatteType != TrackMatteType::None && layer.matteSourceId.isValid()) {
+            matteSourceIds.push_back(layer.matteSourceId);
+        }
+    }
+    for (EvaluatedLayer &layer : layers) {
+        for (const EntityId &sourceId : matteSourceIds) {
+            if (layer.id == sourceId) {
+                layer.usedAsMatteOnly = true;
+                break;
+            }
+        }
     }
 }
 
@@ -229,6 +263,7 @@ Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document
                                     static_cast<float>(std::min(composition->width, composition->height)) * 0.5f);
     EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0,
                         state.layers);
+    MarkMatteSources(state.layers);
     return state;
 }
 

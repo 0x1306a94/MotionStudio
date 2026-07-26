@@ -200,6 +200,26 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             return resolveStyleProperty(layer->styles[static_cast<size_t>(first.index)].get(),
                                         segments[1].name);
         }
+        if (first.name == "masks" && first.index >= 0 && segments.size() == 2) {
+            if (first.index >= static_cast<int>(layer->masks.size())) {
+                return nullptr;
+            }
+            Mask &mask = layer->masks[static_cast<size_t>(first.index)];
+            const std::string &name = segments[1].name;
+            if (name == "path") {
+                return &mask.path;
+            }
+            if (name == "opacity") {
+                return &mask.opacity;
+            }
+            if (name == "feather") {
+                return &mask.feather;
+            }
+            if (name == "expansion") {
+                return &mask.expansion;
+            }
+            return nullptr;
+        }
         if (segments.size() == 1 && layer->content->type() == LayerType::Shape) {
             auto *shapeContent = static_cast<ShapeContent *>(layer->content.get());
             if (!shapeContent->geometry) {

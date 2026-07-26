@@ -63,6 +63,9 @@ enum class DrawCommandType {
     DrawPath,     // 填充
     StrokePath,   // 描边
     ClipPath,
+    BeginLayer, EndLayer,   // 离屏组（mask / track matte）
+    BeginMask, EndMask,     // coverage 记录与应用
+    DrawMaskPath,           // PathCoverage 内单条 mask
 };
 
 struct DrawCommand {

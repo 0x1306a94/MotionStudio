@@ -5,6 +5,7 @@
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -18,6 +19,7 @@ using motion::Document;
 using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
+using motion::Mask;
 using motion::ParsePropertyPath;
 using motion::PropertyPath;
 using motion::ResolveAnimatable;
@@ -117,6 +119,29 @@ TEST(ResolveAnimatableTest, ResolvesLayerStyleProperty) {
         ResolveAnimatable(scene.document, {scene.layer->id, "styles[1].width"});
     EXPECT_EQ(color, static_cast<AnimatableBase *>(&fillStyle->color));
     EXPECT_EQ(width, static_cast<AnimatableBase *>(&strokeStyle->width));
+}
+
+TEST(ResolveAnimatableTest, ResolvesMaskProperties) {
+    ShapeScene scene;
+    scene.layer->masks.emplace_back();
+    Mask &mask = scene.layer->masks.front();
+
+    AnimatableBase *path =
+        ResolveAnimatable(scene.document, {scene.layer->id, "masks[0].path"});
+    AnimatableBase *opacity =
+        ResolveAnimatable(scene.document, {scene.layer->id, "masks[0].opacity"});
+    AnimatableBase *feather =
+        ResolveAnimatable(scene.document, {scene.layer->id, "masks[0].feather"});
+    AnimatableBase *expansion =
+        ResolveAnimatable(scene.document, {scene.layer->id, "masks[0].expansion"});
+    EXPECT_EQ(path, static_cast<AnimatableBase *>(&mask.path));
+    EXPECT_EQ(opacity, static_cast<AnimatableBase *>(&mask.opacity));
+    EXPECT_EQ(feather, static_cast<AnimatableBase *>(&mask.feather));
+    EXPECT_EQ(expansion, static_cast<AnimatableBase *>(&mask.expansion));
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "masks[1].opacity"}),
+              nullptr);
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "masks[0].mode"}),
+              nullptr);
 }
 
 TEST(ResolveAnimatableTest, ResolvesTextContent) {

@@ -6,11 +6,13 @@
 
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/EvaluatedMask.h"
 #include "MotionStudio/render/SceneEvaluator.h"
-
 #include "MotionStudio/render/ShapeGeometry.h"
 
 #include "TgfxRenderAdapter.h"
@@ -20,7 +22,9 @@ using motion::BuildCommands;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::EntityId;
 using motion::EvaluatedLayer;
+using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
 using motion::FillStyle;
 using motion::Layer;
@@ -28,6 +32,8 @@ using motion::LayerType;
 using motion::LineCap;
 using motion::MakePathGeometry;
 using motion::MakeRectGeometry;
+using motion::MaskMode;
+using motion::Mat3;
 using motion::Paint;
 using motion::PlayCommands;
 using motion::SceneEvaluator;
@@ -35,6 +41,7 @@ using motion::SceneState;
 using motion::ShapeContent;
 using motion::ShapeRect;
 using motion::TgfxRenderAdapter;
+using motion::TrackMatteType;
 using motion::Vec2;
 
 namespace {
@@ -190,4 +197,129 @@ TEST(TgfxRenderAdapterTest, RendersDocumentPipelineEndToEnd) {
     EXPECT_NEAR(center.r, 255, 8);
     EXPECT_NEAR(center.g, 255, 8);
     EXPECT_NEAR(center.b, 0, 8);
+}
+
+TEST(TgfxRenderAdapterTest, PathMaskAddClipsLayerContent) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{80, 80});
+    item.paint = Paint{Color{1, 0, 0, 1}};
+    layer.shapeItems.push_back(item);
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Add;
+    // 20x20 rect centered at (50,50) in path form via MakeRectGeometry converted...
+    // Use an explicit closed path covering [40,60] x [40,60].
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{40, 40}, {}, {}});
+    path.vertices.push_back({{60, 40}, {}, {}});
+    path.vertices.push_back({{60, 60}, {}, {}});
+    path.vertices.push_back({{40, 60}, {}, {}});
+    mask.path = path;
+    layer.masks.push_back(mask);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel inside = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(inside.r, 255, 8);
+    const Pixel outside = PixelAt(pixels, 100, 20, 20);
+    EXPECT_NEAR(outside.r, 0, 8);
+}
+
+TEST(TgfxRenderAdapterTest, PathMaskFeatherSoftensEdge) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{80, 80});
+    item.paint = Paint{Color{1, 0, 0, 1}};
+    layer.shapeItems.push_back(item);
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Add;
+    mask.feather = 8.0f;
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{40, 40}, {}, {}});
+    path.vertices.push_back({{60, 40}, {}, {}});
+    path.vertices.push_back({{60, 60}, {}, {}});
+    path.vertices.push_back({{40, 60}, {}, {}});
+    mask.path = path;
+    layer.masks.push_back(mask);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel nearEdge = PixelAt(pixels, 100, 36, 50);
+    EXPECT_GT(nearEdge.r, 8);
+    EXPECT_LT(nearEdge.r, 250);
+}
+
+TEST(TgfxRenderAdapterTest, AlphaTrackMatteMasksTargetLayer) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+
+    EvaluatedLayer matte;
+    matte.id = EntityId{1};
+    matte.usedAsMatteOnly = true;
+    matte.worldTransform = Mat3::Identity();
+    EvaluatedShapeItem matteItem;
+    matteItem.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{20, 20});
+    matteItem.paint = Paint{Color{1, 1, 1, 1}};
+    matte.shapeItems.push_back(matteItem);
+
+    EvaluatedLayer target;
+    target.id = EntityId{2};
+    target.worldTransform = Mat3::Identity();
+    target.trackMatteType = TrackMatteType::Alpha;
+    target.matteSourceId = EntityId{1};
+    EvaluatedShapeItem targetItem;
+    targetItem.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{80, 80});
+    targetItem.paint = Paint{Color{0, 0, 1, 1}};
+    target.shapeItems.push_back(targetItem);
+
+    state.layers.push_back(std::move(matte));
+    state.layers.push_back(std::move(target));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel inside = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(inside.b, 255, 8);
+    const Pixel outside = PixelAt(pixels, 100, 20, 20);
+    EXPECT_NEAR(outside.b, 0, 8);
 }

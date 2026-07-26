@@ -13,6 +13,7 @@
 #include "MotionStudio/model/LayerContent.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/model/Transform.h"
 
 namespace motion {
@@ -20,10 +21,12 @@ namespace motion {
 class Document;
 
 struct Mask {
-    BezierPath path;
+    Animatable<BezierPath> path;
     MaskMode mode = MaskMode::Add;
     Animatable<float> opacity{1.0f};
     bool inverted = false;
+    Animatable<float> feather{0.0f};
+    Animatable<float> expansion{0.0f};
 };
 
 class Layer {
@@ -68,6 +71,8 @@ class Layer {
 
     BlendMode blendMode = BlendMode::Normal;
     std::vector<Mask> masks;
+    EntityId trackMatteLayerId;
+    TrackMatteType trackMatteType = TrackMatteType::None;
     std::vector<std::unique_ptr<LayerStyle>> styles;
 
   private:

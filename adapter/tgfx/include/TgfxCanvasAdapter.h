@@ -8,6 +8,7 @@
 
 namespace tgfx {
 class AutoCanvasRestore;
+class Canvas;
 class Device;
 class Surface;
 }  // namespace tgfx
@@ -15,6 +16,7 @@ class Surface;
 namespace motion {
 
 struct TgfxPathCache;
+struct TgfxIsolationStack;
 
 struct TgfxEndFrameProfile {
     double canvasRestoreMs = 0;
@@ -53,6 +55,12 @@ class TgfxCanvasAdapter : public RenderAdapter {
     void strokePath(const ShapeGeometry &geometry, const Paint &paint,
                     const StrokeOptions &options) override;
     void clipPath(const ShapeGeometry &geometry, FillRule rule) override;
+    void beginLayer() override;
+    void endLayer() override;
+    void beginMask(MaskApplyMode mode) override;
+    void endMask() override;
+    void drawMaskPath(const ShapeGeometry &geometry, MaskMode mode, float opacity, bool inverted,
+                      float feather, float expansion) override;
 
   protected:
     TgfxCanvasAdapter();
@@ -82,6 +90,8 @@ class TgfxCanvasAdapter : public RenderAdapter {
     TgfxEndFrameProfile endFrameProfile_;
 
   private:
+    tgfx::Canvas *drawingCanvas();
+
     float opacity_ = 1;
     BlendMode blendMode_ = BlendMode::Normal;
     std::vector<float> opacityStack_;
@@ -91,6 +101,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // Declared after surface_ so destruction still has a live canvas.
     std::unique_ptr<tgfx::AutoCanvasRestore> frameRestore_;
     std::unique_ptr<TgfxPathCache> pathCache_;
+    std::unique_ptr<TgfxIsolationStack> isolationStack_;
 };
 
 }  // namespace motion

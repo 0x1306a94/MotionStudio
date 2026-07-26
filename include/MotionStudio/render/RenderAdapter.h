@@ -4,7 +4,9 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/DrawCommand.h"
+#include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/PreviewBackdrop.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -60,6 +62,25 @@ class RenderAdapter {
     // geometry: clip shape.
     // rule: fill rule used to interpret path geometry.
     virtual void clipPath(const ShapeGeometry &geometry, FillRule rule) = 0;
+
+    // Begins an offscreen layer for content that will be masked.
+    virtual void beginLayer() = 0;
+
+    // Ends the offscreen layer and composites it with accumulated coverage.
+    virtual void endLayer() = 0;
+
+    // Begins recording coverage for the current offscreen layer.
+    // mode: how EndMask should interpret the recorded coverage.
+    virtual void beginMask(MaskApplyMode mode) = 0;
+
+    // Ends coverage recording and applies it to the current offscreen layer.
+    virtual void endMask() = 0;
+
+    // Adds one path mask contribution while inside BeginMask(PathCoverage).
+    // geometry: mask path in the current transform space.
+    // mode / opacity / inverted / feather / expansion: AE mask parameters.
+    virtual void drawMaskPath(const ShapeGeometry &geometry, MaskMode mode, float opacity,
+                              bool inverted, float feather, float expansion) = 0;
 
     // Sets live-preview chrome behind the composition. Default is a no-op;
     // on-screen adapters override this. Offscreen adapters ignore it.

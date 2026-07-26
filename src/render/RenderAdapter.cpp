@@ -37,6 +37,28 @@ void PlayCommands(const DrawCommandList &commands, RenderAdapter &adapter) {
                 adapter.clipPath(command.geometry, command.fillRule);
                 break;
             }
+            case DrawCommandType::BeginLayer: {
+                adapter.beginLayer();
+                break;
+            }
+            case DrawCommandType::EndLayer: {
+                adapter.endLayer();
+                break;
+            }
+            case DrawCommandType::BeginMask: {
+                adapter.beginMask(command.maskApplyMode);
+                break;
+            }
+            case DrawCommandType::EndMask: {
+                adapter.endMask();
+                break;
+            }
+            case DrawCommandType::DrawMaskPath: {
+                adapter.drawMaskPath(command.geometry, command.maskMode, command.maskOpacity,
+                                     command.maskInverted, command.maskFeather,
+                                     command.maskExpansion);
+                break;
+            }
         }
     }
 }

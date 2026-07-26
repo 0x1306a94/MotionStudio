@@ -314,6 +314,46 @@ Expected<MaskMode, std::string> maskModeFromString(const std::string &text) {
     return Unexpected(std::string("unknown mask mode: " + text));
 }
 
+const char *ToString(TrackMatteType type) {
+    switch (type) {
+        case TrackMatteType::None: {
+            return "none";
+        }
+        case TrackMatteType::Alpha: {
+            return "alpha";
+        }
+        case TrackMatteType::AlphaInverted: {
+            return "alphaInverted";
+        }
+        case TrackMatteType::Luma: {
+            return "luma";
+        }
+        case TrackMatteType::LumaInverted: {
+            return "lumaInverted";
+        }
+    }
+    return "unknown";
+}
+
+Expected<TrackMatteType, std::string> trackMatteTypeFromString(const std::string &text) {
+    if (text == "none") {
+        return TrackMatteType::None;
+    }
+    if (text == "alpha") {
+        return TrackMatteType::Alpha;
+    }
+    if (text == "alphaInverted") {
+        return TrackMatteType::AlphaInverted;
+    }
+    if (text == "luma") {
+        return TrackMatteType::Luma;
+    }
+    if (text == "lumaInverted") {
+        return TrackMatteType::LumaInverted;
+    }
+    return Unexpected(std::string("unknown track matte type: " + text));
+}
+
 const char *ToString(AssetType type) {
     return type == AssetType::Image ? "image" : "font";
 }
