@@ -5,6 +5,7 @@
 //  Track matte type + source layer picker for the selected layer.
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 struct TrackMatteInspector: View {
@@ -23,7 +24,7 @@ struct TrackMatteInspector: View {
             .foregroundStyle(.secondary)
         HStack(spacing: 8) {
             Picker("Type", selection: typeBinding) {
-                ForEach(TrackMatteTypeTag.allCases) { matteType in
+                ForEach(MS_TRACK_MATTE.allCases) { matteType in
                     Text(matteType.label).tag(matteType)
                 }
             }
@@ -41,26 +42,26 @@ struct TrackMatteInspector: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .disabled(!isEditable || type == .none)
+            .disabled(!isEditable || type == .NONE)
             .id("track-matte-source-\(sourceID)-\(core.revision)")
         }
     }
 
-    private var currentType: TrackMatteTypeTag {
-        TrackMatteTypeTag(rawValue: core.trackMatteType(layerID: layerID)) ?? .none
+    private var currentType: MS_TRACK_MATTE {
+        core.trackMatteType(layerID: layerID)
     }
 
     private var candidateSourceIDs: [UInt64] {
         core.layerIDs(compositionID: compositionID).filter { $0 != layerID }
     }
 
-    private var typeBinding: Binding<TrackMatteTypeTag> {
+    private var typeBinding: Binding<MS_TRACK_MATTE> {
         Binding {
             currentType
         } set: { newValue in
             guard isEditable else { return }
             let existingSource = core.trackMatteLayerID(layerID: layerID)
-            let sourceID: UInt64 = if newValue == .none {
+            let sourceID: UInt64 = if newValue == .NONE {
                 0
             } else if existingSource != 0 {
                 existingSource
@@ -68,7 +69,7 @@ struct TrackMatteInspector: View {
                 candidateSourceIDs.first ?? 0
             }
             perform("Set Track Matte") {
-                core.setTrackMatte(layerID: layerID, matteLayerID: sourceID, type: newValue.rawValue)
+                core.setTrackMatte(layerID: layerID, matteLayerID: sourceID, type: newValue)
             }
         }
     }
@@ -78,12 +79,10 @@ struct TrackMatteInspector: View {
             core.trackMatteLayerID(layerID: layerID)
         } set: { newValue in
             guard isEditable else { return }
-            let type = currentType == .none ? TrackMatteTypeTag.alpha : currentType
-            let resolvedType = newValue == 0 ? TrackMatteTypeTag.none : type
+            let type = currentType == .NONE ? .ALPHA : currentType
+            let resolvedType = newValue == 0 ? .NONE : type
             perform("Set Track Matte") {
-                core.setTrackMatte(layerID: layerID,
-                                   matteLayerID: newValue,
-                                   type: resolvedType.rawValue)
+                core.setTrackMatte(layerID: layerID, matteLayerID: newValue, type: resolvedType)
             }
         }
     }

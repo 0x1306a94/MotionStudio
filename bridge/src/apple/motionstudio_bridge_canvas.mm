@@ -44,11 +44,11 @@ void ms_canvas_destroy(MSCanvas *canvas) {
     delete canvas;
 }
 
-void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop) {
+void ms_canvas_set_preview_backdrop(MSCanvas *canvas, MS_PREVIEWER_BACKDROP backdrop) {
     if (canvas == nullptr || canvas->adapter == nullptr) {
         return;
     }
-    const auto mode = backdrop == 1 ? motion::PreviewBackdrop::Transparent : motion::PreviewBackdrop::Black;
+    const auto mode = backdrop == MS_PREVIEWER_BACKDROP_TRANSPARENT ? motion::PreviewBackdrop::Transparent : motion::PreviewBackdrop::Black;
     canvas->adapter->setPreviewBackdrop(mode);
 }
 
@@ -81,8 +81,7 @@ void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compo
 }
 
 void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame, MSCanvasFrameProfile *profileOut) {
-    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId,
-                                          static_cast<double>(frame), profileOut);
+    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId, static_cast<double>(frame), profileOut);
 }
 
 void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, MSCanvasFrameProfile *profileOut) {

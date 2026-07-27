@@ -5,6 +5,7 @@
 //  Fill style list editor for shape layers.
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 /// One row per fill (color with keyframe toggle, blend mode, delete) plus an
@@ -37,12 +38,11 @@ struct FillsInspector: View {
             let hasKeyframe = hasKeyframe(styleIndex: styleIndex)
             HStack(spacing: 8) {
                 ColorPicker("Fill \(position + 1)",
-                            selection: colorBinding(styleIndex: styleIndex,
-                                                    hasKeyframe: hasKeyframe),
+                            selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasKeyframe),
                             supportsOpacity: true)
                     .font(.callout)
                 Picker("", selection: blendBinding(styleIndex: styleIndex)) {
-                    ForEach(FillBlendMode.allCases) { mode in
+                    ForEach(MS_BLEND.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
@@ -69,7 +69,7 @@ struct FillsInspector: View {
 
     private func fillIndices() -> [Int] {
         (0 ..< core.styleCount(layerID: layerID)).filter { index in
-            core.styleType(layerID: layerID, index: index) == MS_STYLE_FILL
+            core.styleType(layerID: layerID, index: index) == .FILL
         }
     }
 
@@ -92,8 +92,7 @@ struct FillsInspector: View {
             let value = MotionColor(newValue).clampedChannels()
             perform("Set Fill Color") {
                 if hasKeyframe {
-                    core.addKeyframeColor(entityID: layerID, path: path,
-                                          frame: playheadFrame, value: value)
+                    core.addKeyframeColor(entityID: layerID, path: path, frame: playheadFrame, value: value)
                 } else {
                     core.setStaticColor(entityID: layerID, path: path, value: value)
                 }
@@ -102,14 +101,14 @@ struct FillsInspector: View {
         }
     }
 
-    private func blendBinding(styleIndex: Int) -> Binding<FillBlendMode> {
+    private func blendBinding(styleIndex: Int) -> Binding<MS_BLEND> {
         Binding {
-            FillBlendMode(rawValue: core.styleBlendMode(layerID: layerID, index: styleIndex)) ?? .normal
+            let mode = core.styleBlendMode(layerID: layerID, index: styleIndex)
+            return mode == .INVALID ? .NORMAL : mode
         } set: { newValue in
             guard isEditable else { return }
             perform("Set Fill Blend Mode") {
-                core.setStyleBlendMode(layerID: layerID, index: styleIndex,
-                                       blendMode: newValue.rawValue)
+                core.setStyleBlendMode(layerID: layerID, index: styleIndex, blendMode: newValue)
             }
         }
     }
@@ -124,8 +123,7 @@ struct FillsInspector: View {
         } else {
             let value = core.evaluateColor(entityID: layerID, path: path, frame: playheadFrame)
             perform("Add Keyframe") {
-                core.addKeyframeColor(entityID: layerID, path: path,
-                                      frame: playheadFrame, value: value)
+                core.addKeyframeColor(entityID: layerID, path: path, frame: playheadFrame, value: value)
             }
         }
     }

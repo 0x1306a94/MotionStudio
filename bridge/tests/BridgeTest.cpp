@@ -159,7 +159,7 @@ TEST(BridgeCommandTest, FillStyleLifecycle) {
     ASSERT_EQ(ms_layer_style_count(document, layerId), 1);
     EXPECT_EQ(ms_layer_style_type_at(document, layerId, 0), MS_STYLE_FILL);
     EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 0), MS_BLEND_NORMAL);
-    EXPECT_EQ(ms_layer_style_type_at(document, layerId, 5), -1);
+    EXPECT_EQ(ms_layer_style_type_at(document, layerId, 5), MS_STYLE_INVALID);
 
     ms_command_add_fill_style(document, layerId);
     EXPECT_EQ(ms_layer_style_count(document, layerId), 2);
@@ -171,7 +171,7 @@ TEST(BridgeCommandTest, FillStyleLifecycle) {
     EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_OVERLAY);
 
     // Out-of-range blend tags fall back to Normal.
-    ms_command_set_style_blend_mode(document, layerId, 1, 99);
+    ms_command_set_style_blend_mode(document, layerId, 1, static_cast<MS_BLEND>(99));
     EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_NORMAL);
 
     ms_command_set_style_blend_mode(document, layerId, 1, MS_BLEND_SCREEN);
@@ -388,7 +388,7 @@ TEST(BridgeCommandTest, KeyframeLifecycle) {
     float inY = 0;
     float outX = 0;
     float outY = 0;
-    const int easingType = ms_property_keyframe_easing_at(
+    const MS_EASING easingType = ms_property_keyframe_easing_at(
         document, layerId, "transform.rotation", 0, &inX, &inY, &outX, &outY);
     EXPECT_EQ(easingType, MS_EASING_CUBIC_BEZIER);
     EXPECT_FLOAT_EQ(inX, 0.42f);
@@ -416,7 +416,7 @@ TEST(BridgeCommandTest, MissingPropertyIsSafe) {
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
     const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
 
-    EXPECT_EQ(ms_property_type(document, layerId, "no.such.property"), -1);
+    EXPECT_EQ(ms_property_type(document, layerId, "no.such.property"), MS_VALUE_INVALID);
     EXPECT_FLOAT_EQ(ms_property_static_float(document, layerId, "no.such.property"), 0.0f);
     EXPECT_EQ(ms_property_keyframe_count(document, layerId, "no.such.property"), 0);
     EXPECT_FALSE(ms_property_is_animated(document, layerId, "no.such.property"));
@@ -472,7 +472,7 @@ TEST(BridgeTest, NullHandlesAreSafe) {
     ms_command_add_keyframe_float(nullptr, 0, "transform.position", 0, 0.0f);
     ms_command_add_stroke_style(nullptr, 0);
     ms_command_set_stroke_position(nullptr, 0, 0, MS_STROKE_POSITION_INSIDE);
-    EXPECT_EQ(ms_layer_style_stroke_position_at(nullptr, 0, 0), -1);
+    EXPECT_EQ(ms_layer_style_stroke_position_at(nullptr, 0, 0), MS_STROKE_POSITION_INVALID);
 }
 
 TEST(BridgeCommandTest, StrokeStyleLifecycle) {
@@ -487,14 +487,14 @@ TEST(BridgeCommandTest, StrokeStyleLifecycle) {
     EXPECT_EQ(ms_layer_style_type_at(document, layerId, 1), MS_STYLE_STROKE);
     EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
               MS_STROKE_POSITION_CENTER);
-    // Position query on a fill reports -1.
-    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 0), -1);
+    // Position query on a fill reports invalid.
+    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 0), MS_STROKE_POSITION_INVALID);
 
     ms_command_set_stroke_position(document, layerId, 1, MS_STROKE_POSITION_INSIDE);
     EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
               MS_STROKE_POSITION_INSIDE);
     // Out-of-range position tags fall back to Center.
-    ms_command_set_stroke_position(document, layerId, 1, 99);
+    ms_command_set_stroke_position(document, layerId, 1, static_cast<MS_STROKE_POSITION>(99));
     EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
               MS_STROKE_POSITION_CENTER);
 

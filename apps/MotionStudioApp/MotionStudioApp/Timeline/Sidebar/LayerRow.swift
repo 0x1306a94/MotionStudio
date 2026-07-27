@@ -3,6 +3,7 @@
 //  MotionStudioApp
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 struct LayerRow: View {
@@ -81,15 +82,15 @@ struct LayerRow: View {
         }
     }
 
-    private func layerSymbol(_ type: Int32) -> String {
+    private func layerSymbol(_ type: MS_LAYER) -> String {
         switch type {
-        case 1:
+        case .IMAGE:
             "photo"
-        case 2:
+        case .TEXT:
             "textformat"
-        case 3:
+        case .GROUP:
             "circle.dashed"
-        case 4:
+        case .PRECOMP:
             "film"
         default:
             "square"

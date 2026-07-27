@@ -5,6 +5,7 @@
 //  Stroke style list editor for shape layers.
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 /// One card per stroke: color/blend/position row plus width and trim rows,
@@ -38,12 +39,11 @@ struct StrokesInspector: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     ColorPicker("Stroke \(position + 1)",
-                                selection: colorBinding(styleIndex: styleIndex,
-                                                        hasKeyframe: hasColorKeyframe),
+                                selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe),
                                 supportsOpacity: true)
                         .font(.callout)
                     Picker("", selection: blendBinding(styleIndex: styleIndex)) {
-                        ForEach(FillBlendMode.allCases) { mode in
+                        ForEach(MS_BLEND.allCases) { mode in
                             Text(mode.label).tag(mode)
                         }
                     }
@@ -69,7 +69,7 @@ struct StrokesInspector: View {
                         .font(.callout)
                         .frame(width: 78, alignment: .leading)
                     Picker("", selection: positionBinding(styleIndex: styleIndex)) {
-                        ForEach(StrokePositionTag.allCases) { tag in
+                        ForEach(MS_STROKE_POSITION.allCases) { tag in
                             Text(tag.label).tag(tag)
                         }
                     }
@@ -87,7 +87,7 @@ struct StrokesInspector: View {
 
     private func strokeIndices() -> [Int] {
         (0 ..< core.styleCount(layerID: layerID)).filter { index in
-            core.styleType(layerID: layerID, index: index) == MS_STYLE_STROKE
+            core.styleType(layerID: layerID, index: index) == .STROKE
         }
     }
 
@@ -106,16 +106,14 @@ struct StrokesInspector: View {
         let hasKeyframe = core.keyframeFrames(entityID: layerID, path: path)
             .contains(playheadFrame)
         return NumberPropertyRow(label: label,
-                                 value: core.evaluateFloat(entityID: layerID, path: path,
-                                                           frame: playheadFrame),
+                                 value: core.evaluateFloat(entityID: layerID, path: path, frame: playheadFrame),
                                  hasKeyframeAtPlayhead: hasKeyframe,
                                  isEditable: isEditable)
         { newValue in
             guard isEditable else { return }
             perform("Set Stroke \(label)") {
                 if hasKeyframe {
-                    core.addKeyframeFloat(entityID: layerID, path: path,
-                                          frame: playheadFrame, value: newValue)
+                    core.addKeyframeFloat(entityID: layerID, path: path, frame: playheadFrame, value: newValue)
                 } else {
                     core.setStaticFloat(entityID: layerID, path: path, value: newValue)
                 }
@@ -129,8 +127,7 @@ struct StrokesInspector: View {
                 }
             } else {
                 perform("Add Keyframe") {
-                    core.addKeyframeFloat(entityID: layerID, path: path,
-                                          frame: playheadFrame, value: value)
+                    core.addKeyframeFloat(entityID: layerID, path: path, frame: playheadFrame, value: value)
                 }
             }
         }
@@ -138,17 +135,14 @@ struct StrokesInspector: View {
 
     private func colorBinding(styleIndex: Int, hasKeyframe: Bool) -> Binding<Color> {
         Binding {
-            core.evaluateColor(entityID: layerID,
-                               path: stylePath(styleIndex: styleIndex, property: "color"),
-                               frame: playheadFrame).swiftUIColor
+            core.evaluateColor(entityID: layerID, path: stylePath(styleIndex: styleIndex, property: "color"), frame: playheadFrame).swiftUIColor
         } set: { newValue in
             guard isEditable else { return }
             let path = stylePath(styleIndex: styleIndex, property: "color")
             let value = MotionColor(newValue).clampedChannels()
             perform("Set Stroke Color") {
                 if hasKeyframe {
-                    core.addKeyframeColor(entityID: layerID, path: path,
-                                          frame: playheadFrame, value: value)
+                    core.addKeyframeColor(entityID: layerID, path: path, frame: playheadFrame, value: value)
                 } else {
                     core.setStaticColor(entityID: layerID, path: path, value: value)
                 }
@@ -157,26 +151,26 @@ struct StrokesInspector: View {
         }
     }
 
-    private func blendBinding(styleIndex: Int) -> Binding<FillBlendMode> {
+    private func blendBinding(styleIndex: Int) -> Binding<MS_BLEND> {
         Binding {
-            FillBlendMode(rawValue: core.styleBlendMode(layerID: layerID, index: styleIndex)) ?? .normal
+            let mode = core.styleBlendMode(layerID: layerID, index: styleIndex)
+            return mode == .INVALID ? .NORMAL : mode
         } set: { newValue in
             guard isEditable else { return }
             perform("Set Stroke Blend Mode") {
-                core.setStyleBlendMode(layerID: layerID, index: styleIndex,
-                                       blendMode: newValue.rawValue)
+                core.setStyleBlendMode(layerID: layerID, index: styleIndex, blendMode: newValue)
             }
         }
     }
 
-    private func positionBinding(styleIndex: Int) -> Binding<StrokePositionTag> {
+    private func positionBinding(styleIndex: Int) -> Binding<MS_STROKE_POSITION> {
         Binding {
-            StrokePositionTag(rawValue: core.strokePosition(layerID: layerID, index: styleIndex)) ?? .center
+            let position = core.strokePosition(layerID: layerID, index: styleIndex)
+            return position == .INVALID ? .CENTER : position
         } set: { newValue in
             guard isEditable else { return }
             perform("Set Stroke Position") {
-                core.setStrokePosition(layerID: layerID, index: styleIndex,
-                                       position: newValue.rawValue)
+                core.setStrokePosition(layerID: layerID, index: styleIndex, position: newValue)
             }
         }
     }
@@ -191,8 +185,7 @@ struct StrokesInspector: View {
         } else {
             let value = core.evaluateColor(entityID: layerID, path: path, frame: playheadFrame)
             perform("Add Keyframe") {
-                core.addKeyframeColor(entityID: layerID, path: path,
-                                      frame: playheadFrame, value: value)
+                core.addKeyframeColor(entityID: layerID, path: path, frame: playheadFrame, value: value)
             }
         }
     }

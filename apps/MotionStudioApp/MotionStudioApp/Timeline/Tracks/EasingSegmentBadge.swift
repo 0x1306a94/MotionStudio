@@ -3,6 +3,7 @@
 //  MotionStudioApp
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 struct EasingSegmentBadge: View {
@@ -10,7 +11,7 @@ struct EasingSegmentBadge: View {
     let isSelected: Bool
 
     var body: some View {
-        Image(systemName: easing.kind == .hold ? "pause.fill" : "point.topleft.down.curvedto.point.bottomright.up")
+        Image(systemName: easing.kind == .HOLD ? "pause.fill" : "point.topleft.down.curvedto.point.bottomright.up")
             .font(.system(size: 9, weight: .semibold))
             .foregroundStyle(isSelected ? .white : Color.secondary.opacity(0.7))
             .frame(width: 18, height: 16)

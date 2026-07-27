@@ -7,6 +7,7 @@
 
 import CoreGraphics
 import Foundation
+import MotionStudioBridging
 
 struct SelectionHandlesSnapshot {
     var valid = false
@@ -77,69 +78,5 @@ struct SelectionHandlesSnapshot {
         yValues.2 = Float(points[2].y)
         xValues.3 = Float(points[3].x)
         yValues.3 = Float(points[3].y)
-    }
-}
-
-enum SelectionHandleHit: Int32 {
-    case none = 0
-    case anchor = 1
-    case scaleCorner0 = 2
-    case scaleCorner1 = 3
-    case scaleCorner2 = 4
-    case scaleCorner3 = 5
-    case scaleEdge0 = 6
-    case scaleEdge1 = 7
-    case scaleEdge2 = 8
-    case scaleEdge3 = 9
-    case rotate0 = 10
-    case rotate1 = 11
-    case rotate2 = 12
-    case rotate3 = 13
-
-    var isScaleCorner: Bool {
-        switch self {
-        case .scaleCorner0, .scaleCorner1, .scaleCorner2, .scaleCorner3:
-            true
-        default:
-            false
-        }
-    }
-
-    var isScaleEdge: Bool {
-        switch self {
-        case .scaleEdge0, .scaleEdge1, .scaleEdge2, .scaleEdge3:
-            true
-        default:
-            false
-        }
-    }
-
-    var isRotate: Bool {
-        switch self {
-        case .rotate0, .rotate1, .rotate2, .rotate3:
-            true
-        default:
-            false
-        }
-    }
-
-    var cornerIndex: Int? {
-        switch self {
-        case .scaleCorner0: 0
-        case .scaleCorner1: 1
-        case .scaleCorner2: 2
-        case .scaleCorner3: 3
-        default: nil
-        }
-    }
-
-    var edgeIndex: Int? {
-        switch self {
-        case .scaleEdge0: 0
-        case .scaleEdge1: 1
-        case .scaleEdge2: 2
-        case .scaleEdge3: 3
-        default: nil
-        }
     }
 }

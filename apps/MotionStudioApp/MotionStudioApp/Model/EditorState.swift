@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import MotionStudioBridging
 import Observation
 
 struct TimelinePropertySelection: Equatable {
@@ -18,47 +19,6 @@ struct TimelineSegmentSelection: Equatable {
     let path: String
     let startFrame: Int64
     let endFrame: Int64
-}
-
-enum PreviewBackdrop: Int32 {
-    case black = 0
-    case transparent = 1
-
-    var next: PreviewBackdrop {
-        switch self {
-        case .black:
-            .transparent
-        case .transparent:
-            .black
-        }
-    }
-
-    var accessibilityLabel: String {
-        switch self {
-        case .black:
-            "Switch Preview Backdrop to Transparent"
-        case .transparent:
-            "Switch Preview Backdrop to Black"
-        }
-    }
-
-    var helpText: String {
-        switch self {
-        case .black:
-            "Preview backdrop: black"
-        case .transparent:
-            "Preview backdrop: transparent"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .black:
-            "square.fill"
-        case .transparent:
-            "square.grid.2x2"
-        }
-    }
 }
 
 /// Transient editor state that is not part of the document model.
@@ -90,7 +50,7 @@ final class EditorState {
 
     var isPlaying = false
 
-    var previewBackdrop: PreviewBackdrop = .transparent
+    var previewBackdrop: MS_PREVIEWER_BACKDROP = .TRANSPARENT
 
     var timelinePointsPerFrame: Double = 6
 

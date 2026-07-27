@@ -13,6 +13,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(__APPLE__)
+
+#include <CoreFoundation/CFAvailability.h>
+
+#else
+
+// Match Apple's CF_CLOSED_ENUM fallback when fixed enums are unavailable:
+//   typedef CF_CLOSED_ENUM(int, Name) { ... };
+// → typedef int Name; enum { ... };
+#define CF_CLOSED_ENUM(_type, _name) \
+    _type _name;                     \
+    enum
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,7 +52,8 @@ typedef struct MSCanvasFrameProfile {
 } MSCanvasFrameProfile;
 
 // Layer content type tag, mirrors motion::LayerType.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_LAYER) {
+    MS_LAYER_INVALID = -1,
     MS_LAYER_SHAPE = 0,
     MS_LAYER_IMAGE = 1,
     MS_LAYER_TEXT = 2,
@@ -47,20 +62,22 @@ enum {
 };
 
 // Layer style type tag, mirrors motion::LayerStyleType.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_STYLE) {
+    MS_STYLE_INVALID = -1,
     MS_STYLE_FILL = 0,
     MS_STYLE_STROKE = 1,
 };
 
 // Path mask mode tag, mirrors motion::MaskMode.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_MASK) {
+    MS_MASK_INVALID = -1,
     MS_MASK_ADD = 0,
     MS_MASK_SUBTRACT = 1,
     MS_MASK_INTERSECT = 2,
 };
 
 // Track matte type tag, mirrors motion::TrackMatteType.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_TRACK_MATTE) {
     MS_TRACK_MATTE_NONE = 0,
     MS_TRACK_MATTE_ALPHA = 1,
     MS_TRACK_MATTE_ALPHA_INVERTED = 2,
@@ -69,14 +86,16 @@ enum {
 };
 
 // Stroke position tag, mirrors motion::StrokePosition.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_STROKE_POSITION) {
+    MS_STROKE_POSITION_INVALID = -1,
     MS_STROKE_POSITION_CENTER = 0,
     MS_STROKE_POSITION_INSIDE = 1,
     MS_STROKE_POSITION_OUTSIDE = 2,
 };
 
 // Blend mode tag, mirrors motion::BlendMode ordinals (Lottie "bm" value set).
-enum {
+typedef CF_CLOSED_ENUM(int, MS_BLEND) {
+    MS_BLEND_INVALID = -1,
     MS_BLEND_NORMAL = 0,
     MS_BLEND_MULTIPLY = 1,
     MS_BLEND_SCREEN = 2,
@@ -97,7 +116,8 @@ enum {
 };
 
 // Animatable value type tag, mirrors motion::AnimatableType.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_VALUE) {
+    MS_VALUE_INVALID = -1,
     MS_VALUE_FLOAT = 0,
     MS_VALUE_VEC2 = 1,
     MS_VALUE_COLOR = 2,
@@ -106,7 +126,8 @@ enum {
 };
 
 // Easing type tag, mirrors motion::EasingType.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_EASING) {
+    MS_EASING_INVALID = -1,
     MS_EASING_LINEAR = 0,
     MS_EASING_HOLD = 1,
     MS_EASING_EASE = 2,
@@ -116,9 +137,9 @@ enum {
     MS_EASING_CUBIC_BEZIER = 6,
 };
 
-enum {
-    MS_PREVIWER_BACKDROP_BLACK = 0,
-    MS_PREVIWER_BACKDROP_TRANSPARENT = 1,
+typedef CF_CLOSED_ENUM(int, MS_PREVIEWER_BACKDROP) {
+    MS_PREVIEWER_BACKDROP_BLACK = 0,
+    MS_PREVIEWER_BACKDROP_TRANSPARENT = 1,
 };
 
 /* ============================ lifecycle ============================ */
@@ -210,7 +231,7 @@ bool ms_composition_selection_handles(MSDocument *document, uint64_t composition
 
 // Hit-tests selection chrome. Returns MS_SELECTION_HANDLE_* (0 = none).
 // Radii are scene units.
-enum {
+typedef CF_CLOSED_ENUM(int, MS_SELECTION_HANDLE) {
     MS_SELECTION_HANDLE_NONE = 0,
     MS_SELECTION_HANDLE_ANCHOR = 1,
     MS_SELECTION_HANDLE_SCALE_CORNER0 = 2,
@@ -226,8 +247,8 @@ enum {
     MS_SELECTION_HANDLE_ROTATE2 = 12,
     MS_SELECTION_HANDLE_ROTATE3 = 13,
 };
-int ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, float y,
-                                  float handleHitRadius, float rotateInner, float rotateOuter);
+MS_SELECTION_HANDLE ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, float y,
+                                                  float handleHitRadius, float rotateInner, float rotateOuter);
 
 // Composition name (malloc'd).
 char *ms_composition_name(MSDocument *document, uint64_t compositionId);
@@ -241,7 +262,7 @@ uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index)
 // Layer name (malloc'd).
 char *ms_layer_name(MSDocument *document, uint64_t layerId);
 // Layer type tag (MS_LAYER_*), -1 when the layer does not exist.
-int ms_layer_type(MSDocument *document, uint64_t layerId);
+MS_LAYER ms_layer_type(MSDocument *document, uint64_t layerId);
 int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId);
 int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId);
 // Parent layer ID, 0 when the layer has no parent or does not exist.
@@ -253,31 +274,32 @@ bool ms_layer_locked(MSDocument *document, uint64_t layerId);
 
 // Number of styles (fills/strokes) on the layer; 0 when the layer does not exist.
 int ms_layer_style_count(MSDocument *document, uint64_t layerId);
-// Style type tag (MS_STYLE_*) at index, -1 when out of range.
-int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index);
-// Blend mode tag (MS_BLEND_*) of the fill at index, -1 when out of range or
-// the style is not a fill.
-int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
+// Style type tag (MS_STYLE_*) at index, MS_STYLE_INVALID when out of range.
+MS_STYLE ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index);
+// Blend mode tag (MS_BLEND_*) of the style at index; MS_BLEND_INVALID when
+// out of range.
+MS_BLEND ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
 
 // Path masks on a layer.
 int ms_layer_mask_count(MSDocument *document, uint64_t layerId);
-// Mask mode tag (MS_MASK_*) at index, -1 when out of range.
-int ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index);
+// Mask mode tag (MS_MASK_*) at index, MS_MASK_INVALID when out of range.
+MS_MASK ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index);
 bool ms_layer_mask_inverted_at(MSDocument *document, uint64_t layerId, int index);
 
 // Track matte on a layer. type is MS_TRACK_MATTE_*; source id is 0 when none.
-int ms_layer_track_matte_type(MSDocument *document, uint64_t layerId);
+MS_TRACK_MATTE ms_layer_track_matte_type(MSDocument *document, uint64_t layerId);
 uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId);
-// Stroke position of the style at index, or -1 when not a stroke.
-int ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
+// Stroke position of the style at index; MS_STROKE_POSITION_INVALID when out of
+// range or the style is not a stroke.
+MS_STROKE_POSITION ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
 
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
 // path: dot-separated property path. Layer examples: "transform.position", "size", "styles[0].color".
 // ShapeElement examples: "path", "size", "cornerRadius".
 
-// Value type tag (MS_VALUE_*), -1 when the property does not exist.
-int ms_property_type(MSDocument *document, uint64_t entityId, const char *path);
+// Value type tag (MS_VALUE_*), MS_VALUE_INVALID when the property does not exist.
+MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *path);
 bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char *path);
 
 // Static value accessors. Return zero/fill nothing when the property does not
@@ -294,8 +316,8 @@ void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const
 
 // Easing of the keyframe at index. Returns the easing type tag (MS_EASING_*);
 // bezier control points are written to the out parameters for bezier-backed
-// easings. Returns -1 when the keyframe does not exist.
-int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY);
+// easings. Returns MS_EASING_INVALID when the keyframe does not exist.
+MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY);
 
 // Value of the property evaluated at the given frame.
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
@@ -342,9 +364,9 @@ void ms_command_add_stroke_style(MSDocument *document, uint64_t layerId);
 // Removes the style at index from the layer's style list.
 void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index);
 // blendMode: MS_BLEND_* tag. Applies to fill and stroke styles.
-void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode);
+void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode);
 // position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
-void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position);
+void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position);
 
 // Appends a path mask (Add mode) baked from the layer's shape at `frame`.
 // Non-shape layers fall back to a 200x200 centered rectangle.
@@ -352,11 +374,10 @@ void ms_command_add_mask(MSDocument *document, uint64_t layerId, int64_t frame);
 void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index);
 void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex);
 // mode: MS_MASK_* tag.
-void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, int mode);
+void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, MS_MASK mode);
 void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int index, bool inverted);
 // type: MS_TRACK_MATTE_*. matteLayerId may be 0 when type is NONE.
-void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,
-                                int type);
+void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId, MS_TRACK_MATTE type);
 
 #if defined(__APPLE__)
 
@@ -381,7 +402,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
 // Preview chrome behind the composition: 0 = solid black (default), 1 =
 // transparency checkerboard. Ignored when canvas is null.
-void ms_canvas_set_preview_backdrop(MSCanvas *canvas, int backdrop);
+void ms_canvas_set_preview_backdrop(MSCanvas *canvas, MS_PREVIEWER_BACKDROP backdrop);
 
 // Sets preview-only layer selection chrome for subsequent draw calls.
 // layerIds may be null only when count is 0. Supports multiple IDs so callers

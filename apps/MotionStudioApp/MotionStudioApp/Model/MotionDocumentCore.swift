@@ -7,87 +7,8 @@
 
 import CoreGraphics
 import Foundation
+import MotionStudioBridging
 import Observation
-
-/// Snapshot of one keyframe for UI display.
-struct KeyframeInfo: Equatable, Identifiable {
-    let frame: Int64
-    let value: Float
-    let easing: EasingInfo
-
-    var id: Int64 {
-        frame
-    }
-}
-
-/// Easing curve descriptor mirroring the bridge MS_EASING_* tags.
-struct EasingInfo: Equatable {
-    enum Kind: Int32, Equatable {
-        case linear = 0
-        case hold = 1
-        case ease = 2
-        case easeIn = 3
-        case easeOut = 4
-        case easeInOut = 5
-        case cubicBezier = 6
-    }
-
-    var kind: Kind
-    var inX: Float = 0
-    var inY: Float = 0
-    var outX: Float = 1
-    var outY: Float = 1
-
-    static let linear = EasingInfo(kind: .linear)
-    static let hold = EasingInfo(kind: .hold)
-    static let ease = EasingInfo(kind: .ease, inX: 0.25, inY: 0.1, outX: 0.25, outY: 1)
-    static let easeIn = EasingInfo(kind: .easeIn, inX: 0.42, inY: 0, outX: 1, outY: 1)
-    static let easeOut = EasingInfo(kind: .easeOut, inX: 0, inY: 0, outX: 0.58, outY: 1)
-    static let easeInOut = EasingInfo(kind: .easeInOut, inX: 0.42, inY: 0, outX: 0.58, outY: 1)
-}
-
-struct MotionColor: Equatable {
-    var r: Float
-    var g: Float
-    var b: Float
-    var a: Float
-
-    static let black = MotionColor(r: 0, g: 0, b: 0, a: 1)
-}
-
-struct CanvasFrameProfile: Equatable {
-    let drewFrame: Bool
-    let layerCount: Int
-    let drawCommandCount: Int
-    let totalMilliseconds: Double
-    let documentLockMilliseconds: Double
-    let sceneEvaluateMilliseconds: Double
-    let buildCommandsMilliseconds: Double
-    let beginFrameMilliseconds: Double
-    let playCommandsMilliseconds: Double
-    let endFrameMilliseconds: Double
-    let endFrameCanvasRestoreMilliseconds: Double
-    let endFramePresentMilliseconds: Double
-    let endFrameFlushSubmitMilliseconds: Double
-    let endFrameDeviceUnlockMilliseconds: Double
-
-    init(_ profile: MSCanvasFrameProfile) {
-        drewFrame = profile.drewFrame
-        layerCount = Int(profile.layerCount)
-        drawCommandCount = Int(profile.drawCommandCount)
-        totalMilliseconds = profile.totalMs
-        documentLockMilliseconds = profile.documentLockMs
-        sceneEvaluateMilliseconds = profile.sceneEvaluateMs
-        buildCommandsMilliseconds = profile.buildCommandsMs
-        beginFrameMilliseconds = profile.beginFrameMs
-        playCommandsMilliseconds = profile.playCommandsMs
-        endFrameMilliseconds = profile.endFrameMs
-        endFrameCanvasRestoreMilliseconds = profile.endFrameCanvasRestoreMs
-        endFramePresentMilliseconds = profile.endFramePresentMs
-        endFrameFlushSubmitMilliseconds = profile.endFrameFlushSubmitMs
-        endFrameDeviceUnlockMilliseconds = profile.endFrameDeviceUnlockMs
-    }
-}
 
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
@@ -260,16 +181,15 @@ final class MotionDocumentCore {
                                 point: CGPoint,
                                 handleHitRadius: CGFloat,
                                 rotateInner: CGFloat,
-                                rotateOuter: CGFloat) -> SelectionHandleHit
+                                rotateOuter: CGFloat) -> MS_SELECTION_HANDLE
     {
         var handles = snapshot.bridgeValue
-        let raw = ms_selection_handles_hit_test(&handles,
-                                                Float(point.x),
-                                                Float(point.y),
-                                                Float(handleHitRadius),
-                                                Float(rotateInner),
-                                                Float(rotateOuter))
-        return SelectionHandleHit(rawValue: raw) ?? .none
+        return ms_selection_handles_hit_test(&handles,
+                                             Float(point.x),
+                                             Float(point.y),
+                                             Float(handleHitRadius),
+                                             Float(rotateInner),
+                                             Float(rotateOuter))
     }
 
     func layerBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double) -> CGRect? {
@@ -315,8 +235,8 @@ final class MotionDocumentCore {
         ms_layer_out_point(handle, layerID)
     }
 
-    /// MS_LAYER_* type tag; -1 when the layer does not exist.
-    func layerType(_ layerID: UInt64) -> Int32 {
+    /// MS_LAYER_* type tag; `.INVALID` when the layer does not exist.
+    func layerType(_ layerID: UInt64) -> MS_LAYER {
         ms_layer_type(handle, layerID)
     }
 
@@ -327,18 +247,18 @@ final class MotionDocumentCore {
         Int(ms_layer_style_count(handle, layerID))
     }
 
-    /// MS_STYLE_* type tag of the style at index; -1 when out of range.
-    func styleType(layerID: UInt64, index: Int) -> Int32 {
+    /// MS_STYLE_* type tag of the style at index; `.INVALID` when out of range.
+    func styleType(layerID: UInt64, index: Int) -> MS_STYLE {
         ms_layer_style_type_at(handle, layerID, Int32(index))
     }
 
-    /// MS_BLEND_* blend mode tag of the style at index; -1 when out of range.
-    func styleBlendMode(layerID: UInt64, index: Int) -> Int32 {
+    /// MS_BLEND_* blend mode tag of the style at index; `.INVALID` when out of range.
+    func styleBlendMode(layerID: UInt64, index: Int) -> MS_BLEND {
         ms_layer_style_blend_mode_at(handle, layerID, Int32(index))
     }
 
-    /// MS_STROKE_POSITION_* tag of the stroke at index; -1 when not a stroke.
-    func strokePosition(layerID: UInt64, index: Int) -> Int32 {
+    /// MS_STROKE_POSITION_* tag of the stroke at index; `.INVALID` when not a stroke.
+    func strokePosition(layerID: UInt64, index: Int) -> MS_STROKE_POSITION {
         ms_layer_style_stroke_position_at(handle, layerID, Int32(index))
     }
 
@@ -348,8 +268,8 @@ final class MotionDocumentCore {
         Int(ms_layer_mask_count(handle, layerID))
     }
 
-    /// MS_MASK_* tag at index; -1 when out of range.
-    func maskMode(layerID: UInt64, index: Int) -> Int32 {
+    /// MS_MASK_* tag at index; `.INVALID` when out of range.
+    func maskMode(layerID: UInt64, index: Int) -> MS_MASK {
         ms_layer_mask_mode_at(handle, layerID, Int32(index))
     }
 
@@ -358,7 +278,7 @@ final class MotionDocumentCore {
     }
 
     /// MS_TRACK_MATTE_* tag; None when the layer has no track matte.
-    func trackMatteType(layerID: UInt64) -> Int32 {
+    func trackMatteType(layerID: UInt64) -> MS_TRACK_MATTE {
         ms_layer_track_matte_type(handle, layerID)
     }
 
@@ -371,7 +291,7 @@ final class MotionDocumentCore {
 
     /// Whether the entity exposes the given property path at all.
     func hasProperty(entityID: UInt64, path: String) -> Bool {
-        ms_property_type(handle, entityID, path) >= 0
+        ms_property_type(handle, entityID, path) != .INVALID
     }
 
     func staticFloat(entityID: UInt64, path: String) -> Float {
@@ -410,11 +330,11 @@ final class MotionDocumentCore {
             var inY: Float = 0
             var outX: Float = 0
             var outY: Float = 0
-            let type = ms_property_keyframe_easing_at(handle, entityID, path, i, &inX, &inY,
+            let kind = ms_property_keyframe_easing_at(handle, entityID, path, i, &inX, &inY,
                                                       &outX, &outY)
-            let kind = EasingInfo.Kind(rawValue: type) ?? .linear
+            let resolvedKind: MS_EASING = kind == .INVALID ? .LINEAR : kind
             result.append(KeyframeInfo(frame: frame, value: value,
-                                       easing: EasingInfo(kind: kind, inX: inX, inY: inY,
+                                       easing: EasingInfo(kind: resolvedKind, inX: inX, inY: inY,
                                                           outX: outX, outY: outY)))
         }
         return result
@@ -595,13 +515,13 @@ final class MotionDocumentCore {
     }
 
     /// blendMode: MS_BLEND_* tag. Applies to fill and stroke styles.
-    func setStyleBlendMode(layerID: UInt64, index: Int, blendMode: Int32) {
+    func setStyleBlendMode(layerID: UInt64, index: Int, blendMode: MS_BLEND) {
         ms_command_set_style_blend_mode(handle, layerID, Int32(index), blendMode)
         changed()
     }
 
     /// position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
-    func setStrokePosition(layerID: UInt64, index: Int, position: Int32) {
+    func setStrokePosition(layerID: UInt64, index: Int, position: MS_STROKE_POSITION) {
         ms_command_set_stroke_position(handle, layerID, Int32(index), position)
         changed()
     }
@@ -623,7 +543,7 @@ final class MotionDocumentCore {
     }
 
     /// mode: MS_MASK_* tag.
-    func setMaskMode(layerID: UInt64, index: Int, mode: Int32) {
+    func setMaskMode(layerID: UInt64, index: Int, mode: MS_MASK) {
         ms_command_set_mask_mode(handle, layerID, Int32(index), mode)
         changed()
     }
@@ -634,7 +554,7 @@ final class MotionDocumentCore {
     }
 
     /// type: MS_TRACK_MATTE_*. matteLayerID may be 0 when type is None.
-    func setTrackMatte(layerID: UInt64, matteLayerID: UInt64, type: Int32) {
+    func setTrackMatte(layerID: UInt64, matteLayerID: UInt64, type: MS_TRACK_MATTE) {
         ms_command_set_track_matte(handle, layerID, matteLayerID, type)
         changed()
     }

@@ -155,7 +155,7 @@ PropertyPath MakePath(uint64_t entityId, const char *path) {
     return PropertyPath{EntityId{entityId}, path != nullptr ? path : ""};
 }
 
-motion::BlendMode MakeBlendMode(int blendMode) {
+motion::BlendMode MakeBlendMode(MS_BLEND blendMode) {
     // Bridge tags mirror the motion::BlendMode ordinals.
     if (blendMode < MS_BLEND_NORMAL || blendMode > MS_BLEND_ADD) {
         return motion::BlendMode::Normal;
@@ -163,11 +163,7 @@ motion::BlendMode MakeBlendMode(int blendMode) {
     return static_cast<motion::BlendMode>(blendMode);
 }
 
-int BlendModeTag(motion::BlendMode blendMode) {
-    return static_cast<int>(blendMode);
-}
-
-motion::StrokePosition MakeStrokePosition(int position) {
+motion::StrokePosition MakeStrokePosition(MS_STROKE_POSITION position) {
     // Bridge tags mirror the motion::StrokePosition ordinals.
     if (position < MS_STROKE_POSITION_CENTER || position > MS_STROKE_POSITION_OUTSIDE) {
         return motion::StrokePosition::Center;
@@ -175,26 +171,18 @@ motion::StrokePosition MakeStrokePosition(int position) {
     return static_cast<motion::StrokePosition>(position);
 }
 
-motion::MaskMode MakeMaskMode(int mode) {
+motion::MaskMode MakeMaskMode(MS_MASK mode) {
     if (mode < MS_MASK_ADD || mode > MS_MASK_INTERSECT) {
         return motion::MaskMode::Add;
     }
     return static_cast<motion::MaskMode>(mode);
 }
 
-int MaskModeTag(motion::MaskMode mode) {
-    return static_cast<int>(mode);
-}
-
-motion::TrackMatteType MakeTrackMatteType(int type) {
+motion::TrackMatteType MakeTrackMatteType(MS_TRACK_MATTE type) {
     if (type < MS_TRACK_MATTE_NONE || type > MS_TRACK_MATTE_LUMA_INVERTED) {
         return motion::TrackMatteType::None;
     }
     return static_cast<motion::TrackMatteType>(type);
-}
-
-int TrackMatteTypeTag(motion::TrackMatteType type) {
-    return static_cast<int>(type);
 }
 
 motion::Mask MakeMaskFromLayer(const Layer &layer, int64_t frame) {
@@ -563,8 +551,8 @@ bool ms_composition_selection_handles(MSDocument *document, uint64_t composition
     return true;
 }
 
-int ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, float y,
-                                  float handleHitRadius, float rotateInner, float rotateOuter) {
+MS_SELECTION_HANDLE ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, float y,
+                                                  float handleHitRadius, float rotateInner, float rotateOuter) {
     if (handles == nullptr || handles->valid == 0) {
         return MS_SELECTION_HANDLE_NONE;
     }
@@ -581,8 +569,7 @@ int ms_selection_handles_hit_test(const MSSelectionHandles *handles, float x, fl
     coreHandles.boxRotationDegrees = handles->boxRotationDegrees;
     coreHandles.localMin = {handles->localMinX, handles->localMinY};
     coreHandles.localMax = {handles->localMaxX, handles->localMaxY};
-    switch (motion::HitTestSelectionHandle(coreHandles, Vec2{x, y}, handleHitRadius, rotateInner,
-                                           rotateOuter)) {
+    switch (motion::HitTestSelectionHandle(coreHandles, Vec2{x, y}, handleHitRadius, rotateInner, rotateOuter)) {
         case motion::SelectionHandleKind::None:
             return MS_SELECTION_HANDLE_NONE;
         case motion::SelectionHandleKind::Anchor:
@@ -638,13 +625,13 @@ char *ms_layer_name(MSDocument *document, uint64_t layerId) {
     return layer != nullptr ? strdup(layer->name.c_str()) : nullptr;
 }
 
-int ms_layer_type(MSDocument *document, uint64_t layerId) {
+MS_LAYER ms_layer_type(MSDocument *document, uint64_t layerId) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     if (layer == nullptr) {
-        return -1;
+        return MS_LAYER_INVALID;
     }
-    return static_cast<int>(layer->type());
+    return static_cast<MS_LAYER>(layer->type());
 }
 
 int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId) {
@@ -685,12 +672,12 @@ int ms_layer_style_count(MSDocument *document, uint64_t layerId) {
     return layer != nullptr ? static_cast<int>(layer->styles.size()) : 0;
 }
 
-int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index) {
+MS_STYLE ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     if (layer == nullptr || index < 0 ||
         static_cast<size_t>(index) >= layer->styles.size()) {
-        return -1;
+        return MS_STYLE_INVALID;
     }
     switch (layer->styles[static_cast<size_t>(index)]->type()) {
         case motion::LayerStyleType::Fill: {
@@ -700,40 +687,38 @@ int ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index) {
             return MS_STYLE_STROKE;
         }
     }
-    return -1;
+    return MS_STYLE_INVALID;
 }
 
-int ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index) {
+MS_BLEND ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
-    if (layer == nullptr || index < 0 ||
-        static_cast<size_t>(index) >= layer->styles.size()) {
-        return -1;
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->styles.size()) {
+        return MS_BLEND_INVALID;
     }
     motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
     switch (style->type()) {
         case motion::LayerStyleType::Fill: {
-            return BlendModeTag(static_cast<FillStyle *>(style)->blendMode);
+            return static_cast<MS_BLEND>(static_cast<FillStyle *>(style)->blendMode);
         }
         case motion::LayerStyleType::Stroke: {
-            return BlendModeTag(static_cast<StrokeStyle *>(style)->blendMode);
+            return static_cast<MS_BLEND>(static_cast<StrokeStyle *>(style)->blendMode);
         }
     }
-    return -1;
+    return MS_BLEND_INVALID;
 }
 
-int ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index) {
+MS_STROKE_POSITION ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
-    if (layer == nullptr || index < 0 ||
-        static_cast<size_t>(index) >= layer->styles.size()) {
-        return -1;
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->styles.size()) {
+        return MS_STROKE_POSITION_INVALID;
     }
     motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
     if (style->type() != motion::LayerStyleType::Stroke) {
-        return -1;
+        return MS_STROKE_POSITION_INVALID;
     }
-    return static_cast<int>(static_cast<StrokeStyle *>(style)->position);
+    return static_cast<MS_STROKE_POSITION>(static_cast<StrokeStyle *>(style)->position);
 }
 
 /* ============================ mask / track matte queries ============================ */
@@ -744,33 +729,31 @@ int ms_layer_mask_count(MSDocument *document, uint64_t layerId) {
     return layer != nullptr ? static_cast<int>(layer->masks.size()) : 0;
 }
 
-int ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index) {
+MS_MASK ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
-    if (layer == nullptr || index < 0 ||
-        static_cast<size_t>(index) >= layer->masks.size()) {
-        return -1;
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->masks.size()) {
+        return MS_MASK_INVALID;
     }
-    return MaskModeTag(layer->masks[static_cast<size_t>(index)].mode);
+    return static_cast<MS_MASK>(layer->masks[static_cast<size_t>(index)].mode);
 }
 
 bool ms_layer_mask_inverted_at(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
-    if (layer == nullptr || index < 0 ||
-        static_cast<size_t>(index) >= layer->masks.size()) {
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->masks.size()) {
         return false;
     }
     return layer->masks[static_cast<size_t>(index)].inverted;
 }
 
-int ms_layer_track_matte_type(MSDocument *document, uint64_t layerId) {
+MS_TRACK_MATTE ms_layer_track_matte_type(MSDocument *document, uint64_t layerId) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     if (layer == nullptr) {
         return MS_TRACK_MATTE_NONE;
     }
-    return TrackMatteTypeTag(layer->trackMatteType);
+    return static_cast<MS_TRACK_MATTE>(layer->trackMatteType);
 }
 
 uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId) {
@@ -784,10 +767,10 @@ uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId) {
 
 /* ============================ property queries ============================ */
 
-int ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
+MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
-    return property != nullptr ? static_cast<int>(property->valueType()) : -1;
+    return property != nullptr ? static_cast<MS_VALUE>(property->valueType()) : MS_VALUE_INVALID;
 }
 
 bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char *path) {
@@ -931,7 +914,7 @@ void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const
     }
 }
 
-int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY) {
+MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
     const Easing *easing = nullptr;
@@ -948,7 +931,7 @@ int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, cons
         easing = &colorKey->easing;
     }
     if (easing == nullptr) {
-        return -1;
+        return MS_EASING_INVALID;
     }
     if (inX != nullptr) {
         *inX = easing->inX;
@@ -962,7 +945,7 @@ int ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, cons
     if (outY != nullptr) {
         *outY = easing->outY;
     }
-    return static_cast<int>(easing->type);
+    return static_cast<MS_EASING>(easing->type);
 }
 
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
@@ -1152,12 +1135,12 @@ void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index) 
     Execute(document, std::make_unique<motion::RemoveStyleCommand>(EntityId{layerId}, index));
 }
 
-void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, int blendMode) {
+void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStyleBlendModeCommand>(EntityId{layerId}, index, MakeBlendMode(blendMode)));
 }
 
-void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, int position) {
+void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
 }
@@ -1181,7 +1164,7 @@ void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex,
     Execute(document, std::make_unique<motion::MoveMaskCommand>(EntityId{layerId}, fromIndex, toIndex));
 }
 
-void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, int mode) {
+void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, MS_MASK mode) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetMaskModeCommand>(EntityId{layerId}, index, MakeMaskMode(mode)));
 }
@@ -1193,7 +1176,7 @@ void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int in
 }
 
 void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,
-                                int type) {
+                                MS_TRACK_MATTE type) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetTrackMatteCommand>(EntityId{layerId}, EntityId{matteLayerId}, MakeTrackMatteType(type)));
 }

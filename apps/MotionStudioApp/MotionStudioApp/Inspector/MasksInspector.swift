@@ -6,6 +6,7 @@
 //  keyframe toggles.
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 struct MasksInspector: View {
@@ -45,7 +46,7 @@ struct MasksInspector: View {
                 Text("Mask \(index + 1)")
                     .font(.callout)
                 Picker("", selection: modeBinding(index: index)) {
-                    ForEach(MaskModeTag.allCases) { mode in
+                    ForEach(MS_MASK.allCases) { mode in
                         Text(mode.label).tag(mode)
                     }
                 }
@@ -139,13 +140,14 @@ struct MasksInspector: View {
         }
     }
 
-    private func modeBinding(index: Int) -> Binding<MaskModeTag> {
+    private func modeBinding(index: Int) -> Binding<MS_MASK> {
         Binding {
-            MaskModeTag(rawValue: core.maskMode(layerID: layerID, index: index)) ?? .add
+            let mode = core.maskMode(layerID: layerID, index: index)
+            return mode == .INVALID ? .ADD : mode
         } set: { newValue in
             guard isEditable else { return }
             perform("Set Mask Mode") {
-                core.setMaskMode(layerID: layerID, index: index, mode: newValue.rawValue)
+                core.setMaskMode(layerID: layerID, index: index, mode: newValue)
             }
         }
     }

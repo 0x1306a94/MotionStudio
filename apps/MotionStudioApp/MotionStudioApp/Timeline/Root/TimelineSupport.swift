@@ -5,6 +5,7 @@
 //  Shared timeline layout constants and row model.
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 let minTimelinePointsPerFrame: CGFloat = 1
@@ -54,10 +55,10 @@ func timelineStyleTracks(core: MotionDocumentCore,
     for index in 0 ..< core.styleCount(layerID: layerID) {
         let styleType = core.styleType(layerID: layerID, index: index)
         var candidates: [(path: String, label: String)] = []
-        if styleType == MS_STYLE_FILL {
+        if styleType == .FILL {
             fillPosition += 1
             candidates = [("styles[\(index)].color", "Fill \(fillPosition) Color")]
-        } else if styleType == MS_STYLE_STROKE {
+        } else if styleType == .STROKE {
             strokePosition += 1
             let name = "Stroke \(strokePosition)"
             candidates = [("styles[\(index)].color", "\(name) Color"),

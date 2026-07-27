@@ -7,6 +7,7 @@
 //
 
 import MetalKit
+import MotionStudioBridging
 import Observation
 import QuartzCore
 import UIKit
@@ -25,7 +26,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var playheadFrame: Int64 = 0
     private var previewFrame: Double = 0
     private var duration: Int64 = 1
-    private var previewBackdrop: PreviewBackdrop = .transparent
+    private var previewBackdrop: MS_PREVIEWER_BACKDROP = .TRANSPARENT
     private var frameRate: Double = 30
     private var playbackFramesPerSecond: Double = 30
     private var isPlaying = false
@@ -231,7 +232,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                       isPlaying: Bool,
                       duration: Int64,
                       frameRate: Double,
-                      previewBackdrop: PreviewBackdrop,
+                      previewBackdrop: MS_PREVIEWER_BACKDROP,
                       revision _: Int)
     {
         let wasPlaying = self.isPlaying
@@ -281,7 +282,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
         guard let canvas else { return }
         updateSelectionOutline()
-        ms_canvas_set_preview_backdrop(canvas, previewBackdrop.rawValue)
+        ms_canvas_set_preview_backdrop(canvas, previewBackdrop)
         let profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
         // Reveal only after the first frame is presented; an empty CAMetalLayer
         // would otherwise flash black.
@@ -576,7 +577,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
            let handles = currentSelectionHandles()
         {
             let hit = hitTestHandle(handles, atViewPoint: viewPoint)
-            if hit != .none {
+            if hit != .NONE {
                 beginHandleTransform(hit: hit,
                                      handles: handles,
                                      scenePoint: scenePoint,
@@ -606,14 +607,14 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer")
     }
 
-    private func beginHandleTransform(hit: SelectionHandleHit,
+    private func beginHandleTransform(hit: MS_SELECTION_HANDLE,
                                       handles: SelectionHandlesSnapshot,
                                       scenePoint: CGPoint,
                                       alternate: Bool)
     {
         let kind: FreeTransformKind
         let editName: String
-        if hit == .anchor {
+        if hit == .ANCHOR {
             kind = .anchor
             editName = "Move Anchor"
         } else if hit.isRotate {
@@ -630,7 +631,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
 
         var layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsLocked($0) }
-        if hit == .anchor {
+        if hit == .ANCHOR {
             layerIDs = layerIDs.filter { $0 == handles.primaryLayerID }
         }
         guard !layerIDs.isEmpty else {
@@ -714,9 +715,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     /// Hit-tests selection chrome in view points so handle size matches what is drawn.
-    private func hitTestHandle(_ handles: SelectionHandlesSnapshot, atViewPoint viewPoint: CGPoint) -> SelectionHandleHit {
+    private func hitTestHandle(_ handles: SelectionHandlesSnapshot, atViewPoint viewPoint: CGPoint) -> MS_SELECTION_HANDLE {
         guard handles.valid, let transform = currentScreenTransform() else {
-            return .none
+            return .NONE
         }
         let radius = Self.handleHitPoints
         func isNear(_ scenePoint: CGPoint) -> Bool {
@@ -726,19 +727,19 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return dx * dx + dy * dy <= radius * radius
         }
         if isNear(handles.anchor) {
-            return .anchor
+            return .ANCHOR
         }
-        let cornerHits: [SelectionHandleHit] = [.scaleCorner0, .scaleCorner1, .scaleCorner2, .scaleCorner3]
+        let cornerHits: [MS_SELECTION_HANDLE] = [.SCALE_CORNER0, .SCALE_CORNER1, .SCALE_CORNER2, .SCALE_CORNER3]
         for index in 0 ..< 4 where isNear(handles.corners[index]) {
             return cornerHits[index]
         }
-        let edgeHits: [SelectionHandleHit] = [.scaleEdge0, .scaleEdge1, .scaleEdge2, .scaleEdge3]
+        let edgeHits: [MS_SELECTION_HANDLE] = [.SCALE_EDGE0, .SCALE_EDGE1, .SCALE_EDGE2, .SCALE_EDGE3]
         for index in 0 ..< 4 where isNear(handles.edgeMids[index]) {
             return edgeHits[index]
         }
 
         let centerView = transform.viewPoint(fromScenePoint: handles.center)
-        let rotateHits: [SelectionHandleHit] = [.rotate0, .rotate1, .rotate2, .rotate3]
+        let rotateHits: [MS_SELECTION_HANDLE] = [.ROTATE0, .ROTATE1, .ROTATE2, .ROTATE3]
         for index in 0 ..< 4 {
             let cornerView = transform.viewPoint(fromScenePoint: handles.corners[index])
             let outwardX = cornerView.x - centerView.x
@@ -761,7 +762,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                 return rotateHits[index]
             }
         }
-        return .none
+        return .NONE
     }
 
     private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {

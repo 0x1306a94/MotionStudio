@@ -10,6 +10,7 @@ import SwiftUI
 #if canImport(UIKit) && !targetEnvironment(macCatalyst)
     import UIKit
 #endif
+import MotionStudioBridging
 
 struct InspectorView: View {
     let document: MotionProjectState
@@ -51,7 +52,7 @@ struct InspectorView: View {
                                            isEditable: isEditable,
                                            perform: perform)
 
-                        if core.layerType(layerID) == MS_LAYER_SHAPE {
+                        if core.layerType(layerID) == .SHAPE {
                             FillsInspector(core: core,
                                            layerID: layerID,
                                            playheadFrame: editorState.playheadFrame,
