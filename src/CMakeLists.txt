@@ -52,3 +52,10 @@ target_include_directories(core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # nlohmann/json 仅供 core 内部实现使用，不经公共头暴露。
 target_link_libraries(core PRIVATE nlohmann_json::nlohmann_json)
 target_compile_options(core PRIVATE -Wall -Wextra)
+
+
+if(CMAKE_GENERATOR MATCHES "Xcode")
+  set_target_properties(core PROPERTIES
+    XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos iphonesimulator macosx"
+  )
+endif()

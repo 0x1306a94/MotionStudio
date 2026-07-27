@@ -4,3 +4,5 @@ target_link_libraries(scene_evaluator_benchmark PRIVATE core)
 # Recorded only, never gating: run with `ctest -L benchmark`.
 add_test(NAME SceneEvaluatorBenchmark COMMAND scene_evaluator_benchmark)
 set_tests_properties(SceneEvaluatorBenchmark PROPERTIES LABELS "benchmark")
+
+disable_xcode_target_signing(scene_evaluator_benchmark)

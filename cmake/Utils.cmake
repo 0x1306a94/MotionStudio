@@ -43,3 +43,27 @@ function(add_source_group files base_dir group_prefix)
     endif()
   endforeach()
 endfunction()
+
+function(disable_xcode_target_signing target_name)
+  if(CMAKE_GENERATOR MATCHES "Xcode")
+    message(STATUS "========= disable xcode target signing for ${target_name} =========")
+    set_target_properties(${target_name} PROPERTIES
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "-"
+      XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+    )
+  endif()
+endfunction()
+
+function(set_xcode_target_tgfx_prebuilt_search_paths target_name)
+  if(CMAKE_GENERATOR MATCHES "Xcode")
+    message(STATUS "========= configuration tgfx prebuilt search paths for ${target_name} =========")
+    message(STATUS "TGFX_PREBUILT_CATALYST_DIR: ${TGFX_PREBUILT_CATALYST_DIR}")
+    message(STATUS "TGFX_PREBUILT_IOS_DIR: ${TGFX_PREBUILT_IOS_DIR}")
+    message(STATUS "TGFX_PREBUILT_IOSSIM_DIR: ${TGFX_PREBUILT_IOSSIM_DIR}")
+    set_target_properties(${target_name} PROPERTIES
+      XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=macosx*] "${TGFX_PREBUILT_CATALYST_DIR}"
+      XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=iphoneos*] "${TGFX_PREBUILT_IOS_DIR}"
+      XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*] "${TGFX_PREBUILT_IOSSIM_DIR}"
+    )
+  endif()
+endfunction()

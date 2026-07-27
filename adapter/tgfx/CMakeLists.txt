@@ -37,6 +37,13 @@ if(CMAKE_GENERATOR MATCHES "Xcode")
   set(TGFX_PREBUILT_IOS_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/ios/arm64")
   set(TGFX_PREBUILT_IOSSIM_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/ios/arm64-simulator")
 
+  # PARENT_SCOPE only writes to the parent; re-export the local values so sibling
+  # directories (e.g. bridge) can read them without losing them in this scope.
+  set(TGFX_PREBUILT_MAC_DIR "${TGFX_PREBUILT_MAC_DIR}" PARENT_SCOPE)
+  set(TGFX_PREBUILT_CATALYST_DIR "${TGFX_PREBUILT_CATALYST_DIR}" PARENT_SCOPE)
+  set(TGFX_PREBUILT_IOS_DIR "${TGFX_PREBUILT_IOS_DIR}" PARENT_SCOPE)
+  set(TGFX_PREBUILT_IOSSIM_DIR "${TGFX_PREBUILT_IOSSIM_DIR}" PARENT_SCOPE)
+
   function(motionstudio_add_tgfx_prebuild target_name)
     add_custom_command(TARGET ${target_name} PRE_BUILD
         COMMAND ${_tgfx_prebuild_cmd}
@@ -155,6 +162,8 @@ add_files_by_extension(TGFX_ADAPTER_TEST_SOURCES ".h;.cpp"
 
 add_executable(tgfx_adapter_test ${TGFX_ADAPTER_TEST_SOURCES})
 add_source_group(TGFX_ADAPTER_TEST_SOURCES ${CMAKE_CURRENT_LIST_DIR}/tests "Tests")
+
+disable_xcode_target_signing(tgfx_adapter_test)
 
 target_link_libraries(tgfx_adapter_test PRIVATE motionstudio_tgfx_adapter GTest::gtest_main)
 motionstudio_add_tgfx_prebuild(tgfx_adapter_test)

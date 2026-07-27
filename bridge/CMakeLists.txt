@@ -46,5 +46,8 @@ add_files_by_extension(BRIDGE_TEST_SOURCES ".h;.cpp"
 add_executable(bridge_test ${BRIDGE_TEST_SOURCES})
 add_source_group(BRIDGE_TEST_SOURCES ${CMAKE_CURRENT_LIST_DIR}/tests "Tests")
 
+set_xcode_target_tgfx_prebuilt_search_paths(bridge_test)
+disable_xcode_target_signing(bridge_test)
+
 target_link_libraries(bridge_test PRIVATE bridge GTest::gtest_main)
 gtest_discover_tests(bridge_test)
