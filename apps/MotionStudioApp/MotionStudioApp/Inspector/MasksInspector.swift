@@ -77,6 +77,7 @@ struct MasksInspector: View {
                 .buttonStyle(.plain)
                 .help("Invert mask")
                 Spacer(minLength: 0)
+                pathKeyframeButton(index: index)
                 Button(role: .destructive) {
                     removeMask(index: index)
                 } label: {
@@ -132,6 +133,32 @@ struct MasksInspector: View {
 
     private func hasKeyframeAtPlayhead(path: String) -> Bool {
         core.keyframeFrames(entityID: layerID, path: path).contains(playheadFrame)
+    }
+
+    @ViewBuilder
+    private func pathKeyframeButton(index: Int) -> some View {
+        let path = maskPath(index: index, suffix: "path")
+        let hasKeyframe = hasKeyframeAtPlayhead(path: path)
+        Button {
+            guard isEditable else { return }
+            if hasKeyframe {
+                perform("Delete Keyframe") {
+                    core.removeKeyframe(entityID: layerID, path: path, frame: playheadFrame)
+                }
+            } else {
+                perform("Add Keyframe") {
+                    core.addKeyframeBezierPathAtPlayhead(entityID: layerID, path: path,
+                                                         frame: playheadFrame)
+                }
+            }
+        } label: {
+            Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
+                .foregroundStyle(hasKeyframe ? .yellow : .secondary)
+                .id(hasKeyframe)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEditable)
+        .help(hasKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
     }
 
     private func writeFloat(path: String, value: Float) {

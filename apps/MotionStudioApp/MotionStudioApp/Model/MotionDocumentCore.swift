@@ -435,6 +435,16 @@ final class MotionDocumentCore {
         changed()
     }
 
+    /// Adds a BezierPath keyframe at `frame` using the property's evaluated path.
+    func addKeyframeBezierPathAtPlayhead(entityID: UInt64, path: String, frame: Int64) {
+        guard let evaluated = ms_property_evaluate_bezier_path(handle, entityID, path, frame) else {
+            return
+        }
+        defer { ms_bezier_path_free(evaluated) }
+        ms_command_add_keyframe_bezier_path(handle, entityID, path, frame, evaluated)
+        changed()
+    }
+
     func removeKeyframe(entityID: UInt64, path: String, frame: Int64) {
         ms_command_remove_keyframe(handle, entityID, path, frame)
         changed()

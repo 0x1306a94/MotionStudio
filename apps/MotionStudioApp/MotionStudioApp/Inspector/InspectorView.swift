@@ -42,6 +42,13 @@ struct InspectorView: View {
                                                isEditable: isEditable,
                                                perform: perform)
                         }
+                        if core.hasBezierPath(entityID: layerID, path: "path") {
+                            PathKeyframeInspector(core: core,
+                                                  layerID: layerID,
+                                                  playheadFrame: editorState.playheadFrame,
+                                                  isEditable: isEditable,
+                                                  perform: perform)
+                        }
 
                         Text("Transform")
                             .font(.subheadline)

@@ -39,6 +39,11 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: ShapeProperty.cornerRadius.path).isEmpty {
         paths.append(ShapeProperty.cornerRadius.path)
     }
+    if core.hasBezierPath(entityID: layerID, path: "path"),
+       !core.keyframes(entityID: layerID, path: "path").isEmpty
+    {
+        paths.append("path")
+    }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     paths.append(contentsOf: timelineMaskTracks(core: core, layerID: layerID).map(\.path))
     return paths
@@ -84,6 +89,7 @@ func timelineMaskTracks(core: MotionDocumentCore,
     for index in 0 ..< core.maskCount(layerID: layerID) {
         let name = "Mask \(index + 1)"
         let candidates = [
+            ("masks[\(index)].path", "\(name) Path"),
             ("masks[\(index)].opacity", "\(name) Opacity"),
             ("masks[\(index)].feather", "\(name) Feather"),
             ("masks[\(index)].expansion", "\(name) Expansion"),
@@ -133,6 +139,10 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             layerID: layerID,
                                             path: ShapeProperty.cornerRadius.path,
                                             label: ShapeProperty.cornerRadius.actionLabel))
+        }
+        if animatedPaths.contains("path") {
+            rows.append(timelinePropertyRow(core: core, layerID: layerID, path: "path",
+                                            label: "Path"))
         }
         for track in timelineStyleTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,
