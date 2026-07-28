@@ -729,3 +729,61 @@ TEST(ConvertGeometryToPathCommandTest, PathIsNoOp) {
     scene.undo.undo(scene.document);
     EXPECT_EQ(content->geometry->type(), ShapeType::Path);
 }
+
+TEST(AddKeyframeCommandTest, BezierPathAddAndUndo) {
+    Scene scene;
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
+    auto pathShape = std::make_unique<ShapePath>();
+    ShapePath *pathPtr = pathShape.get();
+    content->geometry = std::move(pathShape);
+    scene.document.refreshEntityIndex();
+
+    PropertyPath property{scene.layer->id, "path"};
+    BezierPath value;
+    value.vertices.push_back({{1, 2}, {}, {}});
+    value.vertices.push_back({{3, 4}, {}, {}});
+    Keyframe<BezierPath> keyframe;
+    keyframe.time = 12;
+    keyframe.value = value;
+
+    scene.execute<AddKeyframeCommand>(property, KeyframeData{keyframe});
+    ASSERT_TRUE(pathPtr->path.isAnimated());
+    EXPECT_EQ(pathPtr->path.keyframes().size(), 1u);
+    EXPECT_EQ(pathPtr->path.evaluate(12), value);
+
+    scene.undo.undo(scene.document);
+    EXPECT_FALSE(pathPtr->path.isAnimated());
+}
+
+TEST(RemoveKeyframeCommandTest, BezierPathRemoveAndUndo) {
+    Scene scene;
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
+    auto pathShape = std::make_unique<ShapePath>();
+    ShapePath *pathPtr = pathShape.get();
+    content->geometry = std::move(pathShape);
+    scene.document.refreshEntityIndex();
+
+    BezierPath a;
+    a.vertices.push_back({{0, 0}, {}, {}});
+    a.vertices.push_back({{10, 0}, {}, {}});
+    BezierPath b = a;
+    b.vertices[1].point = {20, 0};
+    Keyframe<BezierPath> kf0;
+    kf0.time = 0;
+    kf0.value = a;
+    Keyframe<BezierPath> kf1;
+    kf1.time = 10;
+    kf1.value = b;
+    pathPtr->path.addKeyframe(kf0);
+    pathPtr->path.addKeyframe(kf1);
+
+    PropertyPath property{scene.layer->id, "path"};
+    scene.execute<RemoveKeyframeCommand>(property, 10);
+    ASSERT_EQ(pathPtr->path.keyframes().size(), 1u);
+    EXPECT_EQ(pathPtr->path.keyframes()[0].time, 0);
+
+    scene.undo.undo(scene.document);
+    ASSERT_EQ(pathPtr->path.keyframes().size(), 2u);
+    EXPECT_EQ(pathPtr->path.keyframes()[1].time, 10);
+    EXPECT_EQ(pathPtr->path.keyframes()[1].value, b);
+}

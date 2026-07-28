@@ -19,6 +19,7 @@
 
 using motion::Asset;
 using motion::AssetType;
+using motion::BezierPath;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -38,6 +39,7 @@ using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::ShapeTrimPath;
+using motion::ShapeType;
 using motion::Vec2;
 
 namespace {
@@ -419,4 +421,50 @@ TEST(FingerprintTest, StableAndSensitiveToChange) {
 
     document->compositions[1]->layers[0]->transform.rotation.setStaticValue(90.0f);
     EXPECT_NE(DocumentFingerprint(*document), before);
+}
+
+TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto path = std::make_unique<ShapePath>();
+
+    BezierPath p0;
+    p0.closed = true;
+    p0.vertices.push_back({{0, 0}, {}, {}});
+    p0.vertices.push_back({{10, 0}, {}, {}});
+    p0.vertices.push_back({{5, 8}, {}, {}});
+    BezierPath p1 = p0;
+    p1.vertices[2].point = {5, 20};
+
+    Keyframe<BezierPath> kf0;
+    kf0.time = 0;
+    kf0.value = p0;
+    Keyframe<BezierPath> kf1;
+    kf1.time = 30;
+    kf1.value = p1;
+    path->path.addKeyframe(kf0);
+    path->path.addKeyframe(kf1);
+    content->geometry = std::move(path);
+    original.refreshEntityIndex();
+
+    const std::string text = Serializer::serialize(original);
+    Expected<std::unique_ptr<Document>, std::string> loaded = Serializer::deserialize(text);
+    ASSERT_TRUE(loaded.hasValue());
+    ASSERT_FALSE((*loaded)->compositions.empty());
+    ASSERT_FALSE((*loaded)->compositions[0]->layers.empty());
+
+    Layer *roundTrip = (*loaded)->compositions[0]->layers[0].get();
+    ASSERT_NE(roundTrip, nullptr);
+    auto *shapeContent = static_cast<ShapeContent *>(roundTrip->content.get());
+    ASSERT_NE(shapeContent->geometry, nullptr);
+    ASSERT_EQ(shapeContent->geometry->type(), ShapeType::Path);
+    const auto &anim = static_cast<ShapePath *>(shapeContent->geometry.get())->path;
+    ASSERT_TRUE(anim.isAnimated());
+    ASSERT_EQ(anim.keyframes().size(), 2u);
+    EXPECT_EQ(anim.keyframes()[0].time, 0);
+    EXPECT_EQ(anim.keyframes()[1].time, 30);
+    EXPECT_EQ(anim.keyframes()[0].value, p0);
+    EXPECT_EQ(anim.keyframes()[1].value, p1);
 }

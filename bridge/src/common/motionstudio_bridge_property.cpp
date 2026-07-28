@@ -4,6 +4,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/animation/Easing.h"
+#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 
@@ -160,6 +161,10 @@ int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, co
     if (colorKey != nullptr) {
         return colorKey->time;
     }
+    const Keyframe<motion::BezierPath> *pathKey = KeyframeAt(AsBezierPath(property), index);
+    if (pathKey != nullptr) {
+        return pathKey->time;
+    }
     return 0;
 }
 
@@ -198,6 +203,10 @@ MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId
     const Keyframe<Color> *colorKey = KeyframeAt(AsColor(property), index);
     if (colorKey != nullptr) {
         easing = &colorKey->easing;
+    }
+    const Keyframe<motion::BezierPath> *pathKey = KeyframeAt(AsBezierPath(property), index);
+    if (pathKey != nullptr) {
+        easing = &pathKey->easing;
     }
     if (easing == nullptr) {
         return MS_EASING_INVALID;
