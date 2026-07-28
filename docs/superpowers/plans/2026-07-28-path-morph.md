@@ -513,10 +513,10 @@ git commit --only \
 
 - [ ] **Step 6：人机验收清单**（用户确认前不要标 `done`）
 
-- [ ] Path / Mask Path 钻石可在 playhead 启用 / 取消关键帧  
-- [ ] 时间轴出现 Path / Mask Path 轨道菱形  
-- [ ] 两帧改形后播放形态连续变化  
-- [ ] ⌘Z 正确  
+- [x] Path / Mask Path 钻石可在 playhead 启用 / 取消关键帧  
+- [x] 时间轴出现 Path / Mask Path 轨道菱形  
+- [x] 两帧改形后播放形态连续变化  
+- [x] ⌘Z 正确  
 
 用户确认后，将 roadmap Phase A 两列都标为 `done`。
 

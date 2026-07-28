@@ -32,7 +32,7 @@
 
 | Phase | 能力 | Core/Bridge | App UI | 备注 |
 |---|---|---|---|---|
-| A | Path Morph | `core-done` | `ui-pending-verify` | 详见 [path-morph-design](./2026-07-28-path-morph-design.md) |
+| A | Path Morph | `done` | `done` | 详见 [path-morph-design](./2026-07-28-path-morph-design.md) |
 | C | Trim Path | `todo` | `todo` | 占位；A 完成后再写 spec |
 | B | Motion Path | `todo` | `todo` | 占位；Core spatial 已有 |
 | D | Follow Path | `todo` | `todo` | 占位；放最后 |

@@ -1,7 +1,7 @@
 # Phase A：路径形变（Path Morph）— 设计说明
 
 日期：2026-07-28  
-状态：设计已批准，待 plan / 实现  
+状态：已完成（人机验证通过）  
 分支：`feature/0x1306a94_path_animation`  
 总览：[path-animation-roadmap](./2026-07-28-path-animation-roadmap.md)
 
