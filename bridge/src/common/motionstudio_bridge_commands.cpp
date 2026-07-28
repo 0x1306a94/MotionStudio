@@ -24,6 +24,7 @@
 #include "MotionStudio/undo/SetCompositionCornerRadiusCommand.h"
 #include "MotionStudio/undo/SetCompositionSettingsCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetFollowPathCommand.h"
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
@@ -300,4 +301,12 @@ void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t
                                 MS_TRACK_MATTE type) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetTrackMatteCommand>(EntityId{layerId}, EntityId{matteLayerId}, MakeTrackMatteType(type)));
+}
+
+void ms_command_set_follow_path(MSDocument *document, uint64_t layerId, bool enabled,
+                                uint64_t pathLayerId, bool orientAlongPath) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::SetFollowPathCommand>(EntityId{layerId}, enabled,
+                                                           EntityId{pathLayerId}, orientAlongPath));
 }

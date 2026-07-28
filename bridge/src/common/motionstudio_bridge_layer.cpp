@@ -173,3 +173,30 @@ uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId) {
     }
     return layer->trackMatteLayerId.value;
 }
+
+bool ms_layer_follow_path_enabled(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return false;
+    }
+    return layer->followPath.enabled;
+}
+
+uint64_t ms_layer_follow_path_layer_id(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return 0;
+    }
+    return layer->followPath.pathLayerId.value;
+}
+
+bool ms_layer_follow_path_orient(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return true;
+    }
+    return layer->followPath.orientAlongPath;
+}

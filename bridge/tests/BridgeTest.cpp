@@ -151,6 +151,40 @@ TEST(BridgeCommandTest, MaskAndTrackMatteLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, FollowPathLifecycle) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t pathLayerId = ms_command_add_ellipse_layer(document, compositionId);
+    const uint64_t followerId = ms_command_add_rect_layer(document, compositionId);
+
+    EXPECT_FALSE(ms_layer_follow_path_enabled(document, followerId));
+    EXPECT_EQ(ms_layer_follow_path_layer_id(document, followerId), 0u);
+    EXPECT_TRUE(ms_layer_follow_path_orient(document, followerId));
+
+    ms_command_set_follow_path(document, followerId, true, pathLayerId, true);
+    EXPECT_TRUE(ms_layer_follow_path_enabled(document, followerId));
+    EXPECT_EQ(ms_layer_follow_path_layer_id(document, followerId), pathLayerId);
+    EXPECT_TRUE(ms_layer_follow_path_orient(document, followerId));
+
+    ms_command_set_static_float(document, followerId, "followPath.pathOffset", 0.5f);
+    EXPECT_FLOAT_EQ(ms_property_evaluate_float(document, followerId, "followPath.pathOffset", 0),
+                    0.5f);
+
+    ms_command_add_keyframe_float(document, followerId, "followPath.pathOffset", 0, 0.0f);
+    ms_command_add_keyframe_float(document, followerId, "followPath.pathOffset", 20, 1.0f);
+    EXPECT_FLOAT_EQ(ms_property_evaluate_float(document, followerId, "followPath.pathOffset", 10),
+                    0.5f);
+
+    ms_document_end_merge_group(document);
+    ms_command_set_follow_path(document, followerId, false, 0, false);
+    EXPECT_FALSE(ms_layer_follow_path_enabled(document, followerId));
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_TRUE(ms_layer_follow_path_enabled(document, followerId));
+    EXPECT_EQ(ms_layer_follow_path_layer_id(document, followerId), pathLayerId);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, FillStyleLifecycle) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

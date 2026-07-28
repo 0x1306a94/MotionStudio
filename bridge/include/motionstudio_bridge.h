@@ -331,6 +331,12 @@ bool ms_layer_mask_inverted_at(MSDocument *document, uint64_t layerId, int index
 // Track matte on a layer. type is MS_TRACK_MATTE_*; source id is 0 when none.
 MS_TRACK_MATTE ms_layer_track_matte_type(MSDocument *document, uint64_t layerId);
 uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId);
+
+// Follow Path constraint on a layer. pathLayerId is 0 when unbound.
+bool ms_layer_follow_path_enabled(MSDocument *document, uint64_t layerId);
+uint64_t ms_layer_follow_path_layer_id(MSDocument *document, uint64_t layerId);
+bool ms_layer_follow_path_orient(MSDocument *document, uint64_t layerId);
+
 // Stroke position of the style at index; MS_STROKE_POSITION_INVALID when out of
 // range or the style is not a stroke.
 MS_STROKE_POSITION ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
@@ -483,6 +489,9 @@ void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index,
 void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int index, bool inverted);
 // type: MS_TRACK_MATTE_*. matteLayerId may be 0 when type is NONE.
 void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId, MS_TRACK_MATTE type);
+// Sets Follow Path binding. pathLayerId may be 0 when disabling.
+void ms_command_set_follow_path(MSDocument *document, uint64_t layerId, bool enabled,
+                                uint64_t pathLayerId, bool orientAlongPath);
 
 #if defined(__APPLE__)
 
