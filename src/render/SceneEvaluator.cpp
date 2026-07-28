@@ -12,6 +12,7 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/render/FollowPathEval.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
 namespace motion {
@@ -19,13 +20,6 @@ namespace motion {
 namespace {
 
 constexpr int kMaxPrecompDepth = 1024;
-
-Mat3 LocalMatrixOf(const Transform &transform, PreviewTime time) {
-    return Mat3::Translate(transform.position.evaluatePreview(time)) *
-        Mat3::Rotate(transform.rotation.evaluatePreview(time)) *
-        Mat3::Scale(transform.scale.evaluatePreview(time)) *
-        Mat3::Translate(-transform.anchorPoint.evaluatePreview(time));
-}
 
 void CollectGeometry(const ShapeElement &element, PreviewTime time,
                      std::vector<ShapeGeometry> &geometries) {
@@ -98,22 +92,8 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
 // down by the enclosing precomp. visiting guards against parent cycles.
 Mat3 WorldTransformOf(const Document &document, const Layer &layer, PreviewTime time,
                       const Mat3 &context, std::vector<EntityId> &visiting) {
-    for (const EntityId &visited : visiting) {
-        if (visited == layer.id) {
-            return context;
-        }
-    }
-    visiting.push_back(layer.id);
-    const Mat3 local = LocalMatrixOf(layer.transform, time);
-    Mat3 result = context * local;
-    if (layer.parentId.isValid()) {
-        const Layer *parent = document.entityIndex().findLayer(layer.parentId);
-        if (parent) {
-            result = WorldTransformOf(document, *parent, time, context, visiting) * local;
-        }
-    }
-    visiting.pop_back();
-    return result;
+    std::vector<EntityId> followVisiting;
+    return FollowAwareWorldTransform(document, layer, time, context, visiting, followVisiting);
 }
 
 float WorldOpacityOf(const Document &document, const Layer &layer, PreviewTime time,
