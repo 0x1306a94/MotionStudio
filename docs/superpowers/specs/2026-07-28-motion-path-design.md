@@ -1,84 +1,124 @@
 # Phase B：Motion Path — 设计说明
 
 日期：2026-07-28  
-状态：B1 实现中  
+状态：B1 `core-done`；B2 实现中  
 分支：`feature/0x1306a94_path_animation`  
 总览：[path-animation-roadmap](./2026-07-28-path-animation-roadmap.md)
 
 ## 目标
 
-为 Position 关键帧提供空间贝塞尔运动路径：**先 API+单测（B1）→ 再画布可视化与手柄编辑（B2）**。
+为 Position 关键帧提供空间贝塞尔运动路径：**B1 API+单测 → B2 画布可视化与手柄编辑**。
 
 ## 现状
 
 | 层 | 已有 |
 |---|---|
-| Core | `Keyframe::spatialIn/OutTangent`、`EvaluateSpatial`、序列化、`AnimatableTest` 弧线用例 |
-| Bridge / App | **无** spatial 读写；无轨迹叠加；无手柄 UI |
+| Core | `spatialIn/OutTangent`、`EvaluateSpatial`、`BuildMotionPath`、`SetSpatialTangentsCommand` |
+| Bridge | spatial get/set、`ms_property_build_motion_path` |
+| App | **无**轨迹叠加；无手柄 UI |
 
 ## 子阶段
 
-### B1 — API（本轮实现）
+### B1 — API（已完成）
 
-- `BuildMotionPath(Animatable<Vec2>)` → 开放 `BezierPath`（精确段：有双边 spatial 用切线，否则直线）
-- `SetSpatialTangentsCommand`（仅 Vec2 关键帧；可清手柄）
-- Bridge：get/set spatial；`ms_property_build_motion_path`
-- 单测：BuildMotionPath、命令 undo、Bridge round-trip
+- `BuildMotionPath` / `SetSpatialTangentsCommand` / Bridge spatial API + 单测
 
-### B2 — 可视 + 手柄（B1 之后）
+### B2 — 可视 + 手柄（本轮）
 
-- 选中层 + position ≥2 KF → `PathOverlay` 画轨迹
-- 手柄 chrome + 拖拽 → `SetSpatialTangentsCommand`
-- 可选：「启用弧线」写入默认切线（段长 1/3）
-- App 人机验证
+**交互（锁定）：**
+
+- Select 工具下：选中层且 `transform.position` ≥2 KF → 画运动路径 + KF 方块
+- 点选 KF → 显示 in/out 空间手柄；无 stored spatial 时显示段长 1/3 的**预览手柄**，首次拖拽才写入
+- 拖动手柄 → `SetSpatialTangentsCommand`；同段对端若缺手柄则一并写入默认值，使弧线立即可见
+- **不做**：画布拖 KF 改 position、「启用弧线」按钮、Pen 工具下显示运动路径
+
+**坐标：** path 顶点 = position KF 值（父空间）；`worldTransform` = 父层 world（无父则为 Identity / precomp context）。
 
 ## 已锁定决策
 
 | 项 | 选择 |
 |---|---|
-| 属性 | 仅 `transform.position`（API 可挂任意 Vec2，产品先 position） |
-| 无手柄 | 直线（现有求值） |
-| B1 默认手柄 | **不**自动生成 |
-| 轨迹空间 | 与 keyframe value 同空间（层局部 position） |
-| 命令 | 独立 `SetSpatialTangents`，不混入 `AddKeyframe` |
+| 属性 | 仅 `transform.position` |
+| 显示条件 | Select 工具 + 选中层 + ≥2 position KF |
+| 无 stored spatial | 直线求值；选中 KF 显示可拉出预览手柄 |
+| 轨迹空间 | position 值 × 父 worldTransform |
+| 命令 | `SetSpatialTangents`（拖拽 merge） |
 
 ## 非目标
 
 - Follow Path（Phase D）
-- 非 position 的 Vec2 运动轨迹产品化
-- 时间轴曲线编辑器面板
+- 画布拖 KF 改 position 值
+- 非 position 的 Vec2 轨迹产品化
+- 时间轴曲线面板
 
-## 核心接口（B1）
+## 核心接口
+
+### B1（已有）
 
 ```cpp
-// animation/MotionPath.h
 BezierPath BuildMotionPath(const Animatable<Vec2> &position);
+class SetSpatialTangentsCommand;  // optional in/out
+```
 
-// undo
-class SetSpatialTangentsCommand : public Command {
-  SetSpatialTangentsCommand(PropertyPath property, FrameTime time,
-                            std::optional<Vec2> spatialIn,
-                            std::optional<Vec2> spatialOut);
+### B2（新增）
+
+```cpp
+// render/MotionPathChrome.h
+struct MotionPathChrome {
+  bool valid = false;
+  EntityId layerId;
+  BezierPath path;                 // BuildMotionPath，父空间
+  Mat3 parentWorldTransform;
+  int selectedKeyframe = -1;       // index into ascending KF list
+  std::vector<FrameTime> keyframeTimes;
+  std::vector<Vec2> worldVertices;
+  std::vector<Vec2> worldInHandles;   // 含预览默认
+  std::vector<Vec2> worldOutHandles;
 };
+
+bool BuildMotionPathChrome(const Document &, EntityId layerId, PreviewTime time,
+                           int selectedKeyframe, MotionPathChrome &out);
+enum class MotionPathHandleKind { None, Keyframe, InTangent, OutTangent };
+struct MotionPathHit { MotionPathHandleKind kind; size_t index; };
+MotionPathHit HitTestMotionPath(const MotionPathChrome &, Vec2 scenePoint, float radius);
+DrawCommandList BuildMotionPathCommands(const MotionPathChrome &, float strokeWidth,
+                                        float handleSize);
+// 拖拽：scene → 父空间相对切线；缺对端则补默认
+Vec2 MotionPathTangentFromScene(const MotionPathChrome &, size_t keyframeIndex, Vec2 scenePoint);
 ```
 
 ```c
-// Bridge
-bool ms_property_keyframe_spatial_at(MSDocument *, uint64_t entityId, const char *path,
-                                     int index, bool *hasIn, float *inX, float *inY,
-                                     bool *hasOut, float *outX, float *outY);
-void ms_command_set_spatial_tangents(MSDocument *, uint64_t entityId, const char *path,
-                                     int64_t frame, bool hasIn, float inX, float inY,
-                                     bool hasOut, float outX, float outY);
-MSBezierPath *ms_property_build_motion_path(MSDocument *, uint64_t entityId, const char *path);
+void ms_canvas_set_motion_path_selection(MSCanvas *, uint64_t layerId, int selectedKeyframe);
+MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *, MSDocument *, uint64_t compositionId,
+                                          double frameTime, float sceneX, float sceneY);
+// 拖动手柄：内部 SetSpatialTangents（含对端默认）
+void ms_command_motion_path_set_tangent(MSDocument *, uint64_t layerId, int64_t frame,
+                                        bool isOut, float sceneX, float sceneY,
+                                        /* parent space written via canvas helper or: */
+                                        float tangentX, float tangentY);
 ```
 
-## 测试（B1）
+伪代码：
 
-- BuildMotionPath：直线两 KF；带 spatial 中点偏离直线；单 KF → 空路径
-- SetSpatialTangents undo
-- Bridge：set → get；build_motion_path 顶点数
+```
+draw:
+  if selectTool && selectedLayer && position.keyframes >= 2:
+    chrome = BuildMotionPathChrome(...)
+    play(BuildMotionPathCommands(chrome))  // after masks, with/before selection
+
+hit (select tool, not pen):
+  hit = HitTestMotionPath(chrome, scene)
+  if Keyframe → set selectedKeyframe
+  if In/OutTangent → begin drag → each move: compute tangent, SetSpatialTangents
+     (+ default opposite end of segment if missing)
+```
+
+## 测试
+
+- B1：已有
+- B2 Core：无父 Identity；有父用 parent world；预览手柄位置；hit 优先级 Out/In > KF
+- Bridge/App：人机验轨迹与拖拽弧线
 
 ## 进度回写
 
-B1 测绿 → Core/Bridge `core-done`；B2 交验 → `ui-pending-verify` → 人机 OK → `done`。
+B2 交验 → `ui-pending-verify` → 人机 OK → `done`。
