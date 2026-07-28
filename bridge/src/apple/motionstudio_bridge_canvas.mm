@@ -201,8 +201,8 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
     }
     const float viewUnit =
         canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
-    // Match selection-chrome view-point hit size (~14pt) so vertex presses land.
-    const float handleRadius = 14.0f * viewUnit;
+    // Vertex chrome is ~7pt; keep hit close so mid-edge insert still works.
+    const float handleRadius = 8.0f * viewUnit;
     const float segmentRadius = 6.0f * viewUnit;
     const motion::PathEditHit coreHit =
         motion::HitTestPathEdit(handles, {sceneX, sceneY}, handleRadius, segmentRadius);
