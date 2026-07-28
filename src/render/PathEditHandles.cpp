@@ -13,6 +13,7 @@ namespace {
 
 constexpr Color kPathEditStrokeColor{1.0f, 0.85f, 0.2f, 1.0f};
 constexpr Color kHandleFillColor{1.0f, 1.0f, 1.0f, 1.0f};
+constexpr Color kSelectedHandleFillColor{1.0f, 0.85f, 0.2f, 1.0f};
 constexpr Color kTangentFillColor{0.35f, 0.75f, 1.0f, 1.0f};
 constexpr int kSegmentSamples = 16;
 
@@ -267,8 +268,12 @@ DrawCommandList BuildPathEditCommands(const PathEditHandles &handles, float stro
         }
     }
 
-    for (const Vec2 &vertex : handles.worldVertices) {
-        AppendFill(commands, AxisAlignedSquare(vertex, safeHandle), kHandleFillColor);
+    for (size_t index = 0; index < handles.worldVertices.size(); ++index) {
+        const Vec2 &vertex = handles.worldVertices[index];
+        const bool selected = handles.selectedVertex >= 0 &&
+            static_cast<size_t>(handles.selectedVertex) == index;
+        AppendFill(commands, AxisAlignedSquare(vertex, safeHandle),
+                   selected ? kSelectedHandleFillColor : kHandleFillColor);
         AppendStroke(commands, AxisAlignedSquare(vertex, safeHandle), safeStroke,
                      kPathEditStrokeColor);
     }

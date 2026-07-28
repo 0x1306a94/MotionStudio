@@ -201,8 +201,9 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
     }
     const float viewUnit =
         canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
-    const float handleRadius = 7.0f * viewUnit;
-    const float segmentRadius = 4.0f * viewUnit;
+    // Match selection-chrome view-point hit size (~14pt) so vertex presses land.
+    const float handleRadius = 14.0f * viewUnit;
+    const float segmentRadius = 6.0f * viewUnit;
     const motion::PathEditHit coreHit =
         motion::HitTestPathEdit(handles, {sceneX, sceneY}, handleRadius, segmentRadius);
     hit.kind = ToMSPathHandle(coreHit.kind);
