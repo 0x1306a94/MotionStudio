@@ -49,7 +49,7 @@
 - Consumes: `SceneEvaluator::Evaluate`、`ShapePath::path`、`ShapeGeometryToBezierPath`
 - Produces: 中间帧几何等于路径 lerp 的回归测试
 
-- [ ] **Step 1：写测试（表征 / 失败均可）**
+- [x] **Step 1：写测试（表征 / 失败均可）**
 
 在 `tests/render/SceneEvaluatorTest.cpp` 追加（缺则补 `#include "MotionStudio/model/ShapePath.h"` 与 `using motion::ShapePath`）：
 
@@ -115,7 +115,7 @@ TEST(SceneEvaluatorTest, AnimatedShapePathMorphsBetweenKeyframes) {
 }
 ```
 
-- [ ] **Step 2：跑测试**
+- [x] **Step 2：跑测试**
 
 ```bash
 cmake --build build --target core_tests
@@ -124,7 +124,7 @@ cmake --build build --target core_tests
 
 期望：求值已正确则 PASS（表征测试）。FAIL 则修 `SceneEvaluator` 路径求值直至 PASS。
 
-- [ ] **Step 3：提交**
+- [x] **Step 3：提交**
 
 ```bash
 git commit --only tests/render/SceneEvaluatorTest.cpp src/render/SceneEvaluator.cpp \
@@ -144,7 +144,7 @@ git commit --only tests/render/SceneEvaluatorTest.cpp src/render/SceneEvaluator.
 - Consumes: `Serializer::Save` / `Load`、`ShapePath::path` 上的 `Animatable<BezierPath>` 关键帧
 - Produces: 路径关键帧时间与值的 round-trip 断言
 
-- [ ] **Step 1：写测试**
+- [x] **Step 1：写测试**
 
 ```cpp
 TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
@@ -194,7 +194,7 @@ TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
 
 `Serializer` 的 Save/Load 调用方式与同文件邻近测试保持一致（照抄 API 名）。
 
-- [ ] **Step 2：跑测试**
+- [x] **Step 2：跑测试**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SerializerTest.ShapePathKeyframeRoundTrip'
@@ -202,7 +202,7 @@ TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
 
 期望：PASS。FAIL 则修 `Animatable<BezierPath>` 序列化再跑。
 
-- [ ] **Step 3：提交**
+- [x] **Step 3：提交**
 
 ```bash
 git commit --only tests/serialization/SerializerTest.cpp src/serialization/Serializer.cpp \
@@ -220,7 +220,7 @@ git commit --only tests/serialization/SerializerTest.cpp src/serialization/Seria
 - Consumes: `AddKeyframeCommand`、`RemoveKeyframeCommand`、`PropertyPath{layerId, "path"}`、`KeyframeData`
 - Produces: undo 恢复 ShapePath.path 的静态值 / 先前关键帧
 
-- [ ] **Step 1：写测试**
+- [x] **Step 1：写测试**
 
 沿用 `CommandsTest.cpp` 里已有的 `AddKeyframeCommandTest` fixture。最小示意：
 
@@ -254,7 +254,7 @@ TEST(RemoveKeyframeCommandTest, BezierPathRemoveAndUndo) {
 }
 ```
 
-- [ ] **Step 2：跑测试**
+- [x] **Step 2：跑测试**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='*BezierPath*Keyframe*'
@@ -262,7 +262,7 @@ TEST(RemoveKeyframeCommandTest, BezierPathRemoveAndUndo) {
 
 期望：PASS。
 
-- [ ] **Step 3：提交**
+- [x] **Step 3：提交**
 
 ```bash
 git commit --only tests/undo/CommandsTest.cpp \
@@ -279,7 +279,7 @@ git commit --only tests/undo/CommandsTest.cpp \
 **Interfaces:**
 - Consumes: `ms_command_add_path_layer`、`ms_command_add_keyframe_bezier_path`、`ms_property_evaluate_bezier_path`、`ms_property_keyframe_count`、`ms_property_keyframe_time_at`、`ms_command_write_bezier_path_at_playhead`、`ms_property_is_animated`
 
-- [ ] **Step 1：写测试**
+- [x] **Step 1：写测试**
 
 ```cpp
 TEST(BridgeBezierPathTest, MorphEvaluateMidpointAndKeyframeTimes) {
@@ -332,7 +332,7 @@ TEST(BridgeBezierPathTest, WriteAtPlayheadStaticThenAnimated) {
 
 若聚合初始化与 `MSBezierPath` 字段顺序不符，按 `StaticRoundTripAndKeyframe` 同文件写法改。
 
-- [ ] **Step 2：跑测试**
+- [x] **Step 2：跑测试**
 
 ```bash
 cmake --build build --target bridge_test
@@ -343,7 +343,7 @@ cmake --build build --target bridge_test
 
 期望：PASS。
 
-- [ ] **Step 3：更新 roadmap 进度并提交**
+- [x] **Step 3：更新 roadmap 进度并提交**
 
 在 `docs/superpowers/specs/2026-07-28-path-animation-roadmap.md` 将 Phase A 的 Core/Bridge 标为 `core-done`。
 
@@ -365,7 +365,7 @@ git commit --only bridge/tests/BridgeTest.cpp \
 - Consumes: `ms_property_evaluate_bezier_path`、`ms_command_add_keyframe_bezier_path`、`ms_bezier_path_free`、`keyframes` / `keyframeFrames`
 - Produces: `addKeyframeBezierPathAtPlayhead(entityID:path:frame:)` 供钻石切换
 
-- [ ] **Step 1：加 Core 辅助方法**
+- [x] **Step 1：加 Core 辅助方法**
 
 ```swift
 /// 在 `frame` 用属性当前求值路径添加 BezierPath 关键帧。
@@ -379,7 +379,7 @@ func addKeyframeBezierPathAtPlayhead(entityID: UInt64, path: String, frame: Int6
 }
 ```
 
-- [ ] **Step 2：时间轴轨道**
+- [x] **Step 2：时间轴轨道**
 
 在 `timelineAnimatedPropertyPaths` 的 cornerRadius 块之后：
 
@@ -404,7 +404,7 @@ if animatedPaths.contains("path") {
 
 Mask path 行：`timelineMaskTracks` 含 path 后，现有对 `timelineMaskTracks` 的循环会自动带上。
 
-- [ ] **Step 3：编译 App（无自动测试）**
+- [x] **Step 3：编译 App（无自动测试）**
 
 优先 Xcode MCP `BuildProject`；否则：
 
@@ -415,7 +415,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 
 期望：BUILD SUCCEEDED。
 
-- [ ] **Step 4：暂不单独提交**（与 Task 6 App UI 一并提交，方便人机冒烟）。
+- [x] **Step 4：暂不单独提交**（与 Task 6 App UI 一并提交，方便人机冒烟）。
 
 ---
 
@@ -431,7 +431,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 - Consumes: `MotionDocumentCore.addKeyframeBezierPathAtPlayhead`、`removeKeyframe`、`keyframeFrames`、`hasBezierPath`
 - Produces: 与 Transform/Fill 同语义的钻石切换
 
-- [ ] **Step 1：PathKeyframeInspector**
+- [x] **Step 1：PathKeyframeInspector**
 
 仅当 `core.hasBezierPath(entityID: layerID, path: "path")` 时显示：
 
@@ -484,19 +484,19 @@ struct PathKeyframeInspector: View {
 
 在 `InspectorView` 的 shape 相关区域挂载（仅 `hasBezierPath(..., "path")` 时）。
 
-- [ ] **Step 2：Mask path 钻石**
+- [x] **Step 2：Mask path 钻石**
 
 在 `MasksInspector` 标题行（铅笔旁）为 `masks[index].path` 加同样钻石，调用 `addKeyframeBezierPathAtPlayhead` / `removeKeyframe`。
 
-- [ ] **Step 3：编译 App**
+- [x] **Step 3：编译 App**
 
 同 Task 5。期望：BUILD SUCCEEDED。
 
-- [ ] **Step 4：更新 roadmap**
+- [x] **Step 4：更新 roadmap**
 
 Phase A App UI → `ui-pending-verify`；Core/Bridge 保持 `core-done`。
 
-- [ ] **Step 5：提交 App + roadmap**（本地编译绿即可；人机验证仍待）
+- [x] **Step 5：提交 App + roadmap**（本地编译绿即可；人机验证仍待）
 
 ```bash
 git commit --only \
