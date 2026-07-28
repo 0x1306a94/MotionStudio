@@ -25,7 +25,6 @@ using motion::Layer;
 using motion::SceneEvaluator;
 using motion::Vec2;
 
-
 /* ============================ composition queries ============================ */
 
 int ms_document_composition_count(MSDocument *document) {

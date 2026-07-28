@@ -17,7 +17,6 @@ using motion::FillStyle;
 using motion::Layer;
 using motion::StrokeStyle;
 
-
 /* ============================ layer queries ============================ */
 
 uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index) {

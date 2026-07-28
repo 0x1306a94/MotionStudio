@@ -48,7 +48,6 @@ using motion::FrameTime;
 using motion::Layer;
 using motion::Vec2;
 
-
 /* ============================ commands ============================ */
 
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value) {
@@ -69,8 +68,7 @@ void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const 
 void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
                                        const MSBezierPath *value) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
-                          MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
 }
 
 void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a) {
@@ -168,8 +166,7 @@ void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t ent
                         MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
         return;
     }
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
-                          MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
 }
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
@@ -204,8 +201,7 @@ uint64_t ms_command_add_path_layer(MSDocument *document, uint64_t compositionId)
 
 void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::ConvertGeometryToPathCommand>(
-                          EntityId{layerId}, static_cast<FrameTime>(frame)));
+    Execute(document, std::make_unique<motion::ConvertGeometryToPathCommand>(EntityId{layerId}, static_cast<FrameTime>(frame)));
 }
 
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId) {

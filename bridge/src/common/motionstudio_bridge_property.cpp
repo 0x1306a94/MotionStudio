@@ -34,7 +34,6 @@ const Keyframe<T> *KeyframeAt(const Animatable<T> *property, int index) {
 
 }  // namespace
 
-
 /* ============================ property queries ============================ */
 
 MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
@@ -145,7 +144,6 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
     }
     return 0;
 }
-
 
 int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, const char *path, int index) {
     DocumentLock guard(document);

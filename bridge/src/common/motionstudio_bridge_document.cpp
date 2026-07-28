@@ -20,7 +20,6 @@ using motion::Document;
 using motion::Serializer;
 using motion::UndoManager;
 
-
 MSDocument *ms_document_create(void) {
     auto *handle = new MSDocument();
     handle->document = std::make_unique<Document>();

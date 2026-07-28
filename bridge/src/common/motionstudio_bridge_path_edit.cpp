@@ -29,7 +29,6 @@ using motion::FrameTime;
 using motion::SceneEvaluator;
 using motion::Vec2;
 
-
 namespace {
 
 std::string PathEditPropertyPath(MS_PATH_EDIT kind, int maskIndex) {
@@ -87,8 +86,7 @@ void WriteBezierPathUnlocked(MSDocument *document, uint64_t entityId, const char
                     motion::KeyframeData(MakeKeyframe(frame, value))));
         return;
     }
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path),
-                                                                      motion::PropertyValue(value)));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value)));
 }
 
 void WriteVec2AtPlayheadUnlocked(MSDocument *document, uint64_t entityId, const char *path,
@@ -104,8 +102,7 @@ void WriteVec2AtPlayheadUnlocked(MSDocument *document, uint64_t entityId, const 
                     motion::KeyframeData(MakeKeyframe(frame, value))));
         return;
     }
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path),
-                                                                      motion::PropertyValue(value)));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value)));
 }
 
 motion::BezierPath CurrentBezierPath(MSDocument *document, uint64_t entityId, const char *path,

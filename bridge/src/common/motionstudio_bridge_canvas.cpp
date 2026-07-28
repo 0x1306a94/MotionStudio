@@ -133,7 +133,7 @@ void ms_canvas_set_path_overlays(MSCanvas *canvas, const MSPathOverlayItem *item
     for (size_t index = 0; index < count; ++index) {
         const MSPathOverlayItem &item = items[index];
         motion::PathOverlayItem overlay;
-            overlay.path = bridge::FromMSBezierPath(item.path);
+        overlay.path = bridge::FromMSBezierPath(item.path);
         overlay.worldTransform = Mat3FromOverlay(item);
         overlay.color = motion::Color{item.r, item.g, item.b, item.a};
         canvas->customPathOverlays.push_back(std::move(overlay));

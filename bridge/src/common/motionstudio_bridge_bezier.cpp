@@ -13,7 +13,6 @@ using namespace bridge;
 
 using motion::Vec2;
 
-
 void ms_bezier_path_free(MSBezierPath *path) {
     if (path == nullptr) {
         return;

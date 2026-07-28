@@ -137,7 +137,7 @@ extension EditorViewController {
     }
 
     /// System Edit → Delete, Backspace / Delete key. Pen vertex takes priority.
-    override func delete(_ sender: Any?) {
+    override func delete(_: Any?) {
         if canDeletePathVertex {
             deletePathVertex()
             return

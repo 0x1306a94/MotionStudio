@@ -72,8 +72,7 @@ struct InspectorView: View {
                                        perform: perform,
                                        onEditMaskPath: { index in
                                            editorState.tool = .pen
-                                           editorState.pathEditTarget = .mask(layerID: layerID,
-                                                                             maskIndex: index)
+                                           editorState.pathEditTarget = .mask(layerID: layerID, maskIndex: index)
                                        })
                         TrackMatteInspector(core: core,
                                             compositionID: core.firstCompositionID,
