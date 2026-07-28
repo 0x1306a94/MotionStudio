@@ -6,12 +6,18 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeEllipse.h"
+#include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
+#include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
@@ -36,6 +42,7 @@ using motion::Animatable;
 using motion::BezierPath;
 using motion::Color;
 using motion::Composition;
+using motion::ConvertGeometryToPathCommand;
 using motion::Document;
 using motion::Easing;
 using motion::EntityId;
@@ -62,6 +69,11 @@ using motion::SetStaticValueCommand;
 using motion::SetStrokePositionCommand;
 using motion::SetStyleBlendModeCommand;
 using motion::SetTrackMatteCommand;
+using motion::ShapeContent;
+using motion::ShapeEllipse;
+using motion::ShapePath;
+using motion::ShapeRect;
+using motion::ShapeType;
 using motion::TrackMatteType;
 using motion::UndoManager;
 using motion::Vec2;
@@ -653,4 +665,67 @@ TEST(SetTrackMatteCommandTest, ConsecutiveSetsMerge) {
     scene.undo.undo(scene.document);
     EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::None);
     EXPECT_FALSE(scene.layer->trackMatteLayerId.isValid());
+}
+
+TEST(ConvertGeometryToPathCommandTest, BakesRectAndUndoes) {
+    Scene scene;
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
+    auto rect = std::make_unique<ShapeRect>();
+    rect->size.setStaticValue(Vec2{100, 50});
+    const EntityId shapeId = rect->id;
+    content->geometry = std::move(rect);
+    scene.document.refreshEntityIndex();
+
+    scene.execute<ConvertGeometryToPathCommand>(scene.layer->id, 0);
+    ASSERT_NE(content->geometry, nullptr);
+    EXPECT_EQ(content->geometry->type(), ShapeType::Path);
+    EXPECT_EQ(content->geometry->id, shapeId);
+    auto *path = static_cast<ShapePath *>(content->geometry.get());
+    EXPECT_TRUE(path->path.staticValue().closed);
+    EXPECT_GE(path->path.staticValue().vertices.size(), 4u);
+    EXPECT_NE(scene.document.entityIndex().findShape(shapeId), nullptr);
+
+    scene.undo.undo(scene.document);
+    ASSERT_NE(content->geometry, nullptr);
+    EXPECT_EQ(content->geometry->type(), ShapeType::Rect);
+    EXPECT_EQ(content->geometry->id, shapeId);
+
+    scene.undo.redo(scene.document);
+    EXPECT_EQ(content->geometry->type(), ShapeType::Path);
+}
+
+TEST(ConvertGeometryToPathCommandTest, BakesEllipse) {
+    Scene scene;
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
+    auto ellipse = std::make_unique<ShapeEllipse>();
+    ellipse->size.setStaticValue(Vec2{80, 80});
+    content->geometry = std::move(ellipse);
+    scene.document.refreshEntityIndex();
+
+    scene.execute<ConvertGeometryToPathCommand>(scene.layer->id, 0);
+    ASSERT_NE(content->geometry, nullptr);
+    EXPECT_EQ(content->geometry->type(), ShapeType::Path);
+    auto *path = static_cast<ShapePath *>(content->geometry.get());
+    EXPECT_EQ(path->path.staticValue().vertices.size(), 4u);
+}
+
+TEST(ConvertGeometryToPathCommandTest, PathIsNoOp) {
+    Scene scene;
+    auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
+    auto pathShape = std::make_unique<ShapePath>();
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{1, 0}, {}, {}});
+    pathShape->path.setStaticValue(path);
+    content->geometry = std::move(pathShape);
+    scene.document.refreshEntityIndex();
+
+    scene.execute<ConvertGeometryToPathCommand>(scene.layer->id, 0);
+    EXPECT_EQ(content->geometry->type(), ShapeType::Path);
+    EXPECT_EQ(static_cast<ShapePath *>(content->geometry.get())->path.staticValue().vertices.size(),
+              2u);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(content->geometry->type(), ShapeType::Path);
 }

@@ -28,6 +28,7 @@ enum class CommandKind {
     SetMaskMode,
     SetMaskInverted,
     SetTrackMatte,
+    ConvertGeometryToPath,
     Composite,
 };
 
