@@ -92,8 +92,8 @@
 - [x] creationToolbar: Select → Pen → Rect → Ellipse → Image；无 title；选中同心圆角；钢笔态禁用创建按钮
 - [x] 钢笔：零延时 press 选点/拖；双击顶点 toggle smooth；CloseRing 可拖为顶点 0
 - [x] 选择态双击单选层 → Shape 钢笔（含 Rect/Ellipse convert）；无选中才双击居中；Mask 仅 Inspector
-- [ ] Human App verification
-- [ ] Commit App Swift only after user confirms
+- [x] Human App verification
+- [x] Commit App Swift only after user confirms
 
 ---
 
