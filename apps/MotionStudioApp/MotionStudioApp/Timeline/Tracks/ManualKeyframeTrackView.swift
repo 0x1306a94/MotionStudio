@@ -32,32 +32,53 @@ struct ManualKeyframeTrackView: View {
                                           segment: segment,
                                           pointsPerFrame: pointsPerFrame,
                                           scrollX: scrollX,
-                                          isTrackSelected: isTrackSelected)
+                                          isTrackSelected: isTrackSelected,
+                                          onSetEasing: { easing in
+                                              applyEasing(frame: segment.start.frame, easing: easing)
+                                          },
+                                          onEasingCommit: { registerEdit("Set Easing") },
+                                          onEasingDragBegan: { core.beginDrag() },
+                                          onEasingDragEnded: {
+                                              core.endDrag()
+                                              registerEdit("Set Easing")
+                                          })
             }
-            ForEach(keyframes) { keyframe in
+            ForEach(Array(keyframes.enumerated()), id: \.element.id) { index, keyframe in
                 KeyframeDiamond(keyframe: keyframe,
                                 duration: duration,
                                 pointsPerFrame: pointsPerFrame,
                                 scrollX: scrollX,
-                                isSelected: isKeyframeSelected(keyframe.frame))
-                { from, to in
-                    core.moveKeyframe(entityID: layerID, path: path, from: from, to: to)
-                } onMoveEnded: {
-                    core.endDrag()
-                    registerEdit("Move Keyframe")
-                } onDelete: {
-                    perform("Delete Keyframe") {
-                        core.removeKeyframe(entityID: layerID, path: path, frame: keyframe.frame)
-                    }
-                } onSetEasing: { easing in
-                    perform("Set Easing") {
-                        core.setEasing(entityID: layerID, path: path,
-                                       frame: keyframe.frame, easing: easing)
-                    }
-                }
+                                isSelected: isKeyframeSelected(keyframe.frame),
+                                hasOutgoingSegment: index + 1 < keyframes.count,
+                                onMove: { from, to in
+                                    core.moveKeyframe(entityID: layerID, path: path, from: from, to: to)
+                                },
+                                onMoveEnded: {
+                                    core.endDrag()
+                                    registerEdit("Move Keyframe")
+                                },
+                                onDelete: {
+                                    perform("Delete Keyframe") {
+                                        core.removeKeyframe(entityID: layerID, path: path,
+                                                            frame: keyframe.frame)
+                                    }
+                                },
+                                onSetEasing: { easing in
+                                    applyEasing(frame: keyframe.frame, easing: easing)
+                                },
+                                onEasingCommit: { registerEdit("Set Easing") },
+                                onEasingDragBegan: { core.beginDrag() },
+                                onEasingDragEnded: {
+                                    core.endDrag()
+                                    registerEdit("Set Easing")
+                                })
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func applyEasing(frame: Int64, easing: EasingInfo) {
+        core.setEasing(entityID: layerID, path: path, frame: frame, easing: easing)
     }
 
     private func isKeyframeSelected(_ frame: Int64) -> Bool {

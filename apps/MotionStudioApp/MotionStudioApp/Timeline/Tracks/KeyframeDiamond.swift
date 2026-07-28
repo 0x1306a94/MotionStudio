@@ -13,15 +13,27 @@ struct KeyframeDiamond: View {
     let pointsPerFrame: CGFloat
     let scrollX: CGFloat
     let isSelected: Bool
+    /// False when this is the last keyframe on the track (no outgoing segment).
+    let hasOutgoingSegment: Bool
     let onMove: (Int64, Int64) -> Void
     let onMoveEnded: () -> Void
     let onDelete: () -> Void
     let onSetEasing: (EasingInfo) -> Void
+    let onEasingCommit: () -> Void
+    let onEasingDragBegan: () -> Void
+    let onEasingDragEnded: () -> Void
 
     @State private var dragStartFrame: Int64?
     @State private var isHovering = false
+    @State private var showEasingPopover = false
+
+    private var centerX: CGFloat {
+        trackLeadingInset + timelineX(for: keyframe.frame, pointsPerFrame: pointsPerFrame) - scrollX
+    }
 
     var body: some View {
+        // Match segment badge: popover on the fixed-size content, then .position the container.
+        // Applying .popover after .position anchors to the filled parent frame instead.
         Image(systemName: "diamond.fill")
             .font(.system(size: isHovering ? 12 : 11))
             .foregroundStyle(isSelected ? Color.accentColor : Color.premnitiplyColor(gray: 1, alpha: 0.68))
@@ -30,10 +42,8 @@ struct KeyframeDiamond: View {
             .frame(width: 20, height: propertyRowHeight)
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }
-            .position(x: trackLeadingInset + timelineX(for: keyframe.frame, pointsPerFrame: pointsPerFrame) - scrollX,
-                      y: propertyRowHeight / 2)
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 4)
                     .onChanged { value in
                         if dragStartFrame == nil {
                             dragStartFrame = keyframe.frame
@@ -52,15 +62,23 @@ struct KeyframeDiamond: View {
                         onMoveEnded()
                     },
             )
-            .contextMenu {
-                Button("Delete Keyframe", role: .destructive, action: onDelete)
-                Divider()
-                Button("Linear") { onSetEasing(.linear) }
-                Button("Ease") { onSetEasing(.ease) }
-                Button("Ease In") { onSetEasing(.easeIn) }
-                Button("Ease Out") { onSetEasing(.easeOut) }
-                Button("Ease In Out") { onSetEasing(.easeInOut) }
-                Button("Hold") { onSetEasing(.hold) }
+            .onTapGesture {
+                showEasingPopover = true
             }
+            .popover(isPresented: $showEasingPopover, arrowEdge: .bottom) {
+                KeyframeEasingPopover(easing: keyframe.easing,
+                                      easingAffectsPlayback: hasOutgoingSegment,
+                                      onSetEasing: { easing in
+                                          onSetEasing(easing)
+                                      },
+                                      onDelete: {
+                                          showEasingPopover = false
+                                          onDelete()
+                                      },
+                                      onCommit: onEasingCommit,
+                                      onDragBegan: onEasingDragBegan,
+                                      onDragEnded: onEasingDragEnded)
+            }
+            .position(x: centerX, y: propertyRowHeight / 2)
     }
 }
