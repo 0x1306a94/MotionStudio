@@ -9,11 +9,13 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
+#include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
+using motion::BezierPath;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -27,6 +29,7 @@ using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
+using motion::ShapePath;
 using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::Vec2;
@@ -63,6 +66,39 @@ struct RectScene {
 
     Expected<SceneState, std::string> EvaluatePreview(motion::PreviewTime time) {
         return SceneEvaluator::EvaluatePreview(document, composition->id, time);
+    }
+};
+
+BezierPath MakeShiftedSegment(float x0, float x1) {
+    BezierPath path;
+    path.closed = false;
+    path.vertices.push_back({{x0, 0}, {0, 0}, {0, 0}});
+    path.vertices.push_back({{x1, 0}, {0, 0}, {0, 0}});
+    return path;
+}
+
+struct PathScene {
+    Document document;
+    Composition *composition = nullptr;
+    Layer *layer = nullptr;
+    ShapePath *pathShape = nullptr;
+
+    PathScene() {
+        composition = document.addComposition(std::make_unique<Composition>());
+        composition->duration = 100;
+        layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+        layer->outPoint = 100;
+        auto *content = static_cast<ShapeContent *>(layer->content.get());
+        auto element = std::make_unique<ShapePath>();
+        pathShape = element.get();
+        content->geometry = std::move(element);
+        auto fill = std::make_unique<FillStyle>();
+        fill->color.setStaticValue(Color{1, 0, 0, 1});
+        layer->styles.push_back(std::move(fill));
+    }
+
+    Expected<SceneState, std::string> Evaluate(motion::FrameTime time) {
+        return SceneEvaluator::Evaluate(document, composition->id, time);
     }
 };
 
@@ -400,4 +436,27 @@ TEST(SceneEvaluatorTest, SelfTrackMatteIsIgnored) {
     EXPECT_EQ(result->layers[0].trackMatteType, motion::TrackMatteType::None);
     EXPECT_FALSE(result->layers[0].matteSourceId.isValid());
     EXPECT_FALSE(result->layers[0].usedAsMatteOnly);
+}
+
+TEST(SceneEvaluatorTest, AnimatedShapePathMorphsBetweenKeyframes) {
+    PathScene scene;
+    motion::Keyframe<BezierPath> from;
+    from.time = 0;
+    from.value = MakeShiftedSegment(0, 10);
+    motion::Keyframe<BezierPath> to;
+    to.time = 20;
+    to.value = MakeShiftedSegment(20, 30);
+    scene.pathShape->path.addKeyframe(from);
+    scene.pathShape->path.addKeyframe(to);
+
+    Expected<SceneState, std::string> mid = scene.Evaluate(10);
+    ASSERT_TRUE(mid.hasValue());
+    ASSERT_EQ(mid->layers.size(), 1u);
+    ASSERT_FALSE(mid->layers[0].shapeItems.empty());
+
+    const BezierPath baked =
+        motion::ShapeGeometryToBezierPath(mid->layers[0].shapeItems[0].geometry);
+    ASSERT_EQ(baked.vertices.size(), 2u);
+    EXPECT_FLOAT_EQ(baked.vertices[0].point.x, 10.0f);
+    EXPECT_FLOAT_EQ(baked.vertices[1].point.x, 20.0f);
 }
