@@ -162,6 +162,8 @@ PathEditHit HitTestPathEdit(const PathEditHandles &handles, Vec2 scenePoint,
     }
     const float handleRadius = std::max(handleHitRadius, 0.0f);
     const float segmentRadius = std::max(segmentHitRadius, 0.0f);
+    const float handleRadiusSquared = handleRadius * handleRadius;
+    const float segmentRadiusSquared = segmentRadius * segmentRadius;
 
     if (handles.selectedVertex >= 0) {
         const size_t selected = static_cast<size_t>(handles.selectedVertex);
@@ -180,44 +182,65 @@ PathEditHit HitTestPathEdit(const PathEditHandles &handles, Vec2 scenePoint,
         }
     }
 
+    // Compete vertex vs segment by distance so a large vertex hit radius does
+    // not swallow mid-edge clicks used for InsertVertex.
+    float bestVertexDistanceSquared = handleRadiusSquared;
+    int bestVertex = -1;
     for (size_t index = 0; index < handles.worldVertices.size(); ++index) {
-        if (!IsNearPoint(scenePoint, handles.worldVertices[index], handleRadius)) {
-            continue;
+        const float distanceSquared =
+            LengthSquared(scenePoint - handles.worldVertices[index]);
+        if (distanceSquared <= bestVertexDistanceSquared) {
+            bestVertexDistanceSquared = distanceSquared;
+            bestVertex = static_cast<int>(index);
         }
-        if (!handles.localPath.closed && index == 0 && handles.worldVertices.size() >= 2) {
-            hit.kind = PathHandleKind::CloseRing;
-            hit.index = 0;
-            return hit;
-        }
-        hit.kind = PathHandleKind::Vertex;
-        hit.index = index;
-        return hit;
     }
 
     Mat3 inverse;
-    if (!handles.worldTransform.tryInvert(inverse)) {
-        return hit;
-    }
-    const Vec2 localPoint = inverse.transformPoint(scenePoint);
-    const size_t count = handles.localPath.vertices.size();
-    const size_t segmentCount = handles.localPath.closed ? count : (count > 0 ? count - 1 : 0);
-    const float radiusSquared = segmentRadius * segmentRadius;
-    float bestDistance = radiusSquared;
-    bool found = false;
-    for (size_t segment = 0; segment < segmentCount; ++segment) {
-        float t = 0;
-        float distance = 0;
-        ClosestOnSegment(handles.localPath, segment, localPoint, t, distance);
-        if (distance <= bestDistance) {
-            bestDistance = distance;
-            hit.kind = PathHandleKind::Segment;
-            hit.index = segment;
-            hit.segmentT = t;
-            found = true;
+    float bestSegmentDistanceSquared = segmentRadiusSquared;
+    int bestSegment = -1;
+    float bestSegmentT = 0;
+    if (handles.worldTransform.tryInvert(inverse)) {
+        const Vec2 localPoint = inverse.transformPoint(scenePoint);
+        const size_t count = handles.localPath.vertices.size();
+        const size_t segmentCount =
+            handles.localPath.closed ? count : (count > 0 ? count - 1 : 0);
+        for (size_t segment = 0; segment < segmentCount; ++segment) {
+            float t = 0;
+            float localDistanceSquared = 0;
+            ClosestOnSegment(handles.localPath, segment, localPoint, t, localDistanceSquared);
+            const BezierPath::Vertex &from = handles.localPath.vertices[segment];
+            const BezierPath::Vertex &to =
+                handles.localPath.vertices[(segment + 1) % count];
+            const Vec2 closestLocal =
+                CubicPoint(from.point, from.point + from.outTangent, to.point + to.inTangent,
+                           to.point, t);
+            const Vec2 closestWorld = handles.worldTransform.transformPoint(closestLocal);
+            const float distanceSquared = LengthSquared(scenePoint - closestWorld);
+            if (distanceSquared <= bestSegmentDistanceSquared) {
+                bestSegmentDistanceSquared = distanceSquared;
+                bestSegment = static_cast<int>(segment);
+                bestSegmentT = t;
+            }
         }
     }
-    if (!found) {
-        hit = {};
+
+    const bool hasVertex = bestVertex >= 0;
+    const bool hasSegment = bestSegment >= 0;
+    if (hasVertex && (!hasSegment || bestVertexDistanceSquared <= bestSegmentDistanceSquared)) {
+        const size_t index = static_cast<size_t>(bestVertex);
+        if (!handles.localPath.closed && index == 0 && handles.worldVertices.size() >= 2) {
+            hit.kind = PathHandleKind::CloseRing;
+        } else {
+            hit.kind = PathHandleKind::Vertex;
+        }
+        hit.index = index;
+        return hit;
+    }
+    if (hasSegment) {
+        hit.kind = PathHandleKind::Segment;
+        hit.index = static_cast<size_t>(bestSegment);
+        hit.segmentT = bestSegmentT;
+        return hit;
     }
     return hit;
 }

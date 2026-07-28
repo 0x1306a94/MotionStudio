@@ -114,6 +114,17 @@ TEST(PathEditHandlesTest, HitTestFindsSegment) {
     EXPECT_NEAR(hit.segmentT, 0.5f, 0.1f);
 }
 
+TEST(PathEditHandlesTest, MidSegmentWinsOverLargeVertexRadius) {
+    PathEditHandles handles;
+    ASSERT_TRUE(BuildPathEditHandlesFromPath(MakeTriangle(), Mat3::Identity(), {}, -1, handles));
+
+    // Midpoint of edge (0,0)-(10,0). A 14-unit vertex radius covers this point,
+    // but segment distance is nearer so insert-on-edge must still win.
+    PathEditHit hit = HitTestPathEdit(handles, {5, 0}, 14.0f, 6.0f);
+    EXPECT_EQ(hit.kind, PathHandleKind::Segment);
+    EXPECT_EQ(hit.index, 0u);
+}
+
 TEST(PathEditHandlesTest, BuildCommandsNonEmpty) {
     PathEditHandles handles;
     ASSERT_TRUE(BuildPathEditHandlesFromPath(MakeTriangle(), Mat3::Identity(), {}, 1, handles));
