@@ -19,6 +19,7 @@
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
+#include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/HitTest.h"
@@ -30,6 +31,7 @@
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
+#include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
@@ -73,6 +75,7 @@ using motion::SceneEvaluator;
 using motion::Serializer;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
+using motion::ShapePath;
 using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::UndoManager;
@@ -133,6 +136,60 @@ const Animatable<Color> *AsColor(AnimatableBase *base) {
         return nullptr;
     }
     return static_cast<const Animatable<Color> *>(base);
+}
+
+const Animatable<motion::BezierPath> *AsBezierPath(AnimatableBase *base) {
+    if (base == nullptr || base->valueType() != AnimatableType::BezierPath) {
+        return nullptr;
+    }
+    return static_cast<const Animatable<motion::BezierPath> *>(base);
+}
+
+MSBezierPath *AllocateMSBezierPath(const motion::BezierPath &path) {
+    auto *result = static_cast<MSBezierPath *>(std::malloc(sizeof(MSBezierPath)));
+    if (result == nullptr) {
+        return nullptr;
+    }
+    result->count = path.vertices.size();
+    result->closed = path.closed;
+    result->vertices = nullptr;
+    if (result->count > 0) {
+        result->vertices =
+            static_cast<MSBezierVertex *>(std::calloc(result->count, sizeof(MSBezierVertex)));
+        if (result->vertices == nullptr) {
+            std::free(result);
+            return nullptr;
+        }
+        for (size_t index = 0; index < result->count; ++index) {
+            const motion::BezierPath::Vertex &vertex = path.vertices[index];
+            result->vertices[index].pointX = vertex.point.x;
+            result->vertices[index].pointY = vertex.point.y;
+            result->vertices[index].inTangentX = vertex.inTangent.x;
+            result->vertices[index].inTangentY = vertex.inTangent.y;
+            result->vertices[index].outTangentX = vertex.outTangent.x;
+            result->vertices[index].outTangentY = vertex.outTangent.y;
+        }
+    }
+    return result;
+}
+
+motion::BezierPath FromMSBezierPath(const MSBezierPath *path) {
+    motion::BezierPath result;
+    if (path == nullptr) {
+        return result;
+    }
+    result.closed = path->closed;
+    if (path->vertices == nullptr || path->count == 0) {
+        return result;
+    }
+    result.vertices.reserve(path->count);
+    for (size_t index = 0; index < path->count; ++index) {
+        const MSBezierVertex &vertex = path->vertices[index];
+        result.vertices.push_back({{vertex.pointX, vertex.pointY},
+                                   {vertex.inTangentX, vertex.inTangentY},
+                                   {vertex.outTangentX, vertex.outTangentY}});
+    }
+    return result;
 }
 
 // Builds a fully-initialized keyframe (avoids partial aggregate init warnings).
@@ -256,6 +313,29 @@ uint64_t AddShapeLayer(MSDocument *handle, uint64_t compositionId, bool ellipse)
     return layerId;
 }
 
+uint64_t AddPathLayer(MSDocument *handle, uint64_t compositionId) {
+    Composition *composition = FindComposition(handle, compositionId);
+    if (composition == nullptr) {
+        return 0;
+    }
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "Path " + std::to_string(composition->layers.size() + 1);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    layer->transform.position.setStaticValue(Vec2{composition->width * 0.5f, composition->height * 0.5f});
+
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    content->geometry = std::make_unique<ShapePath>();
+
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(SHAPE_PALETTE[composition->layers.size() % 6]);
+    layer->styles.push_back(std::move(fill));
+
+    const uint64_t layerId = layer->id.value;
+    Execute(handle, std::make_unique<motion::AddLayerCommand>(composition->id, std::move(layer)));
+    return layerId;
+}
+
 }  // namespace
 
 /* ============================ lifecycle ============================ */
@@ -304,6 +384,14 @@ char *ms_document_save(MSDocument *document) {
 
 void ms_string_free(char *string) {
     free(string);
+}
+
+void ms_bezier_path_free(MSBezierPath *path) {
+    if (path == nullptr) {
+        return;
+    }
+    free(path->vertices);
+    free(path);
 }
 
 /* ============================ undo / redo ============================ */
@@ -841,6 +929,15 @@ void ms_property_static_color(MSDocument *document, uint64_t entityId, const cha
     }
 }
 
+MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path) {
+    DocumentLock guard(document);
+    const Animatable<motion::BezierPath> *property = AsBezierPath(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(property->staticValue());
+}
+
 int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
@@ -990,6 +1087,16 @@ void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const c
     }
 }
 
+MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
+                                               int64_t frame) {
+    DocumentLock guard(document);
+    const Animatable<motion::BezierPath> *property = AsBezierPath(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(property->evaluate(static_cast<FrameTime>(frame)));
+}
+
 /* ============================ commands ============================ */
 
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value) {
@@ -1005,6 +1112,13 @@ void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const c
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
+}
+
+void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
+                                       const MSBezierPath *value) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
+                          MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
 }
 
 void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a) {
@@ -1075,6 +1189,16 @@ void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, cons
     Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Color{r, g, b, a}))));
 }
 
+void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
+                                         int64_t frame, const MSBezierPath *value) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::AddKeyframeCommand>(
+                MakePath(entityId, path),
+                motion::KeyframeData(
+                    MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+}
+
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame)));
@@ -1098,6 +1222,17 @@ uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId)
 uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t compositionId) {
     DocumentLock guard(document);
     return AddShapeLayer(document, compositionId, true);
+}
+
+uint64_t ms_command_add_path_layer(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
+    return AddPathLayer(document, compositionId);
+}
+
+void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::ConvertGeometryToPathCommand>(
+                          EntityId{layerId}, static_cast<FrameTime>(frame)));
 }
 
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId) {

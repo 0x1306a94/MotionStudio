@@ -142,6 +142,26 @@ typedef CF_CLOSED_ENUM(int, MS_PREVIEWER_BACKDROP) {
     MS_PREVIEWER_BACKDROP_TRANSPARENT = 1,
 };
 
+// One BezierPath vertex using the Lottie tangent convention (offsets from point).
+typedef struct MSBezierVertex {
+    float pointX;
+    float pointY;
+    float inTangentX;
+    float inTangentY;
+    float outTangentX;
+    float outTangentY;
+} MSBezierVertex;
+
+// Heap-allocated Bezier path. Release with ms_bezier_path_free.
+typedef struct MSBezierPath {
+    MSBezierVertex *vertices;
+    size_t count;
+    bool closed;
+} MSBezierPath;
+
+// Frees a path returned by this API (vertices + the struct itself).
+void ms_bezier_path_free(MSBezierPath *path);
+
 /* ============================ lifecycle ============================ */
 
 // Creates a new document containing one default composition
@@ -307,6 +327,9 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
 float ms_property_static_float(MSDocument *document, uint64_t entityId, const char *path);
 void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y);
 void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r, float *g, float *b, float *a);
+// Returns a heap-allocated path copy. Release with ms_bezier_path_free.
+// Returns NULL when the property is missing or not a BezierPath.
+MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path);
 
 // Keyframe accessors (index into the ascending-time keyframe list).
 int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path);
@@ -323,6 +346,8 @@ MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y);
 void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *r, float *g, float *b, float *a);
+// Evaluated BezierPath at frame. Release with ms_bezier_path_free. NULL on miss.
+MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 
 /* ============================ commands ============================ */
 // Every function below executes a command through the document's undo
@@ -331,6 +356,8 @@ void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const c
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value);
 void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x, float y);
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a);
+// value may be NULL (treated as empty open path).
+void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path, const MSBezierPath *value);
 void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a);
 void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId, float cornerRadius);
 void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId, int width, int height);
@@ -341,6 +368,7 @@ void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compos
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value);
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a);
+void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSBezierPath *value);
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.
@@ -351,6 +379,11 @@ void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *
 // Returns the new layer ID, 0 on failure.
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId);
 uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t compositionId);
+// Adds an empty open ShapePath layer with a default fill, centered on the
+// composition. Returns the new layer ID, 0 on failure.
+uint64_t ms_command_add_path_layer(MSDocument *document, uint64_t compositionId);
+// Bakes Rect/Ellipse geometry on the layer into a ShapePath at frame.
+void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame);
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);

@@ -526,4 +526,71 @@ TEST(BridgeCommandTest, StrokeStyleLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeBezierPathTest, StaticRoundTripAndKeyframe) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+    EXPECT_EQ(ms_property_type(document, layerId, "path"), MS_VALUE_BEZIER_PATH);
+
+    MSBezierVertex vertices[2] = {
+        {0, 0, 0, 0, 1, 0},
+        {10, 0, -1, 0, 0, 0},
+    };
+    MSBezierPath input;
+    input.vertices = vertices;
+    input.count = 2;
+    input.closed = false;
+
+    ms_command_set_static_bezier_path(document, layerId, "path", &input);
+    MSBezierPath *loaded = ms_property_static_bezier_path(document, layerId, "path");
+    ASSERT_NE(loaded, nullptr);
+    ASSERT_EQ(loaded->count, 2u);
+    EXPECT_FALSE(loaded->closed);
+    EXPECT_FLOAT_EQ(loaded->vertices[0].pointX, 0);
+    EXPECT_FLOAT_EQ(loaded->vertices[1].pointX, 10);
+    EXPECT_FLOAT_EQ(loaded->vertices[0].outTangentX, 1);
+    ms_bezier_path_free(loaded);
+
+    MSBezierVertex keyedVertices[2] = {
+        {0, 0, 0, 0, 0, 0},
+        {20, 5, 0, 0, 0, 0},
+    };
+    MSBezierPath keyed;
+    keyed.vertices = keyedVertices;
+    keyed.count = 2;
+    keyed.closed = true;
+    ms_command_add_keyframe_bezier_path(document, layerId, "path", 10, &keyed);
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "path"));
+    MSBezierPath *evaluated = ms_property_evaluate_bezier_path(document, layerId, "path", 10);
+    ASSERT_NE(evaluated, nullptr);
+    EXPECT_TRUE(evaluated->closed);
+    EXPECT_FLOAT_EQ(evaluated->vertices[1].pointX, 20);
+    ms_bezier_path_free(evaluated);
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeBezierPathTest, ConvertGeometryAndAddPathLayer) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t rectId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_NE(rectId, 0u);
+
+    // Rect has no "path" until converted.
+    EXPECT_EQ(ms_property_type(document, rectId, "path"), MS_VALUE_INVALID);
+    ms_command_convert_geometry_to_path(document, rectId, 0);
+    EXPECT_EQ(ms_property_type(document, rectId, "path"), MS_VALUE_BEZIER_PATH);
+    MSBezierPath *path = ms_property_static_bezier_path(document, rectId, "path");
+    ASSERT_NE(path, nullptr);
+    EXPECT_TRUE(path->closed);
+    EXPECT_GE(path->count, 4u);
+    ms_bezier_path_free(path);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_property_type(document, rectId, "path"), MS_VALUE_INVALID);
+
+    ms_document_destroy(document);
+}
+
 }  // namespace
