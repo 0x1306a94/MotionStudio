@@ -424,6 +424,14 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard editorState.tool != .pen else { return }
         let viewPoint = gesture.location(in: view)
         let additive = gesture.modifierFlags.contains(.shift) || KeyboardModifiers.shiftPressed
+
+        // Prefer motion-path keyframe selection over layer hit so tangent handles appear.
+        if let scenePoint = scenePoint(fromViewPoint: viewPoint),
+           selectMotionPathKeyframe(at: scenePoint)
+        {
+            return
+        }
+
         if let layerID = hitTestLayer(at: viewPoint) {
             selectLayer(layerID, additive: additive)
         } else if !additive {
@@ -715,16 +723,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return false
         }
 
-        editorState.motionPathLayerID = hit.layerId
-        editorState.motionPathSelectedKeyframe = Int(hit.index)
-        if !editorState.isLayerSelected(hit.layerId) {
-            editorState.selectLayer(hit.layerId, additive: false)
-            // selectLayer clears motion path selection — restore.
-            editorState.motionPathLayerID = hit.layerId
-            editorState.motionPathSelectedKeyframe = Int(hit.index)
-        }
-        updateSelectionOutline()
-        requestDraw()
+        applyMotionPathSelection(layerID: hit.layerId, keyframeIndex: Int(hit.index))
 
         if hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT {
             document.core.beginDrag()
@@ -734,6 +733,67 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             motionPathDragDidMove = false
         }
         return true
+    }
+
+    /// Tap helper: select a motion-path keyframe under the point.
+    private func selectMotionPathKeyframe(at scenePoint: CGPoint) -> Bool {
+        guard let canvas, editorState.tool == .select else {
+            return false
+        }
+        // Ensure selected layers are pushed so hit-test sees them.
+        updateSelectionOutline()
+        let hit = document.core.hitMotionPath(canvas: canvas, compositionID: compositionID,
+                                              frameTime: previewFrame, point: scenePoint)
+        guard hit.kind == .KEYFRAME || hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT else {
+            return false
+        }
+        applyMotionPathSelection(layerID: hit.layerId, keyframeIndex: Int(hit.index))
+        return true
+    }
+
+    private func applyMotionPathSelection(layerID: UInt64, keyframeIndex: Int) {
+        if !editorState.isLayerSelected(layerID) {
+            editorState.selectLayer(layerID, additive: false)
+        }
+        editorState.motionPathLayerID = layerID
+        editorState.motionPathSelectedKeyframe = keyframeIndex
+        updateSelectionOutline()
+        requestDraw()
+    }
+
+    /// When a selected layer has ≥2 position keyframes, keep one keyframe selected so
+    /// pullable tangent handles are visible without an extra click.
+    private func ensureDefaultMotionPathKeyframeSelection() {
+        guard editorState.tool == .select,
+              let layerID = editorState.selectedLayerID
+        else {
+            return
+        }
+        let frames = document.core.keyframes(entityID: layerID, path: "transform.position").map(\.frame)
+        guard frames.count >= 2 else {
+            if editorState.motionPathLayerID == layerID {
+                editorState.clearMotionPathSelection()
+            }
+            return
+        }
+        if editorState.motionPathLayerID == layerID,
+           let selected = editorState.motionPathSelectedKeyframe,
+           selected >= 0, selected < frames.count
+        {
+            return
+        }
+        let playhead = playheadFrame
+        var bestIndex = 0
+        var bestDistance = abs(frames[0] - playhead)
+        for index in 1 ..< frames.count {
+            let distance = abs(frames[index] - playhead)
+            if distance < bestDistance {
+                bestDistance = distance
+                bestIndex = index
+            }
+        }
+        editorState.motionPathLayerID = layerID
+        editorState.motionPathSelectedKeyframe = bestIndex
     }
 
     private func updateMotionPathDrag(at viewPoint: CGPoint) {
@@ -936,6 +996,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard let canvas else {
             return
         }
+        ensureDefaultMotionPathKeyframeSelection()
         let selectedLayerIDs = editorState.selectedLayerIDs
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
