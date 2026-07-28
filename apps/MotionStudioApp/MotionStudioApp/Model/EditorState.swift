@@ -62,6 +62,10 @@ final class EditorState {
     /// Active path-edit chrome target while `tool == .pen`.
     var pathEditTarget: PathEditTarget?
 
+    /// Selected position keyframe on the motion path (Select tool). `nil` when none.
+    var motionPathLayerID: UInt64?
+    var motionPathSelectedKeyframe: Int?
+
     func isLayerSelected(_ layerID: UInt64) -> Bool {
         selectedLayerIDs.contains(layerID)
     }
@@ -79,12 +83,19 @@ final class EditorState {
         }
         selectedTimelineProperty = nil
         selectedTimelineSegment = nil
+        clearMotionPathSelection()
     }
 
     func clearLayerSelection() {
         selectedLayerIDs = []
         selectedTimelineProperty = nil
         selectedTimelineSegment = nil
+        clearMotionPathSelection()
+    }
+
+    func clearMotionPathSelection() {
+        motionPathLayerID = nil
+        motionPathSelectedKeyframe = nil
     }
 
     func clearPathEdit() {

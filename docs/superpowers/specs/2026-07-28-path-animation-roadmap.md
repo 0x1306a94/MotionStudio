@@ -34,7 +34,7 @@
 |---|---|---|---|---|
 | A | Path Morph | `done` | `done` | 详见 [path-morph-design](./2026-07-28-path-morph-design.md) |
 | C | Trim Path | `done` | `done` | Stroke Trim 已有能力 + 回归测。见 [stroke-trim-design](./2026-07-28-stroke-trim-design.md)。`ShapeTrimPath` 修饰器后置 |
-| B | Motion Path | `core-done` | `todo` | B1 API 完成；B2 画布轨迹+手柄待做。见 [motion-path-design](./2026-07-28-motion-path-design.md) |
+| B | Motion Path | `core-done` | `ui-pending-verify` | B1 API + B2 画布轨迹/手柄已接；等人机验。见 [motion-path-design](./2026-07-28-motion-path-design.md) |
 | D | Follow Path | `todo` | `todo` | 占位；放最后 |
 
 ## Phase 占位范围

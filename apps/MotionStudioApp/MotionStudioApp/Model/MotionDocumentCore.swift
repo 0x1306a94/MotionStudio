@@ -697,6 +697,25 @@ final class MotionDocumentCore {
                                 Float(point.x), Float(point.y))
     }
 
+    func hitMotionPath(canvas: OpaquePointer, compositionID: UInt64, frameTime: Double,
+                       point: CGPoint) -> MSMotionPathHit
+    {
+        ms_canvas_hit_motion_path(canvas, handle, compositionID, frameTime,
+                                  Float(point.x), Float(point.y))
+    }
+
+    func setMotionPathSelection(canvas: OpaquePointer, layerID: UInt64?, selectedKeyframe: Int?) {
+        ms_canvas_set_motion_path_selection(canvas, layerID ?? 0, Int32(selectedKeyframe ?? -1))
+    }
+
+    func dragMotionPathTangent(layerID: UInt64, keyframeIndex: Int, isOut: Bool,
+                               scenePoint: CGPoint, frameTime: Double)
+    {
+        ms_command_motion_path_drag_tangent(handle, layerID, Int32(keyframeIndex), isOut,
+                                            Float(scenePoint.x), Float(scenePoint.y), frameTime)
+        changed()
+    }
+
     private func changed() {
         revision += 1
         onDidChange?()

@@ -73,6 +73,12 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         var linkedHandles: Bool
     }
 
+    private struct MotionPathDragState {
+        var layerID: UInt64
+        var index: Int
+        var isOut: Bool
+    }
+
     private var penDrag: PenDragState?
     private var penDragDidMove = false
     /// Hit captured on press when not starting a vertex/tangent drag (segment / blank).
@@ -81,6 +87,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var lastPenVertexClickTime: CFTimeInterval = 0
     private var lastPenVertexClickIndex: Int = -1
     private static let penDoubleClickInterval: CFTimeInterval = 0.35
+
+    private var motionPathDrag: MotionPathDragState?
+    private var motionPathDragDidMove = false
 
     private static let minCanvasZoom: CGFloat = 0.02
     private static let maxCanvasZoom: CGFloat = 64
@@ -627,9 +636,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         case .began:
             beginFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
         case .changed:
-            updateFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
+            if motionPathDrag != nil {
+                updateMotionPathDrag(at: gesture.location(in: view))
+            } else {
+                updateFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
+            }
         case .ended, .cancelled, .failed:
-            endFreeTransform()
+            if motionPathDrag != nil {
+                endMotionPathDrag()
+            } else {
+                endFreeTransform()
+            }
         default:
             break
         }
@@ -638,7 +655,13 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private func beginFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
         freeTransformDrag = nil
         freeTransformDidMove = false
+        motionPathDrag = nil
+        motionPathDragDidMove = false
         guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
+            return
+        }
+
+        if beginMotionPathInteraction(at: scenePoint) {
             return
         }
 
@@ -675,6 +698,72 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               pivotScene: .zero,
                                               localPivotRelative: nil,
                                               editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer")
+    }
+
+    /// Handles motion-path keyframe / tangent hits. Returns true when the press
+    /// was consumed (including keyframe-only selection with no drag).
+    private func beginMotionPathInteraction(at scenePoint: CGPoint) -> Bool {
+        guard let canvas, editorState.tool == .select else {
+            return false
+        }
+        guard !editorState.selectedLayerIDs.isEmpty else {
+            return false
+        }
+        let hit = document.core.hitMotionPath(canvas: canvas, compositionID: compositionID,
+                                              frameTime: previewFrame, point: scenePoint)
+        if hit.kind == .NONE {
+            return false
+        }
+
+        editorState.motionPathLayerID = hit.layerId
+        editorState.motionPathSelectedKeyframe = Int(hit.index)
+        if !editorState.isLayerSelected(hit.layerId) {
+            editorState.selectLayer(hit.layerId, additive: false)
+            // selectLayer clears motion path selection — restore.
+            editorState.motionPathLayerID = hit.layerId
+            editorState.motionPathSelectedKeyframe = Int(hit.index)
+        }
+        updateSelectionOutline()
+        requestDraw()
+
+        if hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT {
+            document.core.beginDrag()
+            motionPathDrag = MotionPathDragState(layerID: hit.layerId,
+                                                 index: Int(hit.index),
+                                                 isOut: hit.kind == .OUT_TANGENT)
+            motionPathDragDidMove = false
+        }
+        return true
+    }
+
+    private func updateMotionPathDrag(at viewPoint: CGPoint) {
+        guard let motionPathDrag,
+              let scenePoint = scenePoint(fromViewPoint: viewPoint)
+        else {
+            return
+        }
+        document.core.dragMotionPathTangent(layerID: motionPathDrag.layerID,
+                                            keyframeIndex: motionPathDrag.index,
+                                            isOut: motionPathDrag.isOut,
+                                            scenePoint: scenePoint,
+                                            frameTime: previewFrame)
+        motionPathDragDidMove = true
+        requestDraw()
+    }
+
+    private func endMotionPathDrag() {
+        defer {
+            motionPathDrag = nil
+            motionPathDragDidMove = false
+        }
+        guard motionPathDrag != nil else {
+            return
+        }
+        document.core.endDrag()
+        guard motionPathDragDidMove else {
+            return
+        }
+        registerEdit("Set Spatial Tangents")
     }
 
     private func beginHandleTransform(hit: MS_SELECTION_HANDLE,
@@ -851,6 +940,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
+        document.core.setMotionPathSelection(canvas: canvas,
+                                             layerID: editorState.motionPathLayerID,
+                                             selectedKeyframe: editorState.motionPathSelectedKeyframe)
         updatePathEditChrome()
     }
 

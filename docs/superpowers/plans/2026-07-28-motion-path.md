@@ -62,10 +62,10 @@
 - Create: `src/render/MotionPathChrome.cpp`
 - Create: `tests/render/MotionPathChromeTest.cpp`
 
-- [ ] `BuildMotionPathChrome`：Document 取 position；父 world；≥2 KF；预览手柄 = 邻段 (Δ)/3
-- [ ] `HitTestMotionPath`：选中 KF 时 In/Out > Keyframe
-- [ ] `BuildMotionPathCommands`：复用 PathOverlay 描边 + KF 方块 + 切线圆（零长也画预览）
-- [ ] 单测 + Commit: `Add MotionPathChrome for position path editing.`
+- [x] `BuildMotionPathChrome`：Document 取 position；父 world；≥2 KF；预览手柄 = 邻段 (Δ)/3
+- [x] `HitTestMotionPath`：选中 KF 时 In/Out > Keyframe
+- [x] `BuildMotionPathCommands`：复用 PathOverlay 描边 + KF 方块 + 切线圆（零长也画预览）
+- [x] 单测 + Commit: `Add MotionPathChrome for position path editing.`
 
 ### Task 5（B2）：Bridge 画布
 
@@ -73,16 +73,16 @@
 - Modify: `bridge/.../MSCanvas.h`、`motionstudio_bridge.h`、`motionstudio_bridge_canvas.cpp`
 - Modify: `bridge/tests/BridgeTest.cpp`（可选 smoke）
 
-- [ ] `ms_canvas_set_motion_path_selection`；draw 时合并 MotionPath 命令（非 path-edit 时）
-- [ ] `ms_canvas_hit_motion_path`
-- [ ] App 用已有 `ms_command_set_spatial_tangents`；拖拽时若对端缺手柄由 Core helper 补默认
-- [ ] Commit: `Wire motion path chrome into the canvas bridge.`
+- [x] `ms_canvas_set_motion_path_selection`；draw 时合并 MotionPath 命令（非 path-edit 时）
+- [x] `ms_canvas_hit_motion_path`
+- [x] App 用已有 `ms_command_set_spatial_tangents`；拖拽时若对端缺手柄由 Core helper 补默认
+- [x] Commit: `Wire motion path chrome into the canvas bridge.`
 
 ### Task 6（B2）：App Select 工具
 
 **Files:**
 - Modify: `CanvasViewController.swift`、必要时 `MotionDocumentCore.swift`
 
-- [ ] Select 工具：hit KF 选中；拖 In/Out 写 spatial（merge group）
-- [ ] Pen 工具不显示/不 hit 运动路径
-- [ ] roadmap → `ui-pending-verify`；Commit: `Add motion path handle editing in select tool.`
+- [x] Select 工具：hit KF 选中；拖 In/Out 写 spatial（merge group）
+- [x] Pen 工具不显示/不 hit 运动路径
+- [x] roadmap → `ui-pending-verify`；Commit: `Add motion path handle editing in select tool.`
