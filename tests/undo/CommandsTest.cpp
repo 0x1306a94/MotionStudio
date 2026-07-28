@@ -28,6 +28,7 @@
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
+#include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
@@ -65,6 +66,7 @@ using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
 using motion::SetMaskInvertedCommand;
 using motion::SetMaskModeCommand;
+using motion::SetSpatialTangentsCommand;
 using motion::SetStaticValueCommand;
 using motion::SetStrokePositionCommand;
 using motion::SetStyleBlendModeCommand;
@@ -786,4 +788,26 @@ TEST(RemoveKeyframeCommandTest, BezierPathRemoveAndUndo) {
     ASSERT_EQ(pathPtr->path.keyframes().size(), 2u);
     EXPECT_EQ(pathPtr->path.keyframes()[1].time, 10);
     EXPECT_EQ(pathPtr->path.keyframes()[1].value, b);
+}
+
+TEST(SetSpatialTangentsCommandTest, SetAndUndo) {
+    Scene scene;
+    PropertyPath path = TransformPosition(scene.layer->id);
+    scene.layer->transform.position.addKeyframe(PositionKeyframe(0, {0, 0}));
+    scene.layer->transform.position.addKeyframe(PositionKeyframe(10, {100, 0}));
+
+    scene.execute<SetSpatialTangentsCommand>(path, 0, std::nullopt, Vec2{20, 30});
+    scene.execute<SetSpatialTangentsCommand>(path, 10, Vec2{-20, 30}, std::nullopt);
+
+    const auto &keyframes = scene.layer->transform.position.keyframes();
+    ASSERT_EQ(keyframes.size(), 2u);
+    ASSERT_TRUE(keyframes[0].spatialOutTangent.has_value());
+    EXPECT_EQ(*keyframes[0].spatialOutTangent, (Vec2{20, 30}));
+    ASSERT_TRUE(keyframes[1].spatialInTangent.has_value());
+    EXPECT_EQ(*keyframes[1].spatialInTangent, (Vec2{-20, 30}));
+
+    scene.undo.undo(scene.document);  // clear frame 10 in
+    EXPECT_FALSE(scene.layer->transform.position.keyframes()[1].spatialInTangent.has_value());
+    scene.undo.undo(scene.document);  // clear frame 0 out
+    EXPECT_FALSE(scene.layer->transform.position.keyframes()[0].spatialOutTangent.has_value());
 }

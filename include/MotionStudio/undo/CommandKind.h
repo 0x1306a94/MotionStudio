@@ -29,6 +29,7 @@ enum class CommandKind {
     SetMaskInverted,
     SetTrackMatte,
     ConvertGeometryToPath,
+    SetSpatialTangents,
     Composite,
 };
 

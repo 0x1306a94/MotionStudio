@@ -208,6 +208,33 @@ bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing
     return false;
 }
 
+bool ApplySpatialTangentsVec2(AnimatableBase *target, FrameTime time,
+                              const std::optional<Vec2> &spatialIn,
+                              const std::optional<Vec2> &spatialOut,
+                              std::optional<Vec2> *oldSpatialInOut,
+                              std::optional<Vec2> *oldSpatialOutOut) {
+    if (target == nullptr || target->valueType() != AnimatableType::Vec2) {
+        return false;
+    }
+    auto *animatable = static_cast<Animatable<Vec2> *>(target);
+    for (const Keyframe<Vec2> &keyframe : animatable->keyframes()) {
+        if (keyframe.time != time) {
+            continue;
+        }
+        if (oldSpatialInOut) {
+            *oldSpatialInOut = keyframe.spatialInTangent;
+        }
+        if (oldSpatialOutOut) {
+            *oldSpatialOutOut = keyframe.spatialOutTangent;
+        }
+        Keyframe<Vec2> updated = keyframe;
+        updated.spatialInTangent = spatialIn;
+        updated.spatialOutTangent = spatialOut;
+        return animatable->updateKeyframe(time, std::move(updated));
+    }
+    return false;
+}
+
 int IndexOfLayer(const Composition &composition, EntityId layerId) {
     for (size_t i = 0; i < composition.layers.size(); ++i) {
         if (composition.layers[i]->id == layerId) {
