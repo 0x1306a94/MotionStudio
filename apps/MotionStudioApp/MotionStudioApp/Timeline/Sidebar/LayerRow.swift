@@ -13,6 +13,7 @@ struct LayerRow: View {
     let layerID: UInt64
     let perform: (String, () -> Void) -> Void
     let arrange: (UInt64, LayerArrangeAction) -> Void
+    let deleteLayers: (UInt64) -> Void
     /// Reports finger Y in the timeline viewport coordinate space.
     let onReorderDragChanged: (UInt64, CGFloat) -> Void
     let onReorderDragEnded: () -> Void
@@ -79,6 +80,8 @@ struct LayerRow: View {
             Button("Bring Forward") { arrange(layerID, .bringForward) }
             Button("Send Backward") { arrange(layerID, .sendBackward) }
             Button("Send to Back") { arrange(layerID, .sendToBack) }
+            Divider()
+            Button("Delete", role: .destructive) { deleteLayers(layerID) }
         }
     }
 

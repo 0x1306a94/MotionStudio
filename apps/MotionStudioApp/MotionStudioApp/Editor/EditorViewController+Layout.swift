@@ -203,7 +203,7 @@ extension EditorViewController {
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .horizontal
-        stack.alignment = .center
+        stack.alignment = .fill
         stack.spacing = 6
         stack.isLayoutMarginsRelativeArrangement = true
         let padding = Metrics.creationToolbarPadding
@@ -294,7 +294,6 @@ extension EditorViewController {
         button.addTarget(self, action: action, for: .primaryActionTriggered)
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: Metrics.toolbarButtonSize),
-            button.heightAnchor.constraint(equalToConstant: Metrics.toolbarButtonSize),
         ])
     }
 

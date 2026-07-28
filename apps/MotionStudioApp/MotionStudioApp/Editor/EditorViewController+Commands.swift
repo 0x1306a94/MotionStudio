@@ -123,10 +123,31 @@ extension EditorViewController {
         editorState.clearPathEdit()
     }
 
-    @objc func deletePathVertex() {
+    private var canDeletePathVertex: Bool {
         guard editorState.tool == .pen,
-              let target = editorState.pathEditTarget,
-              target.selectedVertex >= 0
+              let target = editorState.pathEditTarget
+        else {
+            return false
+        }
+        return target.selectedVertex >= 0
+    }
+
+    func canDeleteSelection() -> Bool {
+        canDeletePathVertex || !editorState.selectedLayerIDs.isEmpty
+    }
+
+    /// System Edit → Delete, Backspace / Delete key. Pen vertex takes priority.
+    override func delete(_ sender: Any?) {
+        if canDeletePathVertex {
+            deletePathVertex()
+            return
+        }
+        deleteSelectedLayers()
+    }
+
+    @objc func deletePathVertex() {
+        guard canDeletePathVertex,
+              let target = editorState.pathEditTarget
         else {
             return
         }
@@ -139,6 +160,23 @@ extension EditorViewController {
         var next = target
         next.selectedVertex = -1
         editorState.pathEditTarget = next
+    }
+
+    func deleteSelectedLayers() {
+        let layerIDs = editorState.selectedLayerIDs
+        guard !layerIDs.isEmpty else {
+            return
+        }
+        let compositionID = document.core.firstCompositionID
+        let deleted = Set(layerIDs)
+        let actionName = layerIDs.count > 1 ? "Delete Layers" : "Delete Layer"
+        perform(actionName) {
+            document.core.removeLayers(compositionID: compositionID, layerIDs: layerIDs)
+            editorState.clearLayerSelection()
+            if let target = editorState.pathEditTarget, deleted.contains(target.layerID) {
+                editorState.clearPathEdit()
+            }
+        }
     }
 
     func activatePenTargetFromSelection() {

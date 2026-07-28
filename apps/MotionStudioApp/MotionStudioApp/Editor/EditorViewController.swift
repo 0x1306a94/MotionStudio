@@ -140,7 +140,8 @@ final class EditorViewController: UIViewController {
         [
             UIKeyCommand(input: " ", modifierFlags: [], action: #selector(togglePlayback)),
             UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(exitPenTool)),
-            UIKeyCommand(input: "\u{8}", modifierFlags: [], action: #selector(deletePathVertex)),
+            UIKeyCommand(input: "\u{8}", modifierFlags: [], action: #selector(UIResponderStandardEditActions.delete(_:))),
+            UIKeyCommand(input: UIKeyCommand.inputDelete, modifierFlags: [], action: #selector(UIResponderStandardEditActions.delete(_:))),
             UIKeyCommand(input: "s", modifierFlags: [.command], action: #selector(saveCurrentDocument)),
             UIKeyCommand(input: "s", modifierFlags: [.command, .shift], action: #selector(saveDocumentAs)),
             UIKeyCommand(input: "r", modifierFlags: [.command, .shift], action: #selector(addRectangleLayer)),
@@ -177,6 +178,8 @@ final class EditorViewController: UIViewController {
             canArrangeSelection(.sendBackward)
         case #selector(sendLayersToBack):
             canArrangeSelection(.sendToBack)
+        case #selector(UIResponderStandardEditActions.delete(_:)):
+            canDeleteSelection()
         default:
             super.canPerformAction(action, withSender: sender)
         }

@@ -553,6 +553,23 @@ final class MotionDocumentCore {
         changed()
     }
 
+    /// Removes multiple layers as one undo unit when `layerIDs.count > 1`.
+    func removeLayers(compositionID: UInt64, layerIDs: [UInt64]) {
+        guard !layerIDs.isEmpty else {
+            return
+        }
+        if layerIDs.count == 1 {
+            removeLayer(compositionID: compositionID, layerID: layerIDs[0])
+            return
+        }
+        ms_document_begin_merge_group(handle)
+        for layerID in layerIDs {
+            ms_command_remove_layer(handle, compositionID, layerID)
+        }
+        ms_document_end_merge_group(handle)
+        changed()
+    }
+
     func moveLayer(compositionID: UInt64, fromIndex: Int, toIndex: Int) {
         ms_command_move_layer(handle, compositionID, Int32(fromIndex), Int32(toIndex))
         changed()

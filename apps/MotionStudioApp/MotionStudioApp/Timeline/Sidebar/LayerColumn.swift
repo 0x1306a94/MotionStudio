@@ -41,6 +41,7 @@ struct LayerColumn: View {
                         LayerRow(layerID: row.layerID,
                                  perform: perform,
                                  arrange: arrangeFromContextMenu,
+                                 deleteLayers: deleteFromContextMenu,
                                  onReorderDragChanged: handleReorderDragChanged,
                                  onReorderDragEnded: handleReorderDragEnded)
                             .frame(height: row.height)
@@ -239,6 +240,26 @@ struct LayerColumn: View {
         }
         perform(action.actionName) {
             core.applyLayerOrder(compositionID: compositionID, desired: desired)
+        }
+    }
+
+    private func deleteFromContextMenu(layerID: UInt64) {
+        if !editorState.isLayerSelected(layerID) {
+            editorState.selectLayer(layerID)
+        }
+        let layerIDs = editorState.selectedLayerIDs
+        guard !layerIDs.isEmpty else {
+            return
+        }
+        let compositionID = core.firstCompositionID
+        let deleted = Set(layerIDs)
+        let actionName = layerIDs.count > 1 ? "Delete Layers" : "Delete Layer"
+        perform(actionName) {
+            core.removeLayers(compositionID: compositionID, layerIDs: layerIDs)
+            editorState.clearLayerSelection()
+            if let target = editorState.pathEditTarget, deleted.contains(target.layerID) {
+                editorState.clearPathEdit()
+            }
         }
     }
 }
