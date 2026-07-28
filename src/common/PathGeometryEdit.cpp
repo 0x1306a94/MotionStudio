@@ -1,11 +1,14 @@
 #include "MotionStudio/common/PathGeometryEdit.h"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace motion {
 
 namespace {
+
+constexpr float kCornerEpsilon = 1e-4f;
 
 struct SegmentSplit {
     Vec2 leftOutTangent = {};
@@ -39,6 +42,22 @@ size_t SegmentCount(const BezierPath &path) {
         return 0;
     }
     return path.closed ? count : count - 1;
+}
+
+float LengthSquared(Vec2 value) {
+    return value.x * value.x + value.y * value.y;
+}
+
+bool IsNearZero(Vec2 value) {
+    return LengthSquared(value) <= kCornerEpsilon * kCornerEpsilon;
+}
+
+Vec2 SafeNormalize(Vec2 value) {
+    const float length = std::sqrt(LengthSquared(value));
+    if (length <= kCornerEpsilon) {
+        return {};
+    }
+    return value * (1.0f / length);
 }
 
 }  // namespace
@@ -122,6 +141,84 @@ BezierPath AppendVertex(BezierPath path, BezierPath::Vertex vertex) {
         return path;
     }
     path.vertices.push_back(std::move(vertex));
+    return path;
+}
+
+BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
+    if (index >= path.vertices.size()) {
+        return path;
+    }
+    BezierPath::Vertex &vertex = path.vertices[index];
+    const bool isCorner = IsNearZero(vertex.inTangent) && IsNearZero(vertex.outTangent);
+    if (!isCorner) {
+        vertex.inTangent = {};
+        vertex.outTangent = {};
+        return path;
+    }
+
+    const size_t count = path.vertices.size();
+    if (count < 2) {
+        return path;
+    }
+
+    const bool hasPrev = path.closed || index > 0;
+    const bool hasNext = path.closed || index + 1 < count;
+    if (!hasPrev && !hasNext) {
+        return path;
+    }
+
+    const Vec2 point = vertex.point;
+    Vec2 prevPoint = point;
+    Vec2 nextPoint = point;
+    if (hasPrev) {
+        prevPoint = path.vertices[(index + count - 1) % count].point;
+    }
+    if (hasNext) {
+        nextPoint = path.vertices[(index + 1) % count].point;
+    }
+
+    Vec2 direction;
+    if (hasPrev && hasNext) {
+        direction = SafeNormalize(nextPoint - prevPoint);
+    } else if (hasNext) {
+        direction = SafeNormalize(nextPoint - point);
+    } else {
+        direction = SafeNormalize(point - prevPoint);
+    }
+    if (IsNearZero(direction)) {
+        return path;
+    }
+
+    const float inLength =
+        hasPrev ? std::sqrt(LengthSquared(point - prevPoint)) / 3.0f : 0.0f;
+    const float outLength =
+        hasNext ? std::sqrt(LengthSquared(nextPoint - point)) / 3.0f : 0.0f;
+    vertex.inTangent = direction * (-inLength);
+    vertex.outTangent = direction * outLength;
+    return path;
+}
+
+BezierPath RecenterPath(BezierPath path, Vec2 &localCenterOut) {
+    localCenterOut = {};
+    if (path.vertices.empty()) {
+        return path;
+    }
+    Vec2 minPoint = path.vertices.front().point;
+    Vec2 maxPoint = minPoint;
+    for (const BezierPath::Vertex &vertex : path.vertices) {
+        minPoint.x = std::min(minPoint.x, vertex.point.x);
+        minPoint.y = std::min(minPoint.y, vertex.point.y);
+        maxPoint.x = std::max(maxPoint.x, vertex.point.x);
+        maxPoint.y = std::max(maxPoint.y, vertex.point.y);
+    }
+    const Vec2 center{(minPoint.x + maxPoint.x) * 0.5f, (minPoint.y + maxPoint.y) * 0.5f};
+    if (IsNearZero(center)) {
+        return path;
+    }
+    localCenterOut = center;
+    for (BezierPath::Vertex &vertex : path.vertices) {
+        vertex.point = vertex.point - center;
+    }
     return path;
 }
 

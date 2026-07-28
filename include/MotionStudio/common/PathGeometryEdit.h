@@ -36,4 +36,15 @@ BezierPath ClosePath(BezierPath path);
 // Appends a vertex to an open path. No-op when the path is already closed.
 BezierPath AppendVertex(BezierPath path, BezierPath::Vertex vertex);
 
+// Double-click convert: corner (near-zero tangents) → auto-smooth from
+// neighbors; smooth → corner (zero tangents). No-op for invalid index / single
+// vertex with no neighbor.
+BezierPath ToggleVertexSmooth(BezierPath path, size_t index);
+
+// Translates all vertex points so the axis-aligned bounds center sits at the
+// origin. Tangents (relative offsets) are unchanged. Writes the subtracted
+// center into localCenterOut (zero when empty / already centered). Returns the
+// recentered path.
+BezierPath RecenterPath(BezierPath path, Vec2 &localCenterOut);
+
 }  // namespace motion

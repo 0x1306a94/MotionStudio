@@ -10,7 +10,9 @@ using motion::InsertVertexOnSegment;
 using motion::MoveInTangent;
 using motion::MoveOutTangent;
 using motion::MoveVertex;
+using motion::RecenterPath;
 using motion::RemoveVertex;
+using motion::ToggleVertexSmooth;
 using motion::Vec2;
 
 namespace {
@@ -120,4 +122,44 @@ TEST(PathGeometryEditTest, InvalidIndexIsNoOp) {
     EXPECT_EQ(MoveVertex(path, 9, {1, 1}, true), path);
     EXPECT_EQ(RemoveVertex(path, 9), path);
     EXPECT_EQ(InsertVertexOnSegment(path, 9, 0.5f), path);
+}
+
+TEST(PathGeometryEditTest, ToggleVertexSmoothCornerToSmooth) {
+    BezierPath path;
+    path.vertices.push_back({{0, 0}, {}, {}});
+    path.vertices.push_back({{10, 0}, {}, {}});
+    path.vertices.push_back({{20, 0}, {}, {}});
+    BezierPath result = ToggleVertexSmooth(std::move(path), 1);
+    EXPECT_TRUE(ApproxEqual(result.vertices[1].inTangent, Vec2{-10.0f / 3.0f, 0}));
+    EXPECT_TRUE(ApproxEqual(result.vertices[1].outTangent, Vec2{10.0f / 3.0f, 0}));
+}
+
+TEST(PathGeometryEditTest, ToggleVertexSmoothSmoothToCorner) {
+    BezierPath path = MakeSmoothOpen();
+    BezierPath result = ToggleVertexSmooth(std::move(path), 0);
+    EXPECT_TRUE(ApproxEqual(result.vertices[0].inTangent, Vec2{0, 0}));
+    EXPECT_TRUE(ApproxEqual(result.vertices[0].outTangent, Vec2{0, 0}));
+}
+
+TEST(PathGeometryEditTest, RecenterPathMovesBoundsCenterToOrigin) {
+    BezierPath path;
+    path.vertices.push_back({{10, 20}, {}, {1, 0}});
+    path.vertices.push_back({{30, 40}, {}, {}});
+    Vec2 center{};
+    BezierPath result = RecenterPath(std::move(path), center);
+    EXPECT_TRUE(ApproxEqual(center, Vec2{20, 30}));
+    EXPECT_TRUE(ApproxEqual(result.vertices[0].point, Vec2{-10, -10}));
+    EXPECT_TRUE(ApproxEqual(result.vertices[1].point, Vec2{10, 10}));
+    // Relative tangents are preserved.
+    EXPECT_TRUE(ApproxEqual(result.vertices[0].outTangent, Vec2{1, 0}));
+}
+
+TEST(PathGeometryEditTest, RecenterPathNoOpWhenAlreadyCentered) {
+    BezierPath path = MakeOpenLine();
+    path.vertices[0].point = {-5, 0};
+    path.vertices[1].point = {5, 0};
+    Vec2 center{1, 1};
+    BezierPath result = RecenterPath(path, center);
+    EXPECT_TRUE(ApproxEqual(center, Vec2{0, 0}));
+    EXPECT_EQ(result, path);
 }
