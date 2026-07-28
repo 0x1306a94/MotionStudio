@@ -18,6 +18,7 @@ final class MotionProjectDocument: UIDocument {
     private(set) var modelDocument: MotionProjectState
     private(set) var saveURL: URL
     private(set) var isTemporaryDraft: Bool
+    var onSaveStateChanged: (@MainActor @Sendable () -> Void)?
 
     var core: MotionDocumentCore {
         modelDocument.core
@@ -54,6 +55,14 @@ final class MotionProjectDocument: UIDocument {
         modelDocument = try MotionProjectState(data: documentData(from: fileWrapper))
     }
 
+    override func updateChangeCount(withToken changeCountToken: Any, for saveOperation: UIDocument.SaveOperation) {
+        super.updateChangeCount(withToken: changeCountToken, for: saveOperation)
+        let onSaveStateChanged = onSaveStateChanged
+        Task { @MainActor in
+            onSaveStateChanged?()
+        }
+    }
+
     func snapshotData() throws -> Data {
         try modelDocument.snapshot(contentType: .motionProjectDocument)
     }
@@ -77,7 +86,6 @@ final class MotionProjectDocument: UIDocument {
     func markSaved(to url: URL) {
         saveURL = url
         isTemporaryDraft = false
-        updateChangeCount(.cleared)
     }
 
     private func documentData(from fileWrapper: FileWrapper) throws -> Data {

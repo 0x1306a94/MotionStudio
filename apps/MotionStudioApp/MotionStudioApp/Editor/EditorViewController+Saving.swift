@@ -14,6 +14,9 @@ extension EditorViewController {
     }
 
     func initializeSaveStateIfNeeded() {
+        document.onSaveStateChanged = { [weak self] in
+            self?.updateSaveButtonState()
+        }
         updateSaveButtonState()
     }
 
