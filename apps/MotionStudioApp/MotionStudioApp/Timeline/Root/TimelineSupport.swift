@@ -123,6 +123,13 @@ func timelineX(for frame: CGFloat, pointsPerFrame: CGFloat = pixelsPerFrame) -> 
     frame * pointsPerFrame
 }
 
+func timelineFrame(atVisibleX visibleX: CGFloat, pointsPerFrame: CGFloat,
+                   scrollX: CGFloat, duration: Int64) -> Int64
+{
+    let frame = Int64(((visibleX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
+    return min(max(frame, 0), duration)
+}
+
 func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [TimelineRow] {
     var rows: [TimelineRow] = []
     for layerID in layerIDs {

@@ -14,17 +14,11 @@ struct PropertySubRow: View {
     let path: String
 
     var body: some View {
-        let hasKeyframe = core.keyframes(entityID: layerID, path: path)
-            .contains { $0.frame == editorState.playheadFrame }
         HStack(spacing: 4) {
             Text(label)
                 .foregroundStyle(.secondary)
             Spacer()
-            if hasKeyframe {
-                Image(systemName: "diamond.fill")
-                    .font(.system(size: 8))
-                    .foregroundStyle(.yellow)
-            }
+            KeyframeAtPlayheadBadge(layerID: layerID, path: path)
         }
         .font(.caption)
         .padding(.leading, 28)
@@ -41,5 +35,23 @@ struct PropertySubRow: View {
 
     private var isSelected: Bool {
         editorState.selectedTimelineProperty == TimelinePropertySelection(layerID: layerID, path: path)
+    }
+}
+
+private struct KeyframeAtPlayheadBadge: View {
+    @Environment(MotionDocumentCore.self) private var core
+    @Environment(PlayheadClock.self) private var clock
+
+    let layerID: UInt64
+    let path: String
+
+    var body: some View {
+        let hasKeyframe = core.keyframes(entityID: layerID, path: path)
+            .contains { $0.frame == clock.frame }
+        if hasKeyframe {
+            Image(systemName: "diamond.fill")
+                .font(.system(size: 8))
+                .foregroundStyle(.yellow)
+        }
     }
 }

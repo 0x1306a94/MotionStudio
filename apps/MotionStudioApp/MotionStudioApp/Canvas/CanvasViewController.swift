@@ -16,6 +16,7 @@ import UIKit
 final class CanvasViewController: UIViewController, MTKViewDelegate {
     private let document: MotionProjectState
     private let editorState: EditorState
+    private let playheadClock: PlayheadClock
     private let clearSelection: () -> Void
     private let registerEdit: (String) -> Void
 
@@ -102,11 +103,13 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     init(document: MotionProjectState,
          editorState: EditorState,
+         playheadClock: PlayheadClock,
          clearSelection: @escaping () -> Void,
          registerEdit: @escaping (String) -> Void)
     {
         self.document = document
         self.editorState = editorState
+        self.playheadClock = playheadClock
         self.clearSelection = clearSelection
         self.registerEdit = registerEdit
         super.init(nibName: nil, bundle: nil)
@@ -244,7 +247,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let duration = core.duration(compositionID: compositionID)
         let frameRate = core.frameRate(compositionID: compositionID)
         sync(compositionID: compositionID,
-             playheadFrame: editorState.playheadFrame,
+             playheadFrame: playheadClock.frame,
              isPlaying: editorState.isPlaying,
              duration: duration,
              frameRate: frameRate,
@@ -256,7 +259,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         withObservationTracking {
             _ = document.core.revision
             _ = editorState.selectedLayerIDs
-            _ = editorState.playheadFrame
+            _ = playheadClock.frame
             _ = editorState.isPlaying
             _ = editorState.previewBackdrop
             _ = editorState.tool
@@ -361,7 +364,10 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     private func displayFramesPerSecond() -> Int {
         let screen = view.window?.screen ?? UIScreen.main
-        return max(Int(frameRate.rounded()), screen.maximumFramesPerSecond)
+        // Sub-frame interpolation produces unique shape content every draw, so
+        // tgfx's content-keyed shape cache never hits across draws; cap playback
+        // to 60fps to bound mask rasterization cost on ProMotion (120Hz) displays.
+        return max(Int(frameRate.rounded()), min(screen.maximumFramesPerSecond, 60))
     }
 
     private func advancePlayheadForDraw(at drawTime: CFTimeInterval) {
@@ -412,7 +418,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func publishPlayhead(_ frame: Int64) {
-        editorState.playheadFrame = frame
+        playheadClock.publish(frame)
     }
 
     private func requestDraw() {

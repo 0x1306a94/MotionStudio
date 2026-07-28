@@ -115,7 +115,7 @@ extension EditorViewController {
         if let target = editorState.pathEditTarget, target.kind == .SHAPE {
             let revision = document.core.revision
             document.core.pathEditRecenterShape(layerID: target.layerID,
-                                                frame: editorState.playheadFrame)
+                                                frame: playheadClock.frame)
             if document.core.revision != revision {
                 registerEdit("Center Path Anchor")
             }
@@ -154,7 +154,7 @@ extension EditorViewController {
         perform("Delete Vertex") {
             document.core.pathEditRemoveVertex(layerID: target.layerID, kind: target.kind,
                                                maskIndex: target.maskIndex,
-                                               frame: editorState.playheadFrame,
+                                               frame: playheadClock.frame,
                                                index: target.selectedVertex)
         }
         var next = target
@@ -188,7 +188,7 @@ extension EditorViewController {
         // Inspector-only (`onEditMaskPath`).
         if !document.core.hasBezierPath(entityID: layerID, path: "path") {
             perform("Convert to Path") {
-                document.core.convertGeometryToPath(layerID: layerID, frame: editorState.playheadFrame)
+                document.core.convertGeometryToPath(layerID: layerID, frame: playheadClock.frame)
             }
         }
         if document.core.hasBezierPath(entityID: layerID, path: "path") {

@@ -10,8 +10,13 @@ import SwiftUI
 struct MotionPathInspector: View {
     let core: MotionDocumentCore
     let layerID: UInt64
-    let playheadFrame: Int64
+    @Environment(PlayheadClock.self) private var clock
     let selectedKeyframeIndex: Int?
+
+    private var playheadFrame: Int64 {
+        clock.frame
+    }
+
     let isEditable: Bool
     let perform: (String, () -> Void) -> Void
     let onSelectKeyframe: (Int) -> Void

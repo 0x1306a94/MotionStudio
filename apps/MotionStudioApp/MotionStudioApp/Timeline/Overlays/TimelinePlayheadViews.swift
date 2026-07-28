@@ -51,6 +51,87 @@ struct PlayheadLine: View {
     }
 }
 
+/// Playhead overlays that read the high-frequency PlayheadClock. Reading the
+/// clock inside these small views confines per-frame invalidation to the
+/// overlays instead of the whole timeline.
+struct RulerPlayheadOverlay: View {
+    @Environment(PlayheadClock.self) private var clock
+    let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
+    let viewportWidth: CGFloat
+    let isHovering: Bool
+
+    var body: some View {
+        let visibleX = timelineX(for: clock.frame, pointsPerFrame: pointsPerFrame) - scrollX
+        if visibleX >= 0, visibleX <= viewportWidth {
+            PlayheadLine(x: trackLeadingInset + visibleX, isHovering: isHovering)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+struct GraphPlayheadOverlay: View {
+    @Environment(PlayheadClock.self) private var clock
+    let duration: Int64
+    let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
+    let viewportWidth: CGFloat
+    @Binding var isHovering: Bool
+
+    var body: some View {
+        let visibleX = timelineX(for: clock.frame, pointsPerFrame: pointsPerFrame) - scrollX
+        let contentX = trackLeadingInset + visibleX
+        Group {
+            if visibleX >= 0, visibleX <= viewportWidth {
+                PlayheadLine(x: contentX, isHovering: isHovering, showsMarker: false)
+                    .allowsHitTesting(false)
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .frame(width: 20)
+                    .frame(maxHeight: .infinity)
+                    .offset(x: contentX - 10)
+                    .onHover { isHovering = $0 }
+                    .gesture(playheadDrag)
+            }
+        }
+    }
+
+    private var playheadDrag: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("timelineViewport"))
+            .onChanged { value in
+                clock.publish(timelineFrame(atVisibleX: value.location.x,
+                                            pointsPerFrame: pointsPerFrame,
+                                            scrollX: scrollX,
+                                            duration: duration))
+            }
+    }
+}
+
+struct PlayheadPointerInput: View {
+    @Environment(PlayheadClock.self) private var clock
+    let editorState: EditorState
+    @Binding var isPlayheadHovering: Bool
+    let duration: Int64
+    let pointsPerFrame: CGFloat
+    let scrollX: CGFloat
+    let trackWidth: CGFloat
+    let viewportWidth: CGFloat
+
+    var body: some View {
+        let contentPlayheadX = trackLeadingInset
+            + timelineX(for: clock.frame, pointsPerFrame: pointsPerFrame) - scrollX
+        TimelinePointerInputView(editorState: editorState,
+                                 isPlayheadHovering: $isPlayheadHovering,
+                                 duration: duration,
+                                 pointsPerFrame: pointsPerFrame,
+                                 trackWidth: trackWidth,
+                                 viewportWidth: viewportWidth,
+                                 visiblePlayheadX: contentPlayheadX,
+                                 contentInset: trackLeadingInset)
+    }
+}
+
 private struct PlayheadTriangle: Shape {
     nonisolated func path(in rect: CGRect) -> Path {
         var path = Path()

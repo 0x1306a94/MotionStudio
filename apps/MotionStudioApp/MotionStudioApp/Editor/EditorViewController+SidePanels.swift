@@ -25,6 +25,7 @@ extension EditorViewController {
 
         let inspectorHost = UIHostingController(rootView: InspectorView(document: document.modelDocument,
                                                                         editorState: editorState,
+                                                                        playheadClock: playheadClock,
                                                                         perform: { [weak self] name, edit in
                                                                             self?.perform(name, edit: edit)
                                                                         }))

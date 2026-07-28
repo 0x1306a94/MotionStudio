@@ -50,6 +50,7 @@ final class EditorViewController: UIViewController {
 
     let document: MotionProjectDocument
     let editorState = EditorState()
+    let playheadClock = PlayheadClock()
     let editorUndoManager = UndoManager()
 
     let canvasViewport = UIView()

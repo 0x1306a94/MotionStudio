@@ -15,6 +15,7 @@ import MotionStudioBridging
 struct InspectorView: View {
     let document: MotionProjectState
     let editorState: EditorState
+    let playheadClock: PlayheadClock
     let perform: (String, () -> Void) -> Void
 
     @State private var keyboardFrame = CGRect.null
@@ -38,14 +39,12 @@ struct InspectorView: View {
                                 .foregroundStyle(.secondary)
                             ShapeSizeInspector(core: core,
                                                layerID: layerID,
-                                               playheadFrame: editorState.playheadFrame,
                                                isEditable: isEditable,
                                                perform: perform)
                         }
                         if core.hasBezierPath(entityID: layerID, path: "path") {
                             PathKeyframeInspector(core: core,
                                                   layerID: layerID,
-                                                  playheadFrame: editorState.playheadFrame,
                                                   isEditable: isEditable,
                                                   perform: perform)
                         }
@@ -55,20 +54,17 @@ struct InspectorView: View {
                             .foregroundStyle(.secondary)
                         TransformInspector(core: core,
                                            layerID: layerID,
-                                           playheadFrame: editorState.playheadFrame,
                                            isEditable: isEditable,
                                            perform: perform)
 
                         FollowPathInspector(core: core,
                                             compositionID: core.firstCompositionID,
                                             layerID: layerID,
-                                            playheadFrame: editorState.playheadFrame,
                                             isEditable: isEditable,
                                             perform: perform)
 
                         MotionPathInspector(core: core,
                                             layerID: layerID,
-                                            playheadFrame: editorState.playheadFrame,
                                             selectedKeyframeIndex: editorState.motionPathSelectedKeyframe,
                                             isEditable: isEditable,
                                             perform: perform,
@@ -80,19 +76,16 @@ struct InspectorView: View {
                         if core.layerType(layerID) == .SHAPE {
                             FillsInspector(core: core,
                                            layerID: layerID,
-                                           playheadFrame: editorState.playheadFrame,
                                            isEditable: isEditable,
                                            perform: perform)
                             StrokesInspector(core: core,
                                              layerID: layerID,
-                                             playheadFrame: editorState.playheadFrame,
                                              isEditable: isEditable,
                                              perform: perform)
                         }
 
                         MasksInspector(core: core,
                                        layerID: layerID,
-                                       playheadFrame: editorState.playheadFrame,
                                        isEditable: isEditable,
                                        perform: perform,
                                        onEditMaskPath: { index in
@@ -125,6 +118,7 @@ struct InspectorView: View {
         .task {
             await observeKeyboardFrames()
         }
+        .environment(playheadClock)
     }
 
     private func observeKeyboardFrames() async {

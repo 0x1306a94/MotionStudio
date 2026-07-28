@@ -10,6 +10,7 @@ import SwiftUI
 struct TimelineView: View {
     let document: MotionProjectState
     let editorState: EditorState
+    let playheadClock: PlayheadClock
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
     let clearSelection: () -> Void
@@ -30,5 +31,6 @@ struct TimelineView: View {
                             clearSelection: clearSelection)
             .environment(core)
             .environment(editorState)
+            .environment(playheadClock)
     }
 }

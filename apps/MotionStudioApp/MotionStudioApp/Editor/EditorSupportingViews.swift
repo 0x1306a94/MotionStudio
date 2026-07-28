@@ -37,6 +37,7 @@ final class TimelineGrabberView: UIView {
 struct UIKitTimelineHostView: View {
     let document: MotionProjectState
     let editorState: EditorState
+    let playheadClock: PlayheadClock
     let perform: (String, () -> Void) -> Void
     let registerEdit: (String) -> Void
     let clearSelection: () -> Void
@@ -44,6 +45,7 @@ struct UIKitTimelineHostView: View {
     var body: some View {
         TimelineView(document: document,
                      editorState: editorState,
+                     playheadClock: playheadClock,
                      perform: perform,
                      registerEdit: registerEdit,
                      clearSelection: clearSelection)

@@ -9,6 +9,9 @@ import SwiftUI
 
 struct TimelineContentView: View {
     @Environment(EditorState.self) private var editorState
+    /// Read only inside gesture/zoom closures (never in body) so per-frame
+    /// playhead updates don't re-evaluate the timeline tree.
+    @Environment(PlayheadClock.self) private var clock
 
     let duration: Int64
     let frameRate: Double
@@ -34,10 +37,6 @@ struct TimelineContentView: View {
             let trackWidth = max(CGFloat(duration) * pointsPerFrame, trackViewportWidth)
             let maxScrollX = max(0, trackWidth - trackViewportWidth)
             let scrollX = clampedTimelineScrollX(maxScrollX: maxScrollX)
-            let visiblePlayheadX = visibleTimelineX(for: editorState.playheadFrame,
-                                                    pointsPerFrame: pointsPerFrame,
-                                                    scrollX: scrollX)
-            let contentPlayheadX = trackLeadingInset + visiblePlayheadX
             let contentViewportWidth = trackLeadingInset * 2 + trackViewportWidth
 
             VStack(alignment: .leading, spacing: 0) {
@@ -47,8 +46,6 @@ struct TimelineContentView: View {
                                  pointsPerFrame: pointsPerFrame,
                                  trackWidth: trackWidth,
                                  scrollX: scrollX,
-                                 visiblePlayheadX: visiblePlayheadX,
-                                 contentPlayheadX: contentPlayheadX,
                                  contentViewportWidth: contentViewportWidth)
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
@@ -74,7 +71,6 @@ struct TimelineContentView: View {
 
     private func timelineWorkArea(trackViewportWidth: CGFloat, pointsPerFrame: CGFloat,
                                   trackWidth: CGFloat, scrollX: CGFloat,
-                                  visiblePlayheadX: CGFloat, contentPlayheadX: CGFloat,
                                   contentViewportWidth: CGFloat) -> some View
     {
         ZStack(alignment: .topLeading) {
@@ -83,8 +79,6 @@ struct TimelineContentView: View {
                                     splitDivider: splitDividerHitArea(height: rulerHeight),
                                     ruler: rulerStrip(pointsPerFrame: pointsPerFrame,
                                                       scrollX: scrollX,
-                                                      visiblePlayheadX: visiblePlayheadX,
-                                                      contentPlayheadX: contentPlayheadX,
                                                       contentViewportWidth: contentViewportWidth,
                                                       trackViewportWidth: trackViewportWidth,
                                                       trackWidth: trackWidth))
@@ -93,8 +87,6 @@ struct TimelineContentView: View {
                                   splitDivider: splitDividerHitArea(),
                                   graph: graphStrip(pointsPerFrame: pointsPerFrame,
                                                     scrollX: scrollX,
-                                                    visiblePlayheadX: visiblePlayheadX,
-                                                    contentPlayheadX: contentPlayheadX,
                                                     contentViewportWidth: contentViewportWidth,
                                                     trackViewportWidth: trackViewportWidth,
                                                     trackWidth: trackWidth),
@@ -116,7 +108,6 @@ struct TimelineContentView: View {
     }
 
     private func rulerStrip(pointsPerFrame: CGFloat, scrollX: CGFloat,
-                            visiblePlayheadX: CGFloat, contentPlayheadX: CGFloat,
                             contentViewportWidth: CGFloat, trackViewportWidth: CGFloat,
                             trackWidth: CGFloat) -> some View
     {
@@ -137,25 +128,25 @@ struct TimelineContentView: View {
                                                             pointsPerFrame: pointsPerFrame,
                                                             viewportWidth: trackViewportWidth,
                                                             contentWidth: contentViewportWidth))
-            if isPlayheadVisible(visiblePlayheadX, viewportWidth: trackViewportWidth) {
-                PlayheadLine(x: contentPlayheadX,
-                             isHovering: isPlayheadHovering)
-                    .allowsHitTesting(false)
-            }
+            RulerPlayheadOverlay(pointsPerFrame: pointsPerFrame,
+                                 scrollX: scrollX,
+                                 viewportWidth: trackViewportWidth,
+                                 isHovering: isPlayheadHovering)
         }
         .frame(width: contentViewportWidth, height: rulerHeight)
         .overlay {
-            timelinePointerInput(duration: duration,
+            PlayheadPointerInput(editorState: editorState,
+                                 isPlayheadHovering: $isPlayheadHovering,
+                                 duration: duration,
                                  pointsPerFrame: pointsPerFrame,
+                                 scrollX: scrollX,
                                  trackWidth: trackWidth,
-                                 viewportWidth: trackViewportWidth,
-                                 visiblePlayheadX: contentPlayheadX)
+                                 viewportWidth: trackViewportWidth)
         }
         .clipped()
     }
 
     private func graphStrip(pointsPerFrame: CGFloat, scrollX: CGFloat,
-                            visiblePlayheadX: CGFloat, contentPlayheadX: CGFloat,
                             contentViewportWidth: CGFloat, trackViewportWidth: CGFloat,
                             trackWidth: CGFloat) -> some View
     {
@@ -165,29 +156,33 @@ struct TimelineContentView: View {
                 .onTapGesture(perform: clearSelection)
                 .gesture(timelinePanGesture(trackWidth: trackWidth,
                                             viewportWidth: trackViewportWidth,
-                                            playheadX: contentPlayheadX))
+                                            pointsPerFrame: pointsPerFrame,
+                                            scrollX: scrollX))
             timelineRows(pointsPerFrame: pointsPerFrame,
                          scrollX: scrollX,
                          contentViewportWidth: contentViewportWidth)
-            playheadOverlay(visiblePlayheadX: visiblePlayheadX,
-                            contentPlayheadX: contentPlayheadX,
-                            pointsPerFrame: pointsPerFrame,
-                            scrollX: scrollX,
-                            trackViewportWidth: trackViewportWidth)
+            GraphPlayheadOverlay(duration: duration,
+                                 pointsPerFrame: pointsPerFrame,
+                                 scrollX: scrollX,
+                                 viewportWidth: trackViewportWidth,
+                                 isHovering: $isPlayheadHovering)
         }
         .frame(width: contentViewportWidth)
         .frame(maxHeight: .infinity, alignment: .top)
         .coordinateSpace(name: "timelineViewport")
         .overlay {
-            timelinePointerInput(duration: duration,
+            PlayheadPointerInput(editorState: editorState,
+                                 isPlayheadHovering: $isPlayheadHovering,
+                                 duration: duration,
                                  pointsPerFrame: pointsPerFrame,
+                                 scrollX: scrollX,
                                  trackWidth: trackWidth,
-                                 viewportWidth: trackViewportWidth,
-                                 visiblePlayheadX: contentPlayheadX)
+                                 viewportWidth: trackViewportWidth)
         }
         .simultaneousGesture(timelinePanGesture(trackWidth: trackWidth,
                                                 viewportWidth: trackViewportWidth,
-                                                playheadX: contentPlayheadX))
+                                                pointsPerFrame: pointsPerFrame,
+                                                scrollX: scrollX))
         .simultaneousGesture(timelineMagnifyGesture(duration: duration,
                                                     pointsPerFrame: pointsPerFrame,
                                                     viewportWidth: trackViewportWidth,
@@ -216,65 +211,15 @@ struct TimelineContentView: View {
         .frame(maxHeight: .infinity, alignment: .top)
     }
 
-    private func playheadOverlay(visiblePlayheadX: CGFloat, contentPlayheadX: CGFloat,
-                                 pointsPerFrame: CGFloat, scrollX: CGFloat,
-                                 trackViewportWidth: CGFloat) -> some View
-    {
-        Group {
-            if isPlayheadVisible(visiblePlayheadX, viewportWidth: trackViewportWidth) {
-                PlayheadLine(x: contentPlayheadX,
-                             isHovering: isPlayheadHovering,
-                             showsMarker: false)
-                    .allowsHitTesting(false)
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .frame(width: 20)
-                    .frame(maxHeight: .infinity)
-                    .offset(x: contentPlayheadX - 10)
-                    .onHover { isPlayheadHovering = $0 }
-                    .gesture(playheadDrag(duration: duration,
-                                          pointsPerFrame: pointsPerFrame,
-                                          scrollX: scrollX))
-            }
-        }
-    }
-
-    private func timelinePointerInput(duration: Int64, pointsPerFrame: CGFloat,
-                                      trackWidth: CGFloat, viewportWidth: CGFloat,
-                                      visiblePlayheadX: CGFloat) -> some View
-    {
-        TimelinePointerInputView(editorState: editorState,
-                                 isPlayheadHovering: $isPlayheadHovering,
-                                 duration: duration,
-                                 pointsPerFrame: pointsPerFrame,
-                                 trackWidth: trackWidth,
-                                 viewportWidth: viewportWidth,
-                                 visiblePlayheadX: visiblePlayheadX,
-                                 contentInset: trackLeadingInset)
-    }
-
     private func scrubGesture(duration: Int64, pointsPerFrame: CGFloat,
                               scrollX: CGFloat) -> some Gesture
     {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                editorState.playheadFrame = timelineFrame(at: value.location.x,
-                                                          pointsPerFrame: pointsPerFrame,
-                                                          scrollX: scrollX,
-                                                          duration: duration)
-            }
-    }
-
-    private func playheadDrag(duration: Int64, pointsPerFrame: CGFloat,
-                              scrollX: CGFloat) -> some Gesture
-    {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named("timelineViewport"))
-            .onChanged { value in
-                editorState.playheadFrame = timelineFrame(at: value.location.x,
-                                                          pointsPerFrame: pointsPerFrame,
-                                                          scrollX: scrollX,
-                                                          duration: duration)
+                clock.publish(timelineFrame(atVisibleX: value.location.x,
+                                            pointsPerFrame: pointsPerFrame,
+                                            scrollX: scrollX,
+                                            duration: duration))
             }
     }
 
@@ -282,17 +227,6 @@ struct TimelineContentView: View {
                                   scrollX: CGFloat) -> CGFloat
     {
         timelineX(for: frame, pointsPerFrame: pointsPerFrame) - scrollX
-    }
-
-    private func timelineFrame(at visibleX: CGFloat, pointsPerFrame: CGFloat,
-                               scrollX: CGFloat, duration: Int64) -> Int64
-    {
-        let frame = Int64(((visibleX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
-        return min(max(frame, 0), duration)
-    }
-
-    private func isPlayheadVisible(_ visiblePlayheadX: CGFloat, viewportWidth: CGFloat) -> Bool {
-        visiblePlayheadX >= 0 && visiblePlayheadX <= viewportWidth
     }
 
     private func resolvedPointsPerFrame(duration: Int64, availableWidth: CGFloat) -> CGFloat {
@@ -310,14 +244,14 @@ struct TimelineContentView: View {
             clampTimelineScrollX(trackWidth: trackWidth, viewportWidth: viewportWidth)
             return
         }
-        let oldVisibleX = visibleTimelineX(for: editorState.playheadFrame,
+        let oldVisibleX = visibleTimelineX(for: clock.frame,
                                            pointsPerFrame: oldPointsPerFrame,
                                            scrollX: CGFloat(editorState.timelineScrollX))
-        guard isPlayheadVisible(oldVisibleX, viewportWidth: viewportWidth) else {
+        guard oldVisibleX >= 0, oldVisibleX <= viewportWidth else {
             clampTimelineScrollX(trackWidth: trackWidth, viewportWidth: viewportWidth)
             return
         }
-        let nextScrollX = timelineX(for: editorState.playheadFrame,
+        let nextScrollX = timelineX(for: clock.frame,
                                     pointsPerFrame: newPointsPerFrame) - oldVisibleX
         editorState.timelineScrollX = Double(clampedTimelineScrollX(nextScrollX,
                                                                     trackWidth: trackWidth,
@@ -325,12 +259,14 @@ struct TimelineContentView: View {
     }
 
     private func timelinePanGesture(trackWidth: CGFloat, viewportWidth: CGFloat,
-                                    playheadX: CGFloat? = nil) -> some Gesture
+                                    pointsPerFrame: CGFloat, scrollX: CGFloat) -> some Gesture
     {
         DragGesture(minimumDistance: 6)
             .updating($timelineDragStartX) { value, state, _ in
                 guard !isTimeRangeDragging else { return }
                 if state == nil {
+                    let playheadX = trackLeadingInset
+                        + timelineX(for: clock.frame, pointsPerFrame: pointsPerFrame) - scrollX
                     state = isPlayheadDragStart(value.startLocation.x, playheadX: playheadX)
                         ? .nan
                         : CGFloat(editorState.timelineScrollX)

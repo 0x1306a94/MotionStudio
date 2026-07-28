@@ -16,7 +16,7 @@ extension EditorViewController {
         canvasViewport.clipsToBounds = false
         view.addSubview(canvasViewport)
 
-        let canvasController = CanvasViewController(document: document.modelDocument, editorState: editorState, clearSelection: { [weak self] in
+        let canvasController = CanvasViewController(document: document.modelDocument, editorState: editorState, playheadClock: playheadClock, clearSelection: { [weak self] in
             self?.clearSelection()
         }, registerEdit: { [weak self] actionName in
             self?.registerEdit(actionName)
@@ -240,6 +240,7 @@ extension EditorViewController {
 
         let timelineHost = UIHostingController(rootView: UIKitTimelineHostView(document: document.modelDocument,
                                                                                editorState: editorState,
+                                                                               playheadClock: playheadClock,
                                                                                perform: { [weak self] name, edit in
                                                                                    self?.perform(name, edit: edit)
                                                                                },

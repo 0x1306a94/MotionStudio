@@ -45,9 +45,6 @@ final class EditorState {
 
     var selectedTimelineSegment: TimelineSegmentSelection?
 
-    /// Playhead position in frames.
-    var playheadFrame: Int64 = 0
-
     var isPlaying = false
 
     var previewBackdrop: MS_PREVIEWER_BACKDROP = .TRANSPARENT

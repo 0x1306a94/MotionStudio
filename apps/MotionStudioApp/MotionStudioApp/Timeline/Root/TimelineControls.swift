@@ -41,10 +41,7 @@ struct TimelineControls: View {
             // included). A text field being edited consumes the space first.
             .keyboardShortcut(.space, modifiers: [])
 
-            Text("\(editorState.playheadFrame) / \(duration)")
-                .monospacedDigit()
-                .font(.callout)
-                .frame(minWidth: 72, alignment: .leading)
+            PlayheadFrameLabel(duration: duration)
 
             timelineZoomControls
 
@@ -93,5 +90,17 @@ struct TimelineControls: View {
         let next = CGFloat(editorState.timelinePointsPerFrame) * factor
         editorState.timelinePointsPerFrame = Double(min(max(next, minTimelinePointsPerFrame),
                                                         maxTimelinePointsPerFrame))
+    }
+}
+
+private struct PlayheadFrameLabel: View {
+    @Environment(PlayheadClock.self) private var clock
+    let duration: Int64
+
+    var body: some View {
+        Text("\(clock.frame) / \(duration)")
+            .monospacedDigit()
+            .font(.callout)
+            .frame(minWidth: 72, alignment: .leading)
     }
 }
