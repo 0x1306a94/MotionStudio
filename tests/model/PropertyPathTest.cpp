@@ -81,6 +81,19 @@ TEST(ResolveAnimatableTest, ResolvesTransformProperty) {
               static_cast<AnimatableBase *>(&scene.layer->transform.position));
 }
 
+TEST(ResolveAnimatableTest, ResolvesFollowPathProperties) {
+    ShapeScene scene;
+    AnimatableBase *pathOffset =
+        ResolveAnimatable(scene.document, {scene.layer->id, "followPath.pathOffset"});
+    AnimatableBase *orientOffset =
+        ResolveAnimatable(scene.document, {scene.layer->id, "followPath.orientOffset"});
+    EXPECT_EQ(pathOffset, static_cast<AnimatableBase *>(&scene.layer->followPath.pathOffset));
+    EXPECT_EQ(orientOffset,
+              static_cast<AnimatableBase *>(&scene.layer->followPath.orientOffset));
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "followPath.enabled"}),
+              nullptr);
+}
+
 TEST(ResolveAnimatableTest, ResolvesShapeById) {
     ShapeScene scene;
     AnimatableBase *resolved = ResolveAnimatable(scene.document, {scene.rect->id, "size"});

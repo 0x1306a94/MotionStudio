@@ -10,6 +10,7 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Time.h"
 #include "MotionStudio/model/BlendMode.h"
+#include "MotionStudio/model/FollowPath.h"
 #include "MotionStudio/model/LayerContent.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
@@ -73,6 +74,7 @@ class Layer {
     std::vector<Mask> masks;
     EntityId trackMatteLayerId;
     TrackMatteType trackMatteType = TrackMatteType::None;
+    FollowPath followPath;
     std::vector<std::unique_ptr<LayerStyle>> styles;
 
   private:

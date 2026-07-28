@@ -121,6 +121,11 @@ TEST(LayerMaskTest, DefaultsHaveEmptyPathAndNoTrackMatte) {
     EXPECT_TRUE(layer.masks.empty());
     EXPECT_FALSE(layer.trackMatteLayerId.isValid());
     EXPECT_EQ(layer.trackMatteType, TrackMatteType::None);
+    EXPECT_FALSE(layer.followPath.enabled);
+    EXPECT_FALSE(layer.followPath.pathLayerId.isValid());
+    EXPECT_FLOAT_EQ(layer.followPath.pathOffset.staticValue(), 0.0f);
+    EXPECT_TRUE(layer.followPath.orientAlongPath);
+    EXPECT_FLOAT_EQ(layer.followPath.orientOffset.staticValue(), 0.0f);
 
     Mask mask;
     EXPECT_FALSE(mask.path.isAnimated());

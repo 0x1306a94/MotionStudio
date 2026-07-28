@@ -193,6 +193,16 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
         if (first.name == "transform" && segments.size() == 2) {
             return resolveTransformProperty(layer->transform, segments[1].name);
         }
+        if (first.name == "followPath" && segments.size() == 2) {
+            const std::string &name = segments[1].name;
+            if (name == "pathOffset") {
+                return &layer->followPath.pathOffset;
+            }
+            if (name == "orientOffset") {
+                return &layer->followPath.orientOffset;
+            }
+            return nullptr;
+        }
         if (first.name == "styles" && first.index >= 0 && segments.size() == 2) {
             if (first.index >= static_cast<int>(layer->styles.size())) {
                 return nullptr;
