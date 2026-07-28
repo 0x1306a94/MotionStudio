@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/render/MotionPathChrome.h"
 #include "MotionStudio/render/PathEditHandles.h"
 #include "MotionStudio/render/PathOverlay.h"
 #include "MotionStudio/render/PreviewCanvasAdapter.h"
@@ -14,5 +15,9 @@ struct MSCanvas {
     bool hasPathEditTarget = false;
     motion::PathEditTarget pathEditTarget;
     int pathEditSelectedVertex = -1;
+    // Motion-path chrome: selectedKeyframe is an index into position keyframes
+    // of motionPathLayerId (-1 = none). layerId 0 clears selection chrome.
+    motion::EntityId motionPathLayerId;
+    int motionPathSelectedKeyframe = -1;
     std::vector<motion::PathOverlayItem> customPathOverlays;
 };

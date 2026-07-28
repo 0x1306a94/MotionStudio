@@ -1,6 +1,7 @@
 #include "motionstudio_bridge.h"
 
 #include <chrono>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -14,9 +15,11 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/MotionPathChrome.h"
 #include "MotionStudio/render/PathEditHandles.h"
 #include "MotionStudio/render/PathOverlay.h"
 #include "MotionStudio/render/SceneEvaluator.h"
+#include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 
 using motion::EntityId;
 
@@ -60,6 +63,24 @@ MS_PATH_HANDLE ToMSPathHandle(motion::PathHandleKind kind) {
         }
     }
     return MS_PATH_HANDLE_NONE;
+}
+
+MS_MOTION_PATH_HANDLE ToMSMotionPathHandle(motion::MotionPathHandleKind kind) {
+    switch (kind) {
+        case motion::MotionPathHandleKind::None: {
+            return MS_MOTION_PATH_HANDLE_NONE;
+        }
+        case motion::MotionPathHandleKind::Keyframe: {
+            return MS_MOTION_PATH_HANDLE_KEYFRAME;
+        }
+        case motion::MotionPathHandleKind::InTangent: {
+            return MS_MOTION_PATH_HANDLE_IN_TANGENT;
+        }
+        case motion::MotionPathHandleKind::OutTangent: {
+            return MS_MOTION_PATH_HANDLE_OUT_TANGENT;
+        }
+    }
+    return MS_MOTION_PATH_HANDLE_NONE;
 }
 
 }  // namespace
@@ -174,6 +195,98 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
     return hit;
 }
 
+void ms_canvas_set_motion_path_selection(MSCanvas *canvas, uint64_t layerId,
+                                         int selectedKeyframe) {
+    if (canvas == nullptr) {
+        return;
+    }
+    if (layerId == 0) {
+        canvas->motionPathLayerId = {};
+        canvas->motionPathSelectedKeyframe = -1;
+        return;
+    }
+    canvas->motionPathLayerId = EntityId{layerId};
+    canvas->motionPathSelectedKeyframe = selectedKeyframe;
+}
+
+MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document,
+                                          uint64_t compositionId, double frameTime, float sceneX,
+                                          float sceneY) {
+    MSMotionPathHit hit{};
+    hit.kind = MS_MOTION_PATH_HANDLE_NONE;
+    if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr ||
+        canvas->hasPathEditTarget || canvas->selectedLayerIds.empty()) {
+        return hit;
+    }
+    DocumentLock guard(document);
+    auto result = motion::SceneEvaluator::EvaluatePreview(
+        *document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    if (!result.hasValue()) {
+        return hit;
+    }
+    const motion::SceneState &state = result.value();
+    const float viewUnit =
+        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    const float handleRadius = 8.0f * viewUnit;
+
+    // Prefer the layer with an active keyframe selection, then walk selected layers.
+    std::vector<EntityId> order;
+    order.reserve(canvas->selectedLayerIds.size() + 1);
+    if (canvas->motionPathLayerId.isValid()) {
+        order.push_back(canvas->motionPathLayerId);
+    }
+    for (EntityId id : canvas->selectedLayerIds) {
+        if (id != canvas->motionPathLayerId) {
+            order.push_back(id);
+        }
+    }
+
+    for (EntityId layerId : order) {
+        const int selectedKeyframe =
+            layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
+        motion::MotionPathChrome chrome;
+        if (!motion::BuildMotionPathChrome(*document->document, layerId,
+                                           motion::PreviewTime(frameTime), selectedKeyframe,
+                                           chrome)) {
+            continue;
+        }
+        const motion::MotionPathHit coreHit =
+            motion::HitTestMotionPath(chrome, {sceneX, sceneY}, handleRadius);
+        if (coreHit.kind == motion::MotionPathHandleKind::None) {
+            continue;
+        }
+        hit.kind = ToMSMotionPathHandle(coreHit.kind);
+        hit.layerId = layerId.value;
+        hit.index = coreHit.index;
+        canvas->motionPathLayerId = layerId;
+        return hit;
+    }
+    return hit;
+}
+
+void ms_command_motion_path_drag_tangent(MSDocument *document, uint64_t layerId, int keyframeIndex,
+                                         bool isOut, float sceneX, float sceneY,
+                                         double frameTime) {
+    if (document == nullptr || layerId == 0 || keyframeIndex < 0) {
+        return;
+    }
+    DocumentLock guard(document);
+    motion::MotionPathChrome chrome;
+    if (!motion::BuildMotionPathChrome(*document->document, EntityId{layerId},
+                                       motion::PreviewTime(frameTime), keyframeIndex, chrome)) {
+        return;
+    }
+    const auto updates = motion::MotionPathTangentDragUpdates(
+        *document->document, EntityId{layerId}, static_cast<size_t>(keyframeIndex), isOut,
+        {sceneX, sceneY}, chrome.parentWorldTransform);
+    for (const motion::MotionPathSpatialUpdate &update : updates) {
+        bridge::Execute(document,
+                        std::make_unique<motion::SetSpatialTangentsCommand>(
+                            motion::PropertyPath{EntityId{layerId}, "transform.position"},
+                            update.time, update.spatialIn, update.spatialOut));
+    }
+}
+
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
                           int64_t frame) {
     ms_canvas_draw_frame_profiled(canvas, document, compositionId, frame, nullptr);
@@ -241,6 +354,24 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         }
     }
 
+    motion::DrawCommandList motionPathCommands;
+    if (!canvas->hasPathEditTarget) {
+        for (EntityId layerId : canvas->selectedLayerIds) {
+            const int selectedKeyframe =
+                layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
+            motion::MotionPathChrome chrome;
+            if (!motion::BuildMotionPathChrome(*document->document, layerId,
+                                               motion::PreviewTime(frameTime), selectedKeyframe,
+                                               chrome)) {
+                continue;
+            }
+            motion::DrawCommandList layerCommands =
+                motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
+            motionPathCommands.insert(motionPathCommands.end(), layerCommands.begin(),
+                                      layerCommands.end());
+        }
+    }
+
     motion::DrawCommandList selectionCommands;
     if (!canvas->hasPathEditTarget) {
         const motion::EntityId primaryLayerId =
@@ -251,7 +382,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
     profile.drawCommandCount = commands.size() + pathOverlayCommands.size() +
-        pathEditCommands.size() + selectionCommands.size();
+        pathEditCommands.size() + motionPathCommands.size() + selectionCommands.size();
 
     const auto beginFrameStart = ProfileClock::now();
     canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight, state.backgroundColor,
@@ -261,10 +392,14 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
     const auto playCommandsStart = ProfileClock::now();
     motion::PlayCommands(commands, *canvas->adapter);
-    if (!pathOverlayCommands.empty() || !pathEditCommands.empty() || !selectionCommands.empty()) {
+    if (!pathOverlayCommands.empty() || !pathEditCommands.empty() ||
+        !motionPathCommands.empty() || !selectionCommands.empty()) {
         canvas->adapter->restoreCompositionClip();
         if (!pathOverlayCommands.empty()) {
             motion::PlayCommands(pathOverlayCommands, *canvas->adapter);
+        }
+        if (!motionPathCommands.empty()) {
+            motion::PlayCommands(motionPathCommands, *canvas->adapter);
         }
         if (!pathEditCommands.empty()) {
             motion::PlayCommands(pathEditCommands, *canvas->adapter);

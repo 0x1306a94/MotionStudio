@@ -571,6 +571,37 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
                                       uint64_t compositionId, double frameTime, float sceneX,
                                       float sceneY);
 
+// Motion-path chrome (Select tool). layerId 0 clears the selected keyframe.
+// selectedKeyframe < 0 hides tangent handles but still draws the path for
+// selected layers with ≥2 position keyframes.
+void ms_canvas_set_motion_path_selection(MSCanvas *canvas, uint64_t layerId,
+                                         int selectedKeyframe);
+
+typedef CF_CLOSED_ENUM(int, MS_MOTION_PATH_HANDLE) {
+    MS_MOTION_PATH_HANDLE_NONE = 0,
+    MS_MOTION_PATH_HANDLE_KEYFRAME = 1,
+    MS_MOTION_PATH_HANDLE_IN_TANGENT = 2,
+    MS_MOTION_PATH_HANDLE_OUT_TANGENT = 3,
+};
+
+typedef struct MSMotionPathHit {
+    MS_MOTION_PATH_HANDLE kind;
+    uint64_t layerId;
+    size_t index;
+} MSMotionPathHit;
+
+// Hits motion-path chrome for currently selected layers. Skips when a path-edit
+// target is active. Returns NONE when nothing hits.
+MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document,
+                                          uint64_t compositionId, double frameTime, float sceneX,
+                                          float sceneY);
+
+// Writes spatial tangents for a motion-path handle drag (parent-space via scene
+// point). Also seeds the adjacent keyframe's opposite handle when missing.
+void ms_command_motion_path_drag_tangent(MSDocument *document, uint64_t layerId,
+                                         int keyframeIndex, bool isOut, float sceneX,
+                                         float sceneY, double frameTime);
+
 #ifdef __cplusplus
 }
 #endif
