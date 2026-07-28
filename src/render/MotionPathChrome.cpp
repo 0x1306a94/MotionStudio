@@ -18,15 +18,9 @@ namespace {
 constexpr Color kMotionPathStrokeColor{0.35f, 0.75f, 1.0f, 1.0f};
 constexpr Color kHandleFillColor{1.0f, 1.0f, 1.0f, 1.0f};
 constexpr Color kSelectedHandleFillColor{0.35f, 0.75f, 1.0f, 1.0f};
-constexpr Color kTangentFillColor{0.35f, 0.75f, 1.0f, 1.0f};
-constexpr Color kTangentStrokeColor{0.25f, 0.55f, 0.95f, 1.0f};
 
 float LengthSquared(Vec2 value) {
     return value.x * value.x + value.y * value.y;
-}
-
-bool IsNearPoint(Vec2 point, Vec2 target, float radius) {
-    return LengthSquared(point - target) <= radius * radius;
 }
 
 Mat3 LocalMatrixOf(const Transform &transform, PreviewTime time) {
@@ -167,27 +161,8 @@ MotionPathHit HitTestMotionPath(const MotionPathChrome &chrome, Vec2 scenePoint,
     }
     const float radius = std::max(handleHitRadius, 0.0f);
 
-    if (chrome.selectedKeyframe >= 0) {
-        const size_t selected = static_cast<size_t>(chrome.selectedKeyframe);
-        const Vec2 vertex = chrome.worldVertices[selected];
-        if (selected < chrome.worldInHandles.size() &&
-            (selected > 0 || chrome.hasStoredIn[selected]) &&
-            !IsNearPoint(chrome.worldInHandles[selected], vertex, 1e-4f) &&
-            IsNearPoint(scenePoint, chrome.worldInHandles[selected], radius)) {
-            hit.kind = MotionPathHandleKind::InTangent;
-            hit.index = selected;
-            return hit;
-        }
-        if (selected < chrome.worldOutHandles.size() &&
-            (selected + 1 < chrome.worldVertices.size() || chrome.hasStoredOut[selected]) &&
-            !IsNearPoint(chrome.worldOutHandles[selected], vertex, 1e-4f) &&
-            IsNearPoint(scenePoint, chrome.worldOutHandles[selected], radius)) {
-            hit.kind = MotionPathHandleKind::OutTangent;
-            hit.index = selected;
-            return hit;
-        }
-    }
-
+    // Canvas chrome no longer draws tangent handles; only keyframe markers are
+    // pickable here (tangent editing is in the Inspector pad).
     float bestDistanceSquared = radius * radius;
     int bestKeyframe = -1;
     for (size_t index = 0; index < chrome.worldVertices.size(); ++index) {
@@ -220,37 +195,8 @@ DrawCommandList BuildMotionPathCommands(const MotionPathChrome &chrome, float st
     DrawCommandList strokeCommands = BuildPathOverlayCommands({overlay}, safeStroke);
     commands.insert(commands.end(), strokeCommands.begin(), strokeCommands.end());
 
-    if (chrome.selectedKeyframe >= 0) {
-        const size_t selected = static_cast<size_t>(chrome.selectedKeyframe);
-        const Vec2 vertex = chrome.worldVertices[selected];
-        const Vec2 inHandle = chrome.worldInHandles[selected];
-        const Vec2 outHandle = chrome.worldOutHandles[selected];
-        const float tangentSize = safeHandle * 0.85f;
-
-        if (selected > 0 || chrome.hasStoredIn[selected]) {
-            BezierPath inLine;
-            inLine.vertices.push_back({vertex, {}, {}});
-            inLine.vertices.push_back({inHandle, {}, {}});
-            AppendStroke(commands, MakePathGeometry(std::move(inLine)), safeStroke,
-                         kTangentStrokeColor);
-            AppendFill(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
-                       kTangentFillColor);
-            AppendStroke(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
-                         safeStroke, kTangentStrokeColor);
-        }
-        if (selected + 1 < chrome.worldVertices.size() || chrome.hasStoredOut[selected]) {
-            BezierPath outLine;
-            outLine.vertices.push_back({vertex, {}, {}});
-            outLine.vertices.push_back({outHandle, {}, {}});
-            AppendStroke(commands, MakePathGeometry(std::move(outLine)), safeStroke,
-                         kTangentStrokeColor);
-            AppendFill(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
-                       kTangentFillColor);
-            AppendStroke(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
-                         safeStroke, kTangentStrokeColor);
-        }
-    }
-
+    // Tangent handles are edited in the Inspector curve pad — canvas only shows
+    // the path stroke and keyframe markers.
     for (size_t index = 0; index < chrome.worldVertices.size(); ++index) {
         const Vec2 &vertex = chrome.worldVertices[index];
         const bool selected = chrome.selectedKeyframe >= 0 &&

@@ -87,7 +87,7 @@ TEST(MotionPathChromeTest, ParentWorldTransformApplies) {
     EXPECT_EQ(chrome.worldVertices[1], (Vec2{140, 70}));
 }
 
-TEST(MotionPathChromeTest, HitPrefersTangentOverKeyframe) {
+TEST(MotionPathChromeTest, HitSelectsKeyframeMarkersOnly) {
     Scene scene;
     scene.layer->transform.position.addKeyframe(MakePositionKeyframe(0, {0, 0}));
     scene.layer->transform.position.addKeyframe(MakePositionKeyframe(10, {90, 0}));
@@ -99,9 +99,9 @@ TEST(MotionPathChromeTest, HitPrefersTangentOverKeyframe) {
     EXPECT_EQ(keyHit.kind, MotionPathHandleKind::Keyframe);
     EXPECT_EQ(keyHit.index, 0u);
 
+    // Preview out handle location is not pickable on canvas anymore.
     auto outHit = HitTestMotionPath(chrome, {30, 0}, 8.0f);
-    EXPECT_EQ(outHit.kind, MotionPathHandleKind::OutTangent);
-    EXPECT_EQ(outHit.index, 0u);
+    EXPECT_EQ(outHit.kind, MotionPathHandleKind::None);
 }
 
 TEST(MotionPathChromeTest, TangentDragWritesNeighborDefault) {
