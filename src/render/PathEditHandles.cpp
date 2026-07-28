@@ -15,6 +15,8 @@ constexpr Color kPathEditStrokeColor{1.0f, 0.85f, 0.2f, 1.0f};
 constexpr Color kHandleFillColor{1.0f, 1.0f, 1.0f, 1.0f};
 constexpr Color kSelectedHandleFillColor{1.0f, 0.85f, 0.2f, 1.0f};
 constexpr Color kTangentFillColor{0.35f, 0.75f, 1.0f, 1.0f};
+// Distinct from vertex chrome yellow so tangent stems stay visible.
+constexpr Color kTangentStrokeColor{0.25f, 0.55f, 0.95f, 1.0f};
 constexpr int kSegmentSamples = 16;
 
 float LengthSquared(Vec2 value) {
@@ -247,24 +249,24 @@ DrawCommandList BuildPathEditCommands(const PathEditHandles &handles, float stro
             inLine.vertices.push_back({vertex, {}, {}});
             inLine.vertices.push_back({inHandle, {}, {}});
             AppendStroke(commands, MakePathGeometry(std::move(inLine)), safeStroke,
-                         kPathEditStrokeColor);
+                         kTangentStrokeColor);
             const float tangentSize = safeHandle * 0.85f;
             AppendFill(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
                        kTangentFillColor);
             AppendStroke(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
-                         safeStroke, kPathEditStrokeColor);
+                         safeStroke, kTangentStrokeColor);
         }
         if (!IsNearPoint(outHandle, vertex, 1e-4f)) {
             BezierPath outLine;
             outLine.vertices.push_back({vertex, {}, {}});
             outLine.vertices.push_back({outHandle, {}, {}});
             AppendStroke(commands, MakePathGeometry(std::move(outLine)), safeStroke,
-                         kPathEditStrokeColor);
+                         kTangentStrokeColor);
             const float tangentSize = safeHandle * 0.85f;
             AppendFill(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
                        kTangentFillColor);
             AppendStroke(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
-                         safeStroke, kPathEditStrokeColor);
+                         safeStroke, kTangentStrokeColor);
         }
     }
 
