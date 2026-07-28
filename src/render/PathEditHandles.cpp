@@ -241,24 +241,30 @@ DrawCommandList BuildPathEditCommands(const PathEditHandles &handles, float stro
         const Vec2 inHandle = handles.worldInHandles[selected];
         const Vec2 outHandle = handles.worldOutHandles[selected];
 
-        BezierPath inLine;
-        inLine.vertices.push_back({vertex, {}, {}});
-        inLine.vertices.push_back({inHandle, {}, {}});
-        BezierPath outLine;
-        outLine.vertices.push_back({vertex, {}, {}});
-        outLine.vertices.push_back({outHandle, {}, {}});
-        AppendStroke(commands, MakePathGeometry(std::move(inLine)), safeStroke, kPathEditStrokeColor);
-        AppendStroke(commands, MakePathGeometry(std::move(outLine)), safeStroke, kPathEditStrokeColor);
-
-        const float tangentSize = safeHandle * 0.85f;
-        AppendFill(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
-                   kTangentFillColor);
-        AppendStroke(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}), safeStroke,
-                     kPathEditStrokeColor);
-        AppendFill(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
-                   kTangentFillColor);
-        AppendStroke(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
-                     safeStroke, kPathEditStrokeColor);
+        if (!IsNearPoint(inHandle, vertex, 1e-4f)) {
+            BezierPath inLine;
+            inLine.vertices.push_back({vertex, {}, {}});
+            inLine.vertices.push_back({inHandle, {}, {}});
+            AppendStroke(commands, MakePathGeometry(std::move(inLine)), safeStroke,
+                         kPathEditStrokeColor);
+            const float tangentSize = safeHandle * 0.85f;
+            AppendFill(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
+                       kTangentFillColor);
+            AppendStroke(commands, MakeEllipseGeometry(inHandle, {tangentSize, tangentSize}),
+                         safeStroke, kPathEditStrokeColor);
+        }
+        if (!IsNearPoint(outHandle, vertex, 1e-4f)) {
+            BezierPath outLine;
+            outLine.vertices.push_back({vertex, {}, {}});
+            outLine.vertices.push_back({outHandle, {}, {}});
+            AppendStroke(commands, MakePathGeometry(std::move(outLine)), safeStroke,
+                         kPathEditStrokeColor);
+            const float tangentSize = safeHandle * 0.85f;
+            AppendFill(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
+                       kTangentFillColor);
+            AppendStroke(commands, MakeEllipseGeometry(outHandle, {tangentSize, tangentSize}),
+                         safeStroke, kPathEditStrokeColor);
+        }
     }
 
     for (const Vec2 &vertex : handles.worldVertices) {

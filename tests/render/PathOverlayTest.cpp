@@ -45,6 +45,13 @@ TEST(PathOverlayTest, BuildCommandsEmptyWhenNoItems) {
     EXPECT_TRUE(BuildPathOverlayCommands({}, 1.5f).empty());
 }
 
+TEST(PathOverlayTest, BuildCommandsSkipsSingleVertexPath) {
+    PathOverlayItem item;
+    item.path.vertices.push_back({{0, 0}, {}, {}});
+    item.color = Color{1, 0.85f, 0.2f, 1};
+    EXPECT_TRUE(BuildPathOverlayCommands({item}, 1.5f).empty());
+}
+
 TEST(PathOverlayTest, BuildCommandsEmitsStrokeInLocalTransform) {
     PathOverlayItem item;
     item.worldTransform = Mat3::Translate(Vec2{10, 20});

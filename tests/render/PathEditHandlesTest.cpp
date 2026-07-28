@@ -8,6 +8,7 @@ using motion::BezierPath;
 using motion::BuildPathEditCommands;
 using motion::BuildPathEditHandles;
 using motion::BuildPathEditHandlesFromPath;
+using motion::DrawCommandType;
 using motion::EntityId;
 using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
@@ -118,4 +119,23 @@ TEST(PathEditHandlesTest, BuildCommandsNonEmpty) {
     ASSERT_TRUE(BuildPathEditHandlesFromPath(MakeTriangle(), Mat3::Identity(), {}, 1, handles));
     auto commands = BuildPathEditCommands(handles, 1.5f, 7.0f);
     EXPECT_FALSE(commands.empty());
+}
+
+TEST(PathEditHandlesTest, SingleVertexSkipsPathStrokeButDrawsMarker) {
+    BezierPath path;
+    path.vertices.push_back({{3, 4}, {}, {}});
+    PathEditHandles handles;
+    ASSERT_TRUE(BuildPathEditHandlesFromPath(path, Mat3::Identity(), {}, 0, handles));
+    auto commands = BuildPathEditCommands(handles, 1.5f, 7.0f);
+    ASSERT_FALSE(commands.empty());
+    // Overlay stroke is skipped; only vertex marker fill/stroke remain.
+    bool sawFill = false;
+    for (const auto &command : commands) {
+        EXPECT_NE(command.type, DrawCommandType::Save);
+        EXPECT_NE(command.type, DrawCommandType::ConcatTransform);
+        if (command.type == DrawCommandType::DrawPath) {
+            sawFill = true;
+        }
+    }
+    EXPECT_TRUE(sawFill);
 }

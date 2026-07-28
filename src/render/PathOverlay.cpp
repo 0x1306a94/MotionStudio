@@ -10,7 +10,8 @@ namespace motion {
 namespace {
 
 void AppendOverlayStroke(DrawCommandList &commands, const PathOverlayItem &item, float strokeWidth) {
-    if (item.path.vertices.empty()) {
+    // A single vertex cannot form a stroked segment; tgfx rejects empty bounds.
+    if (item.path.vertices.size() < 2) {
         return;
     }
 
