@@ -26,6 +26,7 @@
 #include "MotionStudio/undo/RemoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetFollowPathCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
@@ -64,6 +65,7 @@ using motion::RemoveLayerCommand;
 using motion::RemoveMaskCommand;
 using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
+using motion::SetFollowPathCommand;
 using motion::SetMaskInvertedCommand;
 using motion::SetMaskModeCommand;
 using motion::SetSpatialTangentsCommand;
@@ -667,6 +669,41 @@ TEST(SetTrackMatteCommandTest, ConsecutiveSetsMerge) {
     scene.undo.undo(scene.document);
     EXPECT_EQ(scene.layer->trackMatteType, TrackMatteType::None);
     EXPECT_FALSE(scene.layer->trackMatteLayerId.isValid());
+}
+
+TEST(SetFollowPathCommandTest, SetAndClear) {
+    Scene scene;
+    Layer *pathLayer =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+
+    scene.execute<SetFollowPathCommand>(scene.layer->id, true, pathLayer->id, true);
+    EXPECT_TRUE(scene.layer->followPath.enabled);
+    EXPECT_EQ(scene.layer->followPath.pathLayerId, pathLayer->id);
+    EXPECT_TRUE(scene.layer->followPath.orientAlongPath);
+
+    scene.undo.endMergeGroup();
+
+    scene.execute<SetFollowPathCommand>(scene.layer->id, false, EntityId{}, false);
+    EXPECT_FALSE(scene.layer->followPath.enabled);
+    EXPECT_FALSE(scene.layer->followPath.pathLayerId.isValid());
+    EXPECT_FALSE(scene.layer->followPath.orientAlongPath);
+
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->followPath.enabled);
+    EXPECT_EQ(scene.layer->followPath.pathLayerId, pathLayer->id);
+}
+
+TEST(SetFollowPathCommandTest, ConsecutiveSetsMerge) {
+    Scene scene;
+    Layer *pathLayer =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+
+    scene.execute<SetFollowPathCommand>(scene.layer->id, true, pathLayer->id, true);
+    scene.execute<SetFollowPathCommand>(scene.layer->id, true, pathLayer->id, false);
+    EXPECT_FALSE(scene.layer->followPath.orientAlongPath);
+
+    scene.undo.undo(scene.document);
+    EXPECT_FALSE(scene.layer->followPath.enabled);
 }
 
 TEST(ConvertGeometryToPathCommandTest, BakesRectAndUndoes) {

@@ -30,6 +30,7 @@ enum class CommandKind {
     SetTrackMatte,
     ConvertGeometryToPath,
     SetSpatialTangents,
+    SetFollowPath,
     Composite,
 };
 

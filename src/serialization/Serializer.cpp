@@ -1103,6 +1103,16 @@ json LayerToJson(const Layer &layer) {
     } else {
         node["trackMatteLayerId"] = nullptr;
     }
+    json followPath = json{{"enabled", layer.followPath.enabled},
+                           {"pathOffset", AnimatableToJson(layer.followPath.pathOffset)},
+                           {"orientAlongPath", layer.followPath.orientAlongPath},
+                           {"orientOffset", AnimatableToJson(layer.followPath.orientOffset)}};
+    if (layer.followPath.pathLayerId.isValid()) {
+        followPath["pathLayerId"] = IdToString(layer.followPath.pathLayerId);
+    } else {
+        followPath["pathLayerId"] = nullptr;
+    }
+    node["followPath"] = std::move(followPath);
     json styles = json::array();
     for (const auto &style : layer.styles) {
         styles.push_back(LayerStyleToJson(*style));
@@ -1226,6 +1236,47 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
             return Unexpected(matteLayerId.error());
         }
         layer->trackMatteLayerId = *matteLayerId;
+    }
+
+    if (const json *followPathNode = FindChild(node, "followPath")) {
+        if (!followPathNode->is_object()) {
+            return Unexpected(std::string("followPath must be an object"));
+        }
+        Expected<bool, std::string> enabled = ParseField<bool>(*followPathNode, "enabled");
+        if (enabled) {
+            layer->followPath.enabled = *enabled;
+        }
+        Expected<bool, std::string> orientAlongPath =
+            ParseField<bool>(*followPathNode, "orientAlongPath");
+        if (orientAlongPath) {
+            layer->followPath.orientAlongPath = *orientAlongPath;
+        }
+        const json *pathLayerNode = FindChild(*followPathNode, "pathLayerId");
+        if (pathLayerNode && !pathLayerNode->is_null()) {
+            Expected<std::string, std::string> pathLayerText = AsString(*pathLayerNode);
+            if (!pathLayerText) {
+                return Unexpected(pathLayerText.error());
+            }
+            Expected<EntityId, std::string> pathLayerId = IdFromString(*pathLayerText);
+            if (!pathLayerId) {
+                return Unexpected(pathLayerId.error());
+            }
+            layer->followPath.pathLayerId = *pathLayerId;
+        }
+        if (const json *pathOffsetNode = FindChild(*followPathNode, "pathOffset")) {
+            Expected<void, std::string> pathOffsetResult =
+                AnimatableFromJson(*pathOffsetNode, layer->followPath.pathOffset);
+            if (!pathOffsetResult) {
+                return Unexpected(pathOffsetResult.error());
+            }
+        }
+        if (const json *orientOffsetNode = FindChild(*followPathNode, "orientOffset")) {
+            Expected<void, std::string> orientOffsetResult =
+                AnimatableFromJson(*orientOffsetNode, layer->followPath.orientOffset);
+            if (!orientOffsetResult) {
+                return Unexpected(orientOffsetResult.error());
+            }
+        }
     }
 
     Expected<const json *, std::string> stylesNode = Child(node, "styles");

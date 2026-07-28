@@ -423,6 +423,53 @@ TEST(FingerprintTest, StableAndSensitiveToChange) {
     EXPECT_NE(DocumentFingerprint(*document), before);
 }
 
+TEST(SerializerTest, LayerWithoutFollowPathDefaults) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    for (auto &layer : json["compositions"][1]["layers"]) {
+        layer.erase("followPath");
+    }
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(restored.hasValue()) << restored.error();
+    const Layer &shapes = *(*restored)->compositions[1]->layers[0];
+    EXPECT_FALSE(shapes.followPath.enabled);
+    EXPECT_FALSE(shapes.followPath.pathLayerId.isValid());
+    EXPECT_FLOAT_EQ(shapes.followPath.pathOffset.staticValue(), 0.0f);
+    EXPECT_TRUE(shapes.followPath.orientAlongPath);
+}
+
+TEST(SerializerTest, FollowPathRoundTrip) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    Layer *pathLayer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *follower = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    follower->followPath.enabled = true;
+    follower->followPath.pathLayerId = pathLayer->id;
+    follower->followPath.orientAlongPath = false;
+    Keyframe<float> offsetKeyframe;
+    offsetKeyframe.time = 0;
+    offsetKeyframe.value = 0.0f;
+    Keyframe<float> offsetKeyframeEnd;
+    offsetKeyframeEnd.time = 20;
+    offsetKeyframeEnd.value = 1.0f;
+    follower->followPath.pathOffset.addKeyframe(offsetKeyframe);
+    follower->followPath.pathOffset.addKeyframe(offsetKeyframeEnd);
+    original.refreshEntityIndex();
+
+    const std::string text = Serializer::serialize(original);
+    Expected<std::unique_ptr<Document>, std::string> loaded = Serializer::deserialize(text);
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    Layer *roundTrip = (*loaded)->compositions[0]->layers[1].get();
+    EXPECT_TRUE(roundTrip->followPath.enabled);
+    EXPECT_EQ(roundTrip->followPath.pathLayerId, pathLayer->id);
+    EXPECT_FALSE(roundTrip->followPath.orientAlongPath);
+    ASSERT_TRUE(roundTrip->followPath.pathOffset.isAnimated());
+    ASSERT_EQ(roundTrip->followPath.pathOffset.keyframes().size(), 2u);
+    EXPECT_FLOAT_EQ(roundTrip->followPath.pathOffset.keyframes()[1].value, 1.0f);
+}
+
 TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
     Document original;
     Composition *composition = original.addComposition(std::make_unique<Composition>());
