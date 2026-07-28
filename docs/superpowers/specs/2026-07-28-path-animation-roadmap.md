@@ -1,7 +1,7 @@
 # 路径动画总览（Roadmap）
 
 日期：2026-07-28  
-状态：进行中（A/C/B 已完成；D 待人机验证）  
+状态：完成（A/C/B/D 均已完成）  
 分支：`feature/0x1306a94_path_animation`
 
 ## 目标
@@ -35,7 +35,7 @@
 | A | Path Morph | `done` | `done` | 详见 [path-morph-design](./2026-07-28-path-morph-design.md) |
 | C | Trim Path | `done` | `done` | Stroke Trim 已有能力 + 回归测。见 [stroke-trim-design](./2026-07-28-stroke-trim-design.md)。`ShapeTrimPath` 修饰器后置 |
 | B | Motion Path | `done` | `done` | 画布轨迹 + Inspector 曲线板。见 [motion-path-design](./2026-07-28-motion-path-design.md) |
-| D | Follow Path | `core-done` | `ui-pending-verify` | [design](./2026-07-28-follow-path-design.md) · [plan](../plans/2026-07-28-follow-path.md) |
+| D | Follow Path | `done` | `done` | [design](./2026-07-28-follow-path-design.md) · [plan](../plans/2026-07-28-follow-path.md) |
 
 ## Phase 占位范围
 
@@ -56,7 +56,7 @@
 
 ### D — Follow Path
 
-Core/Bridge 已完成；App Inspector / 时间轴待人机验证。见 [follow-path-design](./2026-07-28-follow-path-design.md)。
+已完成（人机验证通过）。见 [follow-path-design](./2026-07-28-follow-path-design.md)。
 
 ## 文档索引
 

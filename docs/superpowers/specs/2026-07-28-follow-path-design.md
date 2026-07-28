@@ -1,7 +1,7 @@
 # Phase D：Follow Path — 设计说明
 
 日期：2026-07-28  
-状态：已审阅（实现中）  
+状态：`done`（人机验证通过）  
 分支：`feature/0x1306a94_path_animation`  
 总览：[path-animation-roadmap](./2026-07-28-path-animation-roadmap.md)
 
