@@ -33,7 +33,7 @@
 | Phase | 能力 | Core/Bridge | App UI | 备注 |
 |---|---|---|---|---|
 | A | Path Morph | `done` | `done` | 详见 [path-morph-design](./2026-07-28-path-morph-design.md) |
-| C | Trim Path | `todo` | `todo` | 占位；A 完成后再写 spec |
+| C | Trim Path | `done` | `done` | Stroke Trim 已有能力 + 回归测。见 [stroke-trim-design](./2026-07-28-stroke-trim-design.md)。`ShapeTrimPath` 修饰器后置 |
 | B | Motion Path | `todo` | `todo` | 占位；Core spatial 已有 |
 | D | Follow Path | `todo` | `todo` | 占位；放最后 |
 
@@ -43,11 +43,12 @@
 
 Core 插值 / 求值 / Bridge 关键帧 API 已基本具备；缺口是端到端单测补强 + App 时间轴 / 钻石启用动画闭环。详见 Phase A design。
 
-### C — Trim Path（占位）
+### C — Stroke Trim（本阶段）
 
-- 线索：`StrokeStyle` 已有 `trimStart` / `trimEnd` / `trimOffset`；时间轴已能列出这些轨道。
-- 预期工作：求值 → 几何裁剪 → 渲染正确；是否保留独立 `ShapeTrimPath` 元素在 C 的 spec 里再定。
-- 非目标（C）：路径形变、Follow Path。
+- **已有**：`StrokeStyle` trim + 求值 + 适配器裁剪 + Inspector/时间轴。
+- **本阶段**：文档定界 + 适配器回归测试；无新 UI。
+- **后置**：AE 式 `ShapeTrimPath` 修饰器（Fill+Stroke）。
+- 详见 [stroke-trim-design](./2026-07-28-stroke-trim-design.md)。
 
 ### B — Motion Path（占位）
 
@@ -68,4 +69,5 @@ Core 插值 / 求值 / Bridge 关键帧 API 已基本具备；缺口是端到端
 | 本文件 | 总览 + 进度 |
 | [2026-07-28-path-morph-design.md](./2026-07-28-path-morph-design.md) | Phase A 设计 |
 | [2026-07-28-path-morph.md](../plans/2026-07-28-path-morph.md) | Phase A 实现计划 |
-| C/B/D design + plan | 各阶段开始前再写 |
+| [2026-07-28-stroke-trim-design.md](./2026-07-28-stroke-trim-design.md) | Phase C（Stroke Trim 定界） |
+| C/B/D design + plan | B/D 开始前再写；`ShapeTrimPath` 另开 |

@@ -323,3 +323,75 @@ TEST(TgfxRenderAdapterTest, AlphaTrackMatteMasksTargetLayer) {
     const Pixel outside = PixelAt(pixels, 100, 20, 20);
     EXPECT_NEAR(outside.b, 0, 8);
 }
+
+TEST(TgfxRenderAdapterTest, StrokeTrimKeepsOnlyPartialSegment) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.isStroke = true;
+    BezierPath path;
+    path.vertices.push_back({{20, 50}, {}, {}});
+    path.vertices.push_back({{80, 50}, {}, {}});
+    item.geometry = MakePathGeometry(std::move(path));
+    item.paint = Paint{Color{0, 0, 1, 1}};
+    item.stroke.width = 6;
+    item.stroke.cap = LineCap::Butt;
+    item.stroke.trimStart = 0.5f;
+    item.stroke.trimEnd = 1.0f;
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    // First half of the segment is trimmed away.
+    const Pixel trimmedAway = PixelAt(pixels, 100, 30, 50);
+    EXPECT_NEAR(trimmedAway.r, 255, 8);
+    EXPECT_NEAR(trimmedAway.b, 255, 8);
+    // Second half remains stroked.
+    const Pixel kept = PixelAt(pixels, 100, 65, 50);
+    EXPECT_NEAR(kept.b, 255, 8);
+    EXPECT_NEAR(kept.r, 0, 8);
+}
+
+TEST(TgfxRenderAdapterTest, StrokeEmptyTrimDrawsNothing) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.isStroke = true;
+    BezierPath path;
+    path.vertices.push_back({{20, 50}, {}, {}});
+    path.vertices.push_back({{80, 50}, {}, {}});
+    item.geometry = MakePathGeometry(std::move(path));
+    item.paint = Paint{Color{0, 0, 1, 1}};
+    item.stroke.width = 6;
+    item.stroke.trimStart = 0.4f;
+    item.stroke.trimEnd = 0.4f;
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(center.r, 255, 8);
+    EXPECT_NEAR(center.b, 255, 8);
+}
