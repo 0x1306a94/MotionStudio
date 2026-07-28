@@ -644,4 +644,75 @@ TEST(BridgeBezierPathTest, ToggleSmoothAndRecenterShape) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeBezierPathTest, MorphEvaluateMidpointAndKeyframeTimes) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+
+    MSBezierVertex a[2] = {
+        {0, 0, 0, 0, 0, 0},
+        {10, 0, 0, 0, 0, 0},
+    };
+    MSBezierPath from;
+    from.vertices = a;
+    from.count = 2;
+    from.closed = false;
+
+    MSBezierVertex b[2] = {
+        {20, 0, 0, 0, 0, 0},
+        {30, 0, 0, 0, 0, 0},
+    };
+    MSBezierPath to;
+    to.vertices = b;
+    to.count = 2;
+    to.closed = false;
+
+    ms_command_add_keyframe_bezier_path(document, layerId, "path", 0, &from);
+    ms_command_add_keyframe_bezier_path(document, layerId, "path", 20, &to);
+    EXPECT_EQ(ms_property_keyframe_count(document, layerId, "path"), 2);
+    EXPECT_EQ(ms_property_keyframe_time_at(document, layerId, "path", 0), 0);
+    EXPECT_EQ(ms_property_keyframe_time_at(document, layerId, "path", 1), 20);
+
+    MSBezierPath *mid = ms_property_evaluate_bezier_path(document, layerId, "path", 10);
+    ASSERT_NE(mid, nullptr);
+    ASSERT_EQ(mid->count, 2u);
+    EXPECT_FLOAT_EQ(mid->vertices[0].pointX, 10.0f);
+    EXPECT_FLOAT_EQ(mid->vertices[1].pointX, 20.0f);
+    ms_bezier_path_free(mid);
+    ms_document_destroy(document);
+}
+
+TEST(BridgeBezierPathTest, WriteAtPlayheadStaticThenAnimated) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+
+    MSBezierVertex v0[2] = {
+        {0, 0, 0, 0, 0, 0},
+        {5, 0, 0, 0, 0, 0},
+    };
+    MSBezierPath staticPath;
+    staticPath.vertices = v0;
+    staticPath.count = 2;
+    staticPath.closed = false;
+    ms_command_write_bezier_path_at_playhead(document, layerId, "path", 0, &staticPath);
+    EXPECT_FALSE(ms_property_is_animated(document, layerId, "path"));
+
+    ms_command_add_keyframe_bezier_path(document, layerId, "path", 0, &staticPath);
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, "path"));
+
+    MSBezierVertex v1[2] = {
+        {0, 0, 0, 0, 0, 0},
+        {15, 0, 0, 0, 0, 0},
+    };
+    MSBezierPath keyed;
+    keyed.vertices = v1;
+    keyed.count = 2;
+    keyed.closed = false;
+    ms_command_write_bezier_path_at_playhead(document, layerId, "path", 10, &keyed);
+    EXPECT_EQ(ms_property_keyframe_count(document, layerId, "path"), 2);
+
+    ms_document_destroy(document);
+}
+
 }  // namespace
