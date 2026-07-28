@@ -1,6 +1,7 @@
 #include "motionstudio_bridge.h"
 
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "MotionStudio/animation/Animatable.h"
@@ -27,6 +28,7 @@
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
+#include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
@@ -182,6 +184,21 @@ void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const cha
 void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetEasingCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame), MakeEasing(easingType, inX, inY, outX, outY)));
+}
+
+void ms_command_set_spatial_tangents(MSDocument *document, uint64_t entityId, const char *path,
+                                     int64_t frame, bool hasIn, float inX, float inY, bool hasOut,
+                                     float outX, float outY) {
+    DocumentLock guard(document);
+    std::optional<Vec2> spatialIn;
+    std::optional<Vec2> spatialOut;
+    if (hasIn) {
+        spatialIn = Vec2{inX, inY};
+    }
+    if (hasOut) {
+        spatialOut = Vec2{outX, outY};
+    }
+    Execute(document, std::make_unique<motion::SetSpatialTangentsCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame), spatialIn, spatialOut));
 }
 
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId) {

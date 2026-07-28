@@ -34,7 +34,7 @@
 |---|---|---|---|---|
 | A | Path Morph | `done` | `done` | 详见 [path-morph-design](./2026-07-28-path-morph-design.md) |
 | C | Trim Path | `done` | `done` | Stroke Trim 已有能力 + 回归测。见 [stroke-trim-design](./2026-07-28-stroke-trim-design.md)。`ShapeTrimPath` 修饰器后置 |
-| B | Motion Path | `todo` | `todo` | 占位；Core spatial 已有 |
+| B | Motion Path | `core-done` | `todo` | B1 API 完成；B2 画布轨迹+手柄待做。见 [motion-path-design](./2026-07-28-motion-path-design.md) |
 | D | Follow Path | `todo` | `todo` | 占位；放最后 |
 
 ## Phase 占位范围
@@ -50,11 +50,11 @@ Core 插值 / 求值 / Bridge 关键帧 API 已基本具备；缺口是端到端
 - **后置**：AE 式 `ShapeTrimPath` 修饰器（Fill+Stroke）。
 - 详见 [stroke-trim-design](./2026-07-28-stroke-trim-design.md)。
 
-### B — Motion Path（占位）
+### B — Motion Path（进行中）
 
-- 线索：`Keyframe<Vec2>` 的 `spatialInTangent` / `spatialOutTangent` + `EvaluateSpatial` 已实现。
-- 预期工作：画布运动轨迹叠加、手柄编辑、Bridge/App 读写 spatial 手柄。
-- 非目标（B）：Follow Path。
+- **B1**：`BuildMotionPath` + `SetSpatialTangentsCommand` + Bridge；见 [motion-path-design](./2026-07-28-motion-path-design.md) / [plan](../plans/2026-07-28-motion-path.md)
+- **B2**：画布轨迹 + 手柄编辑（B1 后）
+- Core 已有：`spatialIn/OutTangent` + `EvaluateSpatial`
 
 ### D — Follow Path（占位）
 
@@ -69,5 +69,6 @@ Core 插值 / 求值 / Bridge 关键帧 API 已基本具备；缺口是端到端
 | 本文件 | 总览 + 进度 |
 | [2026-07-28-path-morph-design.md](./2026-07-28-path-morph-design.md) | Phase A 设计 |
 | [2026-07-28-path-morph.md](../plans/2026-07-28-path-morph.md) | Phase A 实现计划 |
-| [2026-07-28-stroke-trim-design.md](./2026-07-28-stroke-trim-design.md) | Phase C（Stroke Trim 定界） |
-| C/B/D design + plan | B/D 开始前再写；`ShapeTrimPath` 另开 |
+| [2026-07-28-motion-path-design.md](./2026-07-28-motion-path-design.md) | Phase B 设计 |
+| [2026-07-28-motion-path.md](../plans/2026-07-28-motion-path.md) | Phase B 实现计划 |
+| C/B/D design + plan | D 开始前再写；`ShapeTrimPath` 另开 |

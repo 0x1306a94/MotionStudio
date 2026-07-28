@@ -412,6 +412,69 @@ TEST(BridgeCommandTest, KeyframeLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, SpatialTangentsAndMotionPath) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+
+    ms_command_add_keyframe_vec2(document, layerId, "transform.position", 0, 0.0f, 0.0f);
+    ms_command_add_keyframe_vec2(document, layerId, "transform.position", 10, 100.0f, 0.0f);
+
+    bool hasIn = true;
+    bool hasOut = true;
+    float inX = 1;
+    float inY = 1;
+    float outX = 1;
+    float outY = 1;
+    ASSERT_TRUE(ms_property_keyframe_spatial_at(document, layerId, "transform.position", 0, &hasIn,
+                                                &inX, &inY, &hasOut, &outX, &outY));
+    EXPECT_FALSE(hasIn);
+    EXPECT_FALSE(hasOut);
+
+    ms_command_set_spatial_tangents(document, layerId, "transform.position", 0, false, 0, 0, true,
+                                    20.0f, 30.0f);
+    ms_command_set_spatial_tangents(document, layerId, "transform.position", 10, true, -20.0f,
+                                    30.0f, false, 0, 0);
+
+    ASSERT_TRUE(ms_property_keyframe_spatial_at(document, layerId, "transform.position", 0, &hasIn,
+                                                &inX, &inY, &hasOut, &outX, &outY));
+    EXPECT_FALSE(hasIn);
+    EXPECT_TRUE(hasOut);
+    EXPECT_FLOAT_EQ(outX, 20.0f);
+    EXPECT_FLOAT_EQ(outY, 30.0f);
+
+    ASSERT_TRUE(ms_property_keyframe_spatial_at(document, layerId, "transform.position", 1, &hasIn,
+                                                &inX, &inY, &hasOut, &outX, &outY));
+    EXPECT_TRUE(hasIn);
+    EXPECT_FALSE(hasOut);
+    EXPECT_FLOAT_EQ(inX, -20.0f);
+    EXPECT_FLOAT_EQ(inY, 30.0f);
+
+    MSBezierPath *motionPath = ms_property_build_motion_path(document, layerId, "transform.position");
+    ASSERT_NE(motionPath, nullptr);
+    ASSERT_EQ(motionPath->count, 2u);
+    EXPECT_FALSE(motionPath->closed);
+    EXPECT_FLOAT_EQ(motionPath->vertices[0].pointX, 0.0f);
+    EXPECT_FLOAT_EQ(motionPath->vertices[0].outTangentX, 20.0f);
+    EXPECT_FLOAT_EQ(motionPath->vertices[0].outTangentY, 30.0f);
+    EXPECT_FLOAT_EQ(motionPath->vertices[1].pointX, 100.0f);
+    EXPECT_FLOAT_EQ(motionPath->vertices[1].inTangentX, -20.0f);
+    EXPECT_FLOAT_EQ(motionPath->vertices[1].inTangentY, 30.0f);
+    ms_bezier_path_free(motionPath);
+
+    EXPECT_TRUE(ms_document_undo(document));  // clear frame 10 in
+    ASSERT_TRUE(ms_property_keyframe_spatial_at(document, layerId, "transform.position", 1, &hasIn,
+                                                &inX, &inY, &hasOut, &outX, &outY));
+    EXPECT_FALSE(hasIn);
+
+    EXPECT_EQ(ms_property_build_motion_path(document, layerId, "transform.rotation"), nullptr);
+    EXPECT_FALSE(ms_property_keyframe_spatial_at(document, layerId, "no.such.property", 0, nullptr,
+                                                 nullptr, nullptr, nullptr, nullptr, nullptr));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, MissingPropertyIsSafe) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

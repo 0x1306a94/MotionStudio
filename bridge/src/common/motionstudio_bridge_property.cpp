@@ -4,6 +4,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/animation/Easing.h"
+#include "MotionStudio/animation/MotionPath.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
@@ -224,6 +225,54 @@ MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId
         *outY = easing->outY;
     }
     return static_cast<MS_EASING>(easing->type);
+}
+
+bool ms_property_keyframe_spatial_at(MSDocument *document, uint64_t entityId, const char *path,
+                                     int index, bool *hasIn, float *inX, float *inY, bool *hasOut,
+                                     float *outX, float *outY) {
+    DocumentLock guard(document);
+    const Keyframe<Vec2> *keyframe =
+        KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
+    if (keyframe == nullptr) {
+        return false;
+    }
+    if (hasIn != nullptr) {
+        *hasIn = keyframe->spatialInTangent.has_value();
+    }
+    if (keyframe->spatialInTangent) {
+        if (inX != nullptr) {
+            *inX = keyframe->spatialInTangent->x;
+        }
+        if (inY != nullptr) {
+            *inY = keyframe->spatialInTangent->y;
+        }
+    }
+    if (hasOut != nullptr) {
+        *hasOut = keyframe->spatialOutTangent.has_value();
+    }
+    if (keyframe->spatialOutTangent) {
+        if (outX != nullptr) {
+            *outX = keyframe->spatialOutTangent->x;
+        }
+        if (outY != nullptr) {
+            *outY = keyframe->spatialOutTangent->y;
+        }
+    }
+    return true;
+}
+
+MSBezierPath *ms_property_build_motion_path(MSDocument *document, uint64_t entityId,
+                                            const char *path) {
+    DocumentLock guard(document);
+    const Animatable<Vec2> *property = AsVec2(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return nullptr;
+    }
+    motion::BezierPath built = motion::BuildMotionPath(*property);
+    if (built.vertices.empty()) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(built);
 }
 
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {

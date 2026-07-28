@@ -364,6 +364,19 @@ void ms_property_keyframe_vec2_at(MSDocument *document, uint64_t entityId, const
 // easings. Returns MS_EASING_INVALID when the keyframe does not exist.
 MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId, const char *path, int index, float *inX, float *inY, float *outX, float *outY);
 
+// Spatial tangents of a Vec2 keyframe (motion path handles). Returns false when
+// the property is missing, not Vec2, or index is out of range. hasIn/hasOut and
+// coordinate outs may be NULL.
+bool ms_property_keyframe_spatial_at(MSDocument *document, uint64_t entityId, const char *path,
+                                     int index, bool *hasIn, float *inX, float *inY, bool *hasOut,
+                                     float *outX, float *outY);
+
+// Builds the spatial motion path for a Vec2 animatable (typically
+// transform.position). Release with ms_bezier_path_free. NULL when missing /
+// not Vec2 / fewer than two keyframes.
+MSBezierPath *ms_property_build_motion_path(MSDocument *document, uint64_t entityId,
+                                            const char *path);
+
 // Value of the property evaluated at the given frame.
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y);
@@ -426,6 +439,12 @@ void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const c
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.
 void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY);
+
+// Sets spatial in/out tangents on a Vec2 keyframe at frame. hasIn/hasOut false
+// clears that handle. No-op when property is not Vec2 or keyframe missing.
+void ms_command_set_spatial_tangents(MSDocument *document, uint64_t entityId, const char *path,
+                                     int64_t frame, bool hasIn, float inX, float inY, bool hasOut,
+                                     float outX, float outY);
 
 // Adds a rectangle/ellipse shape layer (200x200, centered on the composition,
 // default fill, spanning the full composition duration).
