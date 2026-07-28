@@ -449,6 +449,60 @@ void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, s
 // panY: vertical translation in view points.
 // Ignored when canvas is null.
 void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, float panY);
+
+// Path-edit target kind, mirrors motion::PathEditKind (+ none to clear).
+typedef CF_CLOSED_ENUM(int, MS_PATH_EDIT) {
+    MS_PATH_EDIT_NONE = 0,
+    MS_PATH_EDIT_SHAPE = 1,
+    MS_PATH_EDIT_MASK = 2,
+};
+
+// Path-edit hit kind, mirrors motion::PathHandleKind.
+typedef CF_CLOSED_ENUM(int, MS_PATH_HANDLE) {
+    MS_PATH_HANDLE_NONE = 0,
+    MS_PATH_HANDLE_VERTEX = 1,
+    MS_PATH_HANDLE_IN_TANGENT = 2,
+    MS_PATH_HANDLE_OUT_TANGENT = 3,
+    MS_PATH_HANDLE_SEGMENT = 4,
+    MS_PATH_HANDLE_CLOSE_RING = 5,
+};
+
+typedef struct MSPathEditHit {
+    MS_PATH_HANDLE kind;
+    size_t index;
+    float segmentT;
+} MSPathEditHit;
+
+// One preview path overlay. transform is the affine 2x3 of Mat3
+// (m00,m01,m02 / m10,m11,m12); path vertices are local to that transform.
+typedef struct MSPathOverlayItem {
+    const MSBezierPath *path;
+    float m00;
+    float m01;
+    float m02;
+    float m10;
+    float m11;
+    float m12;
+    float r;
+    float g;
+    float b;
+    float a;
+} MSPathOverlayItem;
+
+// Sets the active path-edit target for chrome + hit testing. Pass
+// MS_PATH_EDIT_NONE (or layerId 0) to clear. selectedVertex < 0 hides tangents.
+void ms_canvas_set_path_edit_target(MSCanvas *canvas, MS_PATH_EDIT kind, uint64_t layerId,
+                                    int maskIndex, int selectedVertex);
+
+// Extra path overlays merged after mask overlays (e.g. open draft stroke).
+// items may be NULL when count is 0. Paths are copied; callers may free inputs.
+void ms_canvas_set_path_overlays(MSCanvas *canvas, const MSPathOverlayItem *items, size_t count);
+
+// Hits path-edit chrome at scene-space (sceneX, sceneY). Requires a current
+// path-edit target. Returns kind NONE when nothing hits.
+MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
+                                      uint64_t compositionId, double frameTime, float sceneX,
+                                      float sceneY);
 #endif
 
 #ifdef __cplusplus
