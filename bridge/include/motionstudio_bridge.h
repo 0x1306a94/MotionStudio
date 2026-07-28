@@ -162,6 +162,27 @@ typedef struct MSBezierPath {
 // Frees a path returned by this API (vertices + the struct itself).
 void ms_bezier_path_free(MSBezierPath *path);
 
+// Pure local-space PathGeometryEdit wrappers. Return a new heap path (free with
+// ms_bezier_path_free). NULL path / invalid index yields NULL or a copy.
+MSBezierPath *ms_bezier_move_vertex(const MSBezierPath *path, size_t index, float x, float y,
+                                    bool linkedHandles);
+MSBezierPath *ms_bezier_move_in_tangent(const MSBezierPath *path, size_t index, float x, float y,
+                                        bool mirrorOut);
+MSBezierPath *ms_bezier_move_out_tangent(const MSBezierPath *path, size_t index, float x, float y,
+                                         bool mirrorIn);
+MSBezierPath *ms_bezier_insert_vertex_on_segment(const MSBezierPath *path, size_t segmentIndex,
+                                                 float t);
+MSBezierPath *ms_bezier_remove_vertex(const MSBezierPath *path, size_t index);
+MSBezierPath *ms_bezier_close_path(const MSBezierPath *path);
+MSBezierPath *ms_bezier_append_vertex(const MSBezierPath *path, float x, float y);
+
+// Path-edit target kind, mirrors motion::PathEditKind (+ none to clear).
+typedef CF_CLOSED_ENUM(int, MS_PATH_EDIT) {
+    MS_PATH_EDIT_NONE = 0,
+    MS_PATH_EDIT_SHAPE = 1,
+    MS_PATH_EDIT_MASK = 2,
+};
+
 /* ============================ lifecycle ============================ */
 
 // Creates a new document containing one default composition
@@ -369,6 +390,30 @@ void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, cons
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a);
 void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSBezierPath *value);
+// Writes value at playhead: static SetStaticValue when not animated, otherwise
+// AddKeyframe upsert at frame.
+void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t entityId,
+                                              const char *path, int64_t frame,
+                                              const MSBezierPath *value);
+// Scene-space path edits on a Shape or Mask target. Writes via playhead policy.
+void ms_command_path_edit_move_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                      int maskIndex, int64_t frame, size_t index, float sceneX,
+                                      float sceneY, bool linkedHandles);
+void ms_command_path_edit_move_in_tangent(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                          int maskIndex, int64_t frame, size_t index, float sceneX,
+                                          float sceneY, bool mirrorOut);
+void ms_command_path_edit_move_out_tangent(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                           int maskIndex, int64_t frame, size_t index, float sceneX,
+                                           float sceneY, bool mirrorIn);
+void ms_command_path_edit_insert_on_segment(MSDocument *document, uint64_t layerId,
+                                            MS_PATH_EDIT kind, int maskIndex, int64_t frame,
+                                            size_t segmentIndex, float t);
+void ms_command_path_edit_remove_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, size_t index);
+void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                int maskIndex, int64_t frame);
+void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, float sceneX, float sceneY);
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.
@@ -449,13 +494,6 @@ void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, s
 // panY: vertical translation in view points.
 // Ignored when canvas is null.
 void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, float panY);
-
-// Path-edit target kind, mirrors motion::PathEditKind (+ none to clear).
-typedef CF_CLOSED_ENUM(int, MS_PATH_EDIT) {
-    MS_PATH_EDIT_NONE = 0,
-    MS_PATH_EDIT_SHAPE = 1,
-    MS_PATH_EDIT_MASK = 2,
-};
 
 // Path-edit hit kind, mirrors motion::PathHandleKind.
 typedef CF_CLOSED_ENUM(int, MS_PATH_HANDLE) {

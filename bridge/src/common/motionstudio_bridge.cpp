@@ -11,6 +11,8 @@
 #include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
+#include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/PathGeometryEdit.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
@@ -392,6 +394,62 @@ void ms_bezier_path_free(MSBezierPath *path) {
     }
     free(path->vertices);
     free(path);
+}
+
+MSBezierPath *ms_bezier_move_vertex(const MSBezierPath *path, size_t index, float x, float y,
+                                    bool linkedHandles) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(
+        motion::MoveVertex(FromMSBezierPath(path), index, Vec2{x, y}, linkedHandles));
+}
+
+MSBezierPath *ms_bezier_move_in_tangent(const MSBezierPath *path, size_t index, float x, float y,
+                                        bool mirrorOut) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(
+        motion::MoveInTangent(FromMSBezierPath(path), index, Vec2{x, y}, mirrorOut));
+}
+
+MSBezierPath *ms_bezier_move_out_tangent(const MSBezierPath *path, size_t index, float x, float y,
+                                         bool mirrorIn) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(
+        motion::MoveOutTangent(FromMSBezierPath(path), index, Vec2{x, y}, mirrorIn));
+}
+
+MSBezierPath *ms_bezier_insert_vertex_on_segment(const MSBezierPath *path, size_t segmentIndex,
+                                                 float t) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(
+        motion::InsertVertexOnSegment(FromMSBezierPath(path), segmentIndex, t));
+}
+
+MSBezierPath *ms_bezier_remove_vertex(const MSBezierPath *path, size_t index) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(motion::RemoveVertex(FromMSBezierPath(path), index));
+}
+
+MSBezierPath *ms_bezier_close_path(const MSBezierPath *path) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(motion::ClosePath(FromMSBezierPath(path)));
+}
+
+MSBezierPath *ms_bezier_append_vertex(const MSBezierPath *path, float x, float y) {
+    motion::BezierPath::Vertex vertex;
+    vertex.point = {x, y};
+    return AllocateMSBezierPath(motion::AppendVertex(FromMSBezierPath(path), vertex));
 }
 
 /* ============================ undo / redo ============================ */
@@ -1197,6 +1255,227 @@ void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId
                 MakePath(entityId, path),
                 motion::KeyframeData(
                     MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+}
+
+void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t entityId,
+                                              const char *path, int64_t frame,
+                                              const MSBezierPath *value) {
+    DocumentLock guard(document);
+    AnimatableBase *property = FindProperty(document, entityId, path);
+    if (property == nullptr || property->valueType() != AnimatableType::BezierPath) {
+        return;
+    }
+    const bool animated = static_cast<Animatable<motion::BezierPath> *>(property)->isAnimated();
+    if (animated) {
+        Execute(document,
+                std::make_unique<motion::AddKeyframeCommand>(
+                    MakePath(entityId, path),
+                    motion::KeyframeData(
+                        MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+        return;
+    }
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
+                          MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+}
+
+namespace {
+
+std::string PathEditPropertyPath(MS_PATH_EDIT kind, int maskIndex) {
+    if (kind == MS_PATH_EDIT_MASK) {
+        return "masks[" + std::to_string(maskIndex) + "].path";
+    }
+    return "path";
+}
+
+EntityId CompositionIdForLayer(Document &document, EntityId layerId) {
+    for (const auto &composition : document.compositions) {
+        for (const auto &layer : composition->layers) {
+            if (layer->id == layerId) {
+                return composition->id;
+            }
+        }
+    }
+    return {};
+}
+
+bool ScenePointToLocal(Document &document, EntityId layerId, FrameTime frame, Vec2 scenePoint,
+                       Vec2 &localOut) {
+    const EntityId compositionId = CompositionIdForLayer(document, layerId);
+    if (!compositionId.isValid()) {
+        return false;
+    }
+    auto result = SceneEvaluator::Evaluate(document, compositionId, frame);
+    if (!result.hasValue()) {
+        return false;
+    }
+    for (const motion::EvaluatedLayer &layer : result.value().layers) {
+        if (layer.id != layerId) {
+            continue;
+        }
+        motion::Mat3 inverse;
+        if (!layer.worldTransform.tryInvert(inverse)) {
+            return false;
+        }
+        localOut = inverse.transformPoint(scenePoint);
+        return true;
+    }
+    return false;
+}
+
+void WriteBezierPathUnlocked(MSDocument *document, uint64_t entityId, const char *path,
+                             FrameTime frame, const motion::BezierPath &value) {
+    AnimatableBase *property = FindProperty(document, entityId, path);
+    if (property == nullptr || property->valueType() != AnimatableType::BezierPath) {
+        return;
+    }
+    if (static_cast<Animatable<motion::BezierPath> *>(property)->isAnimated()) {
+        Execute(document,
+                std::make_unique<motion::AddKeyframeCommand>(
+                    MakePath(entityId, path),
+                    motion::KeyframeData(MakeKeyframe(frame, value))));
+        return;
+    }
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path),
+                                                                      motion::PropertyValue(value)));
+}
+
+motion::BezierPath CurrentBezierPath(MSDocument *document, uint64_t entityId, const char *path,
+                                     FrameTime frame) {
+    const Animatable<motion::BezierPath> *property =
+        AsBezierPath(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return {};
+    }
+    return property->evaluate(frame);
+}
+
+}  // namespace
+
+void ms_command_path_edit_move_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                      int maskIndex, int64_t frame, size_t index, float sceneX,
+                                      float sceneY, bool linkedHandles) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    Vec2 localPoint;
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
+                           localPoint)) {
+        return;
+    }
+    motion::BezierPath edited =
+        motion::MoveVertex(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime),
+                           index, localPoint, linkedHandles);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_move_in_tangent(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                          int maskIndex, int64_t frame, size_t index, float sceneX,
+                                          float sceneY, bool mirrorOut) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    Vec2 localPoint;
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
+                           localPoint)) {
+        return;
+    }
+    motion::BezierPath current = CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime);
+    if (index >= current.vertices.size()) {
+        return;
+    }
+    const Vec2 localIn = localPoint - current.vertices[index].point;
+    motion::BezierPath edited = motion::MoveInTangent(std::move(current), index, localIn, mirrorOut);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_move_out_tangent(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                           int maskIndex, int64_t frame, size_t index, float sceneX,
+                                           float sceneY, bool mirrorIn) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    Vec2 localPoint;
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
+                           localPoint)) {
+        return;
+    }
+    motion::BezierPath current = CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime);
+    if (index >= current.vertices.size()) {
+        return;
+    }
+    const Vec2 localOut = localPoint - current.vertices[index].point;
+    motion::BezierPath edited =
+        motion::MoveOutTangent(std::move(current), index, localOut, mirrorIn);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_insert_on_segment(MSDocument *document, uint64_t layerId,
+                                            MS_PATH_EDIT kind, int maskIndex, int64_t frame,
+                                            size_t segmentIndex, float t) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    motion::BezierPath edited = motion::InsertVertexOnSegment(
+        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), segmentIndex, t);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_remove_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, size_t index) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    motion::BezierPath edited = motion::RemoveVertex(
+        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), index);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                int maskIndex, int64_t frame) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    motion::BezierPath edited =
+        motion::ClosePath(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime));
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, float sceneX, float sceneY) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    Vec2 localPoint;
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
+                           localPoint)) {
+        return;
+    }
+    motion::BezierPath::Vertex vertex;
+    vertex.point = localPoint;
+    motion::BezierPath edited = motion::AppendVertex(
+        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), vertex);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
