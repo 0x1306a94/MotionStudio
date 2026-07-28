@@ -1,0 +1,290 @@
+#include "motionstudio_bridge.h"
+
+#include <memory>
+#include <utility>
+
+#include "MotionStudio/animation/Animatable.h"
+#include "MotionStudio/common/Color.h"
+#include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/model/Composition.h"
+#include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/undo/AddKeyframeCommand.h"
+#include "MotionStudio/undo/AddLayerStyleCommand.h"
+#include "MotionStudio/undo/AddMaskCommand.h"
+#include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
+#include "MotionStudio/undo/MoveKeyframeCommand.h"
+#include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveMaskCommand.h"
+#include "MotionStudio/undo/RemoveKeyframeCommand.h"
+#include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveMaskCommand.h"
+#include "MotionStudio/undo/RemoveStyleCommand.h"
+#include "MotionStudio/undo/SetCompositionBackgroundColorCommand.h"
+#include "MotionStudio/undo/SetCompositionCornerRadiusCommand.h"
+#include "MotionStudio/undo/SetCompositionSettingsCommand.h"
+#include "MotionStudio/undo/SetEasingCommand.h"
+#include "MotionStudio/undo/SetLayerLockedCommand.h"
+#include "MotionStudio/undo/SetLayerVisibleCommand.h"
+#include "MotionStudio/undo/SetMaskInvertedCommand.h"
+#include "MotionStudio/undo/SetMaskModeCommand.h"
+#include "MotionStudio/undo/SetStaticValueCommand.h"
+#include "MotionStudio/undo/SetStrokePositionCommand.h"
+#include "MotionStudio/undo/SetStyleBlendModeCommand.h"
+#include "MotionStudio/undo/SetTrackMatteCommand.h"
+
+#include "BridgeInternals.h"
+#include "DocumentLock.h"
+#include "MSDocument.h"
+
+using namespace bridge;
+
+using motion::Animatable;
+using motion::AnimatableBase;
+using motion::AnimatableType;
+using motion::Color;
+using motion::Composition;
+using motion::EntityId;
+using motion::FrameTime;
+using motion::Layer;
+using motion::Vec2;
+
+
+/* ============================ commands ============================ */
+
+void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value)));
+}
+
+void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x, float y) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Vec2{x, y})));
+}
+
+void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
+}
+
+void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
+                                       const MSBezierPath *value) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
+                          MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+}
+
+void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetCompositionBackgroundColorCommand>(EntityId{compositionId}, Color{r, g, b, a}));
+}
+
+void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId, float cornerRadius) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetCompositionCornerRadiusCommand>(EntityId{compositionId}, cornerRadius));
+}
+
+void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId, int width, int height) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr) {
+        return;
+    }
+    motion::CompositionSettings settings;
+    settings.width = width;
+    settings.height = height;
+    settings.duration = composition->duration;
+    settings.frameRate = composition->frameRate;
+    Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
+}
+
+void ms_command_set_composition_duration(MSDocument *document, uint64_t compositionId, int64_t duration) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr) {
+        return;
+    }
+    motion::CompositionSettings settings;
+    settings.width = composition->width;
+    settings.height = composition->height;
+    settings.duration = static_cast<FrameTime>(duration);
+    settings.frameRate = composition->frameRate;
+    Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
+}
+
+void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compositionId, int frameRateNum, int frameRateDen) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr || frameRateNum <= 0 || frameRateDen <= 0) {
+        return;
+    }
+    motion::CompositionSettings settings;
+    settings.width = composition->width;
+    settings.height = composition->height;
+    settings.duration = composition->duration;
+    settings.frameRate = {static_cast<uint32_t>(frameRateNum),
+                          static_cast<uint32_t>(frameRateDen)};
+    Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
+}
+
+void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), value))));
+}
+
+void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec2{x, y}))));
+}
+
+void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Color{r, g, b, a}))));
+}
+
+void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
+                                         int64_t frame, const MSBezierPath *value) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::AddKeyframeCommand>(
+                MakePath(entityId, path),
+                motion::KeyframeData(
+                    MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+}
+
+void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t entityId,
+                                              const char *path, int64_t frame,
+                                              const MSBezierPath *value) {
+    DocumentLock guard(document);
+    AnimatableBase *property = FindProperty(document, entityId, path);
+    if (property == nullptr || property->valueType() != AnimatableType::BezierPath) {
+        return;
+    }
+    const bool animated = static_cast<Animatable<motion::BezierPath> *>(property)->isAnimated();
+    if (animated) {
+        Execute(document,
+                std::make_unique<motion::AddKeyframeCommand>(
+                    MakePath(entityId, path),
+                    motion::KeyframeData(
+                        MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+        return;
+    }
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(
+                          MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+}
+
+void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveKeyframeCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame)));
+}
+
+void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::MoveKeyframeCommand>(MakePath(entityId, path), static_cast<FrameTime>(oldFrame), static_cast<FrameTime>(newFrame)));
+}
+
+void ms_command_set_easing(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, int easingType, float inX, float inY, float outX, float outY) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetEasingCommand>(MakePath(entityId, path), static_cast<FrameTime>(frame), MakeEasing(easingType, inX, inY, outX, outY)));
+}
+
+uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
+    return AddShapeLayer(document, compositionId, false);
+}
+
+uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
+    return AddShapeLayer(document, compositionId, true);
+}
+
+uint64_t ms_command_add_path_layer(MSDocument *document, uint64_t compositionId) {
+    DocumentLock guard(document);
+    return AddPathLayer(document, compositionId);
+}
+
+void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::ConvertGeometryToPathCommand>(
+                          EntityId{layerId}, static_cast<FrameTime>(frame)));
+}
+
+void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveLayerCommand>(EntityId{compositionId}, EntityId{layerId}));
+}
+
+void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, fromIndex, toIndex));
+}
+
+void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerVisibleCommand>(EntityId{layerId}, visible));
+}
+
+void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerLockedCommand>(EntityId{layerId}, locked));
+}
+
+void ms_command_add_fill_style(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerStyleCommand>(EntityId{layerId}, std::make_unique<motion::FillStyle>()));
+}
+
+void ms_command_add_stroke_style(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerStyleCommand>(EntityId{layerId}, std::make_unique<motion::StrokeStyle>()));
+}
+
+void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveStyleCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStyleBlendModeCommand>(EntityId{layerId}, index, MakeBlendMode(blendMode)));
+}
+
+void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
+}
+
+void ms_command_add_mask(MSDocument *document, uint64_t layerId, int64_t frame) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return;
+    }
+    Execute(document, std::make_unique<motion::AddMaskCommand>(EntityId{layerId}, MakeMaskFromLayer(*layer, frame)));
+}
+
+void ms_command_remove_mask(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveMaskCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_move_mask(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::MoveMaskCommand>(EntityId{layerId}, fromIndex, toIndex));
+}
+
+void ms_command_set_mask_mode(MSDocument *document, uint64_t layerId, int index, MS_MASK mode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetMaskModeCommand>(EntityId{layerId}, index, MakeMaskMode(mode)));
+}
+
+void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int index,
+                                  bool inverted) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetMaskInvertedCommand>(EntityId{layerId}, index, inverted));
+}
+
+void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,
+                                MS_TRACK_MATTE type) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetTrackMatteCommand>(EntityId{layerId}, EntityId{matteLayerId}, MakeTrackMatteType(type)));
+}

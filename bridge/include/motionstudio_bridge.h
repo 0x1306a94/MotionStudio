@@ -473,6 +473,8 @@ void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t
 // mtkView: an MTKView instance (paused, drawable-driven). Ownership stays
 // with the caller. Returns NULL when Metal is unavailable or mtkView is null.
 MSCanvas *ms_canvas_create(void *mtkView);
+#endif
+
 void ms_canvas_destroy(MSCanvas *canvas);
 
 // Evaluates the composition at frame and presents the result into the
@@ -549,7 +551,6 @@ void ms_canvas_set_path_overlays(MSCanvas *canvas, const MSPathOverlayItem *item
 MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
                                       uint64_t compositionId, double frameTime, float sceneX,
                                       float sceneY);
-#endif
 
 #ifdef __cplusplus
 }

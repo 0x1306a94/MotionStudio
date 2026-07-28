@@ -27,11 +27,11 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
     // zoom: magnification relative to fit (1 = fit to drawable).
     // panXPoints: horizontal translation in view points.
     // panYPoints: vertical translation in view points.
-    void setViewTransform(float zoom, float panXPoints, float panYPoints);
+    void setViewTransform(float zoom, float panXPoints, float panYPoints) override;
 
     // Converts a visual distance in view points into scene units for the
     // current on-screen transform.
-    float sceneUnitsPerViewPoint(int sceneWidth, int sceneHeight) const;
+    float sceneUnitsPerViewPoint(int sceneWidth, int sceneHeight) const override;
 
   protected:
     bool acquireTarget(int width, int height) override;

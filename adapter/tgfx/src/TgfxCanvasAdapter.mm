@@ -504,7 +504,7 @@ void TgfxCanvasAdapter::endFrame() {
     endFrameProfile_.presentTargetMs = Milliseconds(presentStart, presentEnd);
 }
 
-const TgfxEndFrameProfile &TgfxCanvasAdapter::endFrameProfile() const {
+const EndFrameProfile &TgfxCanvasAdapter::endFrameProfile() const {
     return endFrameProfile_;
 }
 

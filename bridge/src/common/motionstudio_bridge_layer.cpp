@@ -1,0 +1,176 @@
+#include "motionstudio_bridge.h"
+
+#include <cstdlib>
+#include <string>
+
+#include "MotionStudio/model/Composition.h"
+#include "MotionStudio/model/LayerStyle.h"
+
+#include "BridgeInternals.h"
+#include "DocumentLock.h"
+#include "MSDocument.h"
+
+using namespace bridge;
+
+using motion::Composition;
+using motion::FillStyle;
+using motion::Layer;
+using motion::StrokeStyle;
+
+
+/* ============================ layer queries ============================ */
+
+uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index) {
+    DocumentLock guard(document);
+    Composition *composition = FindComposition(document, compositionId);
+    if (composition == nullptr || index < 0 || static_cast<size_t>(index) >= composition->layers.size()) {
+        return 0;
+    }
+    return composition->layers[static_cast<size_t>(index)]->id.value;
+}
+
+char *ms_layer_name(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? strdup(layer->name.c_str()) : nullptr;
+}
+
+MS_LAYER ms_layer_type(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return MS_LAYER_INVALID;
+    }
+    return static_cast<MS_LAYER>(layer->type());
+}
+
+int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? layer->inPoint : 0;
+}
+
+int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? layer->outPoint : 0;
+}
+
+uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? layer->parentId.value : 0;
+}
+
+bool ms_layer_visible(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr && layer->visible;
+}
+
+bool ms_layer_locked(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr && layer->locked;
+}
+
+/* ============================ layer style queries ============================ */
+
+int ms_layer_style_count(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? static_cast<int>(layer->styles.size()) : 0;
+}
+
+MS_STYLE ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->styles.size()) {
+        return MS_STYLE_INVALID;
+    }
+    switch (layer->styles[static_cast<size_t>(index)]->type()) {
+        case motion::LayerStyleType::Fill: {
+            return MS_STYLE_FILL;
+        }
+        case motion::LayerStyleType::Stroke: {
+            return MS_STYLE_STROKE;
+        }
+    }
+    return MS_STYLE_INVALID;
+}
+
+MS_BLEND ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->styles.size()) {
+        return MS_BLEND_INVALID;
+    }
+    motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
+    switch (style->type()) {
+        case motion::LayerStyleType::Fill: {
+            return static_cast<MS_BLEND>(static_cast<FillStyle *>(style)->blendMode);
+        }
+        case motion::LayerStyleType::Stroke: {
+            return static_cast<MS_BLEND>(static_cast<StrokeStyle *>(style)->blendMode);
+        }
+    }
+    return MS_BLEND_INVALID;
+}
+
+MS_STROKE_POSITION ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->styles.size()) {
+        return MS_STROKE_POSITION_INVALID;
+    }
+    motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
+    if (style->type() != motion::LayerStyleType::Stroke) {
+        return MS_STROKE_POSITION_INVALID;
+    }
+    return static_cast<MS_STROKE_POSITION>(static_cast<StrokeStyle *>(style)->position);
+}
+
+/* ============================ mask / track matte queries ============================ */
+
+int ms_layer_mask_count(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? static_cast<int>(layer->masks.size()) : 0;
+}
+
+MS_MASK ms_layer_mask_mode_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->masks.size()) {
+        return MS_MASK_INVALID;
+    }
+    return static_cast<MS_MASK>(layer->masks[static_cast<size_t>(index)].mode);
+}
+
+bool ms_layer_mask_inverted_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->masks.size()) {
+        return false;
+    }
+    return layer->masks[static_cast<size_t>(index)].inverted;
+}
+
+MS_TRACK_MATTE ms_layer_track_matte_type(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return MS_TRACK_MATTE_NONE;
+    }
+    return static_cast<MS_TRACK_MATTE>(layer->trackMatteType);
+}
+
+uint64_t ms_layer_track_matte_layer_id(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return 0;
+    }
+    return layer->trackMatteLayerId.value;
+}

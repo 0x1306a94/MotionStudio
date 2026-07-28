@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "MotionStudio/model/BlendMode.h"
-#include "MotionStudio/render/RenderAdapter.h"
+#include "MotionStudio/render/PreviewCanvasAdapter.h"
 
 namespace tgfx {
 class AutoCanvasRestore;
@@ -18,18 +18,11 @@ namespace motion {
 struct TgfxPathCache;
 struct TgfxIsolationStack;
 
-struct TgfxEndFrameProfile {
-    double canvasRestoreMs = 0;
-    double presentTargetMs = 0;
-    double flushSubmitMs = 0;
-    double deviceUnlockMs = 0;
-};
-
-// Shared RenderAdapter implementation backed by a tgfx canvas. Subclasses only
-// supply the render target: an offscreen texture (TgfxRenderAdapter) or an
-// on-screen window (TgfxOnScreenAdapter). All path/paint/matrix conversions
-// and canvas state tracking live here.
-class TgfxCanvasAdapter : public RenderAdapter {
+// Shared PreviewCanvasAdapter implementation backed by a tgfx canvas.
+// Subclasses only supply the render target: an offscreen texture
+// (TgfxRenderAdapter) or an on-screen window (TgfxOnScreenAdapter). All
+// path/paint/matrix conversions and canvas state tracking live here.
+class TgfxCanvasAdapter : public PreviewCanvasAdapter {
   public:
     ~TgfxCanvasAdapter() override;
 
@@ -39,12 +32,9 @@ class TgfxCanvasAdapter : public RenderAdapter {
     // scene is fit-transformed into it).
     void beginFrame(int width, int height, Color backgroundColor, float cornerRadius) final;
     void endFrame() final;
-    const TgfxEndFrameProfile &endFrameProfile() const;
+    const EndFrameProfile &endFrameProfile() const override;
 
-    // Restores the canvas to the scene transform without the composition clip.
-    // Preview chrome such as selection outlines can then draw outside the
-    // composition bounds while still sharing the same scene-to-target mapping.
-    void restoreCompositionClip();
+    void restoreCompositionClip() override;
 
     void save() override;
     void restore() override;
@@ -87,7 +77,7 @@ class TgfxCanvasAdapter : public RenderAdapter {
 
     std::shared_ptr<tgfx::Device> device_;
     std::shared_ptr<tgfx::Surface> surface_;
-    TgfxEndFrameProfile endFrameProfile_;
+    EndFrameProfile endFrameProfile_;
 
   private:
     tgfx::Canvas *drawingCanvas();
