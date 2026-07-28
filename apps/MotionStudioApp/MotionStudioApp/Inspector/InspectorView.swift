@@ -59,6 +59,13 @@ struct InspectorView: View {
                                            isEditable: isEditable,
                                            perform: perform)
 
+                        FollowPathInspector(core: core,
+                                            compositionID: core.firstCompositionID,
+                                            layerID: layerID,
+                                            playheadFrame: editorState.playheadFrame,
+                                            isEditable: isEditable,
+                                            perform: perform)
+
                         MotionPathInspector(core: core,
                                             layerID: layerID,
                                             playheadFrame: editorState.playheadFrame,

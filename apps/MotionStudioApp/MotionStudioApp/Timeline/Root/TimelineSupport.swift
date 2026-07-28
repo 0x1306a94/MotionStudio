@@ -44,6 +44,12 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     {
         paths.append("path")
     }
+    if !core.keyframes(entityID: layerID, path: "followPath.pathOffset").isEmpty {
+        paths.append("followPath.pathOffset")
+    }
+    if !core.keyframes(entityID: layerID, path: "followPath.orientOffset").isEmpty {
+        paths.append("followPath.orientOffset")
+    }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     paths.append(contentsOf: timelineMaskTracks(core: core, layerID: layerID).map(\.path))
     return paths
@@ -143,6 +149,18 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
         if animatedPaths.contains("path") {
             rows.append(timelinePropertyRow(core: core, layerID: layerID, path: "path",
                                             label: "Path"))
+        }
+        if animatedPaths.contains("followPath.pathOffset") {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: "followPath.pathOffset",
+                                            label: "Path Offset"))
+        }
+        if animatedPaths.contains("followPath.orientOffset") {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: "followPath.orientOffset",
+                                            label: "Orient Offset"))
         }
         for track in timelineStyleTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,

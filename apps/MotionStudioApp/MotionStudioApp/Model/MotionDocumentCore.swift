@@ -287,6 +287,21 @@ final class MotionDocumentCore {
         ms_layer_track_matte_layer_id(handle, layerID)
     }
 
+    // MARK: - Follow Path queries
+
+    func followPathEnabled(layerID: UInt64) -> Bool {
+        ms_layer_follow_path_enabled(handle, layerID)
+    }
+
+    /// Path source layer id; 0 when unbound.
+    func followPathLayerID(layerID: UInt64) -> UInt64 {
+        ms_layer_follow_path_layer_id(handle, layerID)
+    }
+
+    func followPathOrient(layerID: UInt64) -> Bool {
+        ms_layer_follow_path_orient(handle, layerID)
+    }
+
     // MARK: - Property queries
 
     /// Whether the entity exposes the given property path at all.
@@ -700,6 +715,11 @@ final class MotionDocumentCore {
     /// type: MS_TRACK_MATTE_*. matteLayerID may be 0 when type is None.
     func setTrackMatte(layerID: UInt64, matteLayerID: UInt64, type: MS_TRACK_MATTE) {
         ms_command_set_track_matte(handle, layerID, matteLayerID, type)
+        changed()
+    }
+
+    func setFollowPath(layerID: UInt64, enabled: Bool, pathLayerID: UInt64, orientAlongPath: Bool) {
+        ms_command_set_follow_path(handle, layerID, enabled, pathLayerID, orientAlongPath)
         changed()
     }
 

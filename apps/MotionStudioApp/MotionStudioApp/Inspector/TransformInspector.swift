@@ -15,6 +15,10 @@ struct TransformInspector: View {
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.revision
+        let followEnabled = core.followPathEnabled(layerID: layerID)
+        let followOrients = core.followPathOrient(layerID: layerID)
+        let positionEditable = isEditable && !followEnabled
+        let rotationEditable = isEditable && !(followEnabled && followOrients)
         let anchor = core.evaluateVec2(entityID: layerID,
                                        path: TransformProperty.anchorPoint.path,
                                        frame: playheadFrame)
@@ -48,7 +52,7 @@ struct TransformInspector: View {
         NumberPropertyRow(label: TransformField.positionX.label,
                           value: Float(position.dx),
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
-                          isEditable: isEditable)
+                          isEditable: positionEditable)
         { newValue in
             setVec2Property(.position, value: CGVector(dx: CGFloat(newValue), dy: position.dy))
         } onToggleKeyframe: { _ in
@@ -58,7 +62,7 @@ struct TransformInspector: View {
         NumberPropertyRow(label: TransformField.positionY.label,
                           value: Float(position.dy),
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
-                          isEditable: isEditable)
+                          isEditable: positionEditable)
         { newValue in
             setVec2Property(.position, value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
@@ -90,7 +94,7 @@ struct TransformInspector: View {
                                                     path: TransformProperty.rotation.path,
                                                     frame: playheadFrame),
                           hasKeyframeAtPlayhead: hasKeyframe(.rotation),
-                          isEditable: isEditable)
+                          isEditable: rotationEditable)
         { newValue in
             setFloatProperty(.rotation, value: newValue)
         } onToggleKeyframe: { value in
