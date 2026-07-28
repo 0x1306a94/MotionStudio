@@ -20,6 +20,10 @@ final class EditorViewController: UIViewController {
         static let topToolbarContentHeight: CGFloat = 52
         static let creationToolbarHeight: CGFloat = 44
         static let creationToolbarSpacing: CGFloat = 10
+        static let creationToolbarCornerRadius: CGFloat = 12
+        /// Inset from toolbar edge to tool buttons; selected highlight radius = corner − padding.
+        static let creationToolbarPadding: CGFloat = 6
+        static let toolButtonCornerRadius: CGFloat = creationToolbarCornerRadius - creationToolbarPadding
         static let sidePanelTopSpacing: CGFloat = 12
         static let sidePanelBottomSpacing: CGFloat = 12
         static let sidePanelHorizontalInset: CGFloat = 16
@@ -61,6 +65,11 @@ final class EditorViewController: UIViewController {
     let projectPanel = UIView()
     let inspectorPanel = UIView()
     let creationToolbar = UIView()
+    let selectToolButton = UIButton(type: .system)
+    let penToolButton = UIButton(type: .system)
+    let addRectangleButton = UIButton(type: .system)
+    let addEllipseButton = UIButton(type: .system)
+    let addImageButton = UIButton(type: .system)
     let timelinePanel = UIVisualEffectView(effect: nil)
     let timelineHandle = TimelineGrabberView()
 
@@ -95,6 +104,7 @@ final class EditorViewController: UIViewController {
         configureTimeline()
         configureSidePanels()
         configureCreationToolbar()
+        observeCreationToolChanges()
         initializeSaveStateIfNeeded()
         becomeFirstResponder()
         #if !targetEnvironment(macCatalyst)
@@ -129,6 +139,8 @@ final class EditorViewController: UIViewController {
     override var keyCommands: [UIKeyCommand]? {
         [
             UIKeyCommand(input: " ", modifierFlags: [], action: #selector(togglePlayback)),
+            UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(exitPenTool)),
+            UIKeyCommand(input: "\u{8}", modifierFlags: [], action: #selector(deletePathVertex)),
             UIKeyCommand(input: "s", modifierFlags: [.command], action: #selector(saveCurrentDocument)),
             UIKeyCommand(input: "s", modifierFlags: [.command, .shift], action: #selector(saveDocumentAs)),
             UIKeyCommand(input: "r", modifierFlags: [.command, .shift], action: #selector(addRectangleLayer)),

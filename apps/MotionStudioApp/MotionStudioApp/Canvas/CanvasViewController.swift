@@ -60,8 +60,27 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var lastScrollTranslation: CGPoint = .zero
     private var lastPointerLocation: CGPoint?
     private var pinchGesture: UIPinchGestureRecognizer?
+    private var doubleTapGesture: UITapGestureRecognizer?
+    private var tapGesture: UITapGestureRecognizer?
+    private var layerDragGesture: UIPanGestureRecognizer?
+    private var penPressGesture: UILongPressGestureRecognizer?
     private var freeTransformDrag: FreeTransformDrag?
     private var freeTransformDidMove = false
+
+    private struct PenDragState {
+        var kind: MS_PATH_HANDLE
+        var index: Int
+        var linkedHandles: Bool
+    }
+
+    private var penDrag: PenDragState?
+    private var penDragDidMove = false
+    /// Hit captured on press when not starting a vertex/tangent drag (segment / blank).
+    private var penPressHit: MSPathEditHit?
+    private var penPressStartPoint: CGPoint?
+    private var lastPenVertexClickTime: CFTimeInterval = 0
+    private var lastPenVertexClickIndex: Int = -1
+    private static let penDoubleClickInterval: CFTimeInterval = 0.35
 
     private static let minCanvasZoom: CGFloat = 0.02
     private static let maxCanvasZoom: CGFloat = 64
@@ -163,11 +182,13 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func configureCanvasGestures() {
-        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasDoubleTap))
+        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasDoubleTap(_:)))
         doubleTapGesture.numberOfTapsRequired = 2
+        self.doubleTapGesture = doubleTapGesture
         view.addGestureRecognizer(doubleTapGesture)
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCanvasTap(_:)))
+        self.tapGesture = tapGesture
         view.addGestureRecognizer(tapGesture)
 
         let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handleCanvasPinch(_:)))
@@ -187,7 +208,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let layerDragGesture = UIPanGestureRecognizer(target: self, action: #selector(handleLayerDrag(_:)))
         layerDragGesture.minimumNumberOfTouches = 1
         layerDragGesture.maximumNumberOfTouches = 1
+        self.layerDragGesture = layerDragGesture
         view.addGestureRecognizer(layerDragGesture)
+
+        // Pen tool: recognize on touch-down (not after pan translation), so press
+        // selects/drags vertices immediately instead of waiting for UIPan.
+        let penPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handlePenPress(_:)))
+        penPressGesture.minimumPressDuration = 0
+        penPressGesture.allowableMovement = .greatestFiniteMagnitude
+        penPressGesture.isEnabled = false
+        self.penPressGesture = penPressGesture
+        view.addGestureRecognizer(penPressGesture)
 
         // Trackpad / mouse wheel input: UIKit routes scroll events to a
         // touchless pan recognizer (Catalyst scroll and iPad pointer alike).
@@ -219,6 +250,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             _ = editorState.playheadFrame
             _ = editorState.isPlaying
             _ = editorState.previewBackdrop
+            _ = editorState.tool
+            _ = editorState.pathEditTarget
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.syncFromState()
@@ -249,6 +282,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         self.previewBackdrop = previewBackdrop
         lastSyncTime = CACurrentMediaTime()
         configurePlayback(isPlaying, wasPlaying: wasPlaying)
+        updatePathEditChrome()
         if !isPlaying || !wasPlaying {
             requestDraw()
         }
@@ -377,6 +411,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     @objc private func handleCanvasTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else { return }
+        // Pen tool owns press/drag via penPressGesture; ignore taps.
+        guard editorState.tool != .pen else { return }
         let viewPoint = gesture.location(in: view)
         let additive = gesture.modifierFlags.contains(.shift) || KeyboardModifiers.shiftPressed
         if let layerID = hitTestLayer(at: viewPoint) {
@@ -405,8 +441,41 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         resetViewTransform()
     }
 
-    @objc private func handleCanvasDoubleTap() {
-        resetViewTransform()
+    @objc private func handleCanvasDoubleTap(_ gesture: UITapGestureRecognizer) {
+        guard editorState.tool == .select else {
+            return
+        }
+        let viewPoint = gesture.location(in: view)
+        let selected = editorState.selectedLayerIDs
+        // Single selected layer + hit on that layer → edit its shape path (not mask).
+        if selected.count == 1,
+           let layerID = selected.first,
+           hitTestLayer(at: viewPoint) == layerID
+        {
+            enterPenForShapeLayer(layerID)
+            return
+        }
+        // Fit-to-view only when nothing is selected.
+        if selected.isEmpty {
+            resetViewTransform()
+        }
+    }
+
+    /// Enters pen mode on the layer's shape path (converts Rect/Ellipse if needed).
+    /// Mask paths stay Inspector-only.
+    private func enterPenForShapeLayer(_ layerID: UInt64) {
+        if !document.core.hasBezierPath(entityID: layerID, path: "path") {
+            document.core.convertGeometryToPath(layerID: layerID, frame: playheadFrame)
+            if document.core.hasBezierPath(entityID: layerID, path: "path") {
+                registerEdit("Convert to Path")
+            }
+        }
+        guard document.core.hasBezierPath(entityID: layerID, path: "path") else {
+            return
+        }
+        editorState.selectedLayerID = layerID
+        editorState.tool = .pen
+        editorState.pathEditTarget = .shape(layerID: layerID)
     }
 
     private func resetViewTransform() {
@@ -551,6 +620,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     @objc private func handleLayerDrag(_ gesture: UIPanGestureRecognizer) {
         guard !isPlaying else { return }
+        guard editorState.tool != .pen else { return }
         let shift = gesture.modifierFlags.contains(.shift) || KeyboardModifiers.shiftPressed
         let alternate = gesture.modifierFlags.contains(.alternate) || KeyboardModifiers.alternatePressed
         switch gesture.state {
@@ -781,6 +851,273 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
+        updatePathEditChrome()
+    }
+
+    private func updatePathEditChrome() {
+        let penActive = editorState.tool == .pen
+        // Disable fit-to-view double-tap while the pen tool owns canvas clicks.
+        doubleTapGesture?.isEnabled = !penActive
+        tapGesture?.isEnabled = !penActive
+        layerDragGesture?.isEnabled = !penActive
+        penPressGesture?.isEnabled = penActive
+        guard let canvas else {
+            return
+        }
+        if penActive, let target = editorState.pathEditTarget {
+            ms_canvas_set_path_edit_target(canvas, target.kind, target.layerID,
+                                           Int32(target.maskIndex), Int32(target.selectedVertex))
+        } else {
+            ms_canvas_set_path_edit_target(canvas, .NONE, 0, 0, -1)
+        }
+    }
+
+    @objc private func handlePenPress(_ gesture: UILongPressGestureRecognizer) {
+        guard editorState.tool == .pen, !isPlaying else {
+            return
+        }
+        let alternate = gesture.modifierFlags.contains(.alternate) || KeyboardModifiers.alternatePressed
+        let viewPoint = gesture.location(in: view)
+        switch gesture.state {
+        case .began:
+            beginPenPress(at: viewPoint, alternate: alternate)
+        case .changed:
+            guard let start = penPressStartPoint else {
+                return
+            }
+            let dx = viewPoint.x - start.x
+            let dy = viewPoint.y - start.y
+            // Ignore jitter so a click does not start a drag / merge group.
+            if !penDragDidMove, (dx * dx + dy * dy) < 16 {
+                return
+            }
+            updatePenDrag(at: viewPoint, alternate: alternate)
+        case .ended, .cancelled, .failed:
+            endPenPress(at: viewPoint, alternate: alternate)
+        default:
+            break
+        }
+    }
+
+    private func beginPenPress(at viewPoint: CGPoint, alternate: Bool) {
+        penDrag = nil
+        penDragDidMove = false
+        penPressHit = nil
+        penPressStartPoint = viewPoint
+        guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
+            return
+        }
+        if editorState.pathEditTarget == nil {
+            // Blank create happens on release so a press-drag doesn't spawn a layer.
+            penPressHit = MSPathEditHit(kind: .NONE, index: 0, segmentT: 0)
+            return
+        }
+        guard let target = editorState.pathEditTarget else {
+            return
+        }
+        pushPathEditTarget(target)
+        let hit = hitPathEdit(at: scenePoint)
+        switch hit.kind {
+        case .CLOSE_RING, .VERTEX, .IN_TANGENT, .OUT_TANGENT:
+            let dragKind: MS_PATH_HANDLE = hit.kind == .CLOSE_RING ? .VERTEX : hit.kind
+            var next = target
+            next.selectedVertex = Int(hit.index)
+            editorState.pathEditTarget = next
+            penDrag = PenDragState(kind: dragKind, index: Int(hit.index), linkedHandles: !alternate)
+            // Remember CloseRing so a click-without-drag still closes the path.
+            penPressHit = hit
+            updatePathEditChrome()
+            requestDraw()
+        default:
+            penPressHit = hit
+        }
+    }
+
+    private func handlePenTap(at viewPoint: CGPoint, alternate _: Bool) {
+        guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
+            return
+        }
+        if ensurePenTarget(forBlankClickAt: scenePoint) {
+            updatePathEditChrome()
+            requestDraw()
+            return
+        }
+        guard var target = editorState.pathEditTarget else {
+            return
+        }
+        pushPathEditTarget(target)
+        let hit = hitPathEdit(at: scenePoint)
+        applyPenClick(hit: hit, target: &target, scenePoint: scenePoint)
+        updatePathEditChrome()
+        requestDraw()
+    }
+
+    private func applyPenClick(hit: MSPathEditHit, target: inout PathEditTarget, scenePoint: CGPoint) {
+        switch hit.kind {
+        case .CLOSE_RING:
+            performPenEdit("Close Path") {
+                document.core.pathEditClose(layerID: target.layerID, kind: target.kind,
+                                            maskIndex: target.maskIndex, frame: playheadFrame)
+            }
+            target.selectedVertex = -1
+            editorState.pathEditTarget = target
+        case .SEGMENT:
+            performPenEdit("Insert Vertex") {
+                document.core.pathEditInsertOnSegment(layerID: target.layerID, kind: target.kind,
+                                                      maskIndex: target.maskIndex,
+                                                      frame: playheadFrame,
+                                                      segmentIndex: Int(hit.index),
+                                                      t: hit.segmentT)
+            }
+            target.selectedVertex = Int(hit.index) + 1
+            editorState.pathEditTarget = target
+        case .VERTEX, .IN_TANGENT, .OUT_TANGENT:
+            target.selectedVertex = Int(hit.index)
+            editorState.pathEditTarget = target
+        default:
+            performPenEdit("Add Vertex") {
+                document.core.pathEditAppendVertex(layerID: target.layerID, kind: target.kind,
+                                                   maskIndex: target.maskIndex,
+                                                   frame: playheadFrame, scenePoint: scenePoint)
+            }
+        }
+    }
+
+    private func endPenPress(at viewPoint: CGPoint, alternate: Bool) {
+        defer {
+            penPressHit = nil
+            penPressStartPoint = nil
+        }
+        if penDragDidMove {
+            endPenDrag()
+            return
+        }
+        let pressedHandle = penDrag != nil
+        let hit = penPressHit
+        penDrag = nil
+        if pressedHandle {
+            // Vertex/tangent already selected on press; CloseRing click still closes.
+            // Double-click a vertex (not CloseRing) toggles corner ↔ smooth.
+            if let hit, hit.kind == .VERTEX || hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT {
+                let now = CACurrentMediaTime()
+                let index = Int(hit.index)
+                if index == lastPenVertexClickIndex,
+                   now - lastPenVertexClickTime <= Self.penDoubleClickInterval,
+                   let target = editorState.pathEditTarget
+                {
+                    lastPenVertexClickIndex = -1
+                    lastPenVertexClickTime = 0
+                    performPenEdit("Toggle Vertex Smooth") {
+                        document.core.pathEditToggleSmooth(layerID: target.layerID,
+                                                           kind: target.kind,
+                                                           maskIndex: target.maskIndex,
+                                                           frame: playheadFrame,
+                                                           index: index)
+                    }
+                    updatePathEditChrome()
+                    requestDraw()
+                    return
+                }
+                lastPenVertexClickIndex = index
+                lastPenVertexClickTime = now
+                return
+            }
+            if hit?.kind == .CLOSE_RING {
+                lastPenVertexClickIndex = -1
+                handlePenTap(at: viewPoint, alternate: alternate)
+            }
+            return
+        }
+        lastPenVertexClickIndex = -1
+        // Segment / blank click.
+        handlePenTap(at: viewPoint, alternate: alternate)
+    }
+
+    private func updatePenDrag(at viewPoint: CGPoint, alternate: Bool) {
+        guard let penDrag,
+              let scenePoint = scenePoint(fromViewPoint: viewPoint),
+              let target = editorState.pathEditTarget
+        else {
+            return
+        }
+        if !penDragDidMove {
+            document.core.beginDrag()
+        }
+        let linked = !alternate
+        switch penDrag.kind {
+        case .VERTEX:
+            document.core.pathEditMoveVertex(layerID: target.layerID, kind: target.kind,
+                                             maskIndex: target.maskIndex, frame: playheadFrame,
+                                             index: penDrag.index, scenePoint: scenePoint,
+                                             linkedHandles: linked)
+        case .IN_TANGENT:
+            document.core.pathEditMoveInTangent(layerID: target.layerID, kind: target.kind,
+                                                maskIndex: target.maskIndex, frame: playheadFrame,
+                                                index: penDrag.index, scenePoint: scenePoint,
+                                                mirrorOut: linked)
+        case .OUT_TANGENT:
+            document.core.pathEditMoveOutTangent(layerID: target.layerID, kind: target.kind,
+                                                 maskIndex: target.maskIndex, frame: playheadFrame,
+                                                 index: penDrag.index, scenePoint: scenePoint,
+                                                 mirrorIn: linked)
+        default:
+            return
+        }
+        penDragDidMove = true
+        requestDraw()
+    }
+
+    private func endPenDrag() {
+        defer {
+            penDrag = nil
+            penDragDidMove = false
+            document.core.endDrag()
+        }
+        guard penDragDidMove else {
+            return
+        }
+        registerEdit("Edit Path")
+    }
+
+    @discardableResult
+    private func ensurePenTarget(forBlankClickAt scenePoint: CGPoint) -> Bool {
+        if editorState.pathEditTarget != nil {
+            return false
+        }
+        document.core.beginDrag()
+        let layerID = document.core.addPathLayer(compositionID: compositionID)
+        guard layerID != 0 else {
+            document.core.endDrag()
+            return false
+        }
+        document.core.pathEditAppendVertex(layerID: layerID, kind: .SHAPE, maskIndex: 0,
+                                           frame: playheadFrame, scenePoint: scenePoint)
+        document.core.endDrag()
+        editorState.selectedLayerID = layerID
+        editorState.pathEditTarget = .shape(layerID: layerID, selectedVertex: 0)
+        registerEdit("Add Path")
+        return true
+    }
+
+    private func pushPathEditTarget(_ target: PathEditTarget) {
+        guard let canvas else {
+            return
+        }
+        ms_canvas_set_path_edit_target(canvas, target.kind, target.layerID,
+                                       Int32(target.maskIndex), Int32(target.selectedVertex))
+    }
+
+    private func hitPathEdit(at scenePoint: CGPoint) -> MSPathEditHit {
+        guard let canvas else {
+            return MSPathEditHit(kind: .NONE, index: 0, segmentT: 0)
+        }
+        return document.core.hitPathEdit(canvas: canvas, compositionID: compositionID,
+                                         frameTime: previewFrame, point: scenePoint)
+    }
+
+    private func performPenEdit(_ name: String, edit: () -> Void) {
+        edit()
+        registerEdit(name)
     }
 
     private func hitToleranceSceneUnits() -> CGFloat {

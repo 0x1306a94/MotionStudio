@@ -5,6 +5,7 @@
 //  UIKit layout assembly for the editor shell.
 //
 
+import Observation
 import SwiftUI
 import UIKit
 
@@ -164,24 +165,50 @@ extension EditorViewController {
     func configureCreationToolbar() {
         creationToolbar.translatesAutoresizingMaskIntoConstraints = false
         creationToolbar.backgroundColor = Palette.panelBackground
-        creationToolbar.layer.cornerRadius = 12
+        creationToolbar.layer.cornerRadius = Metrics.creationToolbarCornerRadius
+        creationToolbar.layer.cornerCurve = .continuous
         creationToolbar.layer.shadowColor = UIColor.black.cgColor
         creationToolbar.layer.shadowOpacity = 0.14
         creationToolbar.layer.shadowRadius = 12
         creationToolbar.layer.shadowOffset = CGSize(width: 0, height: 4)
         view.addSubview(creationToolbar)
 
+        configureToolbarButton(selectToolButton,
+                               systemName: "cursorarrow",
+                               accessibilityLabel: "Select",
+                               action: #selector(activateSelectTool))
+        configureToolbarButton(penToolButton,
+                               systemName: "pencil.tip",
+                               accessibilityLabel: "Pen",
+                               action: #selector(activatePenTool))
+        configureToolbarButton(addRectangleButton,
+                               systemName: "rectangle",
+                               accessibilityLabel: "Add Rectangle",
+                               action: #selector(addRectangleLayer))
+        configureToolbarButton(addEllipseButton,
+                               systemName: "circle",
+                               accessibilityLabel: "Add Ellipse",
+                               action: #selector(addEllipseLayer))
+        configureToolbarButton(addImageButton,
+                               systemName: "photo",
+                               accessibilityLabel: "Add Image",
+                               action: #selector(addImageLayer))
+
         let stack = UIStackView(arrangedSubviews: [
-            creationButton(systemName: "rectangle", title: "Rectangle", action: #selector(addRectangleLayer)),
-            creationButton(systemName: "circle", title: "Ellipse", action: #selector(addEllipseLayer)),
-            creationButton(systemName: "photo", title: "Image", action: #selector(addImageLayer)),
+            selectToolButton,
+            penToolButton,
+            addRectangleButton,
+            addEllipseButton,
+            addImageButton,
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .horizontal
         stack.alignment = .center
         stack.spacing = 6
         stack.isLayoutMarginsRelativeArrangement = true
-        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6)
+        let padding = Metrics.creationToolbarPadding
+        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: padding, leading: padding,
+                                                                 bottom: padding, trailing: padding)
         creationToolbar.addSubview(stack)
 
         NSLayoutConstraint.activate([
@@ -195,6 +222,8 @@ extension EditorViewController {
             stack.topAnchor.constraint(equalTo: creationToolbar.topAnchor),
             stack.bottomAnchor.constraint(equalTo: creationToolbar.bottomAnchor),
         ])
+
+        updateCreationToolSelection()
     }
 
     func configureTimeline() {
@@ -259,7 +288,9 @@ extension EditorViewController {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: systemName), for: .normal)
         button.accessibilityLabel = accessibilityLabel
-        button.layer.cornerRadius = 8
+        button.layer.cornerRadius = Metrics.toolButtonCornerRadius
+        button.layer.cornerCurve = .continuous
+        button.clipsToBounds = true
         button.addTarget(self, action: action, for: .primaryActionTriggered)
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: Metrics.toolbarButtonSize),
@@ -267,19 +298,30 @@ extension EditorViewController {
         ])
     }
 
-    func creationButton(systemName: String, title: String, action: Selector) -> UIButton {
-        var configuration = UIButton.Configuration.filled()
-        configuration.image = UIImage(systemName: systemName)
-        configuration.title = title
-        configuration.imagePadding = 6
-        configuration.baseForegroundColor = Palette.buttonTint
-        configuration.baseBackgroundColor = Palette.buttonBackground
-        configuration.cornerStyle = .medium
+    func updateCreationToolSelection() {
+        let penActive = editorState.tool == .pen
+        updatePanelToggleButton(selectToolButton, isActive: editorState.tool == .select)
+        updatePanelToggleButton(penToolButton, isActive: penActive)
+        updateCreationActionButton(addRectangleButton, enabled: !penActive)
+        updateCreationActionButton(addEllipseButton, enabled: !penActive)
+        updateCreationActionButton(addImageButton, enabled: !penActive)
+    }
 
-        let button = UIButton(configuration: configuration)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.accessibilityLabel = "Add \(title) Layer"
-        button.addTarget(self, action: action, for: .primaryActionTriggered)
-        return button
+    func updateCreationActionButton(_ button: UIButton, enabled: Bool) {
+        button.isEnabled = enabled
+        button.tintColor = enabled ? .secondaryLabel : .tertiaryLabel
+        button.backgroundColor = .clear
+        button.alpha = enabled ? 1 : 0.45
+    }
+
+    func observeCreationToolChanges() {
+        withObservationTracking {
+            _ = editorState.tool
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.updateCreationToolSelection()
+                self?.observeCreationToolChanges()
+            }
+        }
     }
 }

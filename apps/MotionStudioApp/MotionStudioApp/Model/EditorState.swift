@@ -56,6 +56,12 @@ final class EditorState {
 
     var timelineScrollX: Double = 0
 
+    /// Active editor tool (select vs pen path editing).
+    var tool: EditorTool = .select
+
+    /// Active path-edit chrome target while `tool == .pen`.
+    var pathEditTarget: PathEditTarget?
+
     func isLayerSelected(_ layerID: UInt64) -> Bool {
         selectedLayerIDs.contains(layerID)
     }
@@ -79,5 +85,10 @@ final class EditorState {
         selectedLayerIDs = []
         selectedTimelineProperty = nil
         selectedTimelineSegment = nil
+    }
+
+    func clearPathEdit() {
+        pathEditTarget = nil
+        tool = .select
     }
 }

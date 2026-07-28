@@ -289,3 +289,7 @@ struct CanvasFrameProfile: Equatable {
         endFrameDeviceUnlockMilliseconds = profile.endFrameDeviceUnlockMs
     }
 }
+
+extension MS_PATH_EDIT: @retroactive Equatable, @retroactive Hashable {}
+
+extension MS_PATH_HANDLE: @retroactive Equatable, @retroactive Hashable {}

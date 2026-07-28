@@ -465,6 +465,89 @@ final class MotionDocumentCore {
         return layerID
     }
 
+    @discardableResult
+    func addPathLayer(compositionID: UInt64) -> UInt64 {
+        let layerID = ms_command_add_path_layer(handle, compositionID)
+        changed()
+        return layerID
+    }
+
+    func convertGeometryToPath(layerID: UInt64, frame: Int64) {
+        ms_command_convert_geometry_to_path(handle, layerID, frame)
+        changed()
+    }
+
+    func hasBezierPath(entityID: UInt64, path: String) -> Bool {
+        ms_property_type(handle, entityID, path) == .BEZIER_PATH
+    }
+
+    func pathEditMoveVertex(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                            index: Int, scenePoint: CGPoint, linkedHandles: Bool)
+    {
+        ms_command_path_edit_move_vertex(handle, layerID, kind, Int32(maskIndex), frame,
+                                         index, Float(scenePoint.x), Float(scenePoint.y),
+                                         linkedHandles)
+        changed()
+    }
+
+    func pathEditMoveInTangent(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                               index: Int, scenePoint: CGPoint, mirrorOut: Bool)
+    {
+        ms_command_path_edit_move_in_tangent(handle, layerID, kind, Int32(maskIndex), frame,
+                                             index, Float(scenePoint.x), Float(scenePoint.y),
+                                             mirrorOut)
+        changed()
+    }
+
+    func pathEditMoveOutTangent(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                                index: Int, scenePoint: CGPoint, mirrorIn: Bool)
+    {
+        ms_command_path_edit_move_out_tangent(handle, layerID, kind, Int32(maskIndex), frame,
+                                              index, Float(scenePoint.x), Float(scenePoint.y),
+                                              mirrorIn)
+        changed()
+    }
+
+    func pathEditInsertOnSegment(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                                 segmentIndex: Int, t: Float)
+    {
+        ms_command_path_edit_insert_on_segment(handle, layerID, kind, Int32(maskIndex), frame,
+                                               segmentIndex, t)
+        changed()
+    }
+
+    func pathEditRemoveVertex(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                              index: Int)
+    {
+        ms_command_path_edit_remove_vertex(handle, layerID, kind, Int32(maskIndex), frame, index)
+        changed()
+    }
+
+    func pathEditClose(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64) {
+        ms_command_path_edit_close(handle, layerID, kind, Int32(maskIndex), frame)
+        changed()
+    }
+
+    func pathEditAppendVertex(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                              scenePoint: CGPoint)
+    {
+        ms_command_path_edit_append_vertex(handle, layerID, kind, Int32(maskIndex), frame,
+                                           Float(scenePoint.x), Float(scenePoint.y))
+        changed()
+    }
+
+    func pathEditToggleSmooth(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                              index: Int)
+    {
+        ms_command_path_edit_toggle_smooth(handle, layerID, kind, Int32(maskIndex), frame, index)
+        changed()
+    }
+
+    func pathEditRecenterShape(layerID: UInt64, frame: Int64) {
+        ms_command_path_edit_recenter_shape(handle, layerID, frame)
+        changed()
+    }
+
     func removeLayer(compositionID: UInt64, layerID: UInt64) {
         ms_command_remove_layer(handle, compositionID, layerID)
         changed()
@@ -578,6 +661,13 @@ final class MotionDocumentCore {
         var profile = MSCanvasFrameProfile()
         ms_canvas_draw_frame_at_time_profiled(canvas, handle, compositionID, frameTime, &profile)
         return CanvasFrameProfile(profile)
+    }
+
+    func hitPathEdit(canvas: OpaquePointer, compositionID: UInt64, frameTime: Double,
+                     point: CGPoint) -> MSPathEditHit
+    {
+        ms_canvas_hit_path_edit(canvas, handle, compositionID, frameTime,
+                                Float(point.x), Float(point.y))
     }
 
     private func changed() {

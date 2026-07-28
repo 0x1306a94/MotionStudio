@@ -5,6 +5,7 @@
 //  Editor commands and undo registration.
 //
 
+import MotionStudioBridging
 import UIKit
 
 @MainActor
@@ -77,6 +78,86 @@ extension EditorViewController {
         let compositionID = document.core.firstCompositionID
         perform("Add Ellipse") {
             editorState.selectedLayerID = document.core.addEllipseLayer(compositionID: compositionID)
+        }
+    }
+
+    @objc func activateSelectTool() {
+        guard editorState.tool != .select else {
+            return
+        }
+        finishPenTool()
+    }
+
+    @objc func activatePenTool() {
+        guard editorState.tool != .pen else {
+            return
+        }
+        editorState.tool = .pen
+        activatePenTargetFromSelection()
+    }
+
+    @objc func togglePenTool() {
+        if editorState.tool == .pen {
+            finishPenTool()
+            return
+        }
+        activatePenTool()
+    }
+
+    @objc func exitPenTool() {
+        guard editorState.tool == .pen else {
+            return
+        }
+        finishPenTool()
+    }
+
+    private func finishPenTool() {
+        if let target = editorState.pathEditTarget, target.kind == .SHAPE {
+            let revision = document.core.revision
+            document.core.pathEditRecenterShape(layerID: target.layerID,
+                                                frame: editorState.playheadFrame)
+            if document.core.revision != revision {
+                registerEdit("Center Path Anchor")
+            }
+        }
+        editorState.clearPathEdit()
+    }
+
+    @objc func deletePathVertex() {
+        guard editorState.tool == .pen,
+              let target = editorState.pathEditTarget,
+              target.selectedVertex >= 0
+        else {
+            return
+        }
+        perform("Delete Vertex") {
+            document.core.pathEditRemoveVertex(layerID: target.layerID, kind: target.kind,
+                                               maskIndex: target.maskIndex,
+                                               frame: editorState.playheadFrame,
+                                               index: target.selectedVertex)
+        }
+        var next = target
+        next.selectedVertex = -1
+        editorState.pathEditTarget = next
+    }
+
+    func activatePenTargetFromSelection() {
+        guard let layerID = editorState.selectedLayerID else {
+            editorState.pathEditTarget = nil
+            return
+        }
+        // Toolbar / double-click always target the shape path. Mask edit stays
+        // Inspector-only (`onEditMaskPath`).
+        if !document.core.hasBezierPath(entityID: layerID, path: "path") {
+            perform("Convert to Path") {
+                document.core.convertGeometryToPath(layerID: layerID, frame: editorState.playheadFrame)
+            }
+        }
+        if document.core.hasBezierPath(entityID: layerID, path: "path") {
+            editorState.pathEditTarget = .shape(layerID: layerID)
+            editorState.selectedLayerID = layerID
+        } else {
+            editorState.pathEditTarget = nil
         }
     }
 

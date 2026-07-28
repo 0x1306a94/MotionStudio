@@ -15,6 +15,7 @@ struct MasksInspector: View {
     let playheadFrame: Int64
     let isEditable: Bool
     let perform: (String, () -> Void) -> Void
+    var onEditMaskPath: ((Int) -> Void)?
 
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
@@ -80,6 +81,15 @@ struct MasksInspector: View {
                     removeMask(index: index)
                 } label: {
                     Image(systemName: "minus")
+                }
+                if let onEditMaskPath {
+                    Button {
+                        onEditMaskPath(index)
+                    } label: {
+                        Image(systemName: "pencil.tip")
+                    }
+                    .help("Edit mask path")
+                    .disabled(!isEditable)
                 }
             }
             floatPropertyRow(index: index, suffix: "opacity", label: "Opacity")
