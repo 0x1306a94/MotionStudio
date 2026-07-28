@@ -67,5 +67,5 @@ Core 插值 / 求值 / Bridge 关键帧 API 已基本具备；缺口是端到端
 |---|---|
 | 本文件 | 总览 + 进度 |
 | [2026-07-28-path-morph-design.md](./2026-07-28-path-morph-design.md) | Phase A 设计 |
-| `docs/superpowers/plans/…-path-morph.md` | Phase A 实现计划（待写） |
+| [2026-07-28-path-morph.md](../plans/2026-07-28-path-morph.md) | Phase A 实现计划 |
 | C/B/D design + plan | 各阶段开始前再写 |
