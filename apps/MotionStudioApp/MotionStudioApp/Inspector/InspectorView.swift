@@ -59,6 +59,17 @@ struct InspectorView: View {
                                            isEditable: isEditable,
                                            perform: perform)
 
+                        MotionPathInspector(core: core,
+                                            layerID: layerID,
+                                            playheadFrame: editorState.playheadFrame,
+                                            selectedKeyframeIndex: editorState.motionPathSelectedKeyframe,
+                                            isEditable: isEditable,
+                                            perform: perform,
+                                            onSelectKeyframe: { index in
+                                                editorState.motionPathLayerID = layerID
+                                                editorState.motionPathSelectedKeyframe = index
+                                            })
+
                         if core.layerType(layerID) == .SHAPE {
                             FillsInspector(core: core,
                                            layerID: layerID,

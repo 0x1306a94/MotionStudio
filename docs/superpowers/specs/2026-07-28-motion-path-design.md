@@ -23,14 +23,16 @@
 
 - `BuildMotionPath` / `SetSpatialTangentsCommand` / Bridge spatial API + 单测
 
-### B2 — 可视 + 手柄（本轮）
+### B2 — 可视 + 调节（本轮）
 
 **交互（锁定）：**
 
-- Select 工具下：选中层且 `transform.position` ≥2 KF → 画运动路径 + KF 方块
-- 点选 KF → 显示 in/out 空间手柄；无 stored spatial 时显示段长 1/3 的**预览手柄**，首次拖拽才写入
-- 拖动手柄 → `SetSpatialTangentsCommand`；同段对端若缺手柄则一并写入默认值，使弧线立即可见
-- **不做**：画布拖 KF 改 position、「启用弧线」按钮、Pen 工具下显示运动路径
+- Select 工具下：选中层且 `transform.position` ≥2 KF → 画布画运动路径 + KF 方块（只读切线预览）
+- **调节**：Inspector「Motion Path」`CubicBezierPad` 拖控制点 → `SetSpatialTangents`（避免与图层 Free Transform 抢命中）
+- 画布点选 KF / Prev·Next 切换当前段
+- **不做**：画布拖切线改 spatial、画布拖 KF 改 position
+
+**复用：** `CubicBezierPad` 为绝对坐标两端点+两控制点控件；后续时间缓动 `CUBIC_BEZIER` 映射到单位正方形即可复用。
 
 **坐标：** path 顶点 = position KF 值（父空间）；`worldTransform` = 父层 world（无父则为 Identity / precomp context）。
 

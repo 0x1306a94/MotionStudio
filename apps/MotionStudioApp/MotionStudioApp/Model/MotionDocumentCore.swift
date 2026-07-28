@@ -366,6 +366,40 @@ final class MotionDocumentCore {
         return (0 ..< Int(count)).map { ms_property_keyframe_time_at(handle, entityID, path, Int32($0)) }
     }
 
+    func keyframeVec2(entityID: UInt64, path: String, index: Int) -> CGVector {
+        var x: Float = 0
+        var y: Float = 0
+        ms_property_keyframe_vec2_at(handle, entityID, path, Int32(index), &x, &y)
+        return CGVector(dx: CGFloat(x), dy: CGFloat(y))
+    }
+
+    func keyframeSpatial(entityID: UInt64, path: String, index: Int) -> SpatialTangentsInfo {
+        var hasIn = false
+        var hasOut = false
+        var inX: Float = 0
+        var inY: Float = 0
+        var outX: Float = 0
+        var outY: Float = 0
+        guard ms_property_keyframe_spatial_at(handle, entityID, path, Int32(index), &hasIn, &inX, &inY,
+                                              &hasOut, &outX, &outY)
+        else {
+            return SpatialTangentsInfo()
+        }
+        return SpatialTangentsInfo(hasIn: hasIn, inTangent: CGVector(dx: CGFloat(inX), dy: CGFloat(inY)),
+                                   hasOut: hasOut,
+                                   outTangent: CGVector(dx: CGFloat(outX), dy: CGFloat(outY)))
+    }
+
+    func setSpatialTangents(entityID: UInt64, path: String, frame: Int64,
+                            hasIn: Bool, inTangent: CGVector,
+                            hasOut: Bool, outTangent: CGVector)
+    {
+        ms_command_set_spatial_tangents(handle, entityID, path, frame, hasIn,
+                                        Float(inTangent.dx), Float(inTangent.dy), hasOut,
+                                        Float(outTangent.dx), Float(outTangent.dy))
+        changed()
+    }
+
     // MARK: - Undoable edits
 
     // Every method below runs a command through the core undo manager and

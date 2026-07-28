@@ -261,6 +261,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             _ = editorState.previewBackdrop
             _ = editorState.tool
             _ = editorState.pathEditTarget
+            _ = editorState.motionPathLayerID
+            _ = editorState.motionPathSelectedKeyframe
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.syncFromState()
@@ -725,13 +727,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
         applyMotionPathSelection(layerID: hit.layerId, keyframeIndex: Int(hit.index))
 
-        if hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT {
-            document.core.beginDrag()
-            motionPathDrag = MotionPathDragState(layerID: hit.layerId,
-                                                 index: Int(hit.index),
-                                                 isOut: hit.kind == .OUT_TANGENT)
-            motionPathDragDidMove = false
-        }
+        // Tangent editing lives in the Inspector curve pad to avoid fighting
+        // free-transform drags on the canvas.
         return true
     }
 

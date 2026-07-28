@@ -247,6 +247,14 @@ struct EasingInfo: Equatable {
     static let easeInOut = EasingInfo(kind: .EASE_IN_OUT, inX: 0.42, inY: 0, outX: 0.58, outY: 1)
 }
 
+/// Snapshot of Vec2 keyframe spatial tangents (motion path handles).
+struct SpatialTangentsInfo: Equatable {
+    var hasIn = false
+    var inTangent = CGVector(dx: 0, dy: 0)
+    var hasOut = false
+    var outTangent = CGVector(dx: 0, dy: 0)
+}
+
 struct MotionColor: Equatable {
     var r: Float
     var g: Float
