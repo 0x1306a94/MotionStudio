@@ -175,6 +175,7 @@ MSBezierPath *ms_bezier_insert_vertex_on_segment(const MSBezierPath *path, size_
 MSBezierPath *ms_bezier_remove_vertex(const MSBezierPath *path, size_t index);
 MSBezierPath *ms_bezier_close_path(const MSBezierPath *path);
 MSBezierPath *ms_bezier_append_vertex(const MSBezierPath *path, float x, float y);
+MSBezierPath *ms_bezier_toggle_vertex_smooth(const MSBezierPath *path, size_t index);
 
 // Path-edit target kind, mirrors motion::PathEditKind (+ none to clear).
 typedef CF_CLOSED_ENUM(int, MS_PATH_EDIT) {
@@ -414,6 +415,13 @@ void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_
                                 int maskIndex, int64_t frame);
 void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
                                         int maskIndex, int64_t frame, float sceneX, float sceneY);
+// Corner ↔ smooth convert at index (auto tangents from neighbors).
+void ms_command_path_edit_toggle_smooth(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, size_t index);
+// Shape path only: rebase path so bounds center is local origin and bump
+// transform.position so the world silhouette stays put. No-op for masks /
+// already-centered paths.
+void ms_command_path_edit_recenter_shape(MSDocument *document, uint64_t layerId, int64_t frame);
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.

@@ -452,6 +452,13 @@ MSBezierPath *ms_bezier_append_vertex(const MSBezierPath *path, float x, float y
     return AllocateMSBezierPath(motion::AppendVertex(FromMSBezierPath(path), vertex));
 }
 
+MSBezierPath *ms_bezier_toggle_vertex_smooth(const MSBezierPath *path, size_t index) {
+    if (path == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSBezierPath(motion::ToggleVertexSmooth(FromMSBezierPath(path), index));
+}
+
 /* ============================ undo / redo ============================ */
 
 bool ms_document_undo(MSDocument *document) {
@@ -1339,6 +1346,23 @@ void WriteBezierPathUnlocked(MSDocument *document, uint64_t entityId, const char
                                                                       motion::PropertyValue(value)));
 }
 
+void WriteVec2AtPlayheadUnlocked(MSDocument *document, uint64_t entityId, const char *path,
+                                 FrameTime frame, Vec2 value) {
+    AnimatableBase *property = FindProperty(document, entityId, path);
+    if (property == nullptr || property->valueType() != AnimatableType::Vec2) {
+        return;
+    }
+    if (static_cast<Animatable<Vec2> *>(property)->isAnimated()) {
+        Execute(document,
+                std::make_unique<motion::AddKeyframeCommand>(
+                    MakePath(entityId, path),
+                    motion::KeyframeData(MakeKeyframe(frame, value))));
+        return;
+    }
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path),
+                                                                      motion::PropertyValue(value)));
+}
+
 motion::BezierPath CurrentBezierPath(MSDocument *document, uint64_t entityId, const char *path,
                                      FrameTime frame) {
     const Animatable<motion::BezierPath> *property =
@@ -1347,6 +1371,53 @@ motion::BezierPath CurrentBezierPath(MSDocument *document, uint64_t entityId, co
         return {};
     }
     return property->evaluate(frame);
+}
+
+bool LayerWorldTransform(Document &document, EntityId layerId, FrameTime frame, motion::Mat3 &out) {
+    const EntityId compositionId = CompositionIdForLayer(document, layerId);
+    if (!compositionId.isValid()) {
+        return false;
+    }
+    auto result = SceneEvaluator::Evaluate(document, compositionId, frame);
+    if (!result.hasValue()) {
+        return false;
+    }
+    for (const motion::EvaluatedLayer &layer : result.value().layers) {
+        if (layer.id != layerId) {
+            continue;
+        }
+        out = layer.worldTransform;
+        return true;
+    }
+    return false;
+}
+
+// Rebases a Shape path so its bounds center is local (0,0) and bumps
+// transform.position to keep the world silhouette unchanged.
+void RecenterShapePathUnlocked(MSDocument *document, uint64_t layerId, FrameTime frame) {
+    motion::BezierPath path = CurrentBezierPath(document, layerId, "path", frame);
+    if (path.vertices.empty()) {
+        return;
+    }
+    motion::Mat3 world = motion::Mat3::Identity();
+    const bool hasWorld = LayerWorldTransform(*document->document, EntityId{layerId}, frame, world);
+    Vec2 localCenter{};
+    path = motion::RecenterPath(std::move(path), localCenter);
+    if (localCenter.x == 0.0f && localCenter.y == 0.0f) {
+        return;
+    }
+    const Animatable<Vec2> *positionProperty =
+        AsVec2(FindProperty(document, layerId, "transform.position"));
+    if (positionProperty == nullptr) {
+        WriteBezierPathUnlocked(document, layerId, "path", frame, path);
+        return;
+    }
+    const Vec2 delta = hasWorld ? world.transformVector(localCenter) : localCenter;
+    const Vec2 newPosition = positionProperty->evaluate(frame) + delta;
+    document->undoManager->beginMergeGroup();
+    WriteBezierPathUnlocked(document, layerId, "path", frame, path);
+    WriteVec2AtPlayheadUnlocked(document, layerId, "transform.position", frame, newPosition);
+    document->undoManager->endMergeGroup();
 }
 
 }  // namespace
@@ -1455,6 +1526,26 @@ void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     motion::BezierPath edited =
         motion::ClosePath(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime));
+    if (kind == MS_PATH_EDIT_SHAPE) {
+        motion::Mat3 world = motion::Mat3::Identity();
+        const bool hasWorld =
+            LayerWorldTransform(*document->document, EntityId{layerId}, frameTime, world);
+        Vec2 localCenter{};
+        edited = motion::RecenterPath(std::move(edited), localCenter);
+        const Animatable<Vec2> *positionProperty =
+            AsVec2(FindProperty(document, layerId, "transform.position"));
+        if (positionProperty != nullptr &&
+            (localCenter.x != 0.0f || localCenter.y != 0.0f)) {
+            const Vec2 delta = hasWorld ? world.transformVector(localCenter) : localCenter;
+            const Vec2 newPosition = positionProperty->evaluate(frameTime) + delta;
+            document->undoManager->beginMergeGroup();
+            WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+            WriteVec2AtPlayheadUnlocked(document, layerId, "transform.position", frameTime,
+                                        newPosition);
+            document->undoManager->endMergeGroup();
+            return;
+        }
+    }
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -1476,6 +1567,27 @@ void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, 
     motion::BezierPath edited = motion::AppendVertex(
         CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), vertex);
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_toggle_smooth(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, size_t index) {
+    DocumentLock guard(document);
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+        return;
+    }
+    const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
+    const FrameTime frameTime = static_cast<FrameTime>(frame);
+    motion::BezierPath edited = motion::ToggleVertexSmooth(
+        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), index);
+    WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
+}
+
+void ms_command_path_edit_recenter_shape(MSDocument *document, uint64_t layerId, int64_t frame) {
+    DocumentLock guard(document);
+    if (document == nullptr) {
+        return;
+    }
+    RecenterShapePathUnlocked(document, layerId, static_cast<FrameTime>(frame));
 }
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {

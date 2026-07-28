@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -589,6 +590,56 @@ TEST(BridgeBezierPathTest, ConvertGeometryAndAddPathLayer) {
 
     EXPECT_TRUE(ms_document_undo(document));
     EXPECT_EQ(ms_property_type(document, rectId, "path"), MS_VALUE_INVALID);
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeBezierPathTest, ToggleSmoothAndRecenterShape) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+
+    ms_command_path_edit_append_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 100, 100);
+    ms_command_path_edit_append_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 200, 100);
+    ms_command_path_edit_append_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 200, 200);
+
+    ms_command_path_edit_toggle_smooth(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 1);
+    MSBezierPath *smooth = ms_property_static_bezier_path(document, layerId, "path");
+    ASSERT_NE(smooth, nullptr);
+    ASSERT_EQ(smooth->count, 3u);
+    EXPECT_NE(smooth->vertices[1].inTangentX, 0);
+    EXPECT_NE(smooth->vertices[1].outTangentY, 0);
+    ms_bezier_path_free(smooth);
+
+    float posX = 0;
+    float posY = 0;
+    ms_property_static_vec2(document, layerId, "transform.position", &posX, &posY);
+    ms_command_path_edit_close(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0);
+    MSBezierPath *closed = ms_property_static_bezier_path(document, layerId, "path");
+    ASSERT_NE(closed, nullptr);
+    EXPECT_TRUE(closed->closed);
+    // Bounds center should sit near local origin after close+recenter.
+    float minX = closed->vertices[0].pointX;
+    float maxX = minX;
+    float minY = closed->vertices[0].pointY;
+    float maxY = minY;
+    for (size_t i = 0; i < closed->count; ++i) {
+        minX = std::min(minX, closed->vertices[i].pointX);
+        maxX = std::max(maxX, closed->vertices[i].pointX);
+        minY = std::min(minY, closed->vertices[i].pointY);
+        maxY = std::max(maxY, closed->vertices[i].pointY);
+    }
+    EXPECT_NEAR((minX + maxX) * 0.5f, 0.0f, 1e-3f);
+    EXPECT_NEAR((minY + maxY) * 0.5f, 0.0f, 1e-3f);
+    ms_bezier_path_free(closed);
+
+    float newX = 0;
+    float newY = 0;
+    ms_property_static_vec2(document, layerId, "transform.position", &newX, &newY);
+    // Position absorbs the local center so the silhouette stays put.
+    EXPECT_NE(newX, posX);
+    EXPECT_NE(newY, posY);
 
     ms_document_destroy(document);
 }
