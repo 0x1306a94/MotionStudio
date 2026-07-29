@@ -263,6 +263,20 @@ TEST(SceneEvaluatorTest, OutOfTimeRangeLayerSkipped) {
     EXPECT_TRUE(atOutPoint->layers.empty());
 }
 
+// Default layer outPoint equals composition duration (exclusive). Scrubbing must
+// stop at duration-1 so the last inclusive frame still draws layers.
+TEST(SceneEvaluatorTest, LastInclusiveFrameDrawsWhenOutEqualsDuration) {
+    RectScene scene;  // duration=100, outPoint=100
+    Expected<SceneState, std::string> lastInclusive = scene.Evaluate(99);
+    ASSERT_TRUE(lastInclusive.hasValue());
+    EXPECT_EQ(lastInclusive->layers.size(), 1u);
+
+    Expected<SceneState, std::string> atDuration = scene.Evaluate(100);
+    ASSERT_TRUE(atDuration.hasValue());
+    EXPECT_TRUE(atDuration->layers.empty());
+    EXPECT_EQ(atDuration->backgroundColor.r, scene.composition->backgroundColor.r);
+}
+
 TEST(SceneEvaluatorTest, InvisibleLayerSkipped) {
     RectScene scene;
     scene.layer->visible = false;

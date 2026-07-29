@@ -36,16 +36,17 @@ final class TimelineControlsView: UIView {
 
     func reload(duration: Int64, frame: Int64) {
         self.duration = duration
-        displayedFrame = frame
+        displayedFrame = timelineEvaluationFrame(frame, duration: duration)
         refreshChrome()
     }
 
     func setPlayheadFrame(_ frame: Int64) {
-        guard displayedFrame != frame else {
+        let clamped = timelineEvaluationFrame(frame, duration: duration)
+        guard displayedFrame != clamped else {
             return
         }
-        displayedFrame = frame
-        frameLabel.text = "\(frame) / \(duration)"
+        displayedFrame = clamped
+        refreshFrameLabel()
     }
 
     func refreshPlaybackState() {
@@ -54,6 +55,11 @@ final class TimelineControlsView: UIView {
         backdropButton.setImage(UIImage(systemName: editorState.previewBackdrop.systemImage), for: .normal)
         backdropButton.accessibilityLabel = editorState.previewBackdrop.accessibilityLabel
         syncZoomSlider()
+    }
+
+    private func refreshFrameLabel() {
+        // Denominator is last inclusive frame index (AE: playable frames 0…duration-1).
+        frameLabel.text = "\(displayedFrame) / \(timelineLastInclusiveFrame(duration))"
     }
 
     private func configureChrome() {
@@ -110,7 +116,7 @@ final class TimelineControlsView: UIView {
     }
 
     private func refreshChrome() {
-        frameLabel.text = "\(displayedFrame) / \(duration)"
+        refreshFrameLabel()
         refreshPlaybackState()
     }
 

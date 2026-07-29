@@ -50,7 +50,7 @@ final class TimelineRulerCanvasView: UIView {
         guard let context = UIGraphicsGetCurrentContext(), pointsPerFrame > 0 else {
             return
         }
-        let total = Int(duration)
+        let total = Int(timelineTrackFrameSpan(duration))
         let second = max(Int(frameRate.rounded()), 1)
         let majorStep = rulerMajorStep(pointsPerFrame: pointsPerFrame)
         let minorStep = max(majorStep / 5, 1)

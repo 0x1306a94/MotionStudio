@@ -23,13 +23,13 @@ final class TimelineScrollCoordinator {
     }
 
     var pointsPerFrame: CGFloat {
-        let totalFrames = CGFloat(max(duration, 1))
+        let totalFrames = CGFloat(max(timelineTrackFrameSpan(duration), 1))
         let fitPointsPerFrame = max(minTimelinePointsPerFrame, trackViewportWidth / totalFrames)
         return min(max(CGFloat(editorState.timelinePointsPerFrame), fitPointsPerFrame), maxTimelinePointsPerFrame)
     }
 
     var trackWidth: CGFloat {
-        max(CGFloat(duration) * pointsPerFrame, trackViewportWidth)
+        max(CGFloat(timelineTrackFrameSpan(duration)) * pointsPerFrame, trackViewportWidth)
     }
 
     var scrollX: CGFloat {
@@ -95,8 +95,8 @@ final class TimelineScrollCoordinator {
             return
         }
         let nextScrollX = timelineX(for: playheadClock.frame, pointsPerFrame: newPointsPerFrame) - oldVisibleX
+        let nextTrackWidth = max(CGFloat(timelineTrackFrameSpan(duration)) * newPointsPerFrame, trackViewportWidth)
         editorState.timelineScrollX = Double(min(max(nextScrollX, 0),
-                                                 max(0, max(CGFloat(duration) * newPointsPerFrame, trackViewportWidth)
-                                                     - trackViewportWidth)))
+                                                 max(0, nextTrackWidth - trackViewportWidth)))
     }
 }

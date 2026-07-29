@@ -122,11 +122,36 @@ func timelineX(for frame: CGFloat, pointsPerFrame: CGFloat = pixelsPerFrame) -> 
     frame * pointsPerFrame
 }
 
+/// Last seekable / drawable frame for a composition with `duration` frames
+/// (AE/Lottie half-open range `[0, duration)`).
+func timelineLastInclusiveFrame(_ duration: Int64) -> Int64 {
+    max(duration - 1, 0)
+}
+
+/// Track content width in frame units: markers `0...lastInclusive`, so the
+/// playhead on the last frame sits at the track's right edge.
+func timelineTrackFrameSpan(_ duration: Int64) -> Int64 {
+    timelineLastInclusiveFrame(duration)
+}
+
+/// Clamp a UI/playhead frame into the drawable range (defensive if clock is stale).
+func timelineEvaluationFrame(_ frame: Int64, duration: Int64) -> Int64 {
+    min(max(frame, 0), timelineLastInclusiveFrame(duration))
+}
+
+func timelineEvaluationTime(_ time: Double, duration: Int64) -> Double {
+    let last = Double(timelineLastInclusiveFrame(duration))
+    guard time.isFinite else {
+        return 0
+    }
+    return min(max(time, 0), last)
+}
+
 func timelineFrame(atVisibleX visibleX: CGFloat, pointsPerFrame: CGFloat,
                    scrollX: CGFloat, duration: Int64) -> Int64
 {
     let frame = Int64(((visibleX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
-    return min(max(frame, 0), duration)
+    return min(max(frame, 0), timelineLastInclusiveFrame(duration))
 }
 
 func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [TimelineRow] {

@@ -166,7 +166,7 @@ final class TimelinePointerInputOverlay: UIView {
                                      maxTimelinePointsPerFrame)
         let anchorTimelineX = min(max(anchorX - contentInset, 0), viewportWidth)
         let frameUnderAnchor = (CGFloat(editorState.timelineScrollX) + anchorTimelineX) / pointsPerFrame
-        let nextTrackWidth = max(CGFloat(duration) * nextPointsPerFrame, viewportWidth)
+        let nextTrackWidth = max(CGFloat(timelineTrackFrameSpan(duration)) * nextPointsPerFrame, viewportWidth)
         let nextScrollX = frameUnderAnchor * nextPointsPerFrame - anchorTimelineX
         editorState.timelinePointsPerFrame = Double(nextPointsPerFrame)
         editorState.timelineScrollX = Double(clampedScrollX(nextScrollX, trackWidth: nextTrackWidth))

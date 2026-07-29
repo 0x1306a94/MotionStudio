@@ -83,4 +83,20 @@ struct TimelineDragEngineTests {
                                                neighbors: (prev: nil, next: nil))
         #expect(moves == [KeyframeMove(path: "p", from: 5, to: 0)])
     }
+
+    @Test
+    func `layer scale trailing clamps to last inclusive frame`() throws {
+        let session = try #require(TimelineDragEngine.makeLayerScaleSession(
+            edge: .trailing,
+            originStart: 0,
+            originEnd: 100,
+            originFrames: [("p", 0), ("p", 100)],
+        ))
+        let moves = TimelineDragEngine.resolve(session: session,
+                                               pointerFrame: 200,
+                                               duration: 150,
+                                               neighbors: nil)
+        let byFrom = Dictionary(uniqueKeysWithValues: moves.map { ($0.from, $0.to) })
+        #expect(byFrom[100] == 149)
+    }
 }

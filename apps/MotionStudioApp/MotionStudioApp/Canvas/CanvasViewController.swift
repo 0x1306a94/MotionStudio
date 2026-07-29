@@ -31,6 +31,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var frameRate: Double = 30
     private var playbackFramesPerSecond: Double = 30
     private var isPlaying = false
+
+    /// Playhead may sit on the exclusive duration marker; drawing uses the last inclusive frame.
+    private var evaluationFrame: Int64 {
+        timelineEvaluationFrame(playheadFrame, duration: duration)
+    }
+
+    private var evaluationTime: Double {
+        timelineEvaluationTime(previewFrame, duration: duration)
+    }
+
     private var lastPlayheadPublishTime: CFTimeInterval = 0
     private var lastPlaybackTimingLogTime: CFTimeInterval = 0
     private var lastPlaybackDrawTime: CFTimeInterval?
@@ -289,8 +299,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         if wasPlaying && !isPlaying {
             publishPlayhead(self.playheadFrame)
         } else if !isPlaying || !wasPlaying {
-            self.playheadFrame = playheadFrame
-            previewFrame = Double(playheadFrame)
+            self.playheadFrame = timelineEvaluationFrame(playheadFrame, duration: max(duration, 1))
+            previewFrame = Double(self.playheadFrame)
         }
         self.duration = max(duration, 1)
         self.frameRate = frameRate
@@ -337,10 +347,10 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         ms_canvas_set_draw_mode(canvas, isPlaying ? .PLAYBACK : .EDIT)
         let profile: CanvasFrameProfile
         if isPlaying {
-            let frame = Int64(previewFrame.rounded(.down))
+            let frame = timelineEvaluationFrame(Int64(previewFrame.rounded(.down)), duration: duration)
             profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frame: frame)
         } else {
-            profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
+            profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: evaluationTime)
         }
         // Reveal only after the first frame is presented; an empty CAMetalLayer
         // would otherwise flash black.
@@ -497,7 +507,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     /// Mask paths stay Inspector-only.
     private func enterPenForShapeLayer(_ layerID: UInt64) {
         if !document.core.hasBezierPath(entityID: layerID, path: "path") {
-            document.core.convertGeometryToPath(layerID: layerID, frame: playheadFrame)
+            document.core.convertGeometryToPath(layerID: layerID, frame: evaluationFrame)
             if document.core.hasBezierPath(entityID: layerID, path: "path") {
                 registerEdit("Convert to Path")
             }
@@ -712,7 +722,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard !layerIDs.isEmpty else {
             return
         }
-        let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: playheadFrame)
+        let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
         document.core.beginDrag()
         freeTransformDrag = FreeTransformDrag(kind: .move,
                                               layerStarts: starts,
@@ -733,7 +743,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return false
         }
         let hit = document.core.hitMotionPath(canvas: canvas, compositionID: compositionID,
-                                              frameTime: previewFrame, point: scenePoint)
+                                              frameTime: evaluationTime, point: scenePoint)
         if hit.kind == .NONE {
             return false
         }
@@ -753,7 +763,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         // Ensure selected layers are pushed so hit-test sees them.
         updateSelectionOutline()
         let hit = document.core.hitMotionPath(canvas: canvas, compositionID: compositionID,
-                                              frameTime: previewFrame, point: scenePoint)
+                                              frameTime: evaluationTime, point: scenePoint)
         guard hit.kind == .KEYFRAME || hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT else {
             return false
         }
@@ -816,7 +826,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                             keyframeIndex: motionPathDrag.index,
                                             isOut: motionPathDrag.isOut,
                                             scenePoint: scenePoint,
-                                            frameTime: previewFrame)
+                                            frameTime: evaluationTime)
         motionPathDragDidMove = true
         requestDraw()
     }
@@ -866,7 +876,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard !layerIDs.isEmpty else {
             return
         }
-        let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: playheadFrame)
+        let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
         let pivot = FreeTransformDrag.pivot(for: kind, handles: handles, alternate: alternate)
         let localRel = starts.first.flatMap {
             FreeTransformDrag.localPivotRelative(for: kind, handles: handles, start: $0, alternate: alternate)
@@ -893,7 +903,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return
         }
         freeTransformDrag.apply(core: document.core,
-                                frame: playheadFrame,
+                                frame: evaluationFrame,
                                 scenePoint: scenePoint,
                                 shift: shift,
                                 alternate: alternate)
@@ -927,7 +937,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return nil
         }
         return document.core.hitTestLayer(compositionID: compositionID,
-                                          frameTime: previewFrame,
+                                          frameTime: evaluationTime,
                                           point: scenePoint,
                                           tolerance: hitToleranceSceneUnits())
     }
@@ -938,7 +948,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return nil
         }
         return document.core.selectionHandles(compositionID: compositionID,
-                                              frameTime: previewFrame,
+                                              frameTime: evaluationTime,
                                               layerIDs: layerIDs,
                                               primaryLayerID: layerIDs.last ?? 0)
     }
@@ -1120,7 +1130,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         case .CLOSE_RING:
             performPenEdit("Close Path") {
                 document.core.pathEditClose(layerID: target.layerID, kind: target.kind,
-                                            maskIndex: target.maskIndex, frame: playheadFrame)
+                                            maskIndex: target.maskIndex, frame: evaluationFrame)
             }
             target.selectedVertex = -1
             editorState.pathEditTarget = target
@@ -1128,7 +1138,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             performPenEdit("Insert Vertex") {
                 document.core.pathEditInsertOnSegment(layerID: target.layerID, kind: target.kind,
                                                       maskIndex: target.maskIndex,
-                                                      frame: playheadFrame,
+                                                      frame: evaluationFrame,
                                                       segmentIndex: Int(hit.index),
                                                       t: hit.segmentT)
             }
@@ -1141,7 +1151,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             performPenEdit("Add Vertex") {
                 document.core.pathEditAppendVertex(layerID: target.layerID, kind: target.kind,
                                                    maskIndex: target.maskIndex,
-                                                   frame: playheadFrame, scenePoint: scenePoint)
+                                                   frame: evaluationFrame, scenePoint: scenePoint)
             }
         }
     }
@@ -1174,7 +1184,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                         document.core.pathEditToggleSmooth(layerID: target.layerID,
                                                            kind: target.kind,
                                                            maskIndex: target.maskIndex,
-                                                           frame: playheadFrame,
+                                                           frame: evaluationFrame,
                                                            index: index)
                     }
                     updatePathEditChrome()
@@ -1210,17 +1220,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         switch penDrag.kind {
         case .VERTEX:
             document.core.pathEditMoveVertex(layerID: target.layerID, kind: target.kind,
-                                             maskIndex: target.maskIndex, frame: playheadFrame,
+                                             maskIndex: target.maskIndex, frame: evaluationFrame,
                                              index: penDrag.index, scenePoint: scenePoint,
                                              linkedHandles: linked)
         case .IN_TANGENT:
             document.core.pathEditMoveInTangent(layerID: target.layerID, kind: target.kind,
-                                                maskIndex: target.maskIndex, frame: playheadFrame,
+                                                maskIndex: target.maskIndex, frame: evaluationFrame,
                                                 index: penDrag.index, scenePoint: scenePoint,
                                                 mirrorOut: linked)
         case .OUT_TANGENT:
             document.core.pathEditMoveOutTangent(layerID: target.layerID, kind: target.kind,
-                                                 maskIndex: target.maskIndex, frame: playheadFrame,
+                                                 maskIndex: target.maskIndex, frame: evaluationFrame,
                                                  index: penDrag.index, scenePoint: scenePoint,
                                                  mirrorIn: linked)
         default:
@@ -1254,7 +1264,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return false
         }
         document.core.pathEditAppendVertex(layerID: layerID, kind: .SHAPE, maskIndex: 0,
-                                           frame: playheadFrame, scenePoint: scenePoint)
+                                           frame: evaluationFrame, scenePoint: scenePoint)
         document.core.endDrag()
         editorState.selectedLayerID = layerID
         editorState.pathEditTarget = .shape(layerID: layerID, selectedVertex: 0)
@@ -1275,7 +1285,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return MSPathEditHit(kind: .NONE, index: 0, segmentT: 0)
         }
         return document.core.hitPathEdit(canvas: canvas, compositionID: compositionID,
-                                         frameTime: previewFrame, point: scenePoint)
+                                         frameTime: evaluationTime, point: scenePoint)
     }
 
     private func performPenEdit(_ name: String, edit: () -> Void) {

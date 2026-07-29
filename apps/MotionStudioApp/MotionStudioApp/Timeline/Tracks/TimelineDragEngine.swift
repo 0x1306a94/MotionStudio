@@ -105,6 +105,7 @@ enum TimelineDragEngine {
         guard let edge = session.edge else {
             return []
         }
+        let lastFrame = timelineLastInclusiveFrame(duration)
         let anchor: Int64
         let oldEdge: Int64
         let newEdge: Int64
@@ -112,7 +113,7 @@ enum TimelineDragEngine {
         case .trailing:
             anchor = session.originStart
             oldEdge = session.originEnd
-            newEdge = min(max(pointerFrame, session.originStart + 1), duration)
+            newEdge = min(max(pointerFrame, session.originStart + 1), lastFrame)
         case .leading:
             anchor = session.originEnd
             oldEdge = session.originStart
@@ -125,7 +126,7 @@ enum TimelineDragEngine {
         var moves: [KeyframeMove] = []
         for entry in session.originFrames {
             let mapped = Int64((Double(anchor) + Double(entry.frame - anchor) * scale).rounded())
-            let clamped = min(max(mapped, 0), duration)
+            let clamped = min(max(mapped, 0), lastFrame)
             if clamped != entry.frame {
                 moves.append(KeyframeMove(path: entry.path, from: entry.frame, to: clamped))
             }
@@ -141,6 +142,7 @@ enum TimelineDragEngine {
         guard let edge = session.edge else {
             return []
         }
+        let lastFrame = timelineLastInclusiveFrame(duration)
         let from: Int64
         let to: Int64
         switch edge {
@@ -149,7 +151,7 @@ enum TimelineDragEngine {
             to = min(max(pointerFrame, 0), session.originEnd - 1)
         case .trailing:
             from = session.originEnd
-            to = min(max(pointerFrame, session.originStart + 1), duration)
+            to = min(max(pointerFrame, session.originStart + 1), lastFrame)
         }
         guard from != to else {
             return []
@@ -164,7 +166,7 @@ enum TimelineDragEngine {
                                         neighbors: (prev: Int64?, next: Int64?)?) -> [KeyframeMove]
     {
         var lower: Int64 = 0
-        var upper: Int64 = duration
+        var upper: Int64 = timelineLastInclusiveFrame(duration)
         if let prev = neighbors?.prev {
             lower = max(lower, prev + 1)
         }
