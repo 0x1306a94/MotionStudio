@@ -162,6 +162,7 @@ final class TimelineViewController: UIViewController {
             controlsView.topAnchor.constraint(equalTo: view.topAnchor),
             controlsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            controlsView.heightAnchor.constraint(equalToConstant: 32),
 
             controlsSeparator.topAnchor.constraint(equalTo: controlsView.bottomAnchor),
             controlsSeparator.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -251,6 +252,12 @@ final class TimelineViewController: UIViewController {
         }
         pointerOverlay.onPlayheadHoveringChanged = { [weak self] hovering in
             self?.playheadView.setHovering(hovering)
+        }
+        pointerOverlay.onVerticalScroll = { [weak self] deltaY in
+            self?.tracksView.scrollVertically(by: deltaY)
+        }
+        pointerOverlay.onVerticalScrollEnded = { [weak self] in
+            self?.tracksView.endVerticalRubberBand()
         }
         tracksView.onPresentEasing = { [weak self] request in
             self?.presentEasingEditor(request)

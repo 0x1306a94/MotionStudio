@@ -25,10 +25,9 @@ final class TimelineSidebarView: UIView {
     private let clearSelection: () -> Void
 
     private let tableView = UITableView(frame: .zero, style: .plain)
-    private let insertionLine = UIView()
     private var rows: [TimelineRow] = []
-    private var drag: LayerReorderDragState?
-    private var autoScrollTask: Task<Void, Never>?
+    private var layerDragContext: LayerDragSessionContext?
+    private var didBeginCoreLayerDrag = false
     private var isSyncingOffset = false
 
     init(document: MotionProjectState,
@@ -68,6 +67,9 @@ final class TimelineSidebarView: UIView {
 
     func reloadRows(_ rows: [TimelineRow]) {
         self.rows = rows
+        guard layerDragContext == nil else {
+            return
+        }
         tableView.reloadData()
         refreshSelectionAppearance()
         updatePlayheadBadges()
@@ -105,6 +107,9 @@ final class TimelineSidebarView: UIView {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.dataSource = self
         tableView.delegate = self
+        tableView.dragDelegate = self
+        tableView.dropDelegate = self
+        tableView.dragInteractionEnabled = true
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
         tableView.allowsSelection = false
@@ -112,11 +117,6 @@ final class TimelineSidebarView: UIView {
         tableView.register(TimelineLayerCell.self, forCellReuseIdentifier: TimelineLayerCell.reuseID)
         tableView.register(TimelinePropertyCell.self, forCellReuseIdentifier: TimelinePropertyCell.reuseID)
         addSubview(tableView)
-
-        insertionLine.translatesAutoresizingMaskIntoConstraints = false
-        insertionLine.backgroundColor = .tintColor
-        insertionLine.isHidden = true
-        addSubview(insertionLine)
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
         tap.cancelsTouchesInView = false
@@ -128,10 +128,6 @@ final class TimelineSidebarView: UIView {
             tableView.leadingAnchor.constraint(equalTo: leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            insertionLine.leadingAnchor.constraint(equalTo: leadingAnchor),
-            insertionLine.trailingAnchor.constraint(equalTo: trailingAnchor),
-            insertionLine.heightAnchor.constraint(equalToConstant: 2),
-            insertionLine.topAnchor.constraint(equalTo: topAnchor),
         ])
     }
 
@@ -186,8 +182,7 @@ extension TimelineSidebarView: UITableViewDataSource, UITableViewDelegate {
             cell.configure(name: core.layerName(row.layerID),
                            symbolName: layerSymbol(core.layerType(row.layerID)),
                            visible: visible,
-                           locked: locked,
-                           dimmed: drag?.movingIDs.contains(row.layerID) == true)
+                           locked: locked)
             cell.onTap = { [weak self] in
                 self?.editorState.selectLayer(row.layerID, additive: KeyboardModifiers.shiftPressed)
                 self?.refreshSelectionAppearance()
@@ -208,21 +203,13 @@ extension TimelineSidebarView: UITableViewDataSource, UITableViewDelegate {
                     self.document.core.setLayerLocked(row.layerID, locked: !locked)
                 }
             }
-            cell.onReorderChanged = { [weak self] viewportY in
-                self?.handleReorderDragChanged(layerID: row.layerID, viewportY: viewportY)
-            }
-            cell.onReorderEnded = { [weak self] in
-                self?.handleReorderDragEnded()
-            }
             configureSelection(for: cell, row: row)
             return cell
         case let .propertySpan(path, label), let .keyframeTrack(path, label):
             let cell = tableView.dequeueReusableCell(withIdentifier: TimelinePropertyCell.reuseID, for: indexPath) as! TimelinePropertyCell
             let hasKeyframe = core.keyframes(entityID: row.layerID, path: path)
                 .contains { $0.frame == playheadClock.frame }
-            cell.configure(label: label,
-                           hasKeyframeAtPlayhead: hasKeyframe,
-                           dimmed: drag?.movingIDs.contains(row.layerID) == true)
+            cell.configure(label: label, hasKeyframeAtPlayhead: hasKeyframe)
             cell.onTap = { [weak self] in
                 guard let self else {
                     return
@@ -259,7 +246,7 @@ extension TimelineSidebarView: UITableViewDataSource, UITableViewDelegate {
     }
 }
 
-// MARK: - Context menu / reorder
+// MARK: - Context menu
 
 private extension TimelineSidebarView {
     func layerContextMenu(for layerID: UInt64) -> UIMenu {
@@ -315,159 +302,120 @@ private extension TimelineSidebarView {
         }
     }
 
-    func handleReorderDragChanged(layerID: UInt64, viewportY: CGFloat) {
-        let core = document.core
-        let compositionID = core.firstCompositionID
-        if drag == nil {
-            let moving: Set<UInt64>
-            if editorState.isLayerSelected(layerID) {
-                moving = Set(editorState.selectedLayerIDs)
-            } else {
-                editorState.selectLayer(layerID)
-                moving = [layerID]
-            }
-            let startOrder = core.layerIDs(compositionID: compositionID)
-            core.beginDrag()
-            drag = LayerReorderDragState(movingIDs: moving,
-                                         startOrder: startOrder,
-                                         lastDesired: startOrder,
-                                         frozenFrames: TimelineReorder.layerBlockFrames(rows: rows),
-                                         insertionUISlot: nil,
-                                         lastViewportY: viewportY,
-                                         lastDragLayerID: layerID)
-            tableView.reloadData()
-        }
-        guard var state = drag else {
+    func finishLayerDragSession() {
+        guard let context = layerDragContext else {
             return
         }
-        state.lastViewportY = viewportY
-        state.lastDragLayerID = layerID
-        drag = state
-        applyReorder(using: state, contentY: contentY(fromViewportY: viewportY))
-        updateAutoScroll(viewportY: viewportY)
-    }
-
-    func contentY(fromViewportY viewportY: CGFloat) -> CGFloat {
-        viewportY + tableView.contentOffset.y + tableView.adjustedContentInset.top
-    }
-
-    func applyReorder(using state: LayerReorderDragState, contentY: CGFloat) {
-        let compositionID = document.core.firstCompositionID
-        let slot = TimelineReorder.uiInsertSlot(y: contentY, frames: state.frozenFrames)
-        let insertBefore = TimelineReorder.modelInsertBeforeIndex(uiSlot: slot, layerCount: state.startOrder.count)
-        let desired = TimelineReorder.reorderedLayerIDs(current: state.startOrder,
-                                                        moving: state.movingIDs,
-                                                        insertBeforeModelIndex: insertBefore)
-        var next = state
-        next.insertionUISlot = slot
-        if desired != next.lastDesired {
-            document.core.applyLayerOrder(compositionID: compositionID, desired: desired)
-            next.lastDesired = desired
+        if didBeginCoreLayerDrag {
+            document.core.endDrag()
+            didBeginCoreLayerDrag = false
         }
-        drag = next
-        updateInsertionLine(slot: slot, frames: state.frozenFrames)
-    }
-
-    func updateInsertionLine(slot: Int?, frames: [LayerBlockFrame]) {
-        guard let slot else {
-            insertionLine.isHidden = true
-            return
+        if context.lastDesired != context.startOrder {
+            registerEdit(context.movingIDs.count > 1 ? "Move Layers" : "Move Layer")
         }
-        let y: CGFloat = if frames.isEmpty {
-            0
-        } else if slot <= 0 {
-            frames[0].minY
-        } else if slot >= frames.count {
-            frames[frames.count - 1].maxY
-        } else {
-            frames[slot].minY
-        }
-        let contentY = y - tableView.contentOffset.y - tableView.adjustedContentInset.top
-        insertionLine.isHidden = false
-        insertionLine.frame = CGRect(x: 0, y: contentY - 1, width: bounds.width, height: 2)
-    }
-
-    func updateAutoScroll(viewportY: CGFloat) {
-        let viewportHeight = max(tableView.bounds.height, 1)
-        let edge = layerReorderAutoScrollEdge
-        let inEdge = viewportY < edge || viewportY > viewportHeight - edge
-        if !inEdge {
-            stopAutoScroll()
-            return
-        }
-        startAutoScrollIfNeeded()
-    }
-
-    func startAutoScrollIfNeeded() {
-        if autoScrollTask != nil {
-            return
-        }
-        autoScrollTask = Task { @MainActor in
-            let frameNanoseconds: UInt64 = 16_666_667
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: frameNanoseconds)
-                guard !Task.isCancelled, let state = drag else {
-                    break
-                }
-                let viewportHeight = max(tableView.bounds.height, 1)
-                let viewportY = state.lastViewportY
-                let edge = layerReorderAutoScrollEdge
-                let speed: CGFloat
-                if viewportY < edge {
-                    let intensity = 1 - (viewportY / edge)
-                    speed = -layerReorderAutoScrollMaxSpeed * max(0, min(1, intensity))
-                } else if viewportY > viewportHeight - edge {
-                    let intensity = (viewportY - (viewportHeight - edge)) / edge
-                    speed = layerReorderAutoScrollMaxSpeed * max(0, min(1, intensity))
-                } else {
-                    break
-                }
-                if abs(speed) < 1 {
-                    break
-                }
-                let before = tableView.contentOffset.y
-                let maxOffset = max(0, tableView.contentSize.height - tableView.bounds.height
-                    + tableView.adjustedContentInset.bottom)
-                let next = min(max(before + speed * (1.0 / 60.0), -tableView.adjustedContentInset.top), maxOffset)
-                tableView.contentOffset = CGPoint(x: 0, y: next)
-                if before == tableView.contentOffset.y {
-                    break
-                }
-                applyReorder(using: state, contentY: contentY(fromViewportY: viewportY))
-            }
-            autoScrollTask = nil
-        }
-    }
-
-    func stopAutoScroll() {
-        autoScrollTask?.cancel()
-        autoScrollTask = nil
-    }
-
-    func handleReorderDragEnded() {
-        stopAutoScroll()
-        guard let state = drag else {
-            return
-        }
-        document.core.endDrag()
-        if state.lastDesired != state.startOrder {
-            registerEdit(state.movingIDs.count > 1 ? "Move Layers" : "Move Layer")
-        }
-        drag = nil
-        insertionLine.isHidden = true
-        // Document observation reloads rows after endDrag mutations settle.
+        layerDragContext = nil
         tableView.reloadData()
+        refreshSelectionAppearance()
+        updatePlayheadBadges()
+    }
+
+    func applyDrop(beforeRow rowIndex: Int, context: LayerDragSessionContext) {
+        let slot = TimelineReorder.uiInsertSlot(dropBeforeRow: rowIndex, rows: rows)
+        let insertBefore = TimelineReorder.modelInsertBeforeIndex(uiSlot: slot, layerCount: context.startOrder.count)
+        let desired = TimelineReorder.reorderedLayerIDs(current: context.startOrder,
+                                                        moving: context.movingIDs,
+                                                        insertBeforeModelIndex: insertBefore)
+        guard desired != context.lastDesired else {
+            return
+        }
+        document.core.applyLayerOrder(compositionID: document.core.firstCompositionID, desired: desired)
+        context.lastDesired = desired
     }
 }
 
-private struct LayerReorderDragState {
-    var movingIDs: Set<UInt64>
-    var startOrder: [UInt64]
+// MARK: - UITableView drag & drop
+
+extension TimelineSidebarView: UITableViewDragDelegate, UITableViewDropDelegate {
+    func tableView(_: UITableView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
+        let row = rows[indexPath.row]
+        guard case .layer = row.kind else {
+            return []
+        }
+        let layerID = row.layerID
+        if !editorState.isLayerSelected(layerID) {
+            editorState.selectLayer(layerID)
+        }
+        let moving = Set(editorState.selectedLayerIDs)
+        let startOrder = document.core.layerIDs(compositionID: document.core.firstCompositionID)
+        session.localContext = LayerDragSessionContext(movingIDs: moving,
+                                                       startOrder: startOrder,
+                                                       lastDesired: startOrder)
+
+        let item = UIDragItem(itemProvider: NSItemProvider(object: "\(layerID)" as NSString))
+        item.localObject = layerID
+        return [item]
+    }
+
+    func tableView(_: UITableView, dragSessionWillBegin session: UIDragSession) {
+        layerDragContext = session.localContext as? LayerDragSessionContext
+        document.core.beginDrag()
+        didBeginCoreLayerDrag = true
+    }
+
+    func tableView(_: UITableView, dragSessionDidEnd session: UIDragSession) {
+        if layerDragContext == nil {
+            layerDragContext = session.localContext as? LayerDragSessionContext
+        }
+        finishLayerDragSession()
+    }
+
+    func tableView(_: UITableView,
+                   dropSessionDidUpdate session: UIDropSession,
+                   withDestinationIndexPath _: IndexPath?) -> UITableViewDropProposal
+    {
+        guard session.localDragSession != nil else {
+            return UITableViewDropProposal(operation: .cancel)
+        }
+        return UITableViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
+    }
+
+    func tableView(_: UITableView, performDropWith coordinator: UITableViewDropCoordinator) {
+        guard let context = (coordinator.session.localDragSession?.localContext as? LayerDragSessionContext)
+            ?? layerDragContext
+        else {
+            return
+        }
+        // Apply model order only — avoid UITableView row animations that break property sub-rows.
+        let destinationRow = coordinator.destinationIndexPath?.row ?? rows.count
+        applyDrop(beforeRow: destinationRow, context: context)
+    }
+
+    func tableView(_: UITableView, canHandle session: UIDropSession) -> Bool {
+        session.localDragSession != nil
+    }
+
+    func tableView(_: UITableView,
+                   dragPreviewParametersForRowAt indexPath: IndexPath) -> UIDragPreviewParameters?
+    {
+        guard case .layer = rows[indexPath.row].kind else {
+            return nil
+        }
+        let parameters = UIDragPreviewParameters()
+        parameters.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.92)
+        return parameters
+    }
+}
+
+private final class LayerDragSessionContext: NSObject {
+    let movingIDs: Set<UInt64>
+    let startOrder: [UInt64]
     var lastDesired: [UInt64]
-    var frozenFrames: [LayerBlockFrame]
-    var insertionUISlot: Int?
-    var lastViewportY: CGFloat
-    var lastDragLayerID: UInt64
+
+    init(movingIDs: Set<UInt64>, startOrder: [UInt64], lastDesired: [UInt64]) {
+        self.movingIDs = movingIDs
+        self.startOrder = startOrder
+        self.lastDesired = lastDesired
+    }
 }
 
 // MARK: - Cells
@@ -479,8 +427,6 @@ private final class TimelineLayerCell: UITableViewCell {
     var onTap: (() -> Void)?
     var onToggleVisible: (() -> Void)?
     var onToggleLocked: (() -> Void)?
-    var onReorderChanged: ((CGFloat) -> Void)?
-    var onReorderEnded: (() -> Void)?
 
     private let iconView = UIImageView()
     private let nameLabel = UILabel()
@@ -535,9 +481,6 @@ private final class TimelineLayerCell: UITableViewCell {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         contentView.addGestureRecognizer(tap)
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handleReorderPan(_:)))
-        pan.delegate = self
-        contentView.addGestureRecognizer(pan)
     }
 
     @available(*, unavailable)
@@ -545,12 +488,12 @@ private final class TimelineLayerCell: UITableViewCell {
         nil
     }
 
-    func configure(name: String, symbolName: String, visible: Bool, locked: Bool, dimmed: Bool) {
+    func configure(name: String, symbolName: String, visible: Bool, locked: Bool) {
         nameLabel.text = name
         iconView.image = UIImage(systemName: symbolName)
         visibleButton.setImage(UIImage(systemName: visible ? "eye.fill" : "eye.slash"), for: .normal)
         lockedButton.setImage(UIImage(systemName: locked ? "lock.fill" : "lock.open"), for: .normal)
-        contentView.alpha = dimmed ? 0.55 : 1
+        contentView.alpha = 1
     }
 
     func setSelectedLayer(_ selected: Bool) {
@@ -573,31 +516,6 @@ private final class TimelineLayerCell: UITableViewCell {
 
     @objc private func toggleLocked() {
         onToggleLocked?()
-    }
-
-    @objc private func handleReorderPan(_ recognizer: UIPanGestureRecognizer) {
-        let y = recognizer.location(in: superview?.superview).y
-        switch recognizer.state {
-        case .began, .changed:
-            // Convert into table viewport coordinates.
-            if let table = sequence(first: superview, next: { $0?.superview }).compactMap({ $0 as? UITableView }).first {
-                onReorderChanged?(recognizer.location(in: table).y)
-            } else {
-                onReorderChanged?(y)
-            }
-        case .ended, .cancelled, .failed:
-            onReorderEnded?()
-        default:
-            break
-        }
-    }
-
-    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard let pan = gestureRecognizer as? UIPanGestureRecognizer else {
-            return super.gestureRecognizerShouldBegin(gestureRecognizer)
-        }
-        let velocity = pan.velocity(in: contentView)
-        return abs(velocity.y) >= abs(velocity.x)
     }
 }
 
@@ -656,10 +574,10 @@ private final class TimelinePropertyCell: UITableViewCell {
         nil
     }
 
-    func configure(label: String, hasKeyframeAtPlayhead: Bool, dimmed: Bool) {
+    func configure(label: String, hasKeyframeAtPlayhead: Bool) {
         nameLabel.text = label
         setHasKeyframeAtPlayhead(hasKeyframeAtPlayhead)
-        contentView.alpha = dimmed ? 0.55 : 1
+        contentView.alpha = 1
     }
 
     func setSelectedProperty(_ selected: Bool) {

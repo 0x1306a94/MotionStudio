@@ -10,6 +10,10 @@ import UIKit
 @MainActor
 final class TimelinePointerInputOverlay: UIView {
     var onPlayheadHoveringChanged: ((Bool) -> Void)?
+    /// Trackpad / mouse wheel vertical delta in points (positive = fingers/content move down).
+    var onVerticalScroll: ((CGFloat) -> Void)?
+    /// Fired when a vertical trackpad/wheel gesture ends so the tracks can spring back.
+    var onVerticalScrollEnded: (() -> Void)?
 
     private let editorState: EditorState
     private var duration: Int64 = 0
@@ -115,16 +119,29 @@ final class TimelinePointerInputOverlay: UIView {
             if gesture.modifierFlags.contains(.command) {
                 let fallbackAnchor = bounds.width * 0.5
                 applyZoom(delta: exp(-delta.y * 0.01), anchorX: lastPointerX ?? fallbackAnchor)
+            } else if shouldForwardVerticalScroll(delta: delta, modifierFlags: gesture.modifierFlags) {
+                // Overlay sits above tracks; forward vertical wheel/trackpad to the row scroller.
+                onVerticalScroll?(delta.y)
             } else {
                 applyScroll(delta: timelineScrollDelta(delta: delta, modifierFlags: gesture.modifierFlags))
             }
+        case .ended, .cancelled, .failed:
+            lastScrollTranslation = .zero
+            onVerticalScrollEnded?()
         default:
             lastScrollTranslation = .zero
         }
     }
 
+    private func shouldForwardVerticalScroll(delta: CGPoint, modifierFlags: UIKeyModifierFlags) -> Bool {
+        if modifierFlags.contains(.shift) {
+            return false
+        }
+        return abs(delta.y) > abs(delta.x)
+    }
+
     private func timelineScrollDelta(delta: CGPoint, modifierFlags: UIKeyModifierFlags) -> CGFloat {
-        if delta.x != 0 {
+        if abs(delta.x) >= abs(delta.y) {
             return delta.x
         }
         if modifierFlags.contains(.shift) {

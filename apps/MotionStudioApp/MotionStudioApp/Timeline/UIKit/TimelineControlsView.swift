@@ -57,30 +57,19 @@ final class TimelineControlsView: UIView {
     }
 
     private func configureChrome() {
-        // Thumb extends past the track; keep a padded host so Catalyst stack layout
-        // does not clip the leading/trailing corners of the knob.
-        let zoomSliderHost = UIView()
-        zoomSliderHost.translatesAutoresizingMaskIntoConstraints = false
-        zoomSliderHost.clipsToBounds = false
-        zoomSlider.translatesAutoresizingMaskIntoConstraints = false
-        zoomSliderHost.addSubview(zoomSlider)
-
         let stack = UIStackView(arrangedSubviews: [
-            UIView(),
             backdropButton,
             playButton,
             frameLabel,
             zoomOutButton,
-            zoomSliderHost,
+            zoomSlider,
             zoomInButton,
-            UIView(),
         ])
         stack.axis = .horizontal
         stack.alignment = .center
+        stack.distribution = .fill
         stack.spacing = 6
-        stack.clipsToBounds = false
         stack.translatesAutoresizingMaskIntoConstraints = false
-        clipsToBounds = false
         addSubview(stack)
 
         configureIconButton(backdropButton, action: #selector(cycleBackdrop))
@@ -92,27 +81,18 @@ final class TimelineControlsView: UIView {
 
         frameLabel.font = .preferredFont(forTextStyle: .callout)
         frameLabel.font = UIFont.monospacedDigitSystemFont(ofSize: frameLabel.font.pointSize, weight: .regular)
-        frameLabel.setContentHuggingPriority(.required, for: .horizontal)
-        frameLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 72).isActive = true
+        frameLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
         zoomSlider.minimumValue = Float(minTimelinePointsPerFrame)
         zoomSlider.maximumValue = Float(maxTimelinePointsPerFrame)
         zoomSlider.addTarget(self, action: #selector(zoomSliderChanged), for: .valueChanged)
         zoomSlider.accessibilityLabel = "Timeline Zoom"
-        NSLayoutConstraint.activate([
-            zoomSliderHost.widthAnchor.constraint(equalToConstant: 128),
-            zoomSliderHost.heightAnchor.constraint(equalToConstant: 31),
-            zoomSlider.leadingAnchor.constraint(equalTo: zoomSliderHost.leadingAnchor, constant: 8),
-            zoomSlider.trailingAnchor.constraint(equalTo: zoomSliderHost.trailingAnchor, constant: -8),
-            zoomSlider.centerYAnchor.constraint(equalTo: zoomSliderHost.centerYAnchor),
-        ])
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            zoomSlider.widthAnchor.constraint(equalToConstant: 128),
+            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor, constant: 4),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
-            heightAnchor.constraint(greaterThanOrEqualToConstant: 32),
         ])
         refreshChrome()
     }

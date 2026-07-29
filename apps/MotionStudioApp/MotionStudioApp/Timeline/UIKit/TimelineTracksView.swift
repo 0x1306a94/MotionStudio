@@ -79,6 +79,67 @@ final class TimelineTracksView: UIView {
         }
     }
 
+    /// Applies a vertical wheel/trackpad delta (positive = content moves down).
+    /// Allows rubber-banding past edges (UITableView-like); call `endVerticalRubberBand()` on gesture end.
+    func scrollVertically(by deltaY: CGFloat) {
+        guard deltaY != 0 else {
+            return
+        }
+        let limits = verticalScrollLimits()
+        let proposed = scrollView.contentOffset.y - deltaY
+        let next: CGFloat = if proposed < limits.min {
+            limits.min - rubberBand(overscroll: limits.min - proposed, dimension: scrollView.bounds.height)
+        } else if proposed > limits.max {
+            limits.max + rubberBand(overscroll: proposed - limits.max, dimension: scrollView.bounds.height)
+        } else {
+            proposed
+        }
+        guard abs(next - scrollView.contentOffset.y) > 0.05 else {
+            return
+        }
+        contentOffsetY = next
+        delegate?.timelineTracksDidScroll(self, offsetY: next)
+    }
+
+    /// Springs content offset back into valid range after trackpad/wheel rubber-band.
+    func endVerticalRubberBand() {
+        let limits = verticalScrollLimits()
+        let current = scrollView.contentOffset.y
+        let clamped = min(max(current, limits.min), limits.max)
+        guard abs(clamped - current) > 0.5 else {
+            return
+        }
+        isSyncingOffset = true
+        UIView.animate(withDuration: 0.35,
+                       delay: 0,
+                       usingSpringWithDamping: 1,
+                       initialSpringVelocity: 0,
+                       options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut])
+        {
+            self.scrollView.contentOffset = CGPoint(x: 0, y: clamped)
+        } completion: { _ in
+            self.isSyncingOffset = false
+            self.delegate?.timelineTracksDidScroll(self, offsetY: self.scrollView.contentOffset.y)
+        }
+        // Keep sidebar locked to the settled edge immediately (same final offset).
+        delegate?.timelineTracksDidScroll(self, offsetY: clamped)
+    }
+
+    private func verticalScrollLimits() -> (min: CGFloat, max: CGFloat) {
+        let minOffset = -scrollView.adjustedContentInset.top
+        let maxOffset = max(minOffset,
+                            scrollView.contentSize.height - scrollView.bounds.height
+                                + scrollView.adjustedContentInset.bottom)
+        return (minOffset, maxOffset)
+    }
+
+    /// UIScrollView-style rubber band: maps overscroll distance into a diminishing offset.
+    private func rubberBand(overscroll: CGFloat, dimension: CGFloat) -> CGFloat {
+        let limit = max(dimension, 1)
+        let constant: CGFloat = 0.55
+        return (1 - (1 / ((overscroll * constant / limit) + 1))) * limit
+    }
+
     func reload(rows: [TimelineRow], duration: Int64, pointsPerFrame: CGFloat, scrollX: CGFloat) {
         self.rows = rows
         self.duration = duration
@@ -130,6 +191,7 @@ final class TimelineTracksView: UIView {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.delegate = self
         scrollView.alwaysBounceVertical = true
+        scrollView.bounces = true
         scrollView.showsVerticalScrollIndicator = false
         scrollView.backgroundColor = .clear
         contentView.translatesAutoresizingMaskIntoConstraints = false

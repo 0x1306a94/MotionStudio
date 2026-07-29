@@ -155,4 +155,16 @@ enum TimelineReorder {
         }
         return frames.count
     }
+
+    /// Maps a table drop index (`0...rows.count`, insert-before) to a layer UI insert slot.
+    nonisolated static func uiInsertSlot(dropBeforeRow rowIndex: Int, rows: [TimelineRow]) -> Int {
+        let clamped = min(max(0, rowIndex), rows.count)
+        var slot = 0
+        for index in 0 ..< clamped {
+            if case .layer = rows[index].kind {
+                slot += 1
+            }
+        }
+        return slot
+    }
 }

@@ -51,6 +51,21 @@ struct TimelineReorderTests {
     }
 
     @Test
+    func `ui insert slot from drop row index`() {
+        let rows = [
+            TimelineRow(id: .layer(10), layerID: 10, kind: .layer),
+            TimelineRow(id: .propertySpan(10, "a"), layerID: 10, kind: .propertySpan(path: "a", label: "A")),
+            TimelineRow(id: .layer(20), layerID: 20, kind: .layer),
+            TimelineRow(id: .layer(30), layerID: 30, kind: .layer),
+        ]
+        #expect(TimelineReorder.uiInsertSlot(dropBeforeRow: 0, rows: rows) == 0)
+        #expect(TimelineReorder.uiInsertSlot(dropBeforeRow: 1, rows: rows) == 1)
+        #expect(TimelineReorder.uiInsertSlot(dropBeforeRow: 2, rows: rows) == 1)
+        #expect(TimelineReorder.uiInsertSlot(dropBeforeRow: 3, rows: rows) == 2)
+        #expect(TimelineReorder.uiInsertSlot(dropBeforeRow: 4, rows: rows) == 3)
+    }
+
+    @Test
     func `arranged layer I ds bring forward and back`() {
         let current: [UInt64] = [1, 2, 3, 4]
         #expect(TimelineReorder.arrangedLayerIDs(current: current, moving: Set([2]),
