@@ -19,17 +19,18 @@ final class TimelineViewController: UIViewController {
     private let scrollCoordinator: TimelineScrollCoordinator
     private let controlsView: TimelineControlsView
     private let sidebarView: TimelineSidebarView
+    private let tracksView: TimelineTracksView
     private let rulerView = TimelineRulerCanvasView()
     private let playheadView = TimelinePlayheadView()
     private let layersHeaderLabel = UILabel()
     private let headerSplit = UIView()
     private let bodySplit = UIView()
-    private let tracksPlaceholder = UIView()
     private let trackColumn = UIView()
     private let leftColumn = UIView()
 
     private var playheadListenerID: UUID?
     private var layerColumnWidthConstraint: NSLayoutConstraint?
+    private var timelineRows: [TimelineRow] = []
     private var isObservingDocument = false
     private var isObservingPlayback = false
     private var isObservingZoom = false
@@ -56,6 +57,10 @@ final class TimelineViewController: UIViewController {
                                           perform: perform,
                                           registerEdit: registerEdit,
                                           clearSelection: clearSelection)
+        tracksView = TimelineTracksView(document: document,
+                                        editorState: editorState,
+                                        perform: perform,
+                                        registerEdit: registerEdit)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -107,7 +112,6 @@ final class TimelineViewController: UIViewController {
         leftColumn.translatesAutoresizingMaskIntoConstraints = false
         trackColumn.translatesAutoresizingMaskIntoConstraints = false
         layersHeaderLabel.translatesAutoresizingMaskIntoConstraints = false
-        tracksPlaceholder.translatesAutoresizingMaskIntoConstraints = false
         headerSplit.translatesAutoresizingMaskIntoConstraints = false
         bodySplit.translatesAutoresizingMaskIntoConstraints = false
 
@@ -117,7 +121,8 @@ final class TimelineViewController: UIViewController {
 
         styleSplit(headerSplit)
         styleSplit(bodySplit)
-        tracksPlaceholder.backgroundColor = UIColor.secondarySystemFill.withAlphaComponent(0.25)
+        sidebarView.delegate = self
+        tracksView.delegate = self
 
         let headerSeparator = hairline()
         let bodySeparator = hairline()
@@ -136,7 +141,7 @@ final class TimelineViewController: UIViewController {
 
         trackColumn.addSubview(rulerView)
         trackColumn.addSubview(bodySeparator)
-        trackColumn.addSubview(tracksPlaceholder)
+        trackColumn.addSubview(tracksView)
         trackColumn.addSubview(playheadView)
         trackColumn.clipsToBounds = true
 
@@ -198,10 +203,10 @@ final class TimelineViewController: UIViewController {
             bodySeparator.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
             bodySeparator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
 
-            tracksPlaceholder.topAnchor.constraint(equalTo: bodySeparator.bottomAnchor),
-            tracksPlaceholder.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
-            tracksPlaceholder.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
-            tracksPlaceholder.bottomAnchor.constraint(equalTo: trackColumn.bottomAnchor),
+            tracksView.topAnchor.constraint(equalTo: bodySeparator.bottomAnchor),
+            tracksView.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
+            tracksView.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
+            tracksView.bottomAnchor.constraint(equalTo: trackColumn.bottomAnchor),
 
             playheadView.topAnchor.constraint(equalTo: trackColumn.topAnchor),
             playheadView.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
@@ -224,9 +229,6 @@ final class TimelineViewController: UIViewController {
         playheadView.onScrub = { [weak self] visibleX in
             self?.scrub(atVisibleX: visibleX)
         }
-        let clearTap = UITapGestureRecognizer(target: self, action: #selector(handleTracksTap))
-        tracksPlaceholder.addGestureRecognizer(clearTap)
-        tracksPlaceholder.isUserInteractionEnabled = true
     }
 
     private func reloadFromDocument() {
@@ -235,17 +237,25 @@ final class TimelineViewController: UIViewController {
         scrollCoordinator.duration = core.duration(compositionID: compositionID)
         let frameRate = core.frameRate(compositionID: compositionID)
         let layerIDs = Array(core.layerIDs(compositionID: compositionID).reversed())
-        sidebarView.reloadRows(buildTimelineRows(core: core, layerIDs: layerIDs))
+        timelineRows = buildTimelineRows(core: core, layerIDs: layerIDs)
+        sidebarView.reloadRows(timelineRows)
+        tracksView.reload(rows: timelineRows,
+                          duration: scrollCoordinator.duration,
+                          pointsPerFrame: scrollCoordinator.pointsPerFrame,
+                          scrollX: scrollCoordinator.scrollX)
         controlsView.reload(duration: scrollCoordinator.duration, frame: playheadClock.frame)
         refreshTrackChrome(updateControls: true, frameRate: frameRate)
     }
 
     private func refreshTrackChrome(updateControls: Bool, frameRate: Double? = nil) {
         let rate = frameRate ?? document.core.frameRate(compositionID: document.core.firstCompositionID)
+        let pointsPerFrame = scrollCoordinator.pointsPerFrame
+        let scrollX = scrollCoordinator.scrollX
         rulerView.update(duration: scrollCoordinator.duration,
                          frameRate: rate,
-                         pointsPerFrame: scrollCoordinator.pointsPerFrame,
-                         scrollX: scrollCoordinator.scrollX)
+                         pointsPerFrame: pointsPerFrame,
+                         scrollX: scrollX)
+        tracksView.updateHorizontalMetrics(pointsPerFrame: pointsPerFrame, scrollX: scrollX)
         if updateControls {
             controlsView.refreshPlaybackState()
         }
@@ -270,10 +280,6 @@ final class TimelineViewController: UIViewController {
 
     private func scrub(atVisibleX visibleX: CGFloat) {
         playheadClock.publish(scrollCoordinator.frame(atVisibleX: visibleX))
-    }
-
-    @objc private func handleTracksTap() {
-        clearSelection()
     }
 
     private func beginObservationLoops() {
@@ -342,6 +348,7 @@ final class TimelineViewController: UIViewController {
                     return
                 }
                 sidebarView.refreshSelectionAppearance()
+                tracksView.refreshSelectionAppearance()
                 observeSelectionState()
             }
         }
@@ -356,5 +363,19 @@ final class TimelineViewController: UIViewController {
         line.translatesAutoresizingMaskIntoConstraints = false
         line.backgroundColor = UIColor.separator
         return line
+    }
+}
+
+extension TimelineViewController: TimelineSidebarViewDelegate, TimelineTracksViewDelegate {
+    func timelineSidebarDidScroll(_: TimelineSidebarView, offsetY: CGFloat) {
+        tracksView.contentOffsetY = offsetY
+    }
+
+    func timelineTracksDidScroll(_: TimelineTracksView, offsetY: CGFloat) {
+        sidebarView.contentOffsetY = offsetY
+    }
+
+    func timelineTracksTimeRangeDraggingChanged(_: TimelineTracksView, isDragging _: Bool) {
+        // Reserved for pan-vs-scrub arbitration in Task 6.
     }
 }
