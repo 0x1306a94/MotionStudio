@@ -1350,7 +1350,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func logSlowFrame(_ profile: CanvasFrameProfile) {
-        #if DEBUG
+        #if SHOW_TIMEPROFILE_LOG
             guard profile.drewFrame else {
                 return
             }
@@ -1414,7 +1414,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                    drawIntervalMilliseconds: Double?,
                                    profile: CanvasFrameProfile)
     {
-        #if DEBUG
+        #if SHOW_TIMEPROFILE_LOG
             let frameBudgetMilliseconds = 1000.0 / max(frameRate, 1)
             let slowRequest = !isPlaying && (requestToDrawMilliseconds ?? 0) > frameBudgetMilliseconds
             let slowInterval = isPlaying && (drawIntervalMilliseconds ?? 0) > frameBudgetMilliseconds * 1.5
