@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -20,4 +21,7 @@ struct MSCanvas {
     motion::EntityId motionPathLayerId;
     int motionPathSelectedKeyframe = -1;
     std::vector<motion::PathOverlayItem> customPathOverlays;
+    // Mirrors MS_CANVAS_DRAW_MODE (0 = EDIT, 1 = PLAYBACK).
+    int drawMode = 0;
+    uint64_t contentRevision = 0;
 };

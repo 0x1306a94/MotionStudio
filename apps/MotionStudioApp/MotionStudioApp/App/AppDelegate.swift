@@ -11,7 +11,10 @@ import UIKit
 class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        true
+        #if DEBUG
+            print("Application directory: \(NSHomeDirectory())")
+        #endif
+        return true
     }
 
     override func buildMenu(with builder: UIMenuBuilder) {

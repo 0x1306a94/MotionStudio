@@ -1,72 +1,72 @@
-# Playback CPU Optimization Design
+# 播放预览 CPU 优化设计
 
-> Branch: `feature/0x1306a94_playback_cpu`  
-> Related: [libpag-rendering-optimization-notes.md](../../libpag-rendering-optimization-notes.md)  
-> Date: 2026-07-29  
-> Process: implement Phase 1 → user manual verify → Phase 2 → verify → Phase 3 → verify
+> 分支：`feature/0x1306a94_playback_cpu`  
+> 相关文档：[libpag-rendering-optimization-notes.md](../../libpag-rendering-optimization-notes.md)  
+> 日期：2026-07-29  
+> 流程：实现 Phase 1 → 用户手测 → Phase 2 → 手测 → Phase 3 → 手测
 
-## Goals
+## 目标
 
-Reduce CPU during continuous canvas playback, borrowing libpag ideas (quantize frames, skip unchanged work, avoid editor chrome on the hot path, then cache / snapshot).
+降低画布持续播放时的 CPU，借鉴 libpag：量化帧、跳过未变化工作、热路径去掉编辑 chrome，再做缓存 / Snapshot。
 
-Non-goals for this branch:
+本分支不做：
 
-- tgfx DisplayList Partial/Tiled dirty regions
-- Full AE-style `excludeVaryingRanges` across all properties
-- Disk cache / video sequence pipeline
+- tgfx DisplayList 的 Partial / Tiled 脏区绘制
+- 完整 AE 式全属性 `excludeVaryingRanges`
+- 磁盘缓存 / 视频序列管线
 
-## Confirmed defaults
+## 已确认默认取舍
 
-| Decision | Choice |
+| 决策 | 选择 |
 |---|---|
-| Playback time sampling | Quantize to **content integer frames** (`floor`) |
-| Scrub / paused preview | Keep existing sub-frame (`double` frameTime) APIs |
-| Editor chrome while playing | **Do not build/draw** selection / path-edit / motion-path chrome |
-| Delivery | Three phases; stop after each for manual verification |
-| Placement | Phase 1 mostly bridge + Swift; Phase 2/3 add Core/adapter cache |
+| 播放时时间采样 | 量化到**内容整数帧**（`floor`） |
+| 拖拽时间轴 / 暂停预览 | 保留现有亚帧（`double` frameTime）API |
+| 播放时编辑 chrome | **不构建、不绘制**选中框 / path-edit / motion-path |
+| 交付方式 | 三阶段；每阶段结束后停手测 |
+| 改动落点 | Phase 1 主要在 bridge + Swift；Phase 2/3 再加 Core/adapter 缓存 |
 
-## Constraint: MTKView drawables
+## 约束：MTKView drawable
 
-Each `MTKView` `draw(in:)` acquires a **new** drawable. Skipping `beginFrame`/`endFrame` without presenting previous pixels produces a blank frame. Therefore:
+每次 `MTKView` 的 `draw(in:)` 都会拿到**新的** drawable。若跳过 `beginFrame`/`endFrame` 又不提交上一帧像素，会黑屏。因此：
 
-- “Skip” cannot mean “return without touching GPU” unless we blit a retained last-frame texture, **or** we simply do not get a draw callback for that display tick.
-- Phase 1 primary lever is **align display callback rate with content frame rate** + integer evaluation, so most callbacks do real unique work at content fps instead of 60× sub-frame full pipelines.
-- True “same key → blit last frame” is Phase 1 optional stretch if rate alignment alone is insufficient; Phase 2 command reuse still runs a cheap present path.
+- 「跳过」不能简单等于「完全不碰 GPU」，除非 blit 保留的上一帧纹理，或本显示周期根本不进 draw 回调。
+- Phase 1 的主杠杆是：**显示回调帧率对齐内容帧率** + 整数帧求值，避免 60× 亚帧全量管线。
+- 「同 key → blit 上一帧」作为 Phase 1 可选加强；若仅靠帧率对齐已够用可暂缓。Phase 2 的命令复用仍会走一次轻量 present。
 
 ---
 
-## Phase 1 — P0: Quantize, rate align, chrome off, cheap skip
+## Phase 1 — P0：量化帧、对齐刷新、关掉 chrome、廉价跳过
 
-### 1.1 Behavior
+### 1.1 行为
 
-**Playing**
+**播放中**
 
-1. `preferredFramesPerSecond = max(1, Int(frameRate.rounded()))` (no longer force up to 60).
-2. Canvas draw uses **integer** frame: `Int64(floor(previewFrame))` via `ms_canvas_draw_frame` / profiled int API (not `*_at_time` with fractional time).
-3. Editor chrome omitted on the draw path (selection outline, path overlays from edit target, motion-path chrome). Custom debug overlays policy: also off while playing (simplest).
-4. Bridge records last draw key; if key matches **and** a retained last-frame image exists, blit + present only (no evaluate/build/play of scene). If no retained image yet, full draw once and retain.
+1. `preferredFramesPerSecond = max(1, Int(frameRate.rounded()))`（不再抬到 60）。
+2. 画布绘制使用**整数帧**：`Int64(floor(previewFrame))`，走 `ms_canvas_draw_frame` / 带 profile 的 int API（不用带小数的 `*_at_time`）。
+3. 绘制路径省略编辑 chrome（选中描边、path 编辑叠层、motion-path）。自定义 debug overlay：播放时一并关闭（最简）。
+4. Bridge 记录上次绘制 key；若 key 相同且已有保留的上一帧图像，则只 blit + present（不做场景 evaluate/build/play）。若尚无保留图，则完整画一次并保留。
 
-**Paused / scrubbing**
+**暂停 / 拖拽时间轴**
 
-- Unchanged: sub-frame `drawFrame(…, frameTime:)`, chrome on, `enableSetNeedsDisplay` driven redraws.
+- 行为不变：亚帧 `drawFrame(…, frameTime:)`、chrome 开启、由 `enableSetNeedsDisplay` 驱动重绘。
 
-### 1.2 API / interface sketch
+### 1.2 API / 接口草案
 
 ```c
 // motionstudio_bridge.h
 
 typedef CF_CLOSED_ENUM(int, MS_CANVAS_DRAW_MODE) {
-    MS_CANVAS_DRAW_MODE_EDIT = 0,      // chrome on, caller may pass fractional time
-    MS_CANVAS_DRAW_MODE_PLAYBACK = 1,  // chrome off; prefer integer frame APIs
+    MS_CANVAS_DRAW_MODE_EDIT = 0,      // 开启 chrome；调用方可传小数时间
+    MS_CANVAS_DRAW_MODE_PLAYBACK = 1,  // 关闭 chrome；优先走整数帧 API
 };
 
 void ms_canvas_set_draw_mode(MSCanvas *canvas, MS_CANVAS_DRAW_MODE mode);
 
-// Content generation from Swift @Observable revision (bridge has no revision today).
+// 内容世代：来自 Swift @Observable 的 revision（bridge 目前没有 revision）。
 void ms_canvas_set_content_revision(MSCanvas *canvas, uint64_t revision);
 ```
 
-`MSCanvas` adds:
+`MSCanvas` 新增：
 
 ```cpp
 MS_CANVAS_DRAW_MODE drawMode = MS_CANVAS_DRAW_MODE_EDIT;
@@ -74,7 +74,7 @@ uint64_t contentRevision = 0;
 
 struct LastDrawKey {
     uint64_t compositionId;
-    int64_t frame;           // quantized
+    int64_t frame;           // 已量化
     uint64_t contentRevision;
     float zoom, panX, panY;
     int backdrop;
@@ -83,16 +83,15 @@ struct LastDrawKey {
 };
 LastDrawKey lastDrawKey{};
 bool hasLastDrawKey = false;
-// Retained by adapter or canvas: last presented snapshot for blit-skip (Phase 1.4).
+// 由 adapter 或 canvas 持有：上一帧快照，供 blit 跳过（见 1.4）。
 ```
 
-### 1.3 Pseudocode
+### 1.3 伪代码
 
 ```
 Swift configurePlayback(playing):
-  metalView.preferredFramesPerSecond =
-      playing ? max(1, Int(frameRate.rounded())) : max(1, Int(frameRate.rounded()))
-  ms_canvas_set_draw_mode(playback | edit)
+  metalView.preferredFramesPerSecond = max(1, Int(frameRate.rounded()))
+  ms_canvas_set_draw_mode(playing ? PLAYBACK : EDIT)
   ms_canvas_set_content_revision(core.revision)
 
 Swift draw(in:):
@@ -102,125 +101,127 @@ Swift draw(in:):
   else:
       ms_canvas_draw_frame_at_time_profiled(..., previewFrame, &profile)
 
-Bridge ms_canvas_draw_frame_at_time_profiled / int entry:
+Bridge 整数帧 / at_time 入口:
   key = MakeKey(...)
   if drawMode == PLAYBACK:
-      suppress chrome builders
+      抑制 chrome 构建
   if hasLastDrawKey && key == lastDrawKey && adapter->blitLastFrameIfPossible():
-      profile.drewFrame = false  // or true with "blitted" flag — use drewFrame=false, add skippedDuplicate
+      profile.drewFrame = false  // 表示跳过了完整场景绘制
       return
-  EvaluatePreview(time)  // int path: PreviewTime(frame)
-  BuildCommands(scene) only
-  if !PLAYBACK: build chrome commands
-  begin/play/end
+  EvaluatePreview(time)  // 整数路径：PreviewTime(frame)
+  BuildCommands(scene)
+  if !PLAYBACK: 构建 chrome 命令
+  begin / play / end
   adapter->retainLastFrameForBlit()
   lastDrawKey = key
 ```
 
-### 1.4 Blit-skip (minimal)
+### 1.4 Blit 跳过（最小实现）
 
-Prefer implementing blit via existing tgfx surface snapshot if cheap in `TgfxCanvasAdapter`; if that proves invasive in Phase 1, **ship without blit** and rely on rate alignment + chrome off + integer frames only. Document in Phase 1 PR which of the two landed.
+优先在 `TgfxCanvasAdapter` 用现有 tgfx surface snapshot 做 blit；若 Phase 1 侵入过大，则**不带 blit 先交付**，只靠帧率对齐 + 关 chrome + 整数帧。Phase 1 提交说明里写清落地的是哪一种。
 
-Acceptance without blit is still a large win: 60× sub-frame → ~content-fps integer frames, no chrome.
+无 blit 也可接受：从约 60× 亚帧降到约内容帧率整数帧，且无 chrome，收益已经很大。
 
-### 1.5 Files (expected)
+**Phase 1 落地结果（2026-07-29）：未实现 blit。** 交付内容为内容帧率对齐 + 整数帧求值 + `PLAYBACK` 关闭 chrome；`content_revision` API 已预留供 Phase 2 使用。
+
+### 1.5 预期改动文件
 
 - `bridge/include/motionstudio_bridge.h`
 - `bridge/src/common/MSCanvas.h`
 - `bridge/src/common/motionstudio_bridge_canvas.cpp`
-- `bridge/tests/BridgeTest.cpp` (draw mode chrome suppressed; revision/frame skip if blit present)
+- `bridge/tests/BridgeTest.cpp`（draw mode 抑制 chrome；若有 blit 则测 revision/帧跳过）
 - `apps/.../CanvasViewController.swift`
-- `apps/.../MotionDocumentCore.swift` (thin wrappers if needed)
-- Optionally `adapter/tgfx/...` for blit retain
+- `apps/.../MotionDocumentCore.swift`（如需薄封装）
+- 可选：`adapter/tgfx/...`（blit 保留）
 
-### 1.6 Manual verify checklist (user)
+### 1.6 手测清单（用户）
 
-- [ ] Play a simple animated comp: playhead advances, motion looks stepped at content fps (acceptable).
-- [ ] Activity Monitor / Instruments: CPU clearly lower vs `develop` on same file.
-- [ ] Pause: selection handles / motion path chrome return.
-- [ ] Scrub timeline: sub-frame smoothness unchanged if previously present.
-- [ ] Resize / zoom / pan during play: canvas updates correctly (key invalidates).
-- [ ] Undo during pause then play: content not stale.
+- [ ] 播放简单动画合成：播放头前进，运动呈内容帧率步进（可接受）。
+- [ ] Activity Monitor / Instruments：同文件下 CPU 明显低于 `develop`。
+- [ ] 暂停后：选中手柄 / motion path chrome 恢复。
+- [ ] 拖拽时间轴：亚帧观感与改前一致（若原先就有）。
+- [ ] 播放中缩放 / 平移 / 改窗口：画面正确更新（key 失效）。
+- [ ] 暂停时 undo 再播放：内容不陈旧。
 
-### 1.7 Tests
+### 1.7 测试
 
-- Bridge: `PLAYBACK` mode does not emit selection/motion-path commands (inspect profile `drawCommandCount` or test hook).
-- Bridge: two draws same key → second reports `drewFrame == false` when blit path exists; otherwise document skip as Swift-rate-only.
+- Bridge：`PLAYBACK` 模式不产生选中 / motion-path 命令（查 profile 的 `drawCommandCount` 或测试钩子）。
+- Bridge：同一 key 连续画两次 → 第二次在有 blit 时 `drewFrame == false`；若无 blit，则在说明里写明仅依赖 Swift 侧帧率对齐。
 
 ---
 
-## Phase 2 — P1: Cross-frame SceneState / DrawCommand reuse
+## Phase 2 — P1：跨帧复用 SceneState / DrawCommand
 
-### 2.1 Behavior
+### 2.1 行为
 
-After Phase 1, when a quantized frame is drawn again (loop, scrub back, duplicate callback):
+Phase 1 之后，同一量化帧再次绘制时（循环、回拖、重复回调）：
 
-- Reuse last `DrawCommandList` (and optionally `SceneState`) for that key instead of evaluate+build.
-- Still `PlayCommands` + present (unless Phase 1 blit handles identical key).
+- 按 key 复用上次的 `DrawCommandList`（可选连同 `SceneState`），跳过 evaluate+build。
+- 仍执行 `PlayCommands` + present（若 Phase 1 blit 已处理同 key，则可继续走 blit）。
 
-Optional stretch: **hold-segment mapping** — if all sampled animatables are static between floor frames in a range, map to one cache key (simple hold detection only; not full libpag static ranges).
+可选加强：**hold 段映射**——若区间内采样到的 animatable 皆静态，多帧映射同一 cache key（仅简单 hold 检测，不做完整 libpag 静帧区间）。
 
-### 2.2 Interface sketch
+### 2.2 接口草案
 
 ```cpp
-// Core or bridge-owned helper
+// Core 或 bridge 持有的辅助类
 class FrameCommandCache {
-  struct Key { uint64_t compositionId; int64_t frame; uint64_t revision; /* view not in key for scene */ };
+  struct Key { uint64_t compositionId; int64_t frame; uint64_t revision; /* 场景 key 不含视图变换 */ };
   struct Entry { SceneState state; DrawCommandList commands; };
   std::optional<Entry> find(const Key&);
   void put(Key, Entry);
-  void clear(); // on revision change
+  void clear(); // revision 变化时清空
 };
 ```
 
-View transform stays outside the scene cache (applied in adapter beginFrame). Chrome remains mode-gated from Phase 1.
+视图变换仍在 adapter `beginFrame` 应用，不进场景缓存。Chrome 继续由 Phase 1 的 draw mode 控制。
 
-### 2.3 Manual verify
+### 2.3 手测
 
-- [ ] Looping playback: CPU stable/lower on second loop.
-- [ ] Edit layer mid-pause, play: no stale frames.
-- [ ] Precomp / nested time still correct.
-
----
-
-## Phase 3 — P2: Static layer snapshots + image prepare
-
-### 3.1 Behavior
-
-- Layers (or whole frames) unchanged for N playback frames → rasterize to GPU texture at `cacheScale`, draw with `drawImage`.
-- LRU + memory cap (start ~20MB echo of libpag; tune later).
-- Invalidate on revision, zoom scale change beyond threshold, or layer bounds change.
-- Image layers (when present): async `prepare` decode before first use (only if image layers exist in tree).
-
-### 3.2 Manual verify
-
-- [ ] Complex static shapes / masks: CPU drop, visual parity at 100% zoom.
-- [ ] Zoom in after snapshot: no prolonged blur (invalidate / rescale).
-- [ ] Memory does not climb without bound over long play.
+- [ ] 循环播放：第二圈 CPU 更稳 / 更低。
+- [ ] 暂停中改图层再播放：无残帧。
+- [ ] Precomp / 嵌套时间仍正确。
 
 ---
 
-## Rollout & git
+## Phase 3 — P2：静态层 Snapshot + 图片预解码
 
-| Step | Action |
+### 3.1 行为
+
+- 图层（或整帧）连续 N 个播放帧未变 → 按 `cacheScale` 栅格化为 GPU 纹理，用 `drawImage` 绘制。
+- LRU + 显存上限（初值约 20MB，对齐 libpag 量级，后续再调）。
+- revision 变化、缩放超过阈值、或图层 bounds 变化时失效。
+- 图片层（若场景中有）：首次使用前异步 `prepare` 解码。
+
+### 3.2 手测
+
+- [ ] 复杂静态形状 / mask：CPU 下降，100% 缩放下观感一致。
+- [ ] Snapshot 后放大：不长时间发糊（应失效 / 重烘焙）。
+- [ ] 长时间播放显存不无界上涨。
+
+---
+
+## 落地与 Git
+
+| 步骤 | 动作 |
 |---|---|
-| 0 | Branch `feature/0x1306a94_playback_cpu` from `develop` |
-| 1 | Land this design + analysis notes |
-| 2 | Implement Phase 1 → commit → **user verifies** |
-| 3 | Implement Phase 2 → commit → **user verifies** |
-| 4 | Implement Phase 3 → commit → **user verifies** |
-| 5 | PR to `develop` when all phases accepted |
+| 0 | 从 `develop` 拉出 `feature/0x1306a94_playback_cpu` |
+| 1 | 合入本设计与分析笔记 |
+| 2 | 实现 Phase 1 → commit → **用户手测** |
+| 3 | 实现 Phase 2 → commit → **用户手测** |
+| 4 | 实现 Phase 3 → commit → **用户手测** |
+| 5 | 全部通过后向 `develop` 开 PR |
 
-No push unless user asks.
+除非用户要求，不自动 push。
 
-## Risk notes
+## 风险
 
-- Integer-frame play looks less smooth on 60Hz displays for slow moves — accepted for Phase 1; optional 2× rate can be a later flag.
-- Hiding chrome while playing may surprise if user expects live handles — accepted; pause restores.
-- Blit path complexity: droppable in Phase 1 if adapter work balloons.
+- 整数帧播放在 60Hz 屏上慢动作会有步进感——Phase 1 接受；若需更顺可后续加 2× 帧率开关。
+- 播放时隐藏 chrome，若用户期望实时手柄会不习惯——接受；暂停即恢复。
+- Blit 路径若过重，Phase 1 可砍掉。
 
-## Success metrics
+## 成功指标
 
-- Phase 1: playback CPU ≪ current on ProMotion (target: roughly proportional to content fps / 60 for the evaluate+build portion).
-- Phase 2: second loop / repeated frames show near-zero evaluate+build time in `MSCanvasFrameProfile`.
-- Phase 3: static-heavy comps show play path dominated by present, not path tessellation.
+- Phase 1：ProMotion 上播放 CPU 明显低于现状（evaluate+build 大致随 内容帧率/60 下降）。
+- Phase 2：第二圈 / 重复帧在 `MSCanvasFrameProfile` 中 evaluate+build 接近 0。
+- Phase 3：静态为主的合成，播放热点在 present，而非 path 三角化。

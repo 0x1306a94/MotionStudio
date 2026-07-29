@@ -89,13 +89,39 @@ void ms_canvas_destroy(MSCanvas *canvas) {
     delete canvas;
 }
 
+void ms_canvas_set_draw_mode(MSCanvas *canvas, MS_CANVAS_DRAW_MODE mode) {
+    if (canvas == nullptr) {
+        return;
+    }
+    canvas->drawMode = static_cast<int>(mode);
+}
+
+MS_CANVAS_DRAW_MODE ms_canvas_get_draw_mode(const MSCanvas *canvas) {
+    if (canvas == nullptr) {
+        return MS_CANVAS_DRAW_MODE_EDIT;
+    }
+    return static_cast<MS_CANVAS_DRAW_MODE>(canvas->drawMode);
+}
+
+void ms_canvas_set_content_revision(MSCanvas *canvas, uint64_t revision) {
+    if (canvas == nullptr) {
+        return;
+    }
+    canvas->contentRevision = revision;
+}
+
+uint64_t ms_canvas_get_content_revision(const MSCanvas *canvas) {
+    if (canvas == nullptr) {
+        return 0;
+    }
+    return canvas->contentRevision;
+}
+
 void ms_canvas_set_preview_backdrop(MSCanvas *canvas, MS_PREVIEWER_BACKDROP backdrop) {
     if (canvas == nullptr || canvas->adapter == nullptr) {
         return;
     }
-    const auto mode = backdrop == MS_PREVIEWER_BACKDROP_TRANSPARENT
-        ? motion::PreviewBackdrop::Transparent
-        : motion::PreviewBackdrop::Black;
+    const auto mode = backdrop == MS_PREVIEWER_BACKDROP_TRANSPARENT ? motion::PreviewBackdrop::Transparent : motion::PreviewBackdrop::Black;
     canvas->adapter->setPreviewBackdrop(mode);
 }
 
@@ -123,8 +149,7 @@ void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, s
     }
 }
 
-void ms_canvas_set_path_edit_target(MSCanvas *canvas, MS_PATH_EDIT kind, uint64_t layerId,
-                                    int maskIndex, int selectedVertex) {
+void ms_canvas_set_path_edit_target(MSCanvas *canvas, MS_PATH_EDIT kind, uint64_t layerId, int maskIndex, int selectedVertex) {
     if (canvas == nullptr) {
         return;
     }
@@ -135,8 +160,7 @@ void ms_canvas_set_path_edit_target(MSCanvas *canvas, MS_PATH_EDIT kind, uint64_
         return;
     }
     canvas->hasPathEditTarget = true;
-    canvas->pathEditTarget.kind =
-        kind == MS_PATH_EDIT_MASK ? motion::PathEditKind::Mask : motion::PathEditKind::Shape;
+    canvas->pathEditTarget.kind = kind == MS_PATH_EDIT_MASK ? motion::PathEditKind::Mask : motion::PathEditKind::Shape;
     canvas->pathEditTarget.layerId = EntityId{layerId};
     canvas->pathEditTarget.maskIndex = maskIndex;
     canvas->pathEditSelectedVertex = selectedVertex;
@@ -161,9 +185,7 @@ void ms_canvas_set_path_overlays(MSCanvas *canvas, const MSPathOverlayItem *item
     }
 }
 
-MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
-                                      uint64_t compositionId, double frameTime, float sceneX,
-                                      float sceneY) {
+MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, float sceneX, float sceneY) {
     MSPathEditHit hit{};
     hit.kind = MS_PATH_HANDLE_NONE;
     if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr ||
@@ -171,32 +193,27 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document,
         return hit;
     }
     DocumentLock guard(document);
-    auto result = motion::SceneEvaluator::EvaluatePreview(
-        *document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
     if (!result.hasValue()) {
         return hit;
     }
     const motion::SceneState &state = result.value();
     motion::PathEditHandles handles;
-    if (!motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex,
-                                      handles)) {
+    if (!motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
         return hit;
     }
-    const float viewUnit =
-        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
     // Vertex chrome is ~7pt; keep hit close so mid-edge insert still works.
     const float handleRadius = 8.0f * viewUnit;
     const float segmentRadius = 6.0f * viewUnit;
-    const motion::PathEditHit coreHit =
-        motion::HitTestPathEdit(handles, {sceneX, sceneY}, handleRadius, segmentRadius);
+    const motion::PathEditHit coreHit = motion::HitTestPathEdit(handles, {sceneX, sceneY}, handleRadius, segmentRadius);
     hit.kind = ToMSPathHandle(coreHit.kind);
     hit.index = coreHit.index;
     hit.segmentT = coreHit.segmentT;
     return hit;
 }
 
-void ms_canvas_set_motion_path_selection(MSCanvas *canvas, uint64_t layerId,
-                                         int selectedKeyframe) {
+void ms_canvas_set_motion_path_selection(MSCanvas *canvas, uint64_t layerId, int selectedKeyframe) {
     if (canvas == nullptr) {
         return;
     }
@@ -209,9 +226,7 @@ void ms_canvas_set_motion_path_selection(MSCanvas *canvas, uint64_t layerId,
     canvas->motionPathSelectedKeyframe = selectedKeyframe;
 }
 
-MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document,
-                                          uint64_t compositionId, double frameTime, float sceneX,
-                                          float sceneY) {
+MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, float sceneX, float sceneY) {
     MSMotionPathHit hit{};
     hit.kind = MS_MOTION_PATH_HANDLE_NONE;
     if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr ||
@@ -219,14 +234,12 @@ MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document
         return hit;
     }
     DocumentLock guard(document);
-    auto result = motion::SceneEvaluator::EvaluatePreview(
-        *document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
     if (!result.hasValue()) {
         return hit;
     }
     const motion::SceneState &state = result.value();
-    const float viewUnit =
-        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
     const float handleRadius = 8.0f * viewUnit;
 
     // Prefer the layer with an active keyframe selection, then walk selected layers.
@@ -242,16 +255,12 @@ MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document
     }
 
     for (EntityId layerId : order) {
-        const int selectedKeyframe =
-            layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
+        const int selectedKeyframe = layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
         motion::MotionPathChrome chrome;
-        if (!motion::BuildMotionPathChrome(*document->document, layerId,
-                                           motion::PreviewTime(frameTime), selectedKeyframe,
-                                           chrome)) {
+        if (!motion::BuildMotionPathChrome(*document->document, layerId, motion::PreviewTime(frameTime), selectedKeyframe, chrome)) {
             continue;
         }
-        const motion::MotionPathHit coreHit =
-            motion::HitTestMotionPath(chrome, {sceneX, sceneY}, handleRadius);
+        const motion::MotionPathHit coreHit = motion::HitTestMotionPath(chrome, {sceneX, sceneY}, handleRadius);
         if (coreHit.kind == motion::MotionPathHandleKind::None) {
             continue;
         }
@@ -264,43 +273,30 @@ MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document
     return hit;
 }
 
-void ms_command_motion_path_drag_tangent(MSDocument *document, uint64_t layerId, int keyframeIndex,
-                                         bool isOut, float sceneX, float sceneY,
-                                         double frameTime) {
+void ms_command_motion_path_drag_tangent(MSDocument *document, uint64_t layerId, int keyframeIndex, bool isOut, float sceneX, float sceneY, double frameTime) {
     if (document == nullptr || layerId == 0 || keyframeIndex < 0) {
         return;
     }
     DocumentLock guard(document);
     motion::MotionPathChrome chrome;
-    if (!motion::BuildMotionPathChrome(*document->document, EntityId{layerId},
-                                       motion::PreviewTime(frameTime), keyframeIndex, chrome)) {
+    if (!motion::BuildMotionPathChrome(*document->document, EntityId{layerId}, motion::PreviewTime(frameTime), keyframeIndex, chrome)) {
         return;
     }
-    const auto updates = motion::MotionPathTangentDragUpdates(
-        *document->document, EntityId{layerId}, static_cast<size_t>(keyframeIndex), isOut,
-        {sceneX, sceneY}, chrome.parentWorldTransform);
+    const auto updates = motion::MotionPathTangentDragUpdates(*document->document, EntityId{layerId}, static_cast<size_t>(keyframeIndex), isOut, {sceneX, sceneY}, chrome.parentWorldTransform);
     for (const motion::MotionPathSpatialUpdate &update : updates) {
-        bridge::Execute(document,
-                        std::make_unique<motion::SetSpatialTangentsCommand>(
-                            motion::PropertyPath{EntityId{layerId}, "transform.position"},
-                            update.time, update.spatialIn, update.spatialOut));
+        bridge::Execute(document, std::make_unique<motion::SetSpatialTangentsCommand>(motion::PropertyPath{EntityId{layerId}, "transform.position"}, update.time, update.spatialIn, update.spatialOut));
     }
 }
 
-void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
-                          int64_t frame) {
+void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame) {
     ms_canvas_draw_frame_profiled(canvas, document, compositionId, frame, nullptr);
 }
 
-void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId,
-                                   int64_t frame, MSCanvasFrameProfile *profileOut) {
-    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId,
-                                          static_cast<double>(frame), profileOut);
+void ms_canvas_draw_frame_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame, MSCanvasFrameProfile *profileOut) {
+    ms_canvas_draw_frame_at_time_profiled(canvas, document, compositionId, static_cast<double>(frame), profileOut);
 }
 
-void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document,
-                                           uint64_t compositionId, double frameTime,
-                                           MSCanvasFrameProfile *profileOut) {
+void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, MSCanvasFrameProfile *profileOut) {
     MSCanvasFrameProfile profile{};
     const auto totalStart = ProfileClock::now();
     const auto lockStart = ProfileClock::now();
@@ -317,8 +313,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     }
 
     const auto evaluateStart = ProfileClock::now();
-    auto result = motion::SceneEvaluator::EvaluatePreview(
-        *document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
     const auto evaluateEnd = ProfileClock::now();
     profile.sceneEvaluateMs = Milliseconds(evaluateStart, evaluateEnd);
     if (!result.hasValue()) {
@@ -333,60 +328,50 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
     const auto buildStart = ProfileClock::now();
     motion::DrawCommandList commands = motion::BuildCommands(state);
-    const float viewUnit =
-        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
-    const float outlineWidth = 1.5f * viewUnit;
-    const float handleSize = 7.0f * viewUnit;
-    constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
-    std::vector<motion::PathOverlayItem> pathOverlays =
-        motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
-    pathOverlays.insert(pathOverlays.end(), canvas->customPathOverlays.begin(),
-                        canvas->customPathOverlays.end());
-    motion::DrawCommandList pathOverlayCommands =
-        motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
-
+    motion::DrawCommandList pathOverlayCommands;
     motion::DrawCommandList pathEditCommands;
-    if (canvas->hasPathEditTarget) {
-        motion::PathEditHandles handles;
-        if (motion::BuildPathEditHandles(state, canvas->pathEditTarget,
-                                         canvas->pathEditSelectedVertex, handles)) {
-            pathEditCommands = motion::BuildPathEditCommands(handles, outlineWidth, handleSize);
-        }
-    }
-
     motion::DrawCommandList motionPathCommands;
-    if (!canvas->hasPathEditTarget) {
-        for (EntityId layerId : canvas->selectedLayerIds) {
-            const int selectedKeyframe =
-                layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
-            motion::MotionPathChrome chrome;
-            if (!motion::BuildMotionPathChrome(*document->document, layerId,
-                                               motion::PreviewTime(frameTime), selectedKeyframe,
-                                               chrome)) {
-                continue;
-            }
-            motion::DrawCommandList layerCommands =
-                motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
-            motionPathCommands.insert(motionPathCommands.end(), layerCommands.begin(),
-                                      layerCommands.end());
-        }
-    }
-
     motion::DrawCommandList selectionCommands;
-    if (!canvas->hasPathEditTarget) {
-        const motion::EntityId primaryLayerId =
-            canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
-        selectionCommands = motion::BuildSelectionOutlineCommands(
-            state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize);
+    const bool buildEditorChrome = canvas->drawMode != static_cast<int>(MS_CANVAS_DRAW_MODE_PLAYBACK);
+    if (buildEditorChrome) {
+        const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+        const float outlineWidth = 1.5f * viewUnit;
+        const float handleSize = 7.0f * viewUnit;
+        constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
+        std::vector<motion::PathOverlayItem> pathOverlays = motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
+        pathOverlays.insert(pathOverlays.end(), canvas->customPathOverlays.begin(), canvas->customPathOverlays.end());
+        pathOverlayCommands = motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
+
+        if (canvas->hasPathEditTarget) {
+            motion::PathEditHandles handles;
+            if (motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
+                pathEditCommands = motion::BuildPathEditCommands(handles, outlineWidth, handleSize);
+            }
+        }
+
+        if (!canvas->hasPathEditTarget) {
+            for (EntityId layerId : canvas->selectedLayerIds) {
+                const int selectedKeyframe = layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
+                motion::MotionPathChrome chrome;
+                if (!motion::BuildMotionPathChrome(*document->document, layerId, motion::PreviewTime(frameTime), selectedKeyframe, chrome)) {
+                    continue;
+                }
+                motion::DrawCommandList layerCommands = motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
+                motionPathCommands.insert(motionPathCommands.end(), layerCommands.begin(), layerCommands.end());
+            }
+        }
+
+        if (!canvas->hasPathEditTarget) {
+            const motion::EntityId primaryLayerId = canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
+            selectionCommands = motion::BuildSelectionOutlineCommands(state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize);
+        }
     }
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
-    profile.drawCommandCount = commands.size() + pathOverlayCommands.size() +
-        pathEditCommands.size() + motionPathCommands.size() + selectionCommands.size();
+    profile.drawCommandCount = commands.size() + pathOverlayCommands.size() + pathEditCommands.size() + motionPathCommands.size() + selectionCommands.size();
 
     const auto beginFrameStart = ProfileClock::now();
-    canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight, state.backgroundColor,
-                                state.cornerRadius);
+    canvas->adapter->beginFrame(state.viewportWidth, state.viewportHeight, state.backgroundColor, state.cornerRadius);
     const auto beginFrameEnd = ProfileClock::now();
     profile.beginFrameMs = Milliseconds(beginFrameStart, beginFrameEnd);
 

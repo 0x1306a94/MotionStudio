@@ -567,10 +567,24 @@ TEST(BridgeTest, NullHandlesAreSafe) {
     EXPECT_EQ(ms_layer_name(nullptr, 1), nullptr);
     EXPECT_EQ(ms_document_load(nullptr, 0, nullptr), nullptr);
     ms_canvas_draw_frame(nullptr, nullptr, 0, 0);
+    ms_canvas_set_draw_mode(nullptr, MS_CANVAS_DRAW_MODE_PLAYBACK);
+    EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
+    ms_canvas_set_content_revision(nullptr, 7);
+    EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
     ms_command_add_keyframe_float(nullptr, 0, "transform.position", 0, 0.0f);
     ms_command_add_stroke_style(nullptr, 0);
     ms_command_set_stroke_position(nullptr, 0, 0, MS_STROKE_POSITION_INSIDE);
     EXPECT_EQ(ms_layer_style_stroke_position_at(nullptr, 0, 0), MS_STROKE_POSITION_INVALID);
+}
+
+TEST(BridgeCanvasTest, DrawModeApiNullSafe) {
+    // Full canvas create needs Metal; getters on null document the defaults.
+    EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
+    EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
+    ms_canvas_set_draw_mode(nullptr, MS_CANVAS_DRAW_MODE_PLAYBACK);
+    ms_canvas_set_content_revision(nullptr, 99);
+    EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
+    EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
 }
 
 TEST(BridgeCommandTest, StrokeStyleLifecycle) {

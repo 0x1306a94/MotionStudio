@@ -11,9 +11,16 @@
         "third_party/tgfx/ios/**",
         "third_party/tgfx/mac/**",
         "third_party/tgfx/src/**",
-        "third_party/tgfx/test/**"
+        "third_party/tgfx/test/**",
+        "third_party/libpag/exporter/**",
+        "third_party/libpag/viewer/**",
+        "third_party/libpag/include/**",
+        "third_party/libpag/src/**",
+        "third_party/libpag/test/**"
     ],
     "exclude": [
-        "third_party/tgfx/third_party/**"
+        "third_party/tgfx/third_party/**",
+        "third_party/libpag/tgfx/**",
+        "third_party/libpag/third_party/**"
     ]
 }

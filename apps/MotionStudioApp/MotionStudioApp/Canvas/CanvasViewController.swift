@@ -327,11 +327,20 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             }
             canvas = created
             ms_canvas_set_view_transform(created, Float(canvasZoom), Float(canvasPan.x), Float(canvasPan.y))
+            ms_canvas_set_draw_mode(created, isPlaying ? .PLAYBACK : .EDIT)
         }
         guard let canvas else { return }
         updateSelectionOutline()
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop)
-        let profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
+        ms_canvas_set_content_revision(canvas, UInt64(document.core.revision))
+        ms_canvas_set_draw_mode(canvas, isPlaying ? .PLAYBACK : .EDIT)
+        let profile: CanvasFrameProfile
+        if isPlaying {
+            let frame = Int64(previewFrame.rounded(.down))
+            profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frame: frame)
+        } else {
+            profile = document.core.drawFrameProfiled(canvas: canvas, compositionID: compositionID, frameTime: previewFrame)
+        }
         // Reveal only after the first frame is presented; an empty CAMetalLayer
         // would otherwise flash black.
         metalView.isHidden = false
@@ -345,11 +354,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     // MARK: - Playback
 
     private func configurePlayback(_ playing: Bool, wasPlaying: Bool) {
-        let preferredFramesPerSecond = playing ? displayFramesPerSecond() : max(1, Int(frameRate.rounded()))
+        // Align display callbacks with content frame rate so playback does not
+        // evaluate unique sub-frames at 60/120Hz.
+        let preferredFramesPerSecond = max(1, Int(frameRate.rounded()))
         metalView.preferredFramesPerSecond = preferredFramesPerSecond
         playbackFramesPerSecond = Double(preferredFramesPerSecond)
         metalView.enableSetNeedsDisplay = !playing
         metalView.isPaused = !playing
+        if let canvas {
+            ms_canvas_set_draw_mode(canvas, playing ? .PLAYBACK : .EDIT)
+        }
         if playing {
             if !wasPlaying {
                 lastPlaybackDrawTime = nil
@@ -360,14 +374,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         } else if wasPlaying {
             lastPlaybackDrawTime = nil
         }
-    }
-
-    private func displayFramesPerSecond() -> Int {
-        let screen = view.window?.screen ?? UIScreen.main
-        // Sub-frame interpolation produces unique shape content every draw, so
-        // tgfx's content-keyed shape cache never hits across draws; cap playback
-        // to 60fps to bound mask rasterization cost on ProMotion (120Hz) displays.
-        return max(Int(frameRate.rounded()), min(screen.maximumFramesPerSecond, 60))
     }
 
     private func advancePlayheadForDraw(at drawTime: CFTimeInterval) {
