@@ -36,6 +36,7 @@ typedef struct MSCanvas MSCanvas;
 
 typedef struct MSCanvasFrameProfile {
     bool drewFrame;
+    bool usedFrameCache;
     uint64_t layerCount;
     uint64_t drawCommandCount;
     double totalMs;

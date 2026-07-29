@@ -340,6 +340,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
             profile.sceneEvaluateMs = 0.0;
             profile.buildCommandsMs = 0.0;
             profile.drawCommandCount = commands.size();
+            profile.usedFrameCache = true;
             usedFrameCache = true;
         }
     }

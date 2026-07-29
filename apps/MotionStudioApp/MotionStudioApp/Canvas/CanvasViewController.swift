@@ -41,6 +41,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var profileStatsStartTime: CFTimeInterval = 0
     private var profileFrameCount: Int = 0
     private var profileDroppedFrameCount: Int = 0
+    private var profileFrameCacheHitCount: Int = 0
     private var profileTotalRenderMilliseconds: Double = 0
     private var profileMaxRenderMilliseconds: Double = 0
     private var profileMaxDrawGapMilliseconds: Double = 0
@@ -1350,6 +1351,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             }
             profileFrameCount += 1
             profileDroppedFrameCount += currentSkippedFrames
+            if profile.usedFrameCache {
+                profileFrameCacheHitCount += 1
+            }
             profileTotalRenderMilliseconds += profile.totalMilliseconds
             profileMaxRenderMilliseconds = max(profileMaxRenderMilliseconds, profile.totalMilliseconds)
             profileMaxDrawGapMilliseconds = max(profileMaxDrawGapMilliseconds, currentDrawGapMilliseconds)
@@ -1360,7 +1364,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             let elapsed = max(now - profileStatsStartTime, 0.001)
             let observedFramesPerSecond = Double(profileFrameCount) / elapsed
             let averageRenderMilliseconds = profileTotalRenderMilliseconds / Double(max(profileFrameCount, 1))
-            print(String(format: "Canvas profile %.2fs: draw fps %.1f, frames %d, skipped %d, gap max %.2f ms, render avg %.2f max %.2f (budget %.2f), last render %.2f, publish %.2f, layers %d, commands %d",
+            let cacheMissCount = profileFrameCount - profileFrameCacheHitCount
+            let cacheHitPercent = 100.0 * Double(profileFrameCacheHitCount) / Double(max(profileFrameCount, 1))
+            print(String(format: "Canvas profile %.2fs: draw fps %.1f, frames %d, skipped %d, gap max %.2f ms, render avg %.2f max %.2f (budget %.2f), last render %.2f, publish %.2f, layers %d, commands %d, cache hit %d miss %d (%.0f%%), last %@, eval %.2f build %.2f",
                          elapsed,
                          observedFramesPerSecond,
                          profileFrameCount,
@@ -1372,7 +1378,13 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                          profile.totalMilliseconds,
                          currentPublishMilliseconds,
                          profile.layerCount,
-                         profile.drawCommandCount))
+                         profile.drawCommandCount,
+                         profileFrameCacheHitCount,
+                         cacheMissCount,
+                         cacheHitPercent,
+                         profile.usedFrameCache ? "HIT" : "MISS",
+                         profile.sceneEvaluateMilliseconds,
+                         profile.buildCommandsMilliseconds))
             resetProfileStats()
         #endif
     }
@@ -1381,6 +1393,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         profileStatsStartTime = 0
         profileFrameCount = 0
         profileDroppedFrameCount = 0
+        profileFrameCacheHitCount = 0
         profileTotalRenderMilliseconds = 0
         profileMaxRenderMilliseconds = 0
         profileMaxDrawGapMilliseconds = 0

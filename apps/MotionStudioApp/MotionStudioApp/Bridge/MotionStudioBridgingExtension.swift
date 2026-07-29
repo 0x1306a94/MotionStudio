@@ -266,6 +266,7 @@ struct MotionColor: Equatable {
 
 struct CanvasFrameProfile: Equatable {
     let drewFrame: Bool
+    let usedFrameCache: Bool
     let layerCount: Int
     let drawCommandCount: Int
     let totalMilliseconds: Double
@@ -282,6 +283,7 @@ struct CanvasFrameProfile: Equatable {
 
     init(_ profile: MSCanvasFrameProfile) {
         drewFrame = profile.drewFrame
+        usedFrameCache = profile.usedFrameCache
         layerCount = Int(profile.layerCount)
         drawCommandCount = Int(profile.drawCommandCount)
         totalMilliseconds = profile.totalMs
