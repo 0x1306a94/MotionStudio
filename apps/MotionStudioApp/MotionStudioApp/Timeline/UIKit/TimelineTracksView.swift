@@ -44,6 +44,9 @@ final class TimelineTracksView: UIView {
     private var pointsPerFrame: CGFloat = pixelsPerFrame
     private var scrollX: CGFloat = 0
     private var isSyncingOffset = false
+    /// moveKeyframe bumps revision → reload; rebuild would destroy the active pan recognizer.
+    private var suspendsReload = false
+    private var needsReloadAfterInteraction = false
 
     init(document: MotionProjectState,
          editorState: EditorState,
@@ -81,20 +84,45 @@ final class TimelineTracksView: UIView {
         self.duration = duration
         self.pointsPerFrame = pointsPerFrame
         self.scrollX = scrollX
+        if suspendsReload {
+            // Do not relayout here — keyframe diamonds / property handles recreate subviews
+            // and would cancel the active pan (same failure mode as early timeRangeBar).
+            // Live visuals come from onDragMoved callbacks.
+            needsReloadAfterInteraction = true
+            return
+        }
         rebuildRows()
     }
 
     func updateHorizontalMetrics(pointsPerFrame: CGFloat, scrollX: CGFloat) {
         self.pointsPerFrame = pointsPerFrame
         self.scrollX = scrollX
+        guard !suspendsReload else {
+            return
+        }
         for rowView in rowViews {
             rowView.updateMetrics(pointsPerFrame: pointsPerFrame, scrollX: scrollX, duration: duration)
         }
     }
 
     func refreshSelectionAppearance() {
+        guard !suspendsReload else {
+            return
+        }
         for rowView in rowViews {
             rowView.refreshSelection()
+        }
+    }
+
+    fileprivate func beginInteractiveEdit() {
+        suspendsReload = true
+    }
+
+    fileprivate func endInteractiveEdit() {
+        suspendsReload = false
+        if needsReloadAfterInteraction {
+            needsReloadAfterInteraction = false
+            rebuildRows()
         }
     }
 
@@ -148,7 +176,40 @@ final class TimelineTracksView: UIView {
                 guard let self else {
                     return
                 }
+                if isDragging {
+                    beginInteractiveEdit()
+                } else {
+                    endInteractiveEdit()
+                }
                 delegate?.timelineTracksTimeRangeDraggingChanged(self, isDragging: isDragging)
+            }
+            rowView.onDragMoved = { [weak self, weak rowView] scope in
+                guard let self, let rowView else {
+                    return
+                }
+                let layerID = rowView.layerID
+                switch scope {
+                case .entireLayer:
+                    for view in rowViews where view.layerID == layerID {
+                        if view === rowView, view.isLayerRow {
+                            view.refreshTimeRangeOnly()
+                        } else if view === rowView {
+                            view.refreshContentPreservingGestures()
+                        } else {
+                            view.updateMetrics(pointsPerFrame: pointsPerFrame, scrollX: scrollX, duration: duration)
+                        }
+                    }
+                case .rowAndLayerBar:
+                    // Geometry only — full reloadContent risks cancelling property handle pan.
+                    rowView.refreshPropertySpanOnly()
+                    for view in rowViews where view.layerID == layerID && view.isLayerRow {
+                        view.refreshTimeRangeOnly()
+                    }
+                case .layerBarOnly:
+                    for view in rowViews where view.layerID == layerID && view.isLayerRow {
+                        view.refreshTimeRangeOnly()
+                    }
+                }
             }
             rowView.onPresentEasing = { [weak self] request in
                 self?.onPresentEasing?(request)
@@ -185,10 +246,29 @@ extension TimelineTracksView: UIScrollViewDelegate {
 
 // MARK: - Row
 
+private enum TimelineDragRefreshScope {
+    case entireLayer
+    case rowAndLayerBar
+    /// Keyframe diamond pan: update envelope only (rebuilding diamonds would cancel the gesture).
+    case layerBarOnly
+}
+
 @MainActor
 private final class TimelineTrackRowView: UIView {
     var onTimeRangeDraggingChanged: ((Bool) -> Void)?
+    var onDragMoved: ((TimelineDragRefreshScope) -> Void)?
     var onPresentEasing: ((TimelineEasingPresentationRequest) -> Void)?
+
+    var layerID: UInt64 {
+        row.layerID
+    }
+
+    var isLayerRow: Bool {
+        if case .layer = row.kind {
+            return true
+        }
+        return false
+    }
 
     private let document: MotionProjectState
     private let editorState: EditorState
@@ -204,10 +284,11 @@ private final class TimelineTrackRowView: UIView {
     private var segmentViews: [UIView] = []
     private var diamondViews: [TimelineKeyframeDiamondView] = []
 
-    private var dragStartRange: TimeRangeDraft?
+    private var dragSession: TimelineDragSession?
     private var dragFrameOffset: Int64 = 0
-    private var didDragRange = false
-    private var activeDragEdge: TimeRangeDragEdge?
+    private var dragCurrentFrames: [String: Int64] = [:]
+    private var didDrag = false
+    private var dragEditName: String?
 
     init(document: MotionProjectState,
          editorState: EditorState,
@@ -252,20 +333,37 @@ private final class TimelineTrackRowView: UIView {
         reloadContent()
     }
 
+    func refreshTimeRangeOnly() {
+        layoutTimeRange()
+    }
+
+    func refreshPropertySpanOnly() {
+        guard case let .propertySpan(path, label) = row.kind else {
+            return
+        }
+        layoutPropertySpan(path: path, label: label)
+    }
+
+    func refreshContentPreservingGestures() {
+        reloadContent()
+    }
+
     private func reloadContent() {
         segmentViews.forEach { $0.removeFromSuperview() }
         segmentViews.removeAll()
         diamondViews.forEach { $0.removeFromSuperview() }
         diamondViews.removeAll()
-        timeRangeBar.isHidden = true
-        propertyBar.isHidden = true
-
+        // Do not hide timeRangeBar / propertyBar before relayout — toggling isHidden cancels an active pan.
         switch row.kind {
         case .layer:
+            propertyBar.isHidden = true
             layoutTimeRange()
         case let .propertySpan(path, label):
+            timeRangeBar.isHidden = true
             layoutPropertySpan(path: path, label: label)
         case let .keyframeTrack(path, _):
+            timeRangeBar.isHidden = true
+            propertyBar.isHidden = true
             layoutKeyframeTrack(path: path)
         }
     }
@@ -274,6 +372,7 @@ private final class TimelineTrackRowView: UIView {
         let core = document.core
         let paths = timelineAnimatedPropertyPaths(core: core, layerID: row.layerID)
         guard let range = keyframeRange(paths: paths) else {
+            timeRangeBar.isHidden = true
             return
         }
         let selected = editorState.isLayerSelected(row.layerID)
@@ -289,6 +388,7 @@ private final class TimelineTrackRowView: UIView {
     private func layoutPropertySpan(path: String, label: String) {
         let frames = document.core.keyframes(entityID: row.layerID, path: path).map(\.frame)
         guard let firstFrame = frames.min(), let lastFrame = frames.max(), firstFrame < lastFrame else {
+            propertyBar.isHidden = true
             return
         }
         let selected = editorState.isLayerSelected(row.layerID)
@@ -333,60 +433,55 @@ private final class TimelineTrackRowView: UIView {
             segmentViews.append(segmentView)
         }
         for (index, keyframe) in keyframes.enumerated() {
-            let selected = trackSelected || isKeyframeSelected(keyframe.frame, path: path)
+            let frame = keyframe.frame
+            let selected = trackSelected || isKeyframeSelected(frame, path: path)
             let diamond = TimelineKeyframeDiamondView()
             diamond.configure(selected: selected)
-            diamond.center = CGPoint(x: contentX(for: keyframe.frame), y: propertyRowHeight / 2)
+            diamond.center = CGPoint(x: contentX(for: frame), y: propertyRowHeight / 2)
+            let prev = index > 0 ? keyframes[index - 1].frame : nil as Int64?
+            let next = index + 1 < keyframes.count ? keyframes[index + 1].frame : nil as Int64?
             var dragOriginFrame: Int64?
-            var lastFrame = keyframe.frame
             diamond.onMoved = { [weak self] translationWidth in
                 guard let self else {
                     return
                 }
                 if dragOriginFrame == nil {
-                    dragOriginFrame = lastFrame
-                    document.core.beginDrag()
+                    dragOriginFrame = frame
+                    beginKeyframeDrag(path: path, frame: frame)
                 }
                 guard let origin = dragOriginFrame else {
                     return
                 }
-                let target = min(max(Int64((CGFloat(origin) + translationWidth / pointsPerFrame).rounded()), 0),
-                                 duration)
-                if target != lastFrame {
-                    document.core.moveKeyframe(entityID: row.layerID, path: path, from: lastFrame, to: target)
-                    lastFrame = target
-                    diamond.center = CGPoint(x: contentX(for: target), y: propertyRowHeight / 2)
-                }
+                let pointer = Int64((CGFloat(origin) + translationWidth / pointsPerFrame).rounded())
+                updateKeyframeDrag(path: path, originFrame: origin, pointerFrame: pointer, prev: prev, next: next)
+                syncKeyframeTrackGeometry(path: path)
             }
             diamond.onMoveEnded = { [weak self] in
-                guard let self else {
-                    return
-                }
-                dragOriginFrame = nil
-                document.core.endDrag()
-                registerEdit("Move Keyframe")
+                self?.endInteractiveDrag()
             }
             diamond.onDelete = { [weak self] in
                 guard let self else {
                     return
                 }
+                let current = dragCurrentFrames[dragKey(path: path, origin: frame)] ?? frame
                 performEdit("Delete Keyframe") {
-                    self.document.core.removeKeyframe(entityID: self.row.layerID, path: path, frame: lastFrame)
+                    self.document.core.removeKeyframe(entityID: self.row.layerID, path: path, frame: current)
                 }
             }
             diamond.onSelect = { [weak self] in
                 guard let self else {
                     return
                 }
+                let current = dragCurrentFrames[dragKey(path: path, origin: frame)] ?? frame
                 editorState.selectedLayerID = row.layerID
                 editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: row.layerID, path: path)
                 let hasOutgoing = index + 1 < keyframes.count
                 if hasOutgoing {
-                    let next = keyframes[index + 1]
+                    let nextFrame = keyframes[index + 1].frame
                     editorState.selectedTimelineSegment = TimelineSegmentSelection(layerID: row.layerID,
                                                                                    path: path,
-                                                                                   startFrame: lastFrame,
-                                                                                   endFrame: next.frame)
+                                                                                   startFrame: current,
+                                                                                   endFrame: nextFrame)
                 } else {
                     editorState.selectedTimelineSegment = nil
                 }
@@ -395,11 +490,11 @@ private final class TimelineTrackRowView: UIView {
                     easingAffectsPlayback: hasOutgoing,
                     sourceView: diamond,
                     onSetEasing: { easing in
-                        self.document.core.setEasing(entityID: self.row.layerID, path: path, frame: lastFrame, easing: easing)
+                        self.document.core.setEasing(entityID: self.row.layerID, path: path, frame: current, easing: easing)
                     },
                     onDelete: {
                         self.performEdit("Delete Keyframe") {
-                            self.document.core.removeKeyframe(entityID: self.row.layerID, path: path, frame: lastFrame)
+                            self.document.core.removeKeyframe(entityID: self.row.layerID, path: path, frame: current)
                         }
                     },
                     onCommit: { self.registerEdit("Set Easing") },
@@ -412,6 +507,9 @@ private final class TimelineTrackRowView: UIView {
             }
             addSubview(diamond)
             diamondViews.append(diamond)
+        }
+        for diamond in diamondViews {
+            bringSubviewToFront(diamond)
         }
     }
 
@@ -449,10 +547,15 @@ private final class TimelineTrackRowView: UIView {
     private func wireTimeRangeGestures() {
         let bodyTap = UITapGestureRecognizer(target: self, action: #selector(selectLayerRow))
         timeRangeBar.addGestureRecognizer(bodyTap)
-        let leading = UIPanGestureRecognizer(target: self, action: #selector(handleLeadingDrag(_:)))
-        let trailing = UIPanGestureRecognizer(target: self, action: #selector(handleTrailingDrag(_:)))
+        let leading = UIPanGestureRecognizer(target: self, action: #selector(handleLayerLeadingDrag(_:)))
+        let trailing = UIPanGestureRecognizer(target: self, action: #selector(handleLayerTrailingDrag(_:)))
         timeRangeBar.leadingHandle.addGestureRecognizer(leading)
         timeRangeBar.trailingHandle.addGestureRecognizer(trailing)
+
+        let propertyLeading = UIPanGestureRecognizer(target: self, action: #selector(handlePropertyLeadingDrag(_:)))
+        let propertyTrailing = UIPanGestureRecognizer(target: self, action: #selector(handlePropertyTrailingDrag(_:)))
+        propertyBar.leadingHandle.addGestureRecognizer(propertyLeading)
+        propertyBar.trailingHandle.addGestureRecognizer(propertyTrailing)
     }
 
     @objc private func selectLayerRow() {
@@ -461,76 +564,227 @@ private final class TimelineTrackRowView: UIView {
         editorState.selectedTimelineSegment = nil
     }
 
-    @objc private func handleLeadingDrag(_ recognizer: UIPanGestureRecognizer) {
-        handleRangeDrag(edge: .leading, recognizer: recognizer)
+    @objc private func handleLayerLeadingDrag(_ recognizer: UIPanGestureRecognizer) {
+        handleLayerScaleDrag(edge: .leading, recognizer: recognizer)
     }
 
-    @objc private func handleTrailingDrag(_ recognizer: UIPanGestureRecognizer) {
-        handleRangeDrag(edge: .trailing, recognizer: recognizer)
+    @objc private func handleLayerTrailingDrag(_ recognizer: UIPanGestureRecognizer) {
+        handleLayerScaleDrag(edge: .trailing, recognizer: recognizer)
     }
 
-    private func handleRangeDrag(edge: TimeRangeDragEdge, recognizer: UIPanGestureRecognizer) {
-        let paths = timelineAnimatedPropertyPaths(core: document.core, layerID: row.layerID)
+    @objc private func handlePropertyLeadingDrag(_ recognizer: UIPanGestureRecognizer) {
+        handlePropertyEdgeDrag(edge: .leading, recognizer: recognizer)
+    }
+
+    @objc private func handlePropertyTrailingDrag(_ recognizer: UIPanGestureRecognizer) {
+        handlePropertyEdgeDrag(edge: .trailing, recognizer: recognizer)
+    }
+
+    private func handleLayerScaleDrag(edge: TimeRangeDragEdge, recognizer: UIPanGestureRecognizer) {
         switch recognizer.state {
         case .began, .changed:
             onTimeRangeDraggingChanged?(true)
             let locationX = recognizer.location(in: self).x
-            updateRangeDrag(edge: edge, paths: paths, locationX: locationX)
+            updateLayerScaleDrag(edge: edge, locationX: locationX)
         case .ended, .cancelled, .failed:
-            endRangeDrag()
+            endInteractiveDrag()
         default:
             break
         }
     }
 
-    private func updateRangeDrag(edge: TimeRangeDragEdge, paths: [String], locationX: CGFloat) {
+    private func updateLayerScaleDrag(edge: TimeRangeDragEdge, locationX: CGFloat) {
         let pointerFrame = Int64(((locationX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
-        if dragStartRange == nil {
+        if dragSession == nil {
+            let paths = timelineAnimatedPropertyPaths(core: document.core, layerID: row.layerID)
             guard let range = keyframeRange(paths: paths) else {
                 return
             }
-            dragStartRange = range
-            dragFrameOffset = pointerFrame - range.frame(for: edge)
-            didDragRange = false
-            activeDragEdge = edge
+            var originFrames: [(path: String, frame: Int64)] = []
+            for path in paths {
+                for keyframe in document.core.keyframes(entityID: row.layerID, path: path) {
+                    originFrames.append((path, keyframe.frame))
+                }
+            }
+            guard let session = TimelineDragEngine.makeLayerScaleSession(edge: edge,
+                                                                         originStart: range.startFrame,
+                                                                         originEnd: range.endFrame,
+                                                                         originFrames: originFrames)
+            else {
+                return
+            }
+            beginSession(session, pointerFrame: pointerFrame, edgeFrame: range.frame(for: edge), editName: "Scale Time Range")
             selectLayerRow()
-            document.core.beginDrag()
         }
-        guard let startRange = dragStartRange,
-              let currentRange = keyframeRange(paths: paths)
+        guard let session = dragSession else {
+            return
+        }
+        let newEdge = pointerFrame - dragFrameOffset
+        let moves = TimelineDragEngine.resolve(session: session,
+                                               pointerFrame: newEdge,
+                                               duration: duration,
+                                               neighbors: nil)
+        applyMoves(moves)
+        if didDrag {
+            onDragMoved?(.entireLayer)
+        }
+    }
+
+    private func handlePropertyEdgeDrag(edge: TimeRangeDragEdge, recognizer: UIPanGestureRecognizer) {
+        guard case let .propertySpan(path, _) = row.kind else {
+            return
+        }
+        switch recognizer.state {
+        case .began, .changed:
+            onTimeRangeDraggingChanged?(true)
+            let locationX = recognizer.location(in: self).x
+            updatePropertyEdgeDrag(path: path, edge: edge, locationX: locationX)
+        case .ended, .cancelled, .failed:
+            endInteractiveDrag()
+        default:
+            break
+        }
+    }
+
+    private func updatePropertyEdgeDrag(path: String, edge: TimeRangeDragEdge, locationX: CGFloat) {
+        let pointerFrame = Int64(((locationX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
+        if dragSession == nil {
+            let frames = document.core.keyframes(entityID: row.layerID, path: path).map(\.frame)
+            guard let start = frames.min(), let end = frames.max(), start < end,
+                  let session = TimelineDragEngine.makePropertyEdgeSession(path: path,
+                                                                           edge: edge,
+                                                                           originStart: start,
+                                                                           originEnd: end)
+            else {
+                return
+            }
+            let edgeFrame = edge == .leading ? start : end
+            beginSession(session, pointerFrame: pointerFrame, edgeFrame: edgeFrame, editName: "Move Property Range")
+            editorState.selectedLayerID = row.layerID
+            editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: row.layerID, path: path)
+            editorState.selectedTimelineSegment = nil
+        }
+        guard let session = dragSession else {
+            return
+        }
+        let newEdge = pointerFrame - dragFrameOffset
+        let moves = TimelineDragEngine.resolve(session: session,
+                                               pointerFrame: newEdge,
+                                               duration: duration,
+                                               neighbors: nil)
+        applyMoves(moves)
+        if didDrag {
+            onDragMoved?(.rowAndLayerBar)
+        }
+    }
+
+    private func beginKeyframeDrag(path: String, frame: Int64) {
+        onTimeRangeDraggingChanged?(true)
+        let session = TimelineDragEngine.makeKeyframeSession(path: path, frame: frame)
+        dragSession = session
+        dragFrameOffset = 0
+        dragCurrentFrames = [dragKey(path: path, origin: frame): frame]
+        didDrag = false
+        dragEditName = "Move Keyframe"
+        document.core.beginDrag()
+    }
+
+    private func updateKeyframeDrag(path _: String, originFrame _: Int64, pointerFrame: Int64,
+                                    prev: Int64?, next: Int64?)
+    {
+        guard let session = dragSession else {
+            return
+        }
+        let moves = TimelineDragEngine.resolve(session: session,
+                                               pointerFrame: pointerFrame,
+                                               duration: duration,
+                                               neighbors: (prev: prev, next: next))
+        applyMoves(moves)
+        if didDrag {
+            onDragMoved?(.layerBarOnly)
+        }
+    }
+
+    private func beginSession(_ session: TimelineDragSession,
+                              pointerFrame: Int64,
+                              edgeFrame: Int64,
+                              editName: String)
+    {
+        dragSession = session
+        dragFrameOffset = pointerFrame - edgeFrame
+        dragCurrentFrames = Dictionary(uniqueKeysWithValues: session.originFrames.map {
+            (dragKey(path: $0.path, origin: $0.frame), $0.frame)
+        })
+        if case let .propertyEdge(path) = session.scope, let edge = session.edge {
+            let origin = edge == .leading ? session.originStart : session.originEnd
+            dragCurrentFrames[dragKey(path: path, origin: origin)] = origin
+        }
+        didDrag = false
+        dragEditName = editName
+        document.core.beginDrag()
+    }
+
+    private func applyMoves(_ moves: [KeyframeMove]) {
+        let enriched = moves.compactMap { move -> (KeyframeMove, Int64)? in
+            let key = dragKey(path: move.path, origin: move.from)
+            let current = dragCurrentFrames[key] ?? move.from
+            guard current != move.to else {
+                return nil
+            }
+            return (move, current)
+        }
+        let ordered = enriched.sorted { lhs, rhs in
+            if lhs.0.path != rhs.0.path {
+                return lhs.0.path < rhs.0.path
+            }
+            let movingRight = lhs.0.to > lhs.1 || rhs.0.to > rhs.1
+            return movingRight ? lhs.1 > rhs.1 : lhs.1 < rhs.1
+        }
+        for (move, current) in ordered {
+            document.core.moveKeyframe(entityID: row.layerID, path: move.path, from: current, to: move.to)
+            dragCurrentFrames[dragKey(path: move.path, origin: move.from)] = move.to
+            didDrag = true
+        }
+    }
+
+    private func endInteractiveDrag() {
+        let editName = dragEditName
+        let moved = didDrag
+        dragSession = nil
+        dragFrameOffset = 0
+        dragCurrentFrames.removeAll()
+        didDrag = false
+        dragEditName = nil
+        onTimeRangeDraggingChanged?(false)
+        document.core.endDrag()
+        if moved, let editName {
+            registerEdit(editName)
+        }
+    }
+
+    private func dragKey(path: String, origin: Int64) -> String {
+        "\(path)#\(origin)"
+    }
+
+    /// Reposition segment lines + diamonds from live document frames without recreating views.
+    private func syncKeyframeTrackGeometry(path: String) {
+        let keyframes = document.core.keyframes(entityID: row.layerID, path: path).sorted { $0.frame < $1.frame }
+        guard diamondViews.count == keyframes.count,
+              segmentViews.count == max(keyframes.count - 1, 0)
         else {
             return
         }
-        let sourceFrame: Int64
-        let targetFrame: Int64
-        let draggedFrame = pointerFrame - dragFrameOffset
-        switch edge {
-        case .leading:
-            sourceFrame = currentRange.startFrame
-            targetFrame = min(max(draggedFrame, 0), startRange.leadingMaxFrame)
-        case .trailing:
-            sourceFrame = currentRange.endFrame
-            targetFrame = min(max(draggedFrame, startRange.trailingMinFrame), duration)
+        for (index, segmentView) in segmentViews.enumerated() {
+            let start = keyframes[index].frame
+            let end = keyframes[index + 1].frame
+            let startX = contentX(for: start)
+            let endX = contentX(for: end)
+            segmentView.frame = CGRect(x: startX, y: 0, width: max(endX - startX, 2), height: propertyRowHeight)
+            segmentView.accessibilityIdentifier = "\(start):\(end):\(path)"
         }
-        guard sourceFrame != targetFrame else {
-            return
+        for (index, diamond) in diamondViews.enumerated() {
+            diamond.center = CGPoint(x: contentX(for: keyframes[index].frame), y: propertyRowHeight / 2)
         }
-        for path in paths where document.core.keyframes(entityID: row.layerID, path: path).contains(where: { $0.frame == sourceFrame }) {
-            document.core.moveKeyframe(entityID: row.layerID, path: path, from: sourceFrame, to: targetFrame)
-        }
-        didDragRange = true
-    }
-
-    private func endRangeDrag() {
-        dragStartRange = nil
-        dragFrameOffset = 0
-        activeDragEdge = nil
-        onTimeRangeDraggingChanged?(false)
-        document.core.endDrag()
-        if didDragRange {
-            registerEdit("Move Time Range")
-        }
-        didDragRange = false
     }
 
     @objc private func handleSegmentTap(_ recognizer: UITapGestureRecognizer) {
@@ -683,6 +937,8 @@ private final class TimelineTimeRangeBarView: UIView {
 @MainActor
 private final class TimelinePropertyBarView: UIView {
     var onTap: (() -> Void)?
+    let leadingHandle = UIView()
+    let trailingHandle = UIView()
     private let label = UILabel()
     private let leadingGrip = UIView()
     private let trailingGrip = UIView()
@@ -697,6 +953,10 @@ private final class TimelinePropertyBarView: UIView {
         addSubview(label)
         addSubview(leadingGrip)
         addSubview(trailingGrip)
+        addSubview(leadingHandle)
+        addSubview(trailingHandle)
+        leadingHandle.backgroundColor = .clear
+        trailingHandle.backgroundColor = .clear
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
     }
@@ -711,6 +971,8 @@ private final class TimelinePropertyBarView: UIView {
         label.frame = bounds.insetBy(dx: 4, dy: 0)
         leadingGrip.frame = CGRect(x: 5, y: (bounds.height - 9) / 2, width: 2, height: 9)
         trailingGrip.frame = CGRect(x: bounds.width - 7, y: leadingGrip.frame.minY, width: 2, height: 9)
+        leadingHandle.frame = CGRect(x: 0, y: 0, width: 24, height: bounds.height)
+        trailingHandle.frame = CGRect(x: bounds.width - 24, y: 0, width: 24, height: bounds.height)
     }
 
     func configure(label text: String, isSelected: Bool) {
@@ -738,7 +1000,6 @@ private final class TimelineKeyframeDiamondView: UIView {
     var onSelect: (() -> Void)?
 
     private let imageView = UIImageView(image: UIImage(systemName: "diamond.fill"))
-    private var dragStartTranslation: CGFloat = 0
     private var didBeginDrag = false
 
     override init(frame _: CGRect) {
@@ -778,7 +1039,6 @@ private final class TimelineKeyframeDiamondView: UIView {
         switch recognizer.state {
         case .began:
             didBeginDrag = false
-            dragStartTranslation = 0
         case .changed:
             let width = recognizer.translation(in: superview).x
             if !didBeginDrag, abs(width) >= 4 {
