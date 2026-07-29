@@ -16,8 +16,23 @@ final class TimelineViewController: UIViewController {
     private let registerEdit: (String) -> Void
     private let clearSelection: () -> Void
 
+    private let scrollCoordinator: TimelineScrollCoordinator
+    private let controlsView: TimelineControlsView
+    private let rulerView = TimelineRulerCanvasView()
+    private let playheadView = TimelinePlayheadView()
+    private let layersHeaderLabel = UILabel()
+    private let headerSplit = UIView()
+    private let bodySplit = UIView()
+    private let sidebarPlaceholder = UIView()
+    private let tracksPlaceholder = UIView()
+    private let trackColumn = UIView()
+    private let leftColumn = UIView()
+
     private var playheadListenerID: UUID?
-    private let placeholderLabel = UILabel()
+    private var layerColumnWidthConstraint: NSLayoutConstraint?
+    private var isObservingDocument = false
+    private var isObservingPlayback = false
+    private var isObservingZoom = false
 
     init(document: MotionProjectState,
          editorState: EditorState,
@@ -32,6 +47,8 @@ final class TimelineViewController: UIViewController {
         performEdit = perform
         self.registerEdit = registerEdit
         self.clearSelection = clearSelection
+        scrollCoordinator = TimelineScrollCoordinator(editorState: editorState, playheadClock: playheadClock)
+        controlsView = TimelineControlsView(editorState: editorState)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -42,34 +59,35 @@ final class TimelineViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .secondarySystemBackground
-        placeholderLabel.translatesAutoresizingMaskIntoConstraints = false
-        placeholderLabel.numberOfLines = 0
-        placeholderLabel.text = "Timeline (UIKit)\nrevision \(document.core.revision)"
-        placeholderLabel.textAlignment = .center
-        placeholderLabel.textColor = .secondaryLabel
-        placeholderLabel.font = .preferredFont(forTextStyle: .title3)
-        view.addSubview(placeholderLabel)
-        NSLayoutConstraint.activate([
-            placeholderLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            placeholderLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            placeholderLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
-            placeholderLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16),
-        ])
-        // Keep injected collaborators retained for upcoming tasks.
-        _ = editorState
+        view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.35)
+        // Retained for Tasks 4–5 wiring.
         _ = performEdit
         _ = registerEdit
-        _ = clearSelection
+        buildHierarchy()
+        wireActions()
+        reloadFromDocument()
+        beginObservationLoops()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let trackWidth = max(1, trackColumn.bounds.width - trackLeadingInset * 2)
+        if abs(trackWidth - scrollCoordinator.trackViewportWidth) > 0.5 {
+            scrollCoordinator.updateTrackViewportWidth(trackWidth)
+            refreshTrackChrome(updateControls: true)
+        } else {
+            updatePlayheadPosition()
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if playheadListenerID == nil {
-            playheadListenerID = playheadClock.addListener { [weak self] _ in
-                self?.handlePlayheadFrameChanged()
+            playheadListenerID = playheadClock.addListener { [weak self] frame in
+                self?.handlePlayheadFrameChanged(frame)
             }
         }
+        reloadFromDocument()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -80,7 +98,241 @@ final class TimelineViewController: UIViewController {
         }
     }
 
-    private func handlePlayheadFrameChanged() {
-        // Task 3: update playhead chrome only.
+    private func buildHierarchy() {
+        controlsView.translatesAutoresizingMaskIntoConstraints = false
+        leftColumn.translatesAutoresizingMaskIntoConstraints = false
+        trackColumn.translatesAutoresizingMaskIntoConstraints = false
+        layersHeaderLabel.translatesAutoresizingMaskIntoConstraints = false
+        sidebarPlaceholder.translatesAutoresizingMaskIntoConstraints = false
+        tracksPlaceholder.translatesAutoresizingMaskIntoConstraints = false
+        headerSplit.translatesAutoresizingMaskIntoConstraints = false
+        bodySplit.translatesAutoresizingMaskIntoConstraints = false
+
+        layersHeaderLabel.text = "Layers"
+        layersHeaderLabel.font = .preferredFont(forTextStyle: .caption1)
+        layersHeaderLabel.textColor = .secondaryLabel
+
+        styleSplit(headerSplit)
+        styleSplit(bodySplit)
+        sidebarPlaceholder.backgroundColor = .clear
+        tracksPlaceholder.backgroundColor = UIColor.secondarySystemFill.withAlphaComponent(0.25)
+
+        let headerSeparator = hairline()
+        let bodySeparator = hairline()
+        let controlsSeparator = hairline()
+
+        view.addSubview(controlsView)
+        view.addSubview(controlsSeparator)
+        view.addSubview(leftColumn)
+        view.addSubview(headerSplit)
+        view.addSubview(bodySplit)
+        view.addSubview(trackColumn)
+
+        leftColumn.addSubview(layersHeaderLabel)
+        leftColumn.addSubview(headerSeparator)
+        leftColumn.addSubview(sidebarPlaceholder)
+
+        trackColumn.addSubview(rulerView)
+        trackColumn.addSubview(bodySeparator)
+        trackColumn.addSubview(tracksPlaceholder)
+        trackColumn.addSubview(playheadView)
+        trackColumn.clipsToBounds = true
+
+        let widthConstraint = leftColumn.widthAnchor.constraint(equalToConstant: scrollCoordinator.layerColumnWidth)
+        layerColumnWidthConstraint = widthConstraint
+
+        NSLayoutConstraint.activate([
+            controlsView.topAnchor.constraint(equalTo: view.topAnchor),
+            controlsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            controlsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            controlsSeparator.topAnchor.constraint(equalTo: controlsView.bottomAnchor),
+            controlsSeparator.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            controlsSeparator.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            controlsSeparator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+
+            leftColumn.topAnchor.constraint(equalTo: controlsSeparator.bottomAnchor),
+            leftColumn.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            leftColumn.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            widthConstraint,
+
+            headerSplit.topAnchor.constraint(equalTo: leftColumn.topAnchor),
+            headerSplit.leadingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
+            headerSplit.widthAnchor.constraint(equalToConstant: splitDividerWidth),
+            headerSplit.heightAnchor.constraint(equalToConstant: rulerHeight),
+
+            bodySplit.topAnchor.constraint(equalTo: headerSplit.bottomAnchor),
+            bodySplit.leadingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
+            bodySplit.widthAnchor.constraint(equalToConstant: splitDividerWidth),
+            bodySplit.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            trackColumn.topAnchor.constraint(equalTo: leftColumn.topAnchor),
+            trackColumn.leadingAnchor.constraint(equalTo: headerSplit.trailingAnchor),
+            trackColumn.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            trackColumn.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            layersHeaderLabel.topAnchor.constraint(equalTo: leftColumn.topAnchor),
+            layersHeaderLabel.leadingAnchor.constraint(equalTo: leftColumn.leadingAnchor, constant: 8),
+            layersHeaderLabel.trailingAnchor.constraint(equalTo: leftColumn.trailingAnchor, constant: -8),
+            layersHeaderLabel.heightAnchor.constraint(equalToConstant: rulerHeight),
+
+            headerSeparator.topAnchor.constraint(equalTo: layersHeaderLabel.bottomAnchor),
+            headerSeparator.leadingAnchor.constraint(equalTo: leftColumn.leadingAnchor),
+            headerSeparator.trailingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
+            headerSeparator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+
+            sidebarPlaceholder.topAnchor.constraint(equalTo: headerSeparator.bottomAnchor),
+            sidebarPlaceholder.leadingAnchor.constraint(equalTo: leftColumn.leadingAnchor),
+            sidebarPlaceholder.trailingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
+            sidebarPlaceholder.bottomAnchor.constraint(equalTo: leftColumn.bottomAnchor),
+
+            rulerView.topAnchor.constraint(equalTo: trackColumn.topAnchor),
+            rulerView.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
+            rulerView.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
+            rulerView.heightAnchor.constraint(equalToConstant: rulerHeight),
+
+            bodySeparator.topAnchor.constraint(equalTo: rulerView.bottomAnchor),
+            bodySeparator.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
+            bodySeparator.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
+            bodySeparator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+
+            tracksPlaceholder.topAnchor.constraint(equalTo: bodySeparator.bottomAnchor),
+            tracksPlaceholder.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
+            tracksPlaceholder.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
+            tracksPlaceholder.bottomAnchor.constraint(equalTo: trackColumn.bottomAnchor),
+
+            playheadView.topAnchor.constraint(equalTo: trackColumn.topAnchor),
+            playheadView.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
+            playheadView.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
+            playheadView.bottomAnchor.constraint(equalTo: trackColumn.bottomAnchor),
+        ])
+    }
+
+    private func wireActions() {
+        controlsView.onZoomChanged = { [weak self] in
+            guard let self else {
+                return
+            }
+            scrollCoordinator.noteExternalZoomChange()
+            refreshTrackChrome(updateControls: true)
+        }
+        rulerView.onScrub = { [weak self] visibleX in
+            self?.scrub(atVisibleX: visibleX)
+        }
+        playheadView.onScrub = { [weak self] visibleX in
+            self?.scrub(atVisibleX: visibleX)
+        }
+        let clearTap = UITapGestureRecognizer(target: self, action: #selector(handleTracksTap))
+        tracksPlaceholder.addGestureRecognizer(clearTap)
+        tracksPlaceholder.isUserInteractionEnabled = true
+    }
+
+    private func reloadFromDocument() {
+        let core = document.core
+        let compositionID = core.firstCompositionID
+        scrollCoordinator.duration = core.duration(compositionID: compositionID)
+        let frameRate = core.frameRate(compositionID: compositionID)
+        controlsView.reload(duration: scrollCoordinator.duration, frame: playheadClock.frame)
+        refreshTrackChrome(updateControls: true, frameRate: frameRate)
+    }
+
+    private func refreshTrackChrome(updateControls: Bool, frameRate: Double? = nil) {
+        let rate = frameRate ?? document.core.frameRate(compositionID: document.core.firstCompositionID)
+        rulerView.update(duration: scrollCoordinator.duration,
+                         frameRate: rate,
+                         pointsPerFrame: scrollCoordinator.pointsPerFrame,
+                         scrollX: scrollCoordinator.scrollX)
+        if updateControls {
+            controlsView.refreshPlaybackState()
+        }
+        updatePlayheadPosition()
+    }
+
+    private func updatePlayheadPosition() {
+        let visibleX = timelineX(for: playheadClock.frame, pointsPerFrame: scrollCoordinator.pointsPerFrame)
+            - scrollCoordinator.scrollX
+        if visibleX >= 0, visibleX <= scrollCoordinator.trackViewportWidth {
+            playheadView.setContentX(trackLeadingInset + visibleX)
+        } else {
+            playheadView.setContentX(nil)
+        }
+    }
+
+    private func handlePlayheadFrameChanged(_ frame: Int64) {
+        controlsView.setPlayheadFrame(frame)
+        updatePlayheadPosition()
+    }
+
+    private func scrub(atVisibleX visibleX: CGFloat) {
+        playheadClock.publish(scrollCoordinator.frame(atVisibleX: visibleX))
+    }
+
+    @objc private func handleTracksTap() {
+        clearSelection()
+    }
+
+    private func beginObservationLoops() {
+        observeDocumentRevision()
+        observePlaybackState()
+        observeZoomState()
+    }
+
+    private func observeDocumentRevision() {
+        isObservingDocument = true
+        withObservationTracking {
+            _ = document.core.revision
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, isObservingDocument else {
+                    return
+                }
+                reloadFromDocument()
+                observeDocumentRevision()
+            }
+        }
+    }
+
+    private func observePlaybackState() {
+        isObservingPlayback = true
+        withObservationTracking {
+            _ = editorState.isPlaying
+            _ = editorState.previewBackdrop
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, isObservingPlayback else {
+                    return
+                }
+                controlsView.refreshPlaybackState()
+                observePlaybackState()
+            }
+        }
+    }
+
+    private func observeZoomState() {
+        isObservingZoom = true
+        withObservationTracking {
+            _ = editorState.timelinePointsPerFrame
+            _ = editorState.timelineScrollX
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, isObservingZoom else {
+                    return
+                }
+                scrollCoordinator.clampScroll()
+                refreshTrackChrome(updateControls: true)
+                observeZoomState()
+            }
+        }
+    }
+
+    private func styleSplit(_ view: UIView) {
+        view.backgroundColor = UIColor.secondaryLabel.withAlphaComponent(0.2)
+    }
+
+    private func hairline() -> UIView {
+        let line = UIView()
+        line.translatesAutoresizingMaskIntoConstraints = false
+        line.backgroundColor = UIColor.separator
+        return line
     }
 }
