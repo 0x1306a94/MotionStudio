@@ -3,17 +3,18 @@
 > 分支：`feature/0x1306a94_playback_cpu`  
 > 相关文档：[libpag-rendering-optimization-notes.md](../../libpag-rendering-optimization-notes.md)  
 > 日期：2026-07-29  
-> 流程：实现 Phase 1 → 用户手测 → Phase 2 → 手测 → Phase 3 → 手测
+> 流程：Phase 1 → 手测 → Phase 2 → 手测；**Phase 3 不做**（见下文）
 
 ## 目标
 
-降低画布持续播放时的 CPU，借鉴 libpag：量化帧、跳过未变化工作、热路径去掉编辑 chrome，再做缓存 / Snapshot。
+降低画布持续播放时的 CPU，借鉴 libpag：量化帧、跳过未变化工作、热路径去掉编辑 chrome，再做命令级缓存。
 
 本分支不做：
 
 - tgfx DisplayList 的 Partial / Tiled 脏区绘制
 - 完整 AE 式全属性 `excludeVaryingRanges`
 - 磁盘缓存 / 视频序列管线
+- **整帧 / 静态层 GPU Snapshot**（原 Phase 3，已取消）
 
 ## 已确认默认取舍
 
@@ -22,8 +23,9 @@
 | 播放时时间采样 | 量化到**内容整数帧**（`floor`） |
 | 拖拽时间轴 / 暂停预览 | 保留现有亚帧（`double` frameTime）API |
 | 播放时编辑 chrome | **不构建、不绘制**选中框 / path-edit / motion-path |
-| 交付方式 | 三阶段；每阶段结束后停手测 |
-| 改动落点 | Phase 1 主要在 bridge + Swift；Phase 2/3 再加 Core/adapter 缓存 |
+| 交付方式 | Phase 1 + Phase 2；每阶段结束后停手测 |
+| 改动落点 | Phase 1：bridge + Swift；Phase 2：bridge `FrameCommandCache` |
+| Phase 3 Snapshot | **取消**（见 §Phase 3） |
 
 ## 约束：MTKView drawable
 
@@ -186,20 +188,17 @@ class FrameCommandCache {
 
 ---
 
-## Phase 3 — P2：静态层 Snapshot + 图片预解码
+## Phase 3 — 已取消：GPU Snapshot
 
-### 3.1 行为
+原计划：静态层（或整帧）栅格化为 GPU 纹理，跳过 `PlayCommands` / path 三角化；图片异步 `prepare`。
 
-- 图层（或整帧）连续 N 个播放帧未变 → 按 `cacheScale` 栅格化为 GPU 纹理，用 `drawImage` 绘制。
-- LRU + 显存上限（初值约 20MB，对齐 libpag 量级，后续再调）。
-- revision 变化、缩放超过阈值、或图层 bounds 变化时失效。
-- 图片层（若场景中有）：首次使用前异步 `prepare` 解码。
+**本分支不做。** 试做整帧 drawable 空间 snapshot 后确认不划算：
 
-### 3.2 手测
+1. **显存装不下循环。** Retina 全窗口单帧常 12–20MB+；约 24MB LRU 往往只能留 1 帧，正常长度动画循环几乎无法命中（手测 `snap hit ≈ 0%`，仍走 `PlayCommands`）。
+2. **Metal drawable 限制。** CAMetalLayer 为 `framebufferOnly`，不能直接 `makeImageSnapshot`；离屏 capture + blit 使 miss 路径比 Phase 2 更贵。
+3. **Phase 1/2 已覆盖主瓶颈。** Instruments 下 evaluate/build 可忽略；剩余热点含 SwiftUI（另议）与 play/三角化。整帧缓存救不了「每帧内容都在变」的长动画。
 
-- [ ] 复杂静态形状 / mask：CPU 下降，100% 缩放下观感一致。
-- [ ] Snapshot 后放大：不长时间发糊（应失效 / 重烘焙）。
-- [ ] 长时间播放显存不无界上涨。
+若将来再做，应另开设计，优先考虑**合成分辨率**或 **per-layer 静态层** snapshot，并单独定显存预算；不要再做全 drawable 整帧 LRU。SwiftUI 时间轴刷新成本单独处理。
 
 ---
 
@@ -211,8 +210,8 @@ class FrameCommandCache {
 | 1 | 合入本设计与分析笔记 |
 | 2 | 实现 Phase 1 → commit → **用户手测** |
 | 3 | 实现 Phase 2 → commit → **用户手测** |
-| 4 | 实现 Phase 3 → commit → **用户手测** |
-| 5 | 全部通过后向 `develop` 开 PR |
+| 4 | （已取消）Phase 3 |
+| 5 | Phase 1/2 通过后向 `develop` 开 PR |
 
 除非用户要求，不自动 push。
 
@@ -220,10 +219,9 @@ class FrameCommandCache {
 
 - 整数帧播放在 60Hz 屏上慢动作会有步进感——Phase 1 接受；若需更顺可后续加 2× 帧率开关。
 - 播放时隐藏 chrome，若用户期望实时手柄会不习惯——接受；暂停即恢复。
-- Blit 路径若过重，Phase 1 可砍掉。
+- Blit 路径若过重，Phase 1 可砍掉（落地时未做 blit）。
 
 ## 成功指标
 
 - Phase 1：ProMotion 上播放 CPU 明显低于现状（evaluate+build 大致随 内容帧率/60 下降）。
 - Phase 2：第二圈 / 重复帧在 `MSCanvasFrameProfile` 中 evaluate+build 接近 0。
-- Phase 3：静态为主的合成，播放热点在 present，而非 path 三角化。

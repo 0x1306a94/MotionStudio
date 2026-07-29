@@ -262,8 +262,10 @@ libpag 的低 CPU 播放并不主要靠「更快的单次 path 绘制」，而�
 4. **重算了也不重复矢量**（Snapshot 纹理）；  
 5. **解码不挡帧**（prepare 异步）。
 
-MotionStudio 当前瓶颈更符合「显示刷新驱动的亚帧全量管线」：每帧唯一内容 → 缓存失效 → evaluate/build/play 全开。优先做 **帧量化 + 整帧短路 + 播放期去掉编辑 chrome**，再考虑层缓存与 Snapshot，性价比最高。
+MotionStudio 当时瓶颈更符合「显示刷新驱动的亚帧全量管线」：每帧唯一内容 → 缓存失效 → evaluate/build/play 全开。优先做 **帧量化 + 播放期去掉编辑 chrome + 命令级复用**（见 [playback-cpu 设计](superpowers/specs/2026-07-29-playback-cpu-optimization-design.md) Phase 1/2）。
+
+**GPU Snapshot（层/整帧）本阶段不做：** 全 drawable 整帧缓存在 Retina 下显存装不下循环、命中率近零，且 Metal `framebufferOnly` 需离屏拷贝，miss 更贵。若再做需另开设计（合成分辨率或 per-layer），见该设计文档 §Phase 3。
 
 ---
 
-相关文档：[rendering.md](rendering.md)、[timeline-evaluation.md](timeline-evaluation.md)、[architecture.md](architecture.md)。
+相关文档：[rendering.md](rendering.md)、[timeline-evaluation.md](timeline-evaluation.md)、[architecture.md](architecture.md)、[playback-cpu 设计](superpowers/specs/2026-07-29-playback-cpu-optimization-design.md)。
