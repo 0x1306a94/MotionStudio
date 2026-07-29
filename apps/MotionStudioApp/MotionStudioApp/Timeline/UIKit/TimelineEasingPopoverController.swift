@@ -7,6 +7,7 @@
 //
 
 import MotionStudioBridging
+import Observation
 import SwiftUI
 import UIKit
 
@@ -29,7 +30,8 @@ final class TimelineEasingPopoverController: UIViewController {
     private var presetRows: [(easing: EasingInfo, check: UIImageView)] = []
     private let customCheck = UIImageView(image: UIImage(systemName: "checkmark"))
     private var showCustomPad: Bool
-    private var padHost: UIHostingController<CubicBezierPad>?
+    private var padHost: UIHostingController<TimelineEasingPadView>?
+    private var padModel: TimelineEasingPadModel?
     private var isDraggingPad = false
 
     init(easing: EasingInfo,
@@ -110,7 +112,7 @@ final class TimelineEasingPopoverController: UIViewController {
         padHeightConstraint = padHeight
         stack.addArrangedSubview(padContainer)
 
-        if let onDelete {
+        if onDelete != nil {
             let divider = UIView()
             divider.backgroundColor = .separator
             divider.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale).isActive = true
@@ -120,7 +122,9 @@ final class TimelineEasingPopoverController: UIViewController {
             delete.setTitleColor(.systemRed, for: .normal)
             delete.contentHorizontalAlignment = .leading
             delete.setContentCompressionResistancePriority(.required, for: .vertical)
-            delete.addAction(UIAction { _ in onDelete() }, for: .touchUpInside)
+            delete.addAction(UIAction { [weak self] _ in
+                self?.handleDelete()
+            }, for: .touchUpInside)
             stack.addArrangedSubview(delete)
         }
 
@@ -146,23 +150,42 @@ final class TimelineEasingPopoverController: UIViewController {
     private func makeChoiceRow(title: String, checkView: UIImageView? = nil,
                                action: @escaping () -> Void) -> (UIView, UIImageView)
     {
+        let row = UIView()
+        row.setContentCompressionResistancePriority(.required, for: .vertical)
+
         let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
         button.contentHorizontalAlignment = .leading
         button.setTitle(title, for: .normal)
         button.setTitleColor(.label, for: .normal)
+        // Leave room on the trailing edge so the overlaid checkmark does not cover the title.
+        button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 28)
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         button.setContentCompressionResistancePriority(.required, for: .vertical)
 
         let check = checkView ?? UIImageView(image: UIImage(systemName: "checkmark"))
+        check.translatesAutoresizingMaskIntoConstraints = false
         check.tintColor = .tintColor
+        check.isUserInteractionEnabled = false
         check.setContentHuggingPriority(.required, for: .horizontal)
         check.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        let row = UIStackView(arrangedSubviews: [button, check])
-        row.axis = .horizontal
-        row.alignment = .center
-        row.setContentCompressionResistancePriority(.required, for: .vertical)
+        row.addSubview(button)
+        row.addSubview(check)
+        NSLayoutConstraint.activate([
+            button.topAnchor.constraint(equalTo: row.topAnchor),
+            button.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            button.bottomAnchor.constraint(equalTo: row.bottomAnchor),
+            check.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            check.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+        ])
         return (row, check)
+    }
+
+    private func handleDelete() {
+        onDelete?()
+        dismiss(animated: true)
     }
 
     private func selectPreset(_ easing: EasingInfo) {
@@ -200,6 +223,7 @@ final class TimelineEasingPopoverController: UIViewController {
         padHost?.view.removeFromSuperview()
         padHost?.removeFromParent()
         padHost = nil
+        padModel = nil
 
         let shouldShow = easingAffectsPlayback && (showCustomPad || currentEasing.kind == .CUBIC_BEZIER)
         padContainer.isHidden = !shouldShow
@@ -209,7 +233,9 @@ final class TimelineEasingPopoverController: UIViewController {
         }
 
         let points = padPoints(from: currentEasing)
-        let pad = CubicBezierPad(p0: points.p0, p3: points.p3, c1: points.c1, c2: points.c2, isEditable: true) { [weak self] c1, c2 in
+        let model = TimelineEasingPadModel(c1: points.c1, c2: points.c2)
+        padModel = model
+        let pad = TimelineEasingPadView(model: model) { [weak self] c1, c2 in
             guard let self else {
                 return
             }
@@ -266,6 +292,40 @@ final class TimelineEasingPopoverController: UIViewController {
                           inY: Float(1 - c1.y),
                           outX: Float(max(0, min(1, c2.x))),
                           outY: Float(1 - c2.y))
+    }
+}
+
+/// Keeps CubicBezierPad control points in sync after drag ends (pad clears its local draft).
+@MainActor
+@Observable
+private final class TimelineEasingPadModel {
+    var c1: CGPoint
+    var c2: CGPoint
+
+    init(c1: CGPoint, c2: CGPoint) {
+        self.c1 = c1
+        self.c2 = c2
+    }
+}
+
+private struct TimelineEasingPadView: View {
+    @Bindable var model: TimelineEasingPadModel
+    let onChange: (CGPoint, CGPoint) -> Void
+    let onDragEnded: () -> Void
+
+    var body: some View {
+        CubicBezierPad(p0: CGPoint(x: 0, y: 1),
+                       p3: CGPoint(x: 1, y: 0),
+                       c1: model.c1,
+                       c2: model.c2,
+                       isEditable: true)
+        { c1, c2 in
+            model.c1 = c1
+            model.c2 = c2
+            onChange(c1, c2)
+        } onDragEnded: {
+            onDragEnded()
+        }
     }
 }
 
