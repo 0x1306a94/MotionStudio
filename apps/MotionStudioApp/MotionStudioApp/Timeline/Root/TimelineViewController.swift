@@ -80,7 +80,6 @@ final class TimelineViewController: UIViewController {
         view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.35)
         buildHierarchy()
         wireActions()
-        reloadFromDocument()
         beginObservationLoops()
     }
 
@@ -95,18 +94,19 @@ final class TimelineViewController: UIViewController {
         }
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
         if playheadListenerID == nil {
             playheadListenerID = playheadClock.addListener { [weak self] frame in
                 self?.handlePlayheadFrameChanged(frame)
             }
         }
+
         reloadFromDocument()
     }
 
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
         if let playheadListenerID {
             playheadClock.removeListener(playheadListenerID)
             self.playheadListenerID = nil
@@ -433,6 +433,7 @@ extension TimelineViewController: UIGestureRecognizerDelegate {
             splitDragStartWidth = scrollCoordinator.layerColumnWidth
             styleSplit(headerSplit, active: true)
             styleSplit(bodySplit, active: true)
+
         case .changed:
             guard let start = splitDragStartWidth else {
                 return
@@ -443,10 +444,12 @@ extension TimelineViewController: UIGestureRecognizerDelegate {
             view.layoutIfNeeded()
             scrollCoordinator.updateTrackViewportWidth(max(1, trackColumn.bounds.width - trackLeadingInset * 2))
             refreshTrackChrome(updateControls: false)
+
         case .ended, .cancelled, .failed:
             splitDragStartWidth = nil
             styleSplit(headerSplit, active: false)
             styleSplit(bodySplit, active: false)
+
         default:
             break
         }
@@ -465,6 +468,7 @@ extension TimelineViewController: UIGestureRecognizerDelegate {
             } else {
                 horizontalPanStartScrollX = CGFloat(editorState.timelineScrollX)
             }
+
         case .changed:
             guard let start = horizontalPanStartScrollX, !start.isNaN else {
                 return
@@ -472,6 +476,7 @@ extension TimelineViewController: UIGestureRecognizerDelegate {
             let next = start - recognizer.translation(in: tracksView).x
             editorState.timelineScrollX = Double(min(max(next, 0),
                                                      max(0, scrollCoordinator.trackWidth - scrollCoordinator.trackViewportWidth)))
+
         default:
             horizontalPanStartScrollX = nil
         }
