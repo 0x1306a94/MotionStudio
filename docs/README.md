@@ -10,6 +10,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [data-model.md](data-model.md) | 动画数据结构：时间表示、EntityId、Document→Composition→Layer→Shape 层级、`Animatable<T>`、Transform 与父子继承、Command 模式 undo/redo、序列化与 DTO |
 | [timeline-evaluation.md](timeline-evaluation.md) | 时间轴与曲线求值：关键帧求值流程、贝塞尔缓动（牛顿+二分）、空间插值、Precomp 时间映射、缓存策略 |
 | [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、Lottie/序列帧导出边界、线程模型 |
+| [libpag-rendering-optimization-notes.md](libpag-rendering-optimization-notes.md) | libpag 渲染优化对照：contentVersion / 静帧缓存 / Snapshot / maxFrameRate 等，及对 MotionStudio 持续播放高 CPU 的改进建议 |
 | [development-plan.md](development-plan.md) | 开发计划：M0–M4 里程碑（约 18 周）、风险清单、测试策略 |
 
 ## 阅读顺序
