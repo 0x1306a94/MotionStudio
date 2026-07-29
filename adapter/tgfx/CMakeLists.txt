@@ -108,7 +108,7 @@ else()
   endfunction()
 endif()
 
-add_files_by_extension(TGFX_ADAPTER_SOURCES ".h;.mm"
+add_files_by_extension(TGFX_ADAPTER_SOURCES ".h;.mm;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
