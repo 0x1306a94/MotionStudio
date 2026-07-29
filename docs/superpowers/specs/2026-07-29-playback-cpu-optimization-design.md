@@ -161,6 +161,8 @@ Phase 1 之后，同一量化帧再次绘制时（循环、回拖、重复回调
 
 可选加强：**hold 段映射**——若区间内采样到的 animatable 皆静态，多帧映射同一 cache key（仅简单 hold 检测，不做完整 libpag 静帧区间）。
 
+**Phase 2 落地结果（2026-07-29）：** `FrameCommandCache`（LRU≤256）仅在 `PLAYBACK` 下按整数帧缓存场景命令；revision/composition 变化清空。未做 hold 段映射。
+
 ### 2.2 接口草案
 
 ```cpp

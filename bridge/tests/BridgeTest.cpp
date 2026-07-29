@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 
+#include "FrameCommandCache.h"
 #include "motionstudio_bridge.h"
 
 namespace {
@@ -585,6 +586,27 @@ TEST(BridgeCanvasTest, DrawModeApiNullSafe) {
     ms_canvas_set_content_revision(nullptr, 99);
     EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
     EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
+}
+
+TEST(BridgeCanvasTest, FrameCommandCacheHitAndRevisionInvalidation) {
+    motionstudio::FrameCommandCache cache;
+    cache.invalidateIfStale(10, 1);
+    motionstudio::FrameCommandCache::Entry entry;
+    entry.viewportWidth = 100;
+    entry.viewportHeight = 50;
+    entry.layerCount = 2;
+    cache.put(3, entry);
+
+    const motionstudio::FrameCommandCache::Entry *found = cache.find(3);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->viewportWidth, 100);
+    EXPECT_EQ(found->viewportHeight, 50);
+    EXPECT_EQ(found->layerCount, 2u);
+    EXPECT_EQ(cache.find(4), nullptr);
+
+    cache.invalidateIfStale(10, 2);
+    EXPECT_EQ(cache.find(3), nullptr);
+    EXPECT_EQ(cache.size(), 0u);
 }
 
 TEST(BridgeCommandTest, StrokeStyleLifecycle) {
