@@ -166,6 +166,10 @@ add_source_group(TGFX_ADAPTER_TEST_SOURCES ${CMAKE_CURRENT_LIST_DIR}/tests "Test
 disable_xcode_target_signing(tgfx_adapter_test)
 
 target_link_libraries(tgfx_adapter_test PRIVATE motionstudio_tgfx_adapter GTest::gtest_main)
+target_include_directories(tgfx_adapter_test
+                           PRIVATE
+                           "${CMAKE_CURRENT_SOURCE_DIR}/src"
+                           "${TGFX_INCLUDE_DIR}")
 motionstudio_add_tgfx_prebuild(tgfx_adapter_test)
 motionstudio_link_prebuilt_tgfx(tgfx_adapter_test)
 gtest_discover_tests(tgfx_adapter_test)

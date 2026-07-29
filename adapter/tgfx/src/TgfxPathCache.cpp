@@ -38,6 +38,24 @@ tgfx::Path BuildPositionedStrokeOutline(const tgfx::Path &strokeGeometry,
     return outline;
 }
 
+// Miter/Butt keep hard corners; Round made shrink look like residual feather.
+tgfx::Path BuildMaskExpandedPath(const tgfx::Path &sourcePath, float expansion) {
+    tgfx::Stroke stroke(std::abs(expansion) * 2.0f, tgfx::LineCap::Butt, tgfx::LineJoin::Miter);
+    tgfx::Path stroked = sourcePath;
+    if (!stroke.applyToPath(&stroked)) {
+        return sourcePath;
+    }
+    if (expansion > 0.0f) {
+        tgfx::Path result = sourcePath;
+        result.addPath(stroked, tgfx::PathOp::Union);
+        return result;
+    }
+    // Shrink: keep the inner half of the stroke band.
+    tgfx::Path result = stroked;
+    result.addPath(sourcePath, tgfx::PathOp::Intersect);
+    return result;
+}
+
 }  // namespace
 
 bool NeedsTrim(const StrokeOptions &options) {
@@ -69,7 +87,8 @@ bool TgfxPathCache::DerivedPathCacheKey::operator==(const DerivedPathCacheKey &o
         derivedKind == other.derivedKind && hasTrim == other.hasTrim &&
         FloatBits(trimStart) == FloatBits(other.trimStart) &&
         FloatBits(trimEnd) == FloatBits(other.trimEnd) && position == other.position &&
-        FloatBits(width) == FloatBits(other.width) && cap == other.cap && join == other.join;
+        FloatBits(width) == FloatBits(other.width) && cap == other.cap && join == other.join &&
+        FloatBits(expansion) == FloatBits(other.expansion);
 }
 
 size_t TgfxPathCache::DerivedPathCacheKeyHash::operator()(const DerivedPathCacheKey &key) const {
@@ -84,6 +103,7 @@ size_t TgfxPathCache::DerivedPathCacheKeyHash::operator()(const DerivedPathCache
     hash = MixHash(hash, FloatBits(key.width));
     hash = MixHash(hash, static_cast<uint64_t>(key.cap));
     hash = MixHash(hash, static_cast<uint64_t>(key.join));
+    hash = MixHash(hash, FloatBits(key.expansion));
     return static_cast<size_t>(hash);
 }
 
@@ -158,6 +178,31 @@ tgfx::Path TgfxPathCache::ResolvePositionedOutline(const ShapeGeometry &geometry
     }
     derivedOrder_.push_front(
         {key, BuildPositionedStrokeOutline(strokeGeometry, fullPath, options)});
+    derivedIndex_.emplace(key, derivedOrder_.begin());
+    return derivedOrder_.front().second;
+}
+
+tgfx::Path TgfxPathCache::ResolveMaskExpanded(const ShapeGeometry &geometry, FillRule fillRule,
+                                              float expansion, const tgfx::Path &sourcePath) {
+    if (expansion == 0.0f) {
+        return sourcePath;
+    }
+    DerivedPathCacheKey key;
+    key.kind = geometry.kind;
+    key.fillRule = fillRule;
+    key.contentHash = HashGeometry(geometry, fillRule);
+    key.derivedKind = DerivedPathKind::MaskExpanded;
+    key.expansion = expansion;
+    const auto found = derivedIndex_.find(key);
+    if (found != derivedIndex_.end()) {
+        derivedOrder_.splice(derivedOrder_.begin(), derivedOrder_, found->second);
+        return found->second->second;
+    }
+    if (derivedOrder_.size() >= DerivedCapacity) {
+        derivedIndex_.erase(derivedOrder_.back().first);
+        derivedOrder_.pop_back();
+    }
+    derivedOrder_.push_front({key, BuildMaskExpandedPath(sourcePath, expansion)});
     derivedIndex_.emplace(key, derivedOrder_.begin());
     return derivedOrder_.front().second;
 }

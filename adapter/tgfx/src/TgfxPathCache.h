@@ -39,11 +39,17 @@ struct TgfxPathCache {
                                         bool hasTrim, const TrimWindow &window,
                                         const StrokeOptions &options, const tgfx::Path &fullPath,
                                         const tgfx::Path &strokeGeometry);
+    // expansion==0 returns sourcePath without touching the derived LRU.
+    // inverted is applied by the caller (toggleInverseFillType) so it stays
+    // out of the cache key.
+    tgfx::Path ResolveMaskExpanded(const ShapeGeometry &geometry, FillRule fillRule,
+                                   float expansion, const tgfx::Path &sourcePath);
 
   private:
     enum class DerivedPathKind : uint8_t {
         Trimmed = 0,
         PositionedOutline = 1,
+        MaskExpanded = 2,
     };
 
     struct PathCacheKey {
@@ -73,6 +79,8 @@ struct TgfxPathCache {
         float width = 0.0f;
         LineCap cap = LineCap::Butt;
         LineJoin join = LineJoin::Miter;
+        // Meaningful when derivedKind == MaskExpanded.
+        float expansion = 0.0f;
 
         bool operator==(const DerivedPathCacheKey &other) const;
     };
