@@ -28,8 +28,7 @@
 | `Timeline/Root/TimelineReorder.swift`（新建） | 纯函数：目标序、move 步骤、UI↔model 槽换算、排列动作目标序 |
 | `MotionStudioAppTests/TimelineReorderTests.swift`（新建） | 上述纯函数单测 |
 | `Model/MotionDocumentCore.swift` | 封装 `moveLayer`；可选 `applyLayerOrder` |
-| `Timeline/Sidebar/LayerColumn.swift` | 拖拽、插入线、块几何、调用重排 |
-| `Timeline/Sidebar/LayerRow.swift` | 右键菜单；拖拽手势挂整行（按钮除外） |
+| `Timeline/Sidebar/TimelineSidebarView.swift` | 侧栏图层拖放重排、右键菜单、排列 |
 | `Editor/EditorViewController+Commands.swift` | `@objc` 排列动作 + 共用 `arrangeSelection` |
 | `Editor/EditorViewController.swift` | `canPerformAction` / `keyCommands` |
 | `App/AppDelegate.swift` | Catalyst Arrange 子菜单 |
@@ -394,8 +393,8 @@ builder.insertSibling(arrangeMenu, afterMenu: .edit)
 ### Task 5: LayerColumn 拖拽重排 + 插入线 + 右键菜单
 
 **Files:**
-- Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/LayerColumn.swift`
-- Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/LayerRow.swift`
+- Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/TimelineSidebarView.swift`
+- Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/TimelineSidebarView.swift`
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineView.swift` / `TimelineContentView.swift`（如需向下传 `registerEdit`）
 
 **Interfaces:**

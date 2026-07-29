@@ -2,7 +2,7 @@
 //  TimelinePointerInputOverlay.swift
 //  MotionStudioApp
 //
-//  Trackpad pinch / scroll / hover for the UIKit timeline track column.
+//  Trackpad pinch / scroll / hover for the timeline track column.
 //
 
 import UIKit

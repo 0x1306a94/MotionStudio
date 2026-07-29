@@ -2,7 +2,7 @@
 //  TimelineViewController.swift
 //  MotionStudioApp
 //
-//  UIKit timeline root. Replaces SwiftUI Timeline hosting in the editor shell.
+//  Timeline root view controller embedded in the editor shell.
 //
 
 import UIKit

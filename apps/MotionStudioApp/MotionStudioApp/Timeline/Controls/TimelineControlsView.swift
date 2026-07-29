@@ -2,7 +2,7 @@
 //  TimelineControlsView.swift
 //  MotionStudioApp
 //
-//  Playback and preview controls above the UIKit timeline.
+//  Playback and preview controls above the timeline.
 //
 
 import UIKit

@@ -27,7 +27,7 @@
 |---|---|
 | `Timeline/Tracks/TimelineDragEngine.swift` | 新建：session / resolve / KeyframeMove |
 | `MotionStudioAppTests/TimelineDragEngineTests.swift` | 新建：引擎单测 |
-| `Timeline/UIKit/TimelineTracksView.swift` | 改：三路手势 + 按 scope 就地刷新 |
+| `Timeline/Tracks/TimelineTracksView.swift` | 改：三路手势 + 按 scope 就地刷新 |
 | `Timeline/Tracks/TimeRangeDraft.swift` | 按需：若引擎复用则保持；否则不动 |
 | `Timeline/Tracks/TimeRangeDragEdge.swift` | 复用 |
 
@@ -133,7 +133,7 @@ EOF
 ### Task 2：timeRangeBar 改为 layerScale + 全量就地刷新
 
 **文件：**
-- 修改：`apps/MotionStudioApp/MotionStudioApp/Timeline/UIKit/TimelineTracksView.swift`
+- 修改：`apps/MotionStudioApp/MotionStudioApp/Timeline/Tracks/TimelineTracksView.swift`
   - `TimelineTrackRowView.updateRangeDrag` / `endRangeDrag`
   - `TimelineTracksView` 的 `onTimeRangeMoved` 刷新范围
 

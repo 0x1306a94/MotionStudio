@@ -2,7 +2,7 @@
 //  TimelineSidebarView.swift
 //  MotionStudioApp
 //
-//  Layer / property rows for the UIKit timeline sidebar.
+//  Layer / property rows for the timeline sidebar.
 //
 
 import MotionStudioBridging

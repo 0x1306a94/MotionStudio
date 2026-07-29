@@ -2,7 +2,7 @@
 //  TimelineScrollCoordinator.swift
 //  MotionStudioApp
 //
-//  Horizontal scroll / zoom metrics shared by UIKit timeline chrome.
+//  Horizontal scroll / zoom metrics shared by timeline chrome.
 //
 
 import UIKit

@@ -20,21 +20,24 @@
 
 ## 目标文件地图
 
+按职责落在 `Timeline/` 子目录（**无** `UIKit/` 文件夹）：
+
 | 路径 | 职责 |
 |---|---|
 | `Model/PlayheadClock.swift` | 保留 `@Observable`；增加 `addListener` / `removeListener` |
-| `Timeline/UIKit/TimelineViewController.swift` | 根 VC；revision reload；listener 生命周期 |
-| `Timeline/UIKit/TimelineControlsView.swift` | 播放/暂停、帧号、缩放、预览背景 |
-| `Timeline/UIKit/TimelineRulerView.swift` | 标尺绘制 |
-| `Timeline/UIKit/TimelinePlayheadView.swift` | 播放头线 + 拖拽 scrub |
-| `Timeline/UIKit/TimelineSidebarView.swift` | 图层/属性行 |
-| `Timeline/UIKit/TimelineTracksView.swift` | 时间条 / 属性轨 / 关键帧轨 |
-| `Timeline/UIKit/TimelineScrollCoordinator.swift` | 纵横向滚动与缩放协调 |
-| `Timeline/Root/TimelineSupport.swift` | 保留；必要时去掉仅 SwiftUI 的 import |
-| `Timeline/Root/TimelineReorder.swift` | 原样保留 |
+| `Timeline/Root/TimelineViewController.swift` | 根 VC；revision reload；listener 生命周期 |
+| `Timeline/Root/TimelineScrollCoordinator.swift` | 纵横向滚动与缩放协调 |
+| `Timeline/Root/TimelineSupport.swift` | 行构建 / 坐标常量 |
+| `Timeline/Root/TimelineReorder.swift` | 图层重排纯逻辑 |
+| `Timeline/Controls/TimelineControlsView.swift` | 播放/暂停、帧号、缩放、预览背景 |
+| `Timeline/Overlays/TimelineRulerCanvasView.swift` | 标尺绘制 |
+| `Timeline/Overlays/TimelinePlayheadView.swift` | 播放头线 + 拖拽 scrub |
+| `Timeline/Sidebar/TimelineSidebarView.swift` | 图层/属性行 |
+| `Timeline/Tracks/TimelineTracksView.swift` | 时间条 / 属性轨 / 关键帧轨 |
+| `Timeline/Input/TimelinePointerInputOverlay.swift` | trackpad 捏合 / 滚动 / hover |
+| `Timeline/Easing/TimelineEasingPopoverController.swift` | 缓动 popover（曲线 pad 可小范围 Hosting） |
 | `Editor/EditorViewController+Layout.swift` | Hosting → child VC |
-| `Editor/EditorSupportingViews.swift` | 无引用后删除 `UIKitTimelineHostView` |
-| 对齐后删除 | `Timeline/` 下 SwiftUI `*View` 入口（保留可复用纯文件） |
+| 对齐后删除 | `UIKitTimelineHostView`、SwiftUI Timeline 入口及无引用旧视图 |
 
 ---
 
@@ -69,7 +72,7 @@ git commit --only apps/MotionStudioApp/MotionStudioApp/Model/PlayheadClock.swift
 ### Task 2：骨架 TimelineViewController + 换宿主
 
 **文件：**
-- 新建：`apps/MotionStudioApp/MotionStudioApp/Timeline/UIKit/TimelineViewController.swift`
+- 新建：`apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineViewController.swift`
 - 修改：`EditorViewController.swift`（属性类型）
 - 修改：`EditorViewController+Layout.swift`（`configureTimeline`）
 - 若工程非文件夹同步，按现有方式把新文件加入 Xcode target
@@ -101,10 +104,10 @@ git commit --only <touched files> -m "Embed UIKit TimelineViewController stub in
 ### Task 3：控件 + 标尺 + 播放头（播放主路径）
 
 **文件：**
-- 新建：`Timeline/UIKit/TimelineControlsView.swift`
-- 新建：`Timeline/UIKit/TimelineRulerView.swift`
-- 新建：`Timeline/UIKit/TimelinePlayheadView.swift`
-- 新建：`Timeline/UIKit/TimelineScrollCoordinator.swift`（`scrollX` / `pointsPerFrame` 与 `EditorState` 对齐）
+- 新建：`Timeline/Controls/TimelineControlsView.swift`
+- 新建：`Timeline/Overlays/TimelineRulerCanvasView.swift`
+- 新建：`Timeline/Overlays/TimelinePlayheadView.swift`
+- 新建：`Timeline/Root/TimelineScrollCoordinator.swift`（`scrollX` / `pointsPerFrame` 与 `EditorState` 对齐）
 - 修改：`TimelineViewController.swift`
 - 复用：`TimelineSupport.swift`（`timelineX`、`timelineFrame`、常量）
 
@@ -144,7 +147,7 @@ git commit --only <touched files> -m "Port timeline controls ruler and playhead 
 ### Task 4：侧栏（图层 / 属性）
 
 **文件：**
-- 新建：`Timeline/UIKit/TimelineSidebarView.swift`（+ cell）
+- 新建：`Timeline/Sidebar/TimelineSidebarView.swift`（+ cell）
 - 修改：`TimelineViewController.swift`
 - 复用：`buildTimelineRows`、`TimelineReorder.swift`、`LayerColumn` 菜单逻辑
 
@@ -175,7 +178,7 @@ git commit --only <touched files> -m "Port timeline layer sidebar interactions t
 ### Task 5：轨道（时间条 / 属性 / 关键帧）
 
 **文件：**
-- 新建：`Timeline/UIKit/TimelineTracksView.swift`（+ 子视图）
+- 新建：`Timeline/Tracks/TimelineTracksView.swift`（+ 子视图）
 - 复用：`TimeRangeDraft`、`KeyframeSegment`、现有拖拽换算
 - 修改：`TimelineScrollCoordinator` 与侧栏纵向同步
 
@@ -206,7 +209,7 @@ git commit --only <touched files> -m "Port timeline track bars and keyframe edit
 ### Task 6：滚动 / 缩放 / 指针输入对齐
 
 **文件：**
-- 移植或包装：`Timeline/Input/TimelinePointerInputView.swift`（trackpad 捏合/滚动/hover，若仍需要）
+- 移植或包装：`Timeline/Input/TimelinePointerInputOverlay.swift`（trackpad 捏合/滚动/hover，若仍需要）
 - 修改：coordinator + contentSize
 
 - [ ] **Step 1：横向滚动 + 捏合缩放并保留播放头锚点**

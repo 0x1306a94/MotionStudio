@@ -2,7 +2,7 @@
 //  TimelineTracksView.swift
 //  MotionStudioApp
 //
-//  Layer time-range bars, property spans, and keyframe tracks (UIKit).
+//  Layer time-range bars, property spans, and keyframe tracks.
 //
 
 import MotionStudioBridging

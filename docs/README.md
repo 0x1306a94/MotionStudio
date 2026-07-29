@@ -12,7 +12,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、Lottie/序列帧导出边界、线程模型 |
 | [libpag-rendering-optimization-notes.md](libpag-rendering-optimization-notes.md) | libpag 渲染优化对照：contentVersion / 静帧缓存 / Snapshot / maxFrameRate 等，及对 MotionStudio 持续播放高 CPU 的改进建议 |
 | [superpowers/specs/2026-07-29-playback-cpu-optimization-design.md](superpowers/specs/2026-07-29-playback-cpu-optimization-design.md) | 播放预览 CPU：Phase 1/2 已落地；Phase 3 GPU Snapshot 取消及原因 |
-| [superpowers/specs/2026-07-29-timeline-uikit-migration-design.md](superpowers/specs/2026-07-29-timeline-uikit-migration-design.md) | 底部 Timeline SwiftUI→UIKit；PlayheadClock listener，暂留 @Observable |
+| [superpowers/specs/2026-07-29-timeline-uikit-migration-design.md](superpowers/specs/2026-07-29-timeline-uikit-migration-design.md) | 底部 Timeline 已迁 UIKit（按职责分子目录）；PlayheadClock listener + 保留 @Observable |
 | [development-plan.md](development-plan.md) | 开发计划：M0–M4 里程碑（约 18 周）、风险清单、测试策略 |
 
 ## 阅读顺序

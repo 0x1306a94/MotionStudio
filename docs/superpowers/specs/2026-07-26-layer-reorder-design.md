@@ -134,7 +134,7 @@ iPad 保留右键菜单，并可按需把相同快捷键挂到 `keyCommands`；�
 ## 预计改动文件
 
 - `apps/.../Model/MotionDocumentCore.swift` — 封装 `ms_command_move_layer`
-- `apps/.../Timeline/Sidebar/LayerColumn.swift` / `LayerRow.swift` — 拖拽、插入线、右键菜单
+- `apps/.../Timeline/Sidebar/TimelineSidebarView.swift` — 图层拖放重排、右键菜单
 - `apps/.../App/AppDelegate.swift` — `buildMenu` 增加 Arrange 子菜单
 - `apps/.../Editor/EditorViewController.swift`（及 Commands）— `@objc` 排列动作、`canPerformAction`、可选 `keyCommands`
 - 时间轴下新增辅助（如 `TimelineReorder.swift`）

@@ -104,21 +104,20 @@ final class PlayheadClock {
 - [ ] 与 `EditorState` / Canvas 选中联动
 - [ ] undo 仍走 `perform` / `registerEdit`
 
-### 2.6 建议目录
+### 2.6 目录（按职责拆分，无 `UIKit/` 子目录）
 
 ```
 Timeline/
-  UIKit/
-    TimelineViewController.swift
-    TimelineControlsView.swift
-    TimelineRulerView.swift
-    TimelinePlayheadView.swift
-    TimelineSidebarView.swift
-    TimelineTracksView.swift
-    ...
+  Root/          TimelineViewController, ScrollCoordinator, Support, Reorder
+  Controls/      TimelineControlsView
+  Sidebar/       TimelineSidebarView
+  Tracks/        TimelineTracksView + 拖拽引擎 / draft
+  Overlays/      TimelineRulerCanvasView, TimelinePlayheadView
+  Input/         TimelinePointerInputOverlay
+  Easing/        TimelineEasingPopoverController（曲线 pad 可小范围 Hosting）
 ```
 
-旧 SwiftUI Timeline 文件在迁移完成后删除。
+旧 SwiftUI Timeline 入口与无引用视图已删除；`PlayheadClock.@Observable` 保留（Inspector 与 UIKit listener 并存）。
 
 ## 3. 风险、验收、落地
 

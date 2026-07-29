@@ -2,7 +2,7 @@
 //  TimelineRulerCanvasView.swift
 //  MotionStudioApp
 //
-//  UIKit timeline ruler drawing and scrub gesture.
+//  Timeline ruler drawing and scrub gesture.
 //
 
 import UIKit
