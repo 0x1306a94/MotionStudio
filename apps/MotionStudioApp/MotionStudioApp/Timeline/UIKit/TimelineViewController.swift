@@ -5,6 +5,7 @@
 //  UIKit timeline root. Replaces SwiftUI Timeline hosting in the editor shell.
 //
 
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -27,6 +28,8 @@ final class TimelineViewController: UIViewController {
     private let bodySplit = UIView()
     private let trackColumn = UIView()
     private let leftColumn = UIView()
+    private let splitHitArea = UIView()
+    private lazy var pointerOverlay = TimelinePointerInputOverlay(editorState: editorState)
 
     private var playheadListenerID: UUID?
     private var layerColumnWidthConstraint: NSLayoutConstraint?
@@ -35,6 +38,10 @@ final class TimelineViewController: UIViewController {
     private var isObservingPlayback = false
     private var isObservingZoom = false
     private var isObservingSelection = false
+    private var isTimeRangeDragging = false
+    private var splitDragStartWidth: CGFloat?
+    private var horizontalPanStartScrollX: CGFloat?
+    private var easingHost: UIViewController?
 
     init(document: MotionProjectState,
          editorState: EditorState,
@@ -123,6 +130,8 @@ final class TimelineViewController: UIViewController {
         styleSplit(bodySplit)
         sidebarView.delegate = self
         tracksView.delegate = self
+        splitHitArea.translatesAutoresizingMaskIntoConstraints = false
+        splitHitArea.backgroundColor = .clear
 
         let headerSeparator = hairline()
         let bodySeparator = hairline()
@@ -134,6 +143,7 @@ final class TimelineViewController: UIViewController {
         view.addSubview(headerSplit)
         view.addSubview(bodySplit)
         view.addSubview(trackColumn)
+        view.addSubview(splitHitArea)
 
         leftColumn.addSubview(layersHeaderLabel)
         leftColumn.addSubview(headerSeparator)
@@ -143,6 +153,7 @@ final class TimelineViewController: UIViewController {
         trackColumn.addSubview(bodySeparator)
         trackColumn.addSubview(tracksView)
         trackColumn.addSubview(playheadView)
+        trackColumn.addSubview(pointerOverlay)
         trackColumn.clipsToBounds = true
 
         let widthConstraint = leftColumn.widthAnchor.constraint(equalToConstant: scrollCoordinator.layerColumnWidth)
@@ -212,6 +223,16 @@ final class TimelineViewController: UIViewController {
             playheadView.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
             playheadView.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
             playheadView.bottomAnchor.constraint(equalTo: trackColumn.bottomAnchor),
+
+            pointerOverlay.topAnchor.constraint(equalTo: trackColumn.topAnchor),
+            pointerOverlay.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
+            pointerOverlay.trailingAnchor.constraint(equalTo: trackColumn.trailingAnchor),
+            pointerOverlay.bottomAnchor.constraint(equalTo: trackColumn.bottomAnchor),
+
+            splitHitArea.topAnchor.constraint(equalTo: leftColumn.topAnchor),
+            splitHitArea.leadingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
+            splitHitArea.widthAnchor.constraint(equalToConstant: splitDividerWidth),
+            splitHitArea.bottomAnchor.constraint(equalTo: leftColumn.bottomAnchor),
         ])
     }
 
@@ -229,6 +250,19 @@ final class TimelineViewController: UIViewController {
         playheadView.onScrub = { [weak self] visibleX in
             self?.scrub(atVisibleX: visibleX)
         }
+        pointerOverlay.onPlayheadHoveringChanged = { [weak self] hovering in
+            self?.playheadView.setHovering(hovering)
+        }
+        tracksView.onPresentEasing = { [weak self] request in
+            self?.presentEasingEditor(request)
+        }
+
+        let splitPan = UIPanGestureRecognizer(target: self, action: #selector(handleSplitDrag(_:)))
+        splitHitArea.addGestureRecognizer(splitPan)
+
+        let horizontalPan = UIPanGestureRecognizer(target: self, action: #selector(handleHorizontalPan(_:)))
+        horizontalPan.delegate = self
+        tracksView.addGestureRecognizer(horizontalPan)
     }
 
     private func reloadFromDocument() {
@@ -265,11 +299,19 @@ final class TimelineViewController: UIViewController {
     private func updatePlayheadPosition() {
         let visibleX = timelineX(for: playheadClock.frame, pointsPerFrame: scrollCoordinator.pointsPerFrame)
             - scrollCoordinator.scrollX
+        let contentX: CGFloat?
         if visibleX >= 0, visibleX <= scrollCoordinator.trackViewportWidth {
-            playheadView.setContentX(trackLeadingInset + visibleX)
+            contentX = trackLeadingInset + visibleX
+            playheadView.setContentX(contentX)
         } else {
+            contentX = nil
             playheadView.setContentX(nil)
         }
+        pointerOverlay.update(duration: scrollCoordinator.duration,
+                              pointsPerFrame: scrollCoordinator.pointsPerFrame,
+                              trackWidth: scrollCoordinator.trackWidth,
+                              viewportWidth: scrollCoordinator.trackViewportWidth,
+                              visiblePlayheadX: contentX ?? -1000)
     }
 
     private func handlePlayheadFrameChanged(_ frame: Int64) {
@@ -354,10 +396,6 @@ final class TimelineViewController: UIViewController {
         }
     }
 
-    private func styleSplit(_ view: UIView) {
-        view.backgroundColor = UIColor.secondaryLabel.withAlphaComponent(0.2)
-    }
-
     private func hairline() -> UIView {
         let line = UIView()
         line.translatesAutoresizingMaskIntoConstraints = false
@@ -375,7 +413,109 @@ extension TimelineViewController: TimelineSidebarViewDelegate, TimelineTracksVie
         sidebarView.contentOffsetY = offsetY
     }
 
-    func timelineTracksTimeRangeDraggingChanged(_: TimelineTracksView, isDragging _: Bool) {
-        // Reserved for pan-vs-scrub arbitration in Task 6.
+    func timelineTracksTimeRangeDraggingChanged(_: TimelineTracksView, isDragging: Bool) {
+        isTimeRangeDragging = isDragging
+    }
+}
+
+extension TimelineViewController: UIGestureRecognizerDelegate {
+    @objc private func handleSplitDrag(_ recognizer: UIPanGestureRecognizer) {
+        switch recognizer.state {
+        case .began:
+            splitDragStartWidth = scrollCoordinator.layerColumnWidth
+            styleSplit(headerSplit, active: true)
+            styleSplit(bodySplit, active: true)
+        case .changed:
+            guard let start = splitDragStartWidth else {
+                return
+            }
+            let next = min(max(start + recognizer.translation(in: view).x, minLayerColumnWidth), maxLayerColumnWidth)
+            scrollCoordinator.layerColumnWidth = next
+            layerColumnWidthConstraint?.constant = next
+            view.layoutIfNeeded()
+            scrollCoordinator.updateTrackViewportWidth(max(1, trackColumn.bounds.width - trackLeadingInset * 2))
+            refreshTrackChrome(updateControls: false)
+        case .ended, .cancelled, .failed:
+            splitDragStartWidth = nil
+            styleSplit(headerSplit, active: false)
+            styleSplit(bodySplit, active: false)
+        default:
+            break
+        }
+    }
+
+    @objc private func handleHorizontalPan(_ recognizer: UIPanGestureRecognizer) {
+        guard !isTimeRangeDragging else {
+            return
+        }
+        switch recognizer.state {
+        case .began:
+            let playheadX = scrollCoordinator.visibleContentX(for: playheadClock.frame)
+            let startX = recognizer.location(in: tracksView).x
+            if abs(startX - playheadX) <= 10 {
+                horizontalPanStartScrollX = .nan
+            } else {
+                horizontalPanStartScrollX = CGFloat(editorState.timelineScrollX)
+            }
+        case .changed:
+            guard let start = horizontalPanStartScrollX, !start.isNaN else {
+                return
+            }
+            let next = start - recognizer.translation(in: tracksView).x
+            editorState.timelineScrollX = Double(min(max(next, 0),
+                                                     max(0, scrollCoordinator.trackWidth - scrollCoordinator.trackViewportWidth)))
+        default:
+            horizontalPanStartScrollX = nil
+        }
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let pan = gestureRecognizer as? UIPanGestureRecognizer, pan.view === tracksView else {
+            return true
+        }
+        let velocity = pan.velocity(in: tracksView)
+        return abs(velocity.x) > abs(velocity.y)
+    }
+
+    func gestureRecognizer(_: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer) -> Bool
+    {
+        true
+    }
+
+    private func styleSplit(_ view: UIView, active: Bool = false) {
+        view.backgroundColor = active
+            ? UIColor.tintColor.withAlphaComponent(0.35)
+            : UIColor.secondaryLabel.withAlphaComponent(0.2)
+    }
+
+    private func presentEasingEditor(_ request: TimelineEasingPresentationRequest) {
+        easingHost?.dismiss(animated: false)
+        let popover = KeyframeEasingPopover(easing: request.easing,
+                                            easingAffectsPlayback: request.easingAffectsPlayback,
+                                            onSetEasing: { easing in
+                                                request.onSetEasing(easing)
+                                            },
+                                            onDelete: request.onDelete,
+                                            onCommit: request.onCommit,
+                                            onDragBegan: request.onDragBegan,
+                                            onDragEnded: request.onDragEnded)
+        let host = UIHostingController(rootView: popover)
+        host.modalPresentationStyle = .popover
+        host.preferredContentSize = CGSize(width: 240, height: 360)
+        if let pop = host.popoverPresentationController {
+            pop.sourceView = request.sourceView
+            pop.sourceRect = request.sourceView.bounds
+            pop.permittedArrowDirections = [.up, .down]
+            pop.delegate = self
+        }
+        easingHost = host
+        present(host, animated: true)
+    }
+}
+
+extension TimelineViewController: UIPopoverPresentationControllerDelegate {
+    func adaptivePresentationStyle(for _: UIPresentationController) -> UIModalPresentationStyle {
+        .none
     }
 }

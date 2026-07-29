@@ -14,9 +14,21 @@ protocol TimelineTracksViewDelegate: AnyObject {
     func timelineTracksTimeRangeDraggingChanged(_ tracks: TimelineTracksView, isDragging: Bool)
 }
 
+struct TimelineEasingPresentationRequest {
+    let easing: EasingInfo
+    let easingAffectsPlayback: Bool
+    let sourceView: UIView
+    let onSetEasing: (EasingInfo) -> Void
+    let onDelete: (() -> Void)?
+    let onCommit: () -> Void
+    let onDragBegan: () -> Void
+    let onDragEnded: () -> Void
+}
+
 @MainActor
 final class TimelineTracksView: UIView {
     weak var delegate: TimelineTracksViewDelegate?
+    var onPresentEasing: ((TimelineEasingPresentationRequest) -> Void)?
 
     private let document: MotionProjectState
     private let editorState: EditorState
@@ -138,6 +150,9 @@ final class TimelineTracksView: UIView {
                 }
                 delegate?.timelineTracksTimeRangeDraggingChanged(self, isDragging: isDragging)
             }
+            rowView.onPresentEasing = { [weak self] request in
+                self?.onPresentEasing?(request)
+            }
             rowView.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview(rowView)
             NSLayoutConstraint.activate([
@@ -173,6 +188,7 @@ extension TimelineTracksView: UIScrollViewDelegate {
 @MainActor
 private final class TimelineTrackRowView: UIView {
     var onTimeRangeDraggingChanged: ((Bool) -> Void)?
+    var onPresentEasing: ((TimelineEasingPresentationRequest) -> Void)?
 
     private let document: MotionProjectState
     private let editorState: EditorState
@@ -365,7 +381,8 @@ private final class TimelineTrackRowView: UIView {
                 }
                 editorState.selectedLayerID = row.layerID
                 editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: row.layerID, path: path)
-                if index + 1 < keyframes.count {
+                let hasOutgoing = index + 1 < keyframes.count
+                if hasOutgoing {
                     let next = keyframes[index + 1]
                     editorState.selectedTimelineSegment = TimelineSegmentSelection(layerID: row.layerID,
                                                                                    path: path,
@@ -374,6 +391,25 @@ private final class TimelineTrackRowView: UIView {
                 } else {
                     editorState.selectedTimelineSegment = nil
                 }
+                onPresentEasing?(TimelineEasingPresentationRequest(
+                    easing: keyframe.easing,
+                    easingAffectsPlayback: hasOutgoing,
+                    sourceView: diamond,
+                    onSetEasing: { easing in
+                        self.document.core.setEasing(entityID: self.row.layerID, path: path, frame: lastFrame, easing: easing)
+                    },
+                    onDelete: {
+                        self.performEdit("Delete Keyframe") {
+                            self.document.core.removeKeyframe(entityID: self.row.layerID, path: path, frame: lastFrame)
+                        }
+                    },
+                    onCommit: { self.registerEdit("Set Easing") },
+                    onDragBegan: { self.document.core.beginDrag() },
+                    onDragEnded: {
+                        self.document.core.endDrag()
+                        self.registerEdit("Set Easing")
+                    },
+                ))
             }
             addSubview(diamond)
             diamondViews.append(diamond)
@@ -517,6 +553,25 @@ private final class TimelineTrackRowView: UIView {
                                                                        path: path,
                                                                        startFrame: start,
                                                                        endFrame: end)
+        let keyframes = document.core.keyframes(entityID: row.layerID, path: path)
+        guard let startKeyframe = keyframes.first(where: { $0.frame == start }) else {
+            return
+        }
+        onPresentEasing?(TimelineEasingPresentationRequest(
+            easing: startKeyframe.easing,
+            easingAffectsPlayback: true,
+            sourceView: recognizer.view ?? self,
+            onSetEasing: { easing in
+                self.document.core.setEasing(entityID: self.row.layerID, path: path, frame: start, easing: easing)
+            },
+            onDelete: nil,
+            onCommit: { self.registerEdit("Set Easing") },
+            onDragBegan: { self.document.core.beginDrag() },
+            onDragEnded: {
+                self.document.core.endDrag()
+                self.registerEdit("Set Easing")
+            },
+        ))
     }
 }
 
