@@ -323,15 +323,14 @@ private final class TimelineTrackRowView: UIView {
                                                                                    path: path,
                                                                                    startFrame: segment.start.frame,
                                                                                    endFrame: segment.end.frame)
-            let line = UIView(frame: CGRect(x: startX, y: propertyRowHeight / 2 - 1, width: width, height: selected ? 4 : 2))
-            line.backgroundColor = selected ? .tintColor : UIColor.secondaryLabel.withAlphaComponent(0.25)
-            line.layer.cornerRadius = line.bounds.height / 2
+            let segmentView = TimelineKeyframeSegmentView(frame: CGRect(x: startX, y: 0, width: width, height: propertyRowHeight))
+            segmentView.configure(easing: segment.start.easing, isSelected: selected)
             let tap = UITapGestureRecognizer(target: self, action: #selector(handleSegmentTap(_:)))
-            line.addGestureRecognizer(tap)
-            line.isUserInteractionEnabled = true
-            line.accessibilityIdentifier = "\(segment.start.frame):\(segment.end.frame):\(path)"
-            addSubview(line)
-            segmentViews.append(line)
+            segmentView.addGestureRecognizer(tap)
+            segmentView.isUserInteractionEnabled = true
+            segmentView.accessibilityIdentifier = "\(segment.start.frame):\(segment.end.frame):\(path)"
+            addSubview(segmentView)
+            segmentViews.append(segmentView)
         }
         for (index, keyframe) in keyframes.enumerated() {
             let selected = trackSelected || isKeyframeSelected(keyframe.frame, path: path)
@@ -575,7 +574,63 @@ private final class TimelineTrackRowView: UIView {
     }
 }
 
-// MARK: - Bars / diamonds
+// MARK: - Bars / diamonds / segment badges
+
+@MainActor
+private final class TimelineKeyframeSegmentView: UIView {
+    private let lineView = UIView()
+    private let badgeBackground = UIView()
+    private let badgeIcon = UIImageView()
+    private var lineHeightConstraint: NSLayoutConstraint?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        lineView.translatesAutoresizingMaskIntoConstraints = false
+        badgeBackground.translatesAutoresizingMaskIntoConstraints = false
+        badgeIcon.translatesAutoresizingMaskIntoConstraints = false
+        badgeBackground.layer.cornerRadius = 5
+        badgeBackground.layer.borderWidth = 1
+        badgeIcon.contentMode = .scaleAspectFit
+        badgeIcon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 9, weight: .semibold)
+        addSubview(lineView)
+        addSubview(badgeBackground)
+        badgeBackground.addSubview(badgeIcon)
+        let height = lineView.heightAnchor.constraint(equalToConstant: 2)
+        lineHeightConstraint = height
+        NSLayoutConstraint.activate([
+            lineView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            lineView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            lineView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            height,
+            badgeBackground.centerXAnchor.constraint(equalTo: centerXAnchor),
+            badgeBackground.centerYAnchor.constraint(equalTo: centerYAnchor),
+            badgeBackground.widthAnchor.constraint(equalToConstant: 18),
+            badgeBackground.heightAnchor.constraint(equalToConstant: 16),
+            badgeIcon.centerXAnchor.constraint(equalTo: badgeBackground.centerXAnchor),
+            badgeIcon.centerYAnchor.constraint(equalTo: badgeBackground.centerYAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        nil
+    }
+
+    func configure(easing: EasingInfo, isSelected: Bool) {
+        let lineHeight: CGFloat = isSelected ? 4 : 2
+        lineView.backgroundColor = isSelected ? .tintColor : UIColor.secondaryLabel.withAlphaComponent(0.25)
+        lineView.layer.cornerRadius = lineHeight / 2
+        lineHeightConstraint?.constant = lineHeight
+
+        let symbol = easing.kind == .HOLD ? "pause.fill" : "point.topleft.down.curvedto.point.bottomright.up"
+        badgeIcon.image = UIImage(systemName: symbol)
+        badgeIcon.tintColor = isSelected ? .white : UIColor.secondaryLabel.withAlphaComponent(0.7)
+        badgeBackground.backgroundColor = isSelected ? .tintColor : UIColor.secondaryLabel.withAlphaComponent(0.08)
+        badgeBackground.layer.borderColor = (isSelected
+            ? UIColor.tintColor.withAlphaComponent(0.35)
+            : UIColor.secondaryLabel.withAlphaComponent(0.22)).cgColor
+    }
+}
 
 @MainActor
 private final class TimelineTimeRangeBarView: UIView {
@@ -711,7 +766,8 @@ private final class TimelineKeyframeDiamondView: UIView {
     }
 
     func configure(selected: Bool) {
-        imageView.tintColor = selected ? .tintColor : UIColor.white.withAlphaComponent(0.68)
+        // Unselected uses secondaryLabel — white was invisible on light track chrome.
+        imageView.tintColor = selected ? .tintColor : .secondaryLabel
     }
 
     @objc private func handleTap() {

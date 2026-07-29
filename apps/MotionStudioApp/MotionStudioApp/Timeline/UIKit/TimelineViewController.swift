@@ -5,7 +5,6 @@
 //  UIKit timeline root. Replaces SwiftUI Timeline hosting in the editor shell.
 //
 
-import SwiftUI
 import UIKit
 
 @MainActor
@@ -491,18 +490,13 @@ extension TimelineViewController: UIGestureRecognizerDelegate {
 
     private func presentEasingEditor(_ request: TimelineEasingPresentationRequest) {
         easingHost?.dismiss(animated: false)
-        let popover = KeyframeEasingPopover(easing: request.easing,
-                                            easingAffectsPlayback: request.easingAffectsPlayback,
-                                            onSetEasing: { easing in
-                                                request.onSetEasing(easing)
-                                            },
-                                            onDelete: request.onDelete,
-                                            onCommit: request.onCommit,
-                                            onDragBegan: request.onDragBegan,
-                                            onDragEnded: request.onDragEnded)
-        let host = UIHostingController(rootView: popover)
-        host.modalPresentationStyle = .popover
-        host.preferredContentSize = CGSize(width: 240, height: 360)
+        let host = TimelineEasingPopoverController(easing: request.easing,
+                                                   easingAffectsPlayback: request.easingAffectsPlayback,
+                                                   onSetEasing: request.onSetEasing,
+                                                   onDelete: request.onDelete,
+                                                   onCommit: request.onCommit,
+                                                   onDragBegan: request.onDragBegan,
+                                                   onDragEnded: request.onDragEnded)
         if let pop = host.popoverPresentationController {
             pop.sourceView = request.sourceView
             pop.sourceRect = request.sourceView.bounds

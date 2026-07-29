@@ -57,20 +57,30 @@ final class TimelineControlsView: UIView {
     }
 
     private func configureChrome() {
+        // Thumb extends past the track; keep a padded host so Catalyst stack layout
+        // does not clip the leading/trailing corners of the knob.
+        let zoomSliderHost = UIView()
+        zoomSliderHost.translatesAutoresizingMaskIntoConstraints = false
+        zoomSliderHost.clipsToBounds = false
+        zoomSlider.translatesAutoresizingMaskIntoConstraints = false
+        zoomSliderHost.addSubview(zoomSlider)
+
         let stack = UIStackView(arrangedSubviews: [
             UIView(),
             backdropButton,
             playButton,
             frameLabel,
             zoomOutButton,
-            zoomSlider,
+            zoomSliderHost,
             zoomInButton,
             UIView(),
         ])
         stack.axis = .horizontal
         stack.alignment = .center
         stack.spacing = 6
+        stack.clipsToBounds = false
         stack.translatesAutoresizingMaskIntoConstraints = false
+        clipsToBounds = false
         addSubview(stack)
 
         configureIconButton(backdropButton, action: #selector(cycleBackdrop))
@@ -89,7 +99,13 @@ final class TimelineControlsView: UIView {
         zoomSlider.maximumValue = Float(maxTimelinePointsPerFrame)
         zoomSlider.addTarget(self, action: #selector(zoomSliderChanged), for: .valueChanged)
         zoomSlider.accessibilityLabel = "Timeline Zoom"
-        zoomSlider.widthAnchor.constraint(equalToConstant: 112).isActive = true
+        NSLayoutConstraint.activate([
+            zoomSliderHost.widthAnchor.constraint(equalToConstant: 128),
+            zoomSliderHost.heightAnchor.constraint(equalToConstant: 31),
+            zoomSlider.leadingAnchor.constraint(equalTo: zoomSliderHost.leadingAnchor, constant: 8),
+            zoomSlider.trailingAnchor.constraint(equalTo: zoomSliderHost.trailingAnchor, constant: -8),
+            zoomSlider.centerYAnchor.constraint(equalTo: zoomSliderHost.centerYAnchor),
+        ])
 
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
