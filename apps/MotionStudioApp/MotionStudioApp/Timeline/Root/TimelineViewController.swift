@@ -153,6 +153,8 @@ final class TimelineViewController: UIViewController {
         trackColumn.addSubview(tracksView)
         trackColumn.addSubview(playheadView)
         trackColumn.addSubview(pointerOverlay)
+        // Pinch on the column so iPad finger touches (which pass through the overlay) still zoom.
+        pointerOverlay.attachPinch(to: trackColumn)
         trackColumn.clipsToBounds = true
 
         let widthConstraint = leftColumn.widthAnchor.constraint(equalToConstant: scrollCoordinator.layerColumnWidth)

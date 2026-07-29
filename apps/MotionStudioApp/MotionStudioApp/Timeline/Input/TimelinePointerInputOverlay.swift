@@ -2,7 +2,9 @@
 //  TimelinePointerInputOverlay.swift
 //  MotionStudioApp
 //
-//  Trackpad pinch / scroll / hover for the timeline track column.
+//  Trackpad scroll / hover for the timeline track column.
+//  Pinch lives on the track column (ancestor) so iPad finger touches that pass
+//  through this overlay still reach the pinch recognizer.
 //
 
 import UIKit
@@ -26,24 +28,24 @@ final class TimelinePointerInputOverlay: UIView {
     private var lastPinchScale: CGFloat = 1
     private var lastScrollTranslation: CGPoint = .zero
     private var lastPointerX: CGFloat?
-    private weak var pinchGesture: UIPinchGestureRecognizer?
+    private let pinchGesture: UIPinchGestureRecognizer
 
     init(editorState: EditorState) {
         self.editorState = editorState
+        let pinch = UIPinchGestureRecognizer()
+        pinchGesture = pinch
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = .clear
         isUserInteractionEnabled = true
 
+        pinch.addTarget(self, action: #selector(handlePinch(_:)))
+        pinch.cancelsTouchesInView = false
+        pinch.delegate = self
+
         let hover = UIHoverGestureRecognizer(target: self, action: #selector(handleHover(_:)))
         hover.cancelsTouchesInView = false
         addGestureRecognizer(hover)
-
-        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
-        pinch.cancelsTouchesInView = false
-        pinch.delegate = self
-        pinchGesture = pinch
-        addGestureRecognizer(pinch)
 
         let scroll = UIPanGestureRecognizer(target: self, action: #selector(handleScroll(_:)))
         scroll.maximumNumberOfTouches = 0
@@ -58,11 +60,20 @@ final class TimelinePointerInputOverlay: UIView {
         nil
     }
 
+    /// Installs pinch on `host` (the track column). Finger hit-testing passes through this
+    /// overlay to tracks; an ancestor recognizer still sees those touches.
+    func attachPinch(to host: UIView) {
+        pinchGesture.view?.removeGestureRecognizer(pinchGesture)
+        host.addGestureRecognizer(pinchGesture)
+    }
+
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         guard let event else {
             return super.point(inside: point, with: event)
         }
-        if event.type == .touches, (event.allTouches?.count ?? 1) <= 1 {
+        // All finger touches pass through so keyframe / scroll UI keeps receiving them.
+        // Trackpad and mouse events stay on the overlay.
+        if event.type == .touches {
             return false
         }
         return super.point(inside: point, with: event)
@@ -104,7 +115,7 @@ final class TimelinePointerInputOverlay: UIView {
     }
 
     @objc private func handleScroll(_ gesture: UIPanGestureRecognizer) {
-        if let pinchGesture, pinchGesture.state == .began || pinchGesture.state == .changed {
+        if pinchGesture.state == .began || pinchGesture.state == .changed {
             lastScrollTranslation = gesture.translation(in: self)
             return
         }
