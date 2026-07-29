@@ -392,8 +392,8 @@ struct DerivedPathCacheKeyHash {
 struct TgfxPathCache {
     // Front = most recently used. Capacity covers a few animated size variants
     // without unbounded growth across long playback sessions.
-    static constexpr size_t kCapacity = 512;
-    static constexpr size_t kDerivedCapacity = 512;
+    static constexpr size_t kCapacity = 1024;
+    static constexpr size_t kDerivedCapacity = 1024;
 
     using EntryList = std::list<std::pair<PathCacheKey, tgfx::Path>>;
     EntryList order;
