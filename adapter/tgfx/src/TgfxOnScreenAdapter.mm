@@ -93,8 +93,11 @@ bool TgfxOnScreenAdapter::acquireTarget(int /*width*/, int /*height*/) {
         device_->unlock();
         return false;
     }
-    const bool needsRecreate = !surface_ || surface_->width() != drawableWidth || surface_->height() != drawableHeight;
+    const bool needsRecreate = !surface_ || surface_->width() != drawableWidth ||
+        surface_->height() != drawableHeight;
     if (needsRecreate) {
+        // Drop PathRef / mask caches before recreating so GPU proxies can purge.
+        releaseGpuCaches(context);
         surface_ = tgfx::Surface::MakeFrom(context, impl_->window);
         if (!surface_) {
             device_->unlock();

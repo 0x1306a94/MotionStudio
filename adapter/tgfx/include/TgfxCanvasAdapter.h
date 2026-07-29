@@ -9,6 +9,7 @@
 namespace tgfx {
 class AutoCanvasRestore;
 class Canvas;
+class Context;
 class Device;
 class Surface;
 }  // namespace tgfx
@@ -74,6 +75,11 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
     // the base implementation after their transform.
     virtual void onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
                               float cornerRadius);
+
+    // Clears PathRef / isolation caches that pin GPU resources, drops surface_,
+    // then purges purgeable Context GPU memory. Call with a locked context when
+    // replacing the render target; create the new surface afterwards.
+    void releaseGpuCaches(tgfx::Context *context);
 
     std::shared_ptr<tgfx::Device> device_;
     std::shared_ptr<tgfx::Surface> surface_;

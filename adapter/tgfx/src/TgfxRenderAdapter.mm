@@ -47,7 +47,8 @@ bool TgfxRenderAdapter::RecreateTarget(int width, int height) {
     if (!context) {
         return false;
     }
-    surface_.reset();
+    // Drop PathRef / mask caches and purge GPU resources before the new target.
+    releaseGpuCaches(context);
     impl_->texture = nil;
 
     MTLTextureDescriptor *descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:static_cast<size_t>(width) height:static_cast<size_t>(height) mipmapped:NO];

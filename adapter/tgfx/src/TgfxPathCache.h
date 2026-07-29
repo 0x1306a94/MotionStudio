@@ -45,6 +45,9 @@ struct TgfxPathCache {
     tgfx::Path ResolveMaskExpanded(const ShapeGeometry &geometry, FillRule fillRule,
                                    float expansion, const tgfx::Path &sourcePath);
 
+    // Drops all cached PathRefs so GPU shape proxies can become purgeable.
+    void Clear();
+
   private:
     enum class DerivedPathKind : uint8_t {
         Trimmed = 0,

@@ -46,6 +46,21 @@ TgfxCanvasAdapter::~TgfxCanvasAdapter() {
     frameRestore_.reset();
 }
 
+void TgfxCanvasAdapter::releaseGpuCaches(tgfx::Context *context) {
+    frameRestore_.reset();
+    compositionClipSaved_ = false;
+    if (pathCache_ != nullptr) {
+        pathCache_->Clear();
+    }
+    if (isolationStack_ != nullptr) {
+        isolationStack_->layers.clear();
+    }
+    surface_.reset();
+    if (context != nullptr) {
+        context->purgeResourcesUntilMemoryTo(0);
+    }
+}
+
 void TgfxCanvasAdapter::drawPreviewBackdrop() {
 }
 

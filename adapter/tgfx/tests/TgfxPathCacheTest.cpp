@@ -43,3 +43,18 @@ TEST(TgfxPathCacheTest, MaskExpandedDifferentExpansionMisses) {
     EXPECT_FALSE(grow.isSame(shrink));
     EXPECT_NE(grow, shrink);
 }
+
+TEST(TgfxPathCacheTest, ClearDropsCachedPathRefs) {
+    TgfxPathCache cache;
+    const auto geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{100, 80}, 0.0f);
+    const tgfx::Path before = cache.Resolve(geometry, FillRule::NonZero);
+    const tgfx::Path expanded = cache.ResolveMaskExpanded(geometry, FillRule::NonZero, 8.0f, before);
+
+    cache.Clear();
+
+    const tgfx::Path after = cache.Resolve(geometry, FillRule::NonZero);
+    const tgfx::Path expandedAfter =
+        cache.ResolveMaskExpanded(geometry, FillRule::NonZero, 8.0f, after);
+    EXPECT_FALSE(before.isSame(after));
+    EXPECT_FALSE(expanded.isSame(expandedAfter));
+}

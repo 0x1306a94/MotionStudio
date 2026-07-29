@@ -182,6 +182,13 @@ tgfx::Path TgfxPathCache::ResolvePositionedOutline(const ShapeGeometry &geometry
     return derivedOrder_.front().second;
 }
 
+void TgfxPathCache::Clear() {
+    order_.clear();
+    index_.clear();
+    derivedOrder_.clear();
+    derivedIndex_.clear();
+}
+
 tgfx::Path TgfxPathCache::ResolveMaskExpanded(const ShapeGeometry &geometry, FillRule fillRule,
                                               float expansion, const tgfx::Path &sourcePath) {
     if (expansion == 0.0f) {
