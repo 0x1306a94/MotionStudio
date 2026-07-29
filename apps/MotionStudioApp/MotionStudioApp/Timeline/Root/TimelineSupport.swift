@@ -6,7 +6,6 @@
 //
 
 import MotionStudioBridging
-import SwiftUI
 
 let minTimelinePointsPerFrame: CGFloat = 1
 let pixelsPerFrame: CGFloat = 6

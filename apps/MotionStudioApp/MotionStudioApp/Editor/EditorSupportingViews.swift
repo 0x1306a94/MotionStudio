@@ -5,7 +5,6 @@
 //  Small support views used by the UIKit editor shell.
 //
 
-import SwiftUI
 import UIKit
 
 @MainActor
@@ -31,23 +30,5 @@ final class TimelineGrabberView: UIView {
                                  height: height)
         UIColor.secondaryLabel.withAlphaComponent(0.55).setFill()
         UIBezierPath(roundedRect: grabberRect, cornerRadius: height * 0.5).fill()
-    }
-}
-
-struct UIKitTimelineHostView: View {
-    let document: MotionProjectState
-    let editorState: EditorState
-    let playheadClock: PlayheadClock
-    let perform: (String, () -> Void) -> Void
-    let registerEdit: (String) -> Void
-    let clearSelection: () -> Void
-
-    var body: some View {
-        TimelineView(document: document,
-                     editorState: editorState,
-                     playheadClock: playheadClock,
-                     perform: perform,
-                     registerEdit: registerEdit,
-                     clearSelection: clearSelection)
     }
 }
