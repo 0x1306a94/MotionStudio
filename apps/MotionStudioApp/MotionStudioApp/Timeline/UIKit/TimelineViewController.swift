@@ -18,12 +18,12 @@ final class TimelineViewController: UIViewController {
 
     private let scrollCoordinator: TimelineScrollCoordinator
     private let controlsView: TimelineControlsView
+    private let sidebarView: TimelineSidebarView
     private let rulerView = TimelineRulerCanvasView()
     private let playheadView = TimelinePlayheadView()
     private let layersHeaderLabel = UILabel()
     private let headerSplit = UIView()
     private let bodySplit = UIView()
-    private let sidebarPlaceholder = UIView()
     private let tracksPlaceholder = UIView()
     private let trackColumn = UIView()
     private let leftColumn = UIView()
@@ -33,6 +33,7 @@ final class TimelineViewController: UIViewController {
     private var isObservingDocument = false
     private var isObservingPlayback = false
     private var isObservingZoom = false
+    private var isObservingSelection = false
 
     init(document: MotionProjectState,
          editorState: EditorState,
@@ -49,6 +50,12 @@ final class TimelineViewController: UIViewController {
         self.clearSelection = clearSelection
         scrollCoordinator = TimelineScrollCoordinator(editorState: editorState, playheadClock: playheadClock)
         controlsView = TimelineControlsView(editorState: editorState)
+        sidebarView = TimelineSidebarView(document: document,
+                                          editorState: editorState,
+                                          playheadClock: playheadClock,
+                                          perform: perform,
+                                          registerEdit: registerEdit,
+                                          clearSelection: clearSelection)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -60,9 +67,6 @@ final class TimelineViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.35)
-        // Retained for Tasks 4–5 wiring.
-        _ = performEdit
-        _ = registerEdit
         buildHierarchy()
         wireActions()
         reloadFromDocument()
@@ -103,7 +107,6 @@ final class TimelineViewController: UIViewController {
         leftColumn.translatesAutoresizingMaskIntoConstraints = false
         trackColumn.translatesAutoresizingMaskIntoConstraints = false
         layersHeaderLabel.translatesAutoresizingMaskIntoConstraints = false
-        sidebarPlaceholder.translatesAutoresizingMaskIntoConstraints = false
         tracksPlaceholder.translatesAutoresizingMaskIntoConstraints = false
         headerSplit.translatesAutoresizingMaskIntoConstraints = false
         bodySplit.translatesAutoresizingMaskIntoConstraints = false
@@ -114,7 +117,6 @@ final class TimelineViewController: UIViewController {
 
         styleSplit(headerSplit)
         styleSplit(bodySplit)
-        sidebarPlaceholder.backgroundColor = .clear
         tracksPlaceholder.backgroundColor = UIColor.secondarySystemFill.withAlphaComponent(0.25)
 
         let headerSeparator = hairline()
@@ -130,7 +132,7 @@ final class TimelineViewController: UIViewController {
 
         leftColumn.addSubview(layersHeaderLabel)
         leftColumn.addSubview(headerSeparator)
-        leftColumn.addSubview(sidebarPlaceholder)
+        leftColumn.addSubview(sidebarView)
 
         trackColumn.addSubview(rulerView)
         trackColumn.addSubview(bodySeparator)
@@ -181,10 +183,10 @@ final class TimelineViewController: UIViewController {
             headerSeparator.trailingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
             headerSeparator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
 
-            sidebarPlaceholder.topAnchor.constraint(equalTo: headerSeparator.bottomAnchor),
-            sidebarPlaceholder.leadingAnchor.constraint(equalTo: leftColumn.leadingAnchor),
-            sidebarPlaceholder.trailingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
-            sidebarPlaceholder.bottomAnchor.constraint(equalTo: leftColumn.bottomAnchor),
+            sidebarView.topAnchor.constraint(equalTo: headerSeparator.bottomAnchor),
+            sidebarView.leadingAnchor.constraint(equalTo: leftColumn.leadingAnchor),
+            sidebarView.trailingAnchor.constraint(equalTo: leftColumn.trailingAnchor),
+            sidebarView.bottomAnchor.constraint(equalTo: leftColumn.bottomAnchor),
 
             rulerView.topAnchor.constraint(equalTo: trackColumn.topAnchor),
             rulerView.leadingAnchor.constraint(equalTo: trackColumn.leadingAnchor),
@@ -232,6 +234,8 @@ final class TimelineViewController: UIViewController {
         let compositionID = core.firstCompositionID
         scrollCoordinator.duration = core.duration(compositionID: compositionID)
         let frameRate = core.frameRate(compositionID: compositionID)
+        let layerIDs = Array(core.layerIDs(compositionID: compositionID).reversed())
+        sidebarView.reloadRows(buildTimelineRows(core: core, layerIDs: layerIDs))
         controlsView.reload(duration: scrollCoordinator.duration, frame: playheadClock.frame)
         refreshTrackChrome(updateControls: true, frameRate: frameRate)
     }
@@ -261,6 +265,7 @@ final class TimelineViewController: UIViewController {
     private func handlePlayheadFrameChanged(_ frame: Int64) {
         controlsView.setPlayheadFrame(frame)
         updatePlayheadPosition()
+        sidebarView.updatePlayheadBadges()
     }
 
     private func scrub(atVisibleX visibleX: CGFloat) {
@@ -275,6 +280,7 @@ final class TimelineViewController: UIViewController {
         observeDocumentRevision()
         observePlaybackState()
         observeZoomState()
+        observeSelectionState()
     }
 
     private func observeDocumentRevision() {
@@ -321,6 +327,22 @@ final class TimelineViewController: UIViewController {
                 scrollCoordinator.clampScroll()
                 refreshTrackChrome(updateControls: true)
                 observeZoomState()
+            }
+        }
+    }
+
+    private func observeSelectionState() {
+        isObservingSelection = true
+        withObservationTracking {
+            _ = editorState.selectedLayerIDs
+            _ = editorState.selectedTimelineProperty
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, isObservingSelection else {
+                    return
+                }
+                sidebarView.refreshSelectionAppearance()
+                observeSelectionState()
             }
         }
     }
