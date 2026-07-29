@@ -238,24 +238,24 @@ extension EditorViewController {
         timelineHandle.translatesAutoresizingMaskIntoConstraints = false
         timelinePanel.contentView.addSubview(timelineHandle)
 
-        let timelineHost = UIHostingController(rootView: UIKitTimelineHostView(document: document.modelDocument,
-                                                                               editorState: editorState,
-                                                                               playheadClock: playheadClock,
-                                                                               perform: { [weak self] name, edit in
-                                                                                   self?.perform(name, edit: edit)
-                                                                               },
-                                                                               registerEdit: { [weak self] name in
-                                                                                   self?.registerEdit(name)
-                                                                               },
-                                                                               clearSelection: { [weak self] in
-                                                                                   self?.clearSelection()
-                                                                               }))
-        timelineHost.view.translatesAutoresizingMaskIntoConstraints = false
-        timelineHost.view.backgroundColor = .clear
-        addChild(timelineHost)
-        timelinePanel.contentView.addSubview(timelineHost.view)
-        timelineHost.didMove(toParent: self)
-        timelineHostingController = timelineHost
+        let timelineController = TimelineViewController(document: document.modelDocument,
+                                                        editorState: editorState,
+                                                        playheadClock: playheadClock,
+                                                        perform: { [weak self] name, edit in
+                                                            self?.perform(name, edit: edit)
+                                                        },
+                                                        registerEdit: { [weak self] name in
+                                                            self?.registerEdit(name)
+                                                        },
+                                                        clearSelection: { [weak self] in
+                                                            self?.clearSelection()
+                                                        })
+        timelineController.view.translatesAutoresizingMaskIntoConstraints = false
+        timelineController.view.backgroundColor = .clear
+        addChild(timelineController)
+        timelinePanel.contentView.addSubview(timelineController.view)
+        timelineController.didMove(toParent: self)
+        timelineViewController = timelineController
 
         timelineHeightConstraint = timelinePanel.heightAnchor.constraint(equalToConstant: timelineHeight)
         timelineHeightConstraint?.priority = .required
@@ -271,10 +271,10 @@ extension EditorViewController {
             timelineHandle.topAnchor.constraint(equalTo: timelinePanel.contentView.topAnchor),
             timelineHandle.heightAnchor.constraint(equalToConstant: Metrics.timelineHandleHeight),
 
-            timelineHost.view.leadingAnchor.constraint(equalTo: timelinePanel.contentView.leadingAnchor),
-            timelineHost.view.trailingAnchor.constraint(equalTo: timelinePanel.contentView.trailingAnchor),
-            timelineHost.view.topAnchor.constraint(equalTo: timelineHandle.bottomAnchor),
-            timelineHost.view.bottomAnchor.constraint(equalTo: timelinePanel.contentView.bottomAnchor),
+            timelineController.view.leadingAnchor.constraint(equalTo: timelinePanel.contentView.leadingAnchor),
+            timelineController.view.trailingAnchor.constraint(equalTo: timelinePanel.contentView.trailingAnchor),
+            timelineController.view.topAnchor.constraint(equalTo: timelineHandle.bottomAnchor),
+            timelineController.view.bottomAnchor.constraint(equalTo: timelinePanel.contentView.bottomAnchor),
         ])
 
         let resize = UIPanGestureRecognizer(target: self, action: #selector(handleTimelineResize(_:)))

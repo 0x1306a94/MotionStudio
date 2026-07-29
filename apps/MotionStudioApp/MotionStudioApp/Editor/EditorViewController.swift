@@ -77,7 +77,7 @@ final class EditorViewController: UIViewController {
     var canvasViewController: CanvasViewController?
     var projectHostingController: UIHostingController<ProjectPanelView>?
     var inspectorHostingController: UIHostingController<InspectorView>?
-    var timelineHostingController: UIHostingController<UIKitTimelineHostView>?
+    var timelineViewController: TimelineViewController?
     var timelineHeightConstraint: NSLayoutConstraint?
 
     var timelineHeight = Metrics.timelinePreferredHeight
