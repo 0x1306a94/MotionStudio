@@ -274,14 +274,14 @@ bool NeedsTrim(const StrokeOptions &options) {
     return options.trimEnd - options.trimStart < 1.0f;
 }
 
-// Cuts the [trimStart, trimEnd] window (rotated by trimOffset degrees) out of
-// the path, matching AE trim paths. MakeTrim accepts values outside [0, 1]
-// and wraps them cyclically over the total length of all contours, so the
-// offset is simply folded into start/end. When start > end the window wraps
-// through the path start ([start, 1] + [0, end]), expressed as [start, end+1].
-// An empty window (start == end) makes the effect reset the path to empty.
-tgfx::Path TrimmedPath(const tgfx::Path &path, float trimStart, float trimEnd,
-                       float trimOffset) {
+// Fold trimOffset into [start, end] the same way AE/MakeTrim wraps windows.
+// Cache keys must use these normalized ends, not the raw offset degrees.
+struct TrimWindow {
+    float start = 0.0f;
+    float end = 1.0f;
+};
+
+TrimWindow NormalizeTrimWindow(float trimStart, float trimEnd, float trimOffset) {
     const float shift = trimOffset / 360.0f;
     float start = trimStart + shift;
     float end = trimEnd + shift;
@@ -291,12 +291,35 @@ tgfx::Path TrimmedPath(const tgfx::Path &path, float trimStart, float trimEnd,
     if (end < start) {
         end += 1.0f;
     }
+    return TrimWindow{start, end};
+}
+
+// Cuts the normalized [start, end] window out of the path. Empty window
+// (start == end) clears the path.
+tgfx::Path ApplyTrimWindow(const tgfx::Path &path, const TrimWindow &window) {
     tgfx::Path result = path;
-    auto effect = tgfx::PathEffect::MakeTrim(start, end);
+    if (window.start == window.end) {
+        result.reset();
+        return result;
+    }
+    auto effect = tgfx::PathEffect::MakeTrim(window.start, window.end);
     if (effect != nullptr) {
         effect->filterPath(&result);
     }
     return result;
+}
+
+tgfx::Path BuildPositionedStrokeOutline(const tgfx::Path &strokeGeometry,
+                                        const tgfx::Path &fullPath,
+                                        const StrokeOptions &options) {
+    tgfx::Stroke stroke(options.width * 2, ToTgfxLineCap(options.cap), ToTgfxLineJoin(options.join));
+    tgfx::Path outline = strokeGeometry;
+    if (!stroke.applyToPath(&outline)) {
+        outline.reset();
+        return outline;
+    }
+    outline.addPath(fullPath, options.position == StrokePosition::Inside ? tgfx::PathOp::Intersect : tgfx::PathOp::Difference);
+    return outline;
 }
 
 struct PathCacheKey {
@@ -318,16 +341,68 @@ struct PathCacheKeyHash {
     }
 };
 
+// Trimmed source paths and inside/outside fill outlines. Keys use normalized
+// trim start/end so equivalent offset rotations share one entry.
+enum class DerivedPathKind : uint8_t {
+    Trimmed = 0,
+    PositionedOutline = 1,
+};
+
+struct DerivedPathCacheKey {
+    ShapeGeometryKind kind = ShapeGeometryKind::Path;
+    FillRule fillRule = FillRule::NonZero;
+    uint64_t contentHash = 0;
+    DerivedPathKind derivedKind = DerivedPathKind::Trimmed;
+    bool hasTrim = false;
+    float trimStart = 0.0f;
+    float trimEnd = 1.0f;
+    StrokePosition position = StrokePosition::Center;
+    float width = 0.0f;
+    LineCap cap = LineCap::Butt;
+    LineJoin join = LineJoin::Miter;
+
+    bool operator==(const DerivedPathCacheKey &other) const {
+        return kind == other.kind && fillRule == other.fillRule && contentHash == other.contentHash &&
+            derivedKind == other.derivedKind && hasTrim == other.hasTrim &&
+            FloatBits(trimStart) == FloatBits(other.trimStart) &&
+            FloatBits(trimEnd) == FloatBits(other.trimEnd) && position == other.position &&
+            FloatBits(width) == FloatBits(other.width) && cap == other.cap && join == other.join;
+    }
+};
+
+struct DerivedPathCacheKeyHash {
+    size_t operator()(const DerivedPathCacheKey &key) const {
+        uint64_t hash = static_cast<uint64_t>(key.kind);
+        hash = MixHash(hash, static_cast<uint64_t>(key.fillRule));
+        hash = MixHash(hash, key.contentHash);
+        hash = MixHash(hash, static_cast<uint64_t>(key.derivedKind));
+        hash = MixHash(hash, key.hasTrim ? 1ULL : 0ULL);
+        hash = MixHash(hash, FloatBits(key.trimStart));
+        hash = MixHash(hash, FloatBits(key.trimEnd));
+        hash = MixHash(hash, static_cast<uint64_t>(key.position));
+        hash = MixHash(hash, FloatBits(key.width));
+        hash = MixHash(hash, static_cast<uint64_t>(key.cap));
+        hash = MixHash(hash, static_cast<uint64_t>(key.join));
+        return static_cast<size_t>(hash);
+    }
+};
+
 }  // namespace
 
 struct TgfxPathCache {
     // Front = most recently used. Capacity covers a few animated size variants
     // without unbounded growth across long playback sessions.
     static constexpr size_t kCapacity = 512;
+    static constexpr size_t kDerivedCapacity = 512;
 
     using EntryList = std::list<std::pair<PathCacheKey, tgfx::Path>>;
     EntryList order;
     std::unordered_map<PathCacheKey, EntryList::iterator, PathCacheKeyHash> index;
+
+    using DerivedEntryList = std::list<std::pair<DerivedPathCacheKey, tgfx::Path>>;
+    DerivedEntryList derivedOrder;
+    std::unordered_map<DerivedPathCacheKey, DerivedEntryList::iterator, DerivedPathCacheKeyHash>
+        derivedIndex;
 
     tgfx::Path Resolve(const ShapeGeometry &geometry, FillRule fillRule) {
         PathCacheKey key;
@@ -346,6 +421,60 @@ struct TgfxPathCache {
         order.push_front({key, BuildTgfxPath(geometry, fillRule)});
         index.emplace(key, order.begin());
         return order.front().second;
+    }
+
+    tgfx::Path ResolveTrimmed(const ShapeGeometry &geometry, FillRule fillRule,
+                              const TrimWindow &window, const tgfx::Path &fullPath) {
+        DerivedPathCacheKey key;
+        key.kind = geometry.kind;
+        key.fillRule = fillRule;
+        key.contentHash = HashGeometry(geometry, fillRule);
+        key.derivedKind = DerivedPathKind::Trimmed;
+        key.hasTrim = true;
+        key.trimStart = window.start;
+        key.trimEnd = window.end;
+        const auto found = derivedIndex.find(key);
+        if (found != derivedIndex.end()) {
+            derivedOrder.splice(derivedOrder.begin(), derivedOrder, found->second);
+            return found->second->second;
+        }
+        if (derivedOrder.size() >= kDerivedCapacity) {
+            derivedIndex.erase(derivedOrder.back().first);
+            derivedOrder.pop_back();
+        }
+        derivedOrder.push_front({key, ApplyTrimWindow(fullPath, window)});
+        derivedIndex.emplace(key, derivedOrder.begin());
+        return derivedOrder.front().second;
+    }
+
+    tgfx::Path ResolvePositionedOutline(const ShapeGeometry &geometry, FillRule fillRule,
+                                        bool hasTrim, const TrimWindow &window,
+                                        const StrokeOptions &options, const tgfx::Path &fullPath,
+                                        const tgfx::Path &strokeGeometry) {
+        DerivedPathCacheKey key;
+        key.kind = geometry.kind;
+        key.fillRule = fillRule;
+        key.contentHash = HashGeometry(geometry, fillRule);
+        key.derivedKind = DerivedPathKind::PositionedOutline;
+        key.hasTrim = hasTrim;
+        key.trimStart = hasTrim ? window.start : 0.0f;
+        key.trimEnd = hasTrim ? window.end : 1.0f;
+        key.position = options.position;
+        key.width = options.width;
+        key.cap = options.cap;
+        key.join = options.join;
+        const auto found = derivedIndex.find(key);
+        if (found != derivedIndex.end()) {
+            derivedOrder.splice(derivedOrder.begin(), derivedOrder, found->second);
+            return found->second->second;
+        }
+        if (derivedOrder.size() >= kDerivedCapacity) {
+            derivedIndex.erase(derivedOrder.back().first);
+            derivedOrder.pop_back();
+        }
+        derivedOrder.push_front({key, BuildPositionedStrokeOutline(strokeGeometry, fullPath, options)});
+        derivedIndex.emplace(key, derivedOrder.begin());
+        return derivedOrder.front().second;
     }
 };
 
@@ -385,18 +514,15 @@ tgfx::BlendMode ToMaskBlendMode(MaskMode mode) {
     return tgfx::BlendMode::SrcOver;
 }
 
-CoverageImage IntersectCoverageImages(tgfx::Context *context, const CoverageImage &base,
+CoverageImage IntersectCoverageImages(tgfx::Context *context,
+                                      const CoverageImage &base,
                                       const CoverageImage &next) {
     CoverageImage result;
     if (context == nullptr || base.image == nullptr || next.image == nullptr) {
         return result;
     }
-    const tgfx::Rect baseBounds =
-        base.localMatrix.mapRect(tgfx::Rect::MakeWH(static_cast<float>(base.image->width()),
-                                                    static_cast<float>(base.image->height())));
-    const tgfx::Rect nextBounds =
-        next.localMatrix.mapRect(tgfx::Rect::MakeWH(static_cast<float>(next.image->width()),
-                                                    static_cast<float>(next.image->height())));
+    const tgfx::Rect baseBounds = base.localMatrix.mapRect(tgfx::Rect::MakeWH(static_cast<float>(base.image->width()), static_cast<float>(base.image->height())));
+    const tgfx::Rect nextBounds = next.localMatrix.mapRect(tgfx::Rect::MakeWH(static_cast<float>(next.image->width()), static_cast<float>(next.image->height())));
     tgfx::Rect bounds = baseBounds;
     bounds.join(nextBounds);
     bounds.roundOut();
@@ -442,15 +568,13 @@ TgfxCanvasAdapter::~TgfxCanvasAdapter() {
 void TgfxCanvasAdapter::drawPreviewBackdrop() {
 }
 
-void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
-                                     float cornerRadius) {
+void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor, float cornerRadius) {
     if (!surface_ || sceneWidth <= 0 || sceneHeight <= 0) {
         return;
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
     const tgfx::Rect compositionBounds = tgfx::Rect::MakeWH(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight));
-    const float radius = std::clamp(cornerRadius, 0.0f,
-                                    std::min(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight)) * 0.5f);
+    const float radius = std::clamp(cornerRadius, 0.0f, std::min(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight)) * 0.5f);
     tgfx::Paint paint;
     paint.setStyle(tgfx::PaintStyle::Fill);
     paint.setColor(ToTgfxColor(backgroundColor));
@@ -469,8 +593,7 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
     }
 }
 
-void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
-                                   float cornerRadius) {
+void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor, float cornerRadius) {
     // Release before acquireTarget: size changes may destroy the old surface/canvas.
     frameRestore_.reset();
     if (!acquireTarget(width, height) || !surface_) {
@@ -582,20 +705,22 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
     canvas->drawPath(pathCache_->Resolve(geometry, paint.fillRule), tgfxPaint);
 }
 
-void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &paint,
-                                   const StrokeOptions &options) {
+void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &paint, const StrokeOptions &options) {
     tgfx::Canvas *canvas = drawingCanvas();
     if (canvas == nullptr || !pathCache_) {
         return;
     }
     const tgfx::Path fullPath = pathCache_->Resolve(geometry, paint.fillRule);
+    const bool hasTrim = NeedsTrim(options);
+    TrimWindow trimWindow{};
     tgfx::Path strokeGeometry = fullPath;
-    if (NeedsTrim(options)) {
-        strokeGeometry = TrimmedPath(fullPath, options.trimStart, options.trimEnd,
-                                     options.trimOffset);
+    if (hasTrim) {
+        trimWindow = NormalizeTrimWindow(options.trimStart, options.trimEnd, options.trimOffset);
+        if (trimWindow.start == trimWindow.end) {
+            return;
+        }
+        strokeGeometry = pathCache_->ResolveTrimmed(geometry, paint.fillRule, trimWindow, fullPath);
     }
-    // An empty trim window (start == end) draws nothing; tgfx asserts on
-    // empty-geometry draws downstream.
     if (strokeGeometry.isEmpty()) {
         return;
     }
@@ -615,15 +740,10 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
         canvas->drawPath(strokeGeometry, tgfxPaint);
         return;
     }
-    // Inside/outside strokes draw at double width with the unwanted half cut
-    // off by a boolean op against the source path, mirroring tgfx ShapeLayer.
-    tgfx::Stroke stroke(options.width * 2, ToTgfxLineCap(options.cap),
-                        ToTgfxLineJoin(options.join));
-    tgfx::Path outline = strokeGeometry;
-    if (!stroke.applyToPath(&outline)) {
-        return;
-    }
-    outline.addPath(fullPath, options.position == StrokePosition::Inside ? tgfx::PathOp::Intersect : tgfx::PathOp::Difference);
+
+    // Inside/outside: cache the boolean outline so PathRef identity stays
+    // stable and tgfx GPU shape proxies can hit across frames.
+    const tgfx::Path outline = pathCache_->ResolvePositionedOutline(geometry, paint.fillRule, hasTrim, trimWindow, options, fullPath, strokeGeometry);
     if (outline.isEmpty()) {
         return;
     }
@@ -665,16 +785,14 @@ void TgfxCanvasAdapter::endLayer() {
         tgfx::Context *context = surface_->getContext();
         CoverageImage combined = layer.coverages.front();
         for (size_t i = 1; i < layer.coverages.size(); ++i) {
-            CoverageImage intersected =
-                IntersectCoverageImages(context, combined, layer.coverages[i]);
+            CoverageImage intersected = IntersectCoverageImages(context, combined, layer.coverages[i]);
             if (intersected.image == nullptr) {
                 continue;
             }
             combined = std::move(intersected);
         }
         if (combined.image != nullptr) {
-            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal,
-                                                        tgfx::TileMode::Decal);
+            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal, tgfx::TileMode::Decal);
             if (shader != nullptr) {
                 shader = shader->makeWithMatrix(combined.localMatrix);
                 paint.setMaskFilter(tgfx::MaskFilter::MakeShader(shader, combined.invertAlpha));
@@ -727,8 +845,7 @@ void TgfxCanvasAdapter::endMask() {
     const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
     const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
     tgfx::Matrix pictureMatrix = tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top);
-    std::shared_ptr<tgfx::Image> image =
-        tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
+    std::shared_ptr<tgfx::Image> image = tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
     if (image == nullptr) {
         return;
     }
