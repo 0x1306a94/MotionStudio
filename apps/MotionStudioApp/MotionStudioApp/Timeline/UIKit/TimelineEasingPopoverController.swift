@@ -12,6 +12,9 @@ import UIKit
 
 @MainActor
 final class TimelineEasingPopoverController: UIViewController {
+    private static let contentInset: CGFloat = 20
+    private static let contentWidth: CGFloat = 260
+
     private var currentEasing: EasingInfo
     private let easingAffectsPlayback: Bool
     private let onSetEasing: (EasingInfo) -> Void
@@ -22,6 +25,7 @@ final class TimelineEasingPopoverController: UIViewController {
 
     private let stack = UIStackView()
     private let padContainer = UIView()
+    private var padHeightConstraint: NSLayoutConstraint?
     private var presetRows: [(easing: EasingInfo, check: UIImageView)] = []
     private let customCheck = UIImageView(image: UIImage(systemName: "checkmark"))
     private var showCustomPad: Bool
@@ -58,13 +62,14 @@ final class TimelineEasingPopoverController: UIViewController {
         view.backgroundColor = .systemBackground
         stack.axis = .vertical
         stack.alignment = .fill
-        stack.spacing = 8
+        stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
 
         let title = UILabel()
         title.text = "Easing"
         title.font = .preferredFont(forTextStyle: .headline)
+        title.setContentCompressionResistancePriority(.required, for: .vertical)
         stack.addArrangedSubview(title)
 
         if !easingAffectsPlayback {
@@ -73,6 +78,7 @@ final class TimelineEasingPopoverController: UIViewController {
             notice.textColor = .secondaryLabel
             notice.numberOfLines = 0
             notice.text = "No following keyframe — easing is unused until you add one."
+            notice.setContentCompressionResistancePriority(.required, for: .vertical)
             stack.addArrangedSubview(notice)
         }
 
@@ -99,7 +105,9 @@ final class TimelineEasingPopoverController: UIViewController {
 
         padContainer.translatesAutoresizingMaskIntoConstraints = false
         padContainer.isHidden = true
-        padContainer.heightAnchor.constraint(equalToConstant: 160).isActive = true
+        let padHeight = padContainer.heightAnchor.constraint(equalToConstant: 160)
+        padHeight.isActive = false
+        padHeightConstraint = padHeight
         stack.addArrangedSubview(padContainer)
 
         if let onDelete {
@@ -111,11 +119,11 @@ final class TimelineEasingPopoverController: UIViewController {
             delete.setTitle("Delete Keyframe", for: .normal)
             delete.setTitleColor(.systemRed, for: .normal)
             delete.contentHorizontalAlignment = .leading
+            delete.setContentCompressionResistancePriority(.required, for: .vertical)
             delete.addAction(UIAction { _ in onDelete() }, for: .touchUpInside)
             stack.addArrangedSubview(delete)
         }
 
-        // Dim presets when easing does not affect playback; keep title/notice readable.
         for row in presetRows {
             row.check.superview?.alpha = easingAffectsPlayback ? 1 : 0.45
             row.check.superview?.isUserInteractionEnabled = easingAffectsPlayback
@@ -123,11 +131,12 @@ final class TimelineEasingPopoverController: UIViewController {
         customCheck.superview?.alpha = easingAffectsPlayback ? 1 : 0.45
         customCheck.superview?.isUserInteractionEnabled = easingAffectsPlayback
 
+        let inset = Self.contentInset
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 12),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -12),
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: inset),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: inset),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -inset),
+            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -inset),
         ])
         refreshChecks()
         refreshPad()
@@ -142,14 +151,17 @@ final class TimelineEasingPopoverController: UIViewController {
         button.setTitle(title, for: .normal)
         button.setTitleColor(.label, for: .normal)
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        button.setContentCompressionResistancePriority(.required, for: .vertical)
 
         let check = checkView ?? UIImageView(image: UIImage(systemName: "checkmark"))
         check.tintColor = .tintColor
         check.setContentHuggingPriority(.required, for: .horizontal)
+        check.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         let row = UIStackView(arrangedSubviews: [button, check])
         row.axis = .horizontal
         row.alignment = .center
+        row.setContentCompressionResistancePriority(.required, for: .vertical)
         return (row, check)
     }
 
@@ -191,6 +203,7 @@ final class TimelineEasingPopoverController: UIViewController {
 
         let shouldShow = easingAffectsPlayback && (showCustomPad || currentEasing.kind == .CUBIC_BEZIER)
         padContainer.isHidden = !shouldShow
+        padHeightConstraint?.isActive = shouldShow
         guard shouldShow else {
             return
         }
@@ -229,7 +242,14 @@ final class TimelineEasingPopoverController: UIViewController {
     }
 
     private func updatePreferredSize() {
-        preferredContentSize = CGSize(width: 240, height: padContainer.isHidden ? 290 : 460)
+        let inset = Self.contentInset
+        let innerWidth = Self.contentWidth - inset * 2
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        let fitting = stack.systemLayoutSizeFitting(CGSize(width: innerWidth, height: 0),
+                                                    withHorizontalFittingPriority: .required,
+                                                    verticalFittingPriority: .fittingSizeLevel)
+        preferredContentSize = CGSize(width: Self.contentWidth, height: ceil(fitting.height) + inset * 2)
     }
 
     private func padPoints(from easing: EasingInfo) -> (p0: CGPoint, p3: CGPoint, c1: CGPoint, c2: CGPoint) {
