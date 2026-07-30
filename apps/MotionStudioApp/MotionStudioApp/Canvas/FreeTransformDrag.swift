@@ -26,10 +26,6 @@ struct LayerTransformStart {
     var hasContentSize: Bool {
         contentSizePath != nil
     }
-
-    var keepsPositionOnContainerResize: Bool {
-        contentSizePath == TextProperty.size.path
-    }
 }
 
 enum FreeTransformKind {
@@ -255,29 +251,36 @@ struct FreeTransformDrag {
                                       scaleY: CGFloat,
                                       alternate: Bool)
     {
-        let sizeScaleX = max(abs(scaleX), 1e-3)
-        let sizeScaleY = max(abs(scaleY), 1e-3)
-        let newSize = CGVector(dx: max(1, start.contentSize.dx * sizeScaleX),
-                               dy: max(1, start.contentSize.dy * sizeScaleY))
-        // Keep anchor at the same relative point inside the container.
-        let ratioX = start.contentSize.dx > 1e-6 ? newSize.dx / start.contentSize.dx : 1
-        let ratioY = start.contentSize.dy > 1e-6 ? newSize.dy / start.contentSize.dy : 1
-        let newAnchor = CGVector(dx: start.anchor.dx * ratioX, dy: start.anchor.dy * ratioY)
+        let startMin = startHandles.localMin
+        let startSize = start.contentSize
+        let resized = Self.resizedLocalBox(for: kind,
+                                           startMin: startMin,
+                                           startSize: startSize,
+                                           scaleX: scaleX,
+                                           scaleY: scaleY,
+                                           alternate: alternate)
+        let newSize = resized.size
+        let floatingMin = resized.min
+
+        // Keep anchor at the same relative point inside the container (content origin stays startMin).
+        let relX = startSize.dx > 1e-6 ? (start.anchor.dx - startMin.x) / startSize.dx : 0.5
+        let relY = startSize.dy > 1e-6 ? (start.anchor.dy - startMin.y) / startSize.dy : 0.5
+        let newAnchor = CGVector(dx: startMin.x + relX * newSize.dx,
+                                 dy: startMin.y + relY * newSize.dy)
 
         writeVec2(core: core, layerID: start.layerID, path: contentSizePath,
                   frame: frame, value: newSize, animated: start.contentSizeAnimated)
         writeVec2(core: core, layerID: start.layerID, path: TransformProperty.anchorPoint.path,
                   frame: frame, value: newAnchor, animated: start.anchorAnimated)
 
-        if start.keepsPositionOnContainerResize {
-            return
-        }
-
-        let localRel = Self.containerLocalPivotRelative(for: kind,
-                                                        size: newSize,
-                                                        localMin: startHandles.localMin,
-                                                        anchor: newAnchor,
-                                                        alternate: alternate)
+        // Map the fixed floating-space pivot into content space (origin = startMin).
+        let startPivotLocal = Self.containerPivotLocal(for: kind,
+                                                       localMin: startMin,
+                                                       size: startSize,
+                                                       alternate: alternate)
+        let fixedInContent = CGPoint(x: startMin.x + (startPivotLocal.x - floatingMin.x),
+                                     y: startMin.y + (startPivotLocal.y - floatingMin.y))
+        let localRel = CGPoint(x: fixedInContent.x - newAnchor.dx, y: fixedInContent.y - newAnchor.dy)
         let position = compensatedPosition(pivot: pivotScene,
                                            rotationDegrees: start.rotation,
                                            scale: start.scale,
@@ -286,17 +289,123 @@ struct FreeTransformDrag {
                   frame: frame, value: position, animated: start.positionAnimated)
     }
 
-    static func containerLocalPivotRelative(for kind: FreeTransformKind,
-                                            size: CGVector,
-                                            localMin: CGPoint,
-                                            anchor: CGVector,
-                                            alternate: Bool) -> CGPoint
+    /// Resizes the local box with signed scales so dragging past the opposite edge flips the box.
+    static func resizedLocalBox(for kind: FreeTransformKind,
+                                startMin: CGPoint,
+                                startSize: CGVector,
+                                scaleX: CGFloat,
+                                scaleY: CGFloat,
+                                alternate: Bool) -> (min: CGPoint, size: CGVector)
+    {
+        let startMax = CGPoint(x: startMin.x + startSize.dx, y: startMin.y + startSize.dy)
+        if alternate {
+            let center = CGPoint(x: (startMin.x + startMax.x) * 0.5,
+                                 y: (startMin.y + startMax.y) * 0.5)
+            let a = CGPoint(x: center.x + (startMin.x - center.x) * scaleX,
+                            y: center.y + (startMin.y - center.y) * scaleY)
+            let b = CGPoint(x: center.x + (startMax.x - center.x) * scaleX,
+                            y: center.y + (startMax.y - center.y) * scaleY)
+            var minX = min(a.x, b.x)
+            var maxX = max(a.x, b.x)
+            var minY = min(a.y, b.y)
+            var maxY = max(a.y, b.y)
+            if maxX - minX < 1 {
+                minX = center.x - 0.5
+                maxX = center.x + 0.5
+            }
+            if maxY - minY < 1 {
+                minY = center.y - 0.5
+                maxY = center.y + 0.5
+            }
+            return (CGPoint(x: minX, y: minY), CGVector(dx: maxX - minX, dy: maxY - minY))
+        }
+
+        switch kind {
+        case let .scaleCorner(index):
+            let corners = [
+                CGPoint(x: startMin.x, y: startMin.y),
+                CGPoint(x: startMax.x, y: startMin.y),
+                CGPoint(x: startMax.x, y: startMax.y),
+                CGPoint(x: startMin.x, y: startMax.y),
+            ]
+            let fixed = corners[(index + 2) % 4]
+            let moving = corners[index]
+            let newMoving = CGPoint(x: fixed.x + (moving.x - fixed.x) * scaleX,
+                                    y: fixed.y + (moving.y - fixed.y) * scaleY)
+            return Self.orderedBox(a: fixed, b: newMoving, scaleX: scaleX, scaleY: scaleY)
+
+        case let .scaleEdge(index):
+            var newMin = startMin
+            var newMax = startMax
+            switch index {
+            case 0: // top — fixed bottom
+                let axis = Self.clampedAxis(fixed: startMax.y,
+                                            moving: startMax.y + (startMin.y - startMax.y) * scaleY,
+                                            scale: scaleY)
+                newMin.y = axis.min
+                newMax.y = axis.max
+            case 1: // right — fixed left
+                let axis = Self.clampedAxis(fixed: startMin.x,
+                                            moving: startMin.x + (startMax.x - startMin.x) * scaleX,
+                                            scale: scaleX)
+                newMin.x = axis.min
+                newMax.x = axis.max
+            case 2: // bottom — fixed top
+                let axis = Self.clampedAxis(fixed: startMin.y,
+                                            moving: startMin.y + (startMax.y - startMin.y) * scaleY,
+                                            scale: scaleY)
+                newMin.y = axis.min
+                newMax.y = axis.max
+            case 3: // left — fixed right
+                let axis = Self.clampedAxis(fixed: startMax.x,
+                                            moving: startMax.x + (startMin.x - startMax.x) * scaleX,
+                                            scale: scaleX)
+                newMin.x = axis.min
+                newMax.x = axis.max
+            default:
+                break
+            }
+            return (newMin, CGVector(dx: newMax.x - newMin.x, dy: newMax.y - newMin.y))
+
+        default:
+            return (startMin, startSize)
+        }
+    }
+
+    private static func orderedBox(a: CGPoint, b: CGPoint, scaleX: CGFloat, scaleY: CGFloat)
+        -> (min: CGPoint, size: CGVector)
+    {
+        let x = clampedAxis(fixed: a.x, moving: b.x, scale: scaleX)
+        let y = clampedAxis(fixed: a.y, moving: b.y, scale: scaleY)
+        return (CGPoint(x: x.min, y: y.min), CGVector(dx: x.max - x.min, dy: y.max - y.min))
+    }
+
+    /// Ensures a minimum extent of 1 while preserving which side of `fixed` the moving edge is on.
+    private static func clampedAxis(fixed: CGFloat, moving: CGFloat, scale: CGFloat)
+        -> (min: CGFloat, max: CGFloat)
+    {
+        let delta = moving - fixed
+        let signed: CGFloat = if abs(delta) < 1 {
+            if delta < 0 || (delta == 0 && scale < 0) {
+                -1
+            } else {
+                1
+            }
+        } else {
+            delta
+        }
+        let resolved = fixed + signed
+        return (min(fixed, resolved), max(fixed, resolved))
+    }
+
+    static func containerPivotLocal(for kind: FreeTransformKind,
+                                    localMin: CGPoint,
+                                    size: CGVector,
+                                    alternate: Bool) -> CGPoint
     {
         let localMax = CGPoint(x: localMin.x + size.dx, y: localMin.y + size.dy)
         if alternate {
-            let localCenter = CGPoint(x: (localMin.x + localMax.x) * 0.5,
-                                      y: (localMin.y + localMax.y) * 0.5)
-            return CGPoint(x: localCenter.x - anchor.dx, y: localCenter.y - anchor.dy)
+            return CGPoint(x: (localMin.x + localMax.x) * 0.5, y: (localMin.y + localMax.y) * 0.5)
         }
         let localCorners = [
             CGPoint(x: localMin.x, y: localMin.y),
@@ -306,14 +415,12 @@ struct FreeTransformDrag {
         ]
         switch kind {
         case let .scaleCorner(index):
-            let pivot = localCorners[(index + 2) % 4]
-            return CGPoint(x: pivot.x - anchor.dx, y: pivot.y - anchor.dy)
+            return localCorners[(index + 2) % 4]
         case let .scaleEdge(index):
             let oppositeA = localCorners[(index + 2) % 4]
             let oppositeB = localCorners[(index + 3) % 4]
-            let oppositeMid = CGPoint(x: (oppositeA.x + oppositeB.x) * 0.5,
-                                      y: (oppositeA.y + oppositeB.y) * 0.5)
-            return CGPoint(x: oppositeMid.x - anchor.dx, y: oppositeMid.y - anchor.dy)
+            return CGPoint(x: (oppositeA.x + oppositeB.x) * 0.5,
+                           y: (oppositeA.y + oppositeB.y) * 0.5)
         default:
             return .zero
         }
