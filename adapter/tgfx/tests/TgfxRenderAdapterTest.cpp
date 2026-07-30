@@ -12,10 +12,12 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedMask.h"
+#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -472,4 +474,47 @@ TEST(TgfxRenderAdapterTest, LetterBoxLeavesSideMargins) {
     EXPECT_NEAR(leftMargin.r, 0, 20);
     EXPECT_NEAR(leftMargin.g, 0, 20);
     EXPECT_NEAR(leftMargin.b, 0, 20);
+}
+
+TEST(TgfxRenderAdapterTest, DrawsTextOverBackground) {
+    auto adapter = TgfxRenderAdapter::Make(200, 120);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 200;
+    state.viewportHeight = 120;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    motion::EvaluatedTextItem text;
+    text.text = "Hi";
+    text.fontSize = 64.0f;
+    text.containerSize = {200, 120};
+    text.autoHeight = true;
+    text.align = motion::TextAlign::Left;
+    text.fontFamily = "Helvetica";
+    text.fillColor = Color{0, 0, 0, 1};
+    text.hitSize = text.containerSize;
+    layer.textItem = std::move(text);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(200, 120, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+
+    bool foundInk = false;
+    for (int y = 0; y < 120 && !foundInk; ++y) {
+        for (int x = 0; x < 200; ++x) {
+            const Pixel pixel = PixelAt(pixels, 200, x, y);
+            if (pixel.r < 240 || pixel.g < 240 || pixel.b < 240) {
+                foundInk = true;
+                break;
+            }
+        }
+    }
+    EXPECT_TRUE(foundInk);
 }

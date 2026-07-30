@@ -5,6 +5,7 @@
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/ColorFilter.h>
+#include <tgfx/core/Font.h>
 #include <tgfx/core/Image.h>
 #include <tgfx/core/ImageFilter.h>
 #include <tgfx/core/MaskFilter.h>
@@ -14,13 +15,18 @@
 #include <tgfx/core/Shader.h>
 #include <tgfx/core/Stroke.h>
 #include <tgfx/core/Surface.h>
+#include <tgfx/core/TextBlob.h>
+#include <tgfx/core/Typeface.h>
 #include <tgfx/gpu/Context.h>
 
 #include "MotionStudio/render/ImageScaleLayout.h"
+#include "MotionStudio/textlayout/TextLayout.h"
+#include "TgfxGlyphMetrics.h"
 #include "TgfxImageCache.h"
 #include "TgfxIsolation.h"
 #include "TgfxPathCache.h"
 #include "TgfxProfileTiming.h"
+#include "TgfxTextTypeface.h"
 #include "TgfxTypeConvert.h"
 
 namespace motion {
@@ -446,13 +452,78 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
     canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
 }
 
-void TgfxCanvasAdapter::drawText(const std::string & /*text*/, float /*fontSize*/,
-                                 Vec2 /*containerSize*/, bool /*autoHeight*/, TextAlign /*align*/,
-                                 const std::string & /*fontFamily*/,
-                                 const std::string & /*fontAbsolutePath*/, Color /*fillColor*/,
-                                 const std::optional<Color> & /*strokeColor*/,
-                                 float /*strokeWidth*/) {
-    // Implemented in the text-layer draw task (layout + TextBlob).
+void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 containerSize,
+                                 bool autoHeight, TextAlign align, const std::string &fontFamily,
+                                 const std::string &fontAbsolutePath, Color fillColor,
+                                 const std::optional<Color> &strokeColor, float strokeWidth) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr || containerSize.x <= 0.0f || containerSize.y <= 0.0f) {
+        return;
+    }
+    std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontAbsolutePath, fontFamily);
+    if (typeface == nullptr) {
+        return;
+    }
+
+    TgfxGlyphMetrics glyphMetrics(typeface);
+    textlayout::TextLayoutInput input;
+    input.text = text;
+    input.boxWidth = containerSize.x;
+    if (!autoHeight) {
+        input.boxHeight = containerSize.y;
+    }
+    input.fontSize = fontSize > 0.0f ? fontSize : 1.0f;
+    switch (align) {
+        case TextAlign::Left: {
+            input.align = textlayout::Align::Left;
+            break;
+        }
+        case TextAlign::Center: {
+            input.align = textlayout::Align::Center;
+            break;
+        }
+        case TextAlign::Right: {
+            input.align = textlayout::Align::Right;
+            break;
+        }
+    }
+    input.metrics = &glyphMetrics;
+    const textlayout::TextLayoutResult layout = textlayout::LayoutText(input);
+
+    tgfx::AutoCanvasRestore restore(canvas);
+    if (!autoHeight) {
+        canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
+    }
+
+    const tgfx::Font font(typeface, layout.appliedFontSize);
+    for (const textlayout::TextLine &line : layout.lines) {
+        if (line.text.empty()) {
+            continue;
+        }
+        std::shared_ptr<tgfx::TextBlob> blob = tgfx::TextBlob::MakeFrom(line.text, font);
+        if (blob == nullptr) {
+            continue;
+        }
+        if (strokeColor.has_value() && strokeWidth > 0.0f) {
+            Color stroke = *strokeColor;
+            stroke.a *= opacity_;
+            tgfx::Paint strokePaint;
+            strokePaint.setAntiAlias(true);
+            strokePaint.setStyle(tgfx::PaintStyle::Stroke);
+            strokePaint.setStrokeWidth(strokeWidth);
+            strokePaint.setColor(ToTgfxColor(stroke));
+            strokePaint.setBlendMode(ToTgfxBlendMode(blendMode_));
+            canvas->drawTextBlob(blob, line.x, line.y, strokePaint);
+        }
+        Color fill = fillColor;
+        fill.a *= opacity_;
+        tgfx::Paint fillPaint;
+        fillPaint.setAntiAlias(true);
+        fillPaint.setStyle(tgfx::PaintStyle::Fill);
+        fillPaint.setColor(ToTgfxColor(fill));
+        fillPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
+        canvas->drawTextBlob(blob, line.x, line.y, fillPaint);
+    }
 }
 
 }  // namespace motion

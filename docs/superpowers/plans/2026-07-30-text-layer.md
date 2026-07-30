@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–7 complete.
+**Progress:** Tasks 1–8 complete.
 
 ## Global Constraints
 
@@ -354,15 +354,15 @@ git commit --only <相关文件> -m "Emit DrawText commands for evaluated text l
 - `autoHeight==false`：clip 到容器矩形
 - 局部原点：容器左上为 (0,0)，与 Image 一致
 
-- [ ] **Step 1: 实现 GlyphMetrics + drawText**
+- [x] **Step 1: 实现 GlyphMetrics + drawText**
 
-- [ ] **Step 2: 跑 tgfx 测试**
+- [x] **Step 2: 跑 tgfx 测试**
 
 ```bash
 ctest --test-dir build -R Tgfx --output-on-failure
 ```
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Draw text layers in tgfx using textlayout and typefaces."

@@ -129,11 +129,13 @@ target_include_directories(tgfx_adapter
 target_include_directories(tgfx_adapter
                            PRIVATE
                            "${CMAKE_CURRENT_SOURCE_DIR}/src"
-                           "${TGFX_INCLUDE_DIR}")
+                           "${TGFX_INCLUDE_DIR}"
+                           "${PROJECT_SOURCE_DIR}/adapter/textlayout/include")
 
 target_link_libraries(tgfx_adapter
                       PUBLIC
                       core
+                      textlayout
                       "-framework Metal"
                       "-framework MetalKit"
                       "-framework Foundation"
