@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Task 1 complete.
+**Progress:** Tasks 1–2 complete.
 
 ## Global Constraints
 
