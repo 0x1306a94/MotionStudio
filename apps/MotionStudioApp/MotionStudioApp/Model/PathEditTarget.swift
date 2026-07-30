@@ -30,9 +30,9 @@ struct PathEditTarget: Equatable {
     var propertyPath: String {
         switch kind {
         case .MASK:
-            "masks[\(maskIndex)].path"
+            MaskProperty.path.path(at: maskIndex)
         default:
-            "path"
+            ShapeProperty.path.path
         }
     }
 }

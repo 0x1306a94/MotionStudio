@@ -19,7 +19,7 @@ struct PathKeyframeInspector: View {
 
     let perform: (String, () -> Void) -> Void
 
-    private let path = "path"
+    private let path = ShapeProperty.path.path
 
     var body: some View {
         let _ = core.revision

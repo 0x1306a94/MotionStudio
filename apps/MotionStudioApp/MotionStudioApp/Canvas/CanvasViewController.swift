@@ -507,13 +507,13 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     /// Enters pen mode on the layer's shape path (converts Rect/Ellipse if needed).
     /// Mask paths stay Inspector-only.
     private func enterPenForShapeLayer(_ layerID: UInt64) {
-        if !document.core.hasBezierPath(entityID: layerID, path: "path") {
+        if !document.core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path) {
             document.core.convertGeometryToPath(layerID: layerID, frame: evaluationFrame)
-            if document.core.hasBezierPath(entityID: layerID, path: "path") {
+            if document.core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path) {
                 registerEdit("Convert to Path")
             }
         }
-        guard document.core.hasBezierPath(entityID: layerID, path: "path") else {
+        guard document.core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path) else {
             return
         }
         editorState.selectedLayerID = layerID

@@ -1,8 +1,8 @@
 //
-//  InspectorProperty.swift
+//  PropertyPath.swift
 //  MotionStudioApp
 //
-//  Field metadata used by the inspector UI.
+//  Canonical Core property-path strings shared by Inspector, Timeline, and Canvas.
 //
 
 import Foundation
@@ -78,6 +78,8 @@ enum TransformProperty: String, CaseIterable {
 }
 
 enum ShapeProperty: String, CaseIterable {
+    case path
+    case position
     case size
     case cornerRadius
 
@@ -87,10 +89,83 @@ enum ShapeProperty: String, CaseIterable {
 
     var actionLabel: String {
         switch self {
+        case .path:
+            "Path"
+        case .position:
+            "Position"
         case .size:
             "Size"
         case .cornerRadius:
             "Corner Radius"
+        }
+    }
+}
+
+enum MaskProperty: String, CaseIterable {
+    case path
+    case opacity
+    case feather
+    case expansion
+
+    func path(at index: Int) -> String {
+        "masks[\(index)].\(rawValue)"
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .path:
+            "Path"
+        case .opacity:
+            "Opacity"
+        case .feather:
+            "Feather"
+        case .expansion:
+            "Expansion"
+        }
+    }
+}
+
+enum StyleProperty: String, CaseIterable {
+    case color
+    case width
+    case trimStart
+    case trimEnd
+    case trimOffset
+
+    func path(at index: Int) -> String {
+        "styles[\(index)].\(rawValue)"
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .color:
+            "Color"
+        case .width:
+            "Width"
+        case .trimStart:
+            "Trim Start"
+        case .trimEnd:
+            "Trim End"
+        case .trimOffset:
+            "Trim Offset"
+        }
+    }
+}
+
+enum FollowPathProperty: String, CaseIterable {
+    case pathOffset = "followPath.pathOffset"
+    case orientOffset = "followPath.orientOffset"
+
+    var path: String {
+        rawValue
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .pathOffset:
+            "Path Offset"
+        case .orientOffset:
+            "Orient Offset"
         }
     }
 }

@@ -54,7 +54,7 @@ struct InspectorView: View {
                                                isEditable: isEditable,
                                                perform: perform)
                         }
-                        if core.hasBezierPath(entityID: layerID, path: "path") {
+                        if core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path) {
                             PathKeyframeInspector(core: core,
                                                   layerID: layerID,
                                                   isEditable: isEditable,

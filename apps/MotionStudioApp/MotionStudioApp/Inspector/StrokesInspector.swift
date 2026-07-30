@@ -41,7 +41,7 @@ struct StrokesInspector: View {
             .disabled(!isEditable)
         }
         ForEach(Array(strokes.enumerated()), id: \.element) { position, styleIndex in
-            let hasColorKeyframe = hasKeyframe(styleIndex: styleIndex, property: "color")
+            let hasColorKeyframe = hasKeyframe(styleIndex: styleIndex, property: .color)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     ColorPicker("Stroke \(position + 1)",
@@ -84,11 +84,11 @@ struct StrokesInspector: View {
                         .pickerStyle(.segmented)
                     }
                 }
-                floatRow(styleIndex: styleIndex, label: "Width", property: "width")
+                floatRow(styleIndex: styleIndex, label: "Width", property: .width)
                 if !isTextLayer {
-                    floatRow(styleIndex: styleIndex, label: "Trim Start", property: "trimStart")
-                    floatRow(styleIndex: styleIndex, label: "Trim End", property: "trimEnd")
-                    floatRow(styleIndex: styleIndex, label: "Trim Offset", property: "trimOffset")
+                    floatRow(styleIndex: styleIndex, label: "Trim Start", property: .trimStart)
+                    floatRow(styleIndex: styleIndex, label: "Trim End", property: .trimEnd)
+                    floatRow(styleIndex: styleIndex, label: "Trim Offset", property: .trimOffset)
                 }
             }
             .disabled(!isEditable)
@@ -101,17 +101,17 @@ struct StrokesInspector: View {
         }
     }
 
-    private func stylePath(styleIndex: Int, property: String) -> String {
-        "styles[\(styleIndex)].\(property)"
+    private func stylePath(styleIndex: Int, property: StyleProperty) -> String {
+        property.path(at: styleIndex)
     }
 
-    private func hasKeyframe(styleIndex: Int, property: String) -> Bool {
+    private func hasKeyframe(styleIndex: Int, property: StyleProperty) -> Bool {
         core.keyframeFrames(entityID: layerID,
                             path: stylePath(styleIndex: styleIndex, property: property))
             .contains(playheadFrame)
     }
 
-    private func floatRow(styleIndex: Int, label: String, property: String) -> some View {
+    private func floatRow(styleIndex: Int, label: String, property: StyleProperty) -> some View {
         let path = stylePath(styleIndex: styleIndex, property: property)
         let hasKeyframe = core.keyframeFrames(entityID: layerID, path: path)
             .contains(playheadFrame)
@@ -145,10 +145,11 @@ struct StrokesInspector: View {
 
     private func colorBinding(styleIndex: Int, hasKeyframe: Bool) -> Binding<Color> {
         Binding {
-            core.evaluateColor(entityID: layerID, path: stylePath(styleIndex: styleIndex, property: "color"), frame: playheadFrame).swiftUIColor
+            core.evaluateColor(entityID: layerID, path: stylePath(styleIndex: styleIndex, property: .color),
+                               frame: playheadFrame).swiftUIColor
         } set: { newValue in
             guard isEditable else { return }
-            let path = stylePath(styleIndex: styleIndex, property: "color")
+            let path = stylePath(styleIndex: styleIndex, property: .color)
             let value = MotionColor(newValue).clampedChannels()
             perform("Set Stroke Color") {
                 if hasKeyframe {
@@ -187,7 +188,7 @@ struct StrokesInspector: View {
 
     private func toggleColorKeyframe(styleIndex: Int, hasKeyframe: Bool) {
         guard isEditable else { return }
-        let path = stylePath(styleIndex: styleIndex, property: "color")
+        let path = stylePath(styleIndex: styleIndex, property: .color)
         if hasKeyframe {
             perform("Delete Keyframe") {
                 core.removeKeyframe(entityID: layerID, path: path, frame: playheadFrame)

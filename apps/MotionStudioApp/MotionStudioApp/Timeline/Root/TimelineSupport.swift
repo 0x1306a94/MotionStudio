@@ -38,6 +38,14 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: ShapeProperty.cornerRadius.path).isEmpty {
         paths.append(ShapeProperty.cornerRadius.path)
     }
+    if !core.keyframes(entityID: layerID, path: ShapeProperty.position.path).isEmpty {
+        paths.append(ShapeProperty.position.path)
+    }
+    if core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path),
+       !core.keyframes(entityID: layerID, path: ShapeProperty.path.path).isEmpty
+    {
+        paths.append(ShapeProperty.path.path)
+    }
     if !core.keyframes(entityID: layerID, path: ImageProperty.size.path).isEmpty {
         paths.append(ImageProperty.size.path)
     }
@@ -47,16 +55,10 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: TextProperty.fontSize.path).isEmpty {
         paths.append(TextProperty.fontSize.path)
     }
-    if core.hasBezierPath(entityID: layerID, path: "path"),
-       !core.keyframes(entityID: layerID, path: "path").isEmpty
+    for property in FollowPathProperty.allCases
+        where !core.keyframes(entityID: layerID, path: property.path).isEmpty
     {
-        paths.append("path")
-    }
-    if !core.keyframes(entityID: layerID, path: "followPath.pathOffset").isEmpty {
-        paths.append("followPath.pathOffset")
-    }
-    if !core.keyframes(entityID: layerID, path: "followPath.orientOffset").isEmpty {
-        paths.append("followPath.orientOffset")
+        paths.append(property.path)
     }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     paths.append(contentsOf: timelineMaskTracks(core: core, layerID: layerID).map(\.path))
@@ -73,18 +75,19 @@ func timelineStyleTracks(core: MotionDocumentCore,
     var tracks: [(path: String, label: String)] = []
     for index in 0 ..< core.styleCount(layerID: layerID) {
         let styleType = core.styleType(layerID: layerID, index: index)
-        var candidates: [(path: String, label: String)] = []
+        let candidates: [(path: String, label: String)]
         if styleType == .FILL {
             fillPosition += 1
-            candidates = [("styles[\(index)].color", "Fill \(fillPosition) Color")]
+            let property = StyleProperty.color
+            candidates = [(property.path(at: index), "Fill \(fillPosition) \(property.actionLabel)")]
         } else if styleType == .STROKE {
             strokePosition += 1
             let name = "Stroke \(strokePosition)"
-            candidates = [("styles[\(index)].color", "\(name) Color"),
-                          ("styles[\(index)].width", "\(name) Width"),
-                          ("styles[\(index)].trimStart", "\(name) Trim Start"),
-                          ("styles[\(index)].trimEnd", "\(name) Trim End"),
-                          ("styles[\(index)].trimOffset", "\(name) Trim Offset")]
+            candidates = StyleProperty.allCases.map { property in
+                (property.path(at: index), "\(name) \(property.actionLabel)")
+            }
+        } else {
+            candidates = []
         }
         for candidate in candidates
             where !core.keyframes(entityID: layerID, path: candidate.path).isEmpty
@@ -102,12 +105,9 @@ func timelineMaskTracks(core: MotionDocumentCore,
     var tracks: [(path: String, label: String)] = []
     for index in 0 ..< core.maskCount(layerID: layerID) {
         let name = "Mask \(index + 1)"
-        let candidates = [
-            ("masks[\(index)].path", "\(name) Path"),
-            ("masks[\(index)].opacity", "\(name) Opacity"),
-            ("masks[\(index)].feather", "\(name) Feather"),
-            ("masks[\(index)].expansion", "\(name) Expansion"),
-        ]
+        let candidates = MaskProperty.allCases.map { property in
+            (property.path(at: index), "\(name) \(property.actionLabel)")
+        }
         for candidate in candidates
             where !core.keyframes(entityID: layerID, path: candidate.0).isEmpty
         {
@@ -189,21 +189,11 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             label: property.actionLabel))
         }
 
-        if animatedPaths.contains("path") {
-            rows.append(timelinePropertyRow(core: core, layerID: layerID, path: "path",
-                                            label: "Path"))
-        }
-        if animatedPaths.contains("followPath.pathOffset") {
+        for property in FollowPathProperty.allCases where animatedPaths.contains(property.path) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
-                                            path: "followPath.pathOffset",
-                                            label: "Path Offset"))
-        }
-        if animatedPaths.contains("followPath.orientOffset") {
-            rows.append(timelinePropertyRow(core: core,
-                                            layerID: layerID,
-                                            path: "followPath.orientOffset",
-                                            label: "Orient Offset"))
+                                            path: property.path,
+                                            label: property.actionLabel))
         }
         for track in timelineStyleTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,

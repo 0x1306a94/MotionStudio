@@ -21,9 +21,6 @@ struct FollowPathInspector: View {
 
     let perform: (String, () -> Void) -> Void
 
-    private let pathOffsetPath = "followPath.pathOffset"
-    private let orientOffsetPath = "followPath.orientOffset"
-
     var body: some View {
         let _ = core.revision
         let enabled = core.followPathEnabled(layerID: layerID)
@@ -50,9 +47,9 @@ struct FollowPathInspector: View {
             .disabled(!isEditable || !enabled)
 
         if enabled {
-            floatRow(label: "Path Offset", path: pathOffsetPath)
+            floatRow(label: FollowPathProperty.pathOffset.actionLabel, path: FollowPathProperty.pathOffset.path)
             if orient {
-                floatRow(label: "Orient Offset", path: orientOffsetPath)
+                floatRow(label: FollowPathProperty.orientOffset.actionLabel, path: FollowPathProperty.orientOffset.path)
             }
         }
     }

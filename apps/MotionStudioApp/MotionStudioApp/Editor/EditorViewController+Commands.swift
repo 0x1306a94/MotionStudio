@@ -186,12 +186,12 @@ extension EditorViewController {
         }
         // Toolbar / double-click always target the shape path. Mask edit stays
         // Inspector-only (`onEditMaskPath`).
-        if !document.core.hasBezierPath(entityID: layerID, path: "path") {
+        if !document.core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path) {
             perform("Convert to Path") {
                 document.core.convertGeometryToPath(layerID: layerID, frame: playheadClock.frame)
             }
         }
-        if document.core.hasBezierPath(entityID: layerID, path: "path") {
+        if document.core.hasBezierPath(entityID: layerID, path: ShapeProperty.path.path) {
             editorState.pathEditTarget = .shape(layerID: layerID)
             editorState.selectedLayerID = layerID
         } else {

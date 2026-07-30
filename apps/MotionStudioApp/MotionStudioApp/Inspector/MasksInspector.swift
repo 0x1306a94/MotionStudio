@@ -98,16 +98,16 @@ struct MasksInspector: View {
                     .disabled(!isEditable)
                 }
             }
-            floatPropertyRow(index: index, suffix: "opacity", label: "Opacity")
-            floatPropertyRow(index: index, suffix: "feather", label: "Feather")
-            floatPropertyRow(index: index, suffix: "expansion", label: "Expansion")
+            floatPropertyRow(index: index, property: .opacity, label: "Opacity")
+            floatPropertyRow(index: index, property: .feather, label: "Feather")
+            floatPropertyRow(index: index, property: .expansion, label: "Expansion")
         }
         .padding(.vertical, 2)
         .id("mask-row-\(index)-\(core.revision)")
     }
 
-    private func floatPropertyRow(index: Int, suffix: String, label: String) -> some View {
-        let path = maskPath(index: index, suffix: suffix)
+    private func floatPropertyRow(index: Int, property: MaskProperty, label: String) -> some View {
+        let path = property.path(at: index)
         let hasKeyframe = hasKeyframeAtPlayhead(path: path)
         return NumberPropertyRow(label: label,
                                  value: core.evaluateFloat(entityID: layerID, path: path,
@@ -142,7 +142,7 @@ struct MasksInspector: View {
 
     @ViewBuilder
     private func pathKeyframeButton(index: Int) -> some View {
-        let path = maskPath(index: index, suffix: "path")
+        let path = MaskProperty.path.path(at: index)
         let hasKeyframe = hasKeyframeAtPlayhead(path: path)
         Button {
             guard isEditable else { return }
@@ -192,10 +192,6 @@ struct MasksInspector: View {
                 core.setMaskMode(layerID: layerID, index: index, mode: newValue)
             }
         }
-    }
-
-    private func maskPath(index: Int, suffix: String) -> String {
-        "masks[\(index)].\(suffix)"
     }
 
     private func addMask() {

@@ -79,7 +79,7 @@ struct FillsInspector: View {
     }
 
     private func fillColorPath(styleIndex: Int) -> String {
-        "styles[\(styleIndex)].color"
+        StyleProperty.color.path(at: styleIndex)
     }
 
     private func hasKeyframe(styleIndex: Int) -> Bool {
