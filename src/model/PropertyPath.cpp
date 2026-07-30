@@ -4,6 +4,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -247,6 +248,14 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             }
             if (segments[1].name == "fontSize") {
                 return &textContent->fontSize;
+            }
+            return nullptr;
+        }
+        if (first.name == "image" && segments.size() == 2 &&
+            layer->content->type() == LayerType::Image) {
+            auto *imageContent = static_cast<ImageContent *>(layer->content.get());
+            if (segments[1].name == "size") {
+                return &imageContent->size;
             }
             return nullptr;
         }
