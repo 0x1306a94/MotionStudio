@@ -1,6 +1,5 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,8 +17,8 @@ enum class Align {
 struct TextLayoutInput {
     std::string text;
     float boxWidth = 0;
-    // nullopt = auto height (no font shrink); set = fixed height with shrink.
-    std::optional<float> boxHeight;
+    float boxHeight = 0;       // fixed layout box height
+    bool shrinkToFit = false;  // true = binary-search font shrink into box
     float fontSize = 48;
     Align align = Align::Left;
     const GlyphMetrics *metrics = nullptr;
@@ -38,8 +37,8 @@ struct TextLayoutResult {
     std::vector<TextLine> lines;
 };
 
-// Lays out boxed text: hard breaks on '\\n', soft wrap by width, optional
-// binary-search font shrink when boxHeight is set.
+// Lays out boxed text: hard breaks on '\\n', soft wrap by width; when
+// shrinkToFit is true, binary-search font size to fit boxHeight.
 TextLayoutResult LayoutText(const TextLayoutInput &input);
 
 }  // namespace motion::textlayout

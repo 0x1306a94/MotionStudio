@@ -59,7 +59,7 @@ TEST(TextLayerEvalTest, EvaluatesDefaultsAndStyles) {
     EXPECT_FLOAT_EQ(item.fontSize, 32.0f);
     EXPECT_FLOAT_EQ(item.containerSize.x, 200.0f);
     EXPECT_FLOAT_EQ(item.containerSize.y, 80.0f);
-    EXPECT_EQ(item.hitSize, item.containerSize);
+    EXPECT_FALSE(item.boxTextMode);
     EXPECT_EQ(item.align, TextAlign::Center);
     EXPECT_EQ(item.fontFamily, "Helvetica");
     EXPECT_EQ(item.fontStyle, "");

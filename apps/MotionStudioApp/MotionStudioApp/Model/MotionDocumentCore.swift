@@ -618,8 +618,8 @@ final class MotionDocumentCore {
         changed()
     }
 
-    func setTextAutoHeight(layerID: UInt64, autoHeight: Bool) {
-        _ = ms_command_set_text_auto_height(handle, layerID, autoHeight)
+    func setTextBoxTextMode(layerID: UInt64, boxTextMode: Bool) {
+        _ = ms_command_set_text_box_text_mode(handle, layerID, boxTextMode)
         changed()
     }
 
@@ -628,8 +628,8 @@ final class MotionDocumentCore {
         changed()
     }
 
-    func textAutoHeight(layerID: UInt64) -> Bool {
-        ms_layer_text_auto_height(handle, layerID)
+    func textBoxTextMode(layerID: UInt64) -> Bool {
+        ms_layer_text_box_text_mode(handle, layerID)
     }
 
     func textAlign(layerID: UInt64) -> MS_TEXT_ALIGN {

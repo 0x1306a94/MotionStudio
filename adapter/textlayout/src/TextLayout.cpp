@@ -208,11 +208,11 @@ TextLayoutResult LayoutText(const TextLayoutInput &input) {
         return empty;
     }
 
-    if (!input.boxHeight.has_value()) {
+    if (!input.shrinkToFit) {
         return LayoutAtFontSize(input, input.fontSize);
     }
 
-    const float targetHeight = *input.boxHeight;
+    const float targetHeight = input.boxHeight;
     float low = 1.0f;
     float high = std::max(1.0f, input.fontSize);
     TextLayoutResult best = LayoutAtFontSize(input, low);

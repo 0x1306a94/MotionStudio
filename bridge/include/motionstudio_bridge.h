@@ -514,14 +514,14 @@ int ms_asset_width(MSDocument *document, uint64_t assetId);
 int ms_asset_height(MSDocument *document, uint64_t assetId);
 int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 = image
 
-// Adds a Text layer (400x120, autoHeight, PingFang SC, black fill, centered).
+// Adds a Text layer (400x120, boxTextMode off, PingFang SC, black fill, centered).
 uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId);
 // family / style: system CT family and style names (style may be empty for default).
 bool ms_command_set_text_font(MSDocument *document, uint64_t layerId, const char *family,
                               const char *style);
-bool ms_command_set_text_auto_height(MSDocument *document, uint64_t layerId, bool autoHeight);
+bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, bool boxTextMode);
 bool ms_command_set_text_align(MSDocument *document, uint64_t layerId, MS_TEXT_ALIGN align);
-bool ms_layer_text_auto_height(MSDocument *document, uint64_t layerId);
+bool ms_layer_text_box_text_mode(MSDocument *document, uint64_t layerId);
 MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId);
 char *ms_layer_text_font_family(MSDocument *document, uint64_t layerId);  // ms_string_free
 char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId);   // ms_string_free

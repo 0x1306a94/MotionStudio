@@ -20,12 +20,12 @@ class TextContent : public LayerContent {
     std::string fontFamily{"PingFang SC"};
     // System style name within the family (e.g. "Bold"); empty = default/Regular.
     std::string fontStyle{};
-    // Font size cap; shrink may apply when autoHeight is false.
+    // Font size cap; shrink applies only when boxTextMode is true.
     Animatable<float> fontSize{48.0f};
-    // Virtual container; width always constrains wrapping.
+    // Fixed layout box; selection / hit bounds use this size.
     Animatable<Vec2> size{Vec2{400, 120}};
-    // true: height follows content; false: fixed height with font shrink.
-    bool autoHeight = true;
+    // true: wrap + shrink font to fit box; false: wrap + clip overflow.
+    bool boxTextMode = false;
     TextAlign align = TextAlign::Left;
 };
 

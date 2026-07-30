@@ -453,7 +453,7 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
 }
 
 void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 containerSize,
-                                 bool autoHeight, TextAlign align, const std::string &fontFamily,
+                                 bool boxTextMode, TextAlign align, const std::string &fontFamily,
                                  const std::string &fontStyle,
                                  const std::vector<TextDrawStyle> &styles) {
     tgfx::Canvas *canvas = drawingCanvas();
@@ -469,9 +469,8 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
     textlayout::TextLayoutInput input;
     input.text = text;
     input.boxWidth = containerSize.x;
-    if (!autoHeight) {
-        input.boxHeight = containerSize.y;
-    }
+    input.boxHeight = containerSize.y;
+    input.shrinkToFit = boxTextMode;
     input.fontSize = fontSize > 0.0f ? fontSize : 1.0f;
     switch (align) {
         case TextAlign::Left: {
@@ -491,9 +490,7 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
     const textlayout::TextLayoutResult layout = textlayout::LayoutText(input);
 
     tgfx::AutoCanvasRestore restore(canvas);
-    if (!autoHeight) {
-        canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
-    }
+    canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
 
     const tgfx::Font font(typeface, layout.appliedFontSize);
     for (const TextDrawStyle &style : styles) {

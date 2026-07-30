@@ -231,11 +231,10 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         textItem.text = textContent.text.evaluatePreview(time);
         textItem.fontSize = textContent.fontSize.evaluatePreview(time);
         textItem.containerSize = textContent.size.evaluatePreview(time);
-        textItem.autoHeight = textContent.autoHeight;
+        textItem.boxTextMode = textContent.boxTextMode;
         textItem.align = textContent.align;
         textItem.fontFamily = textContent.fontFamily;
         textItem.fontStyle = textContent.fontStyle;
-        textItem.hitSize = textItem.containerSize;
         for (const auto &style : layer.styles) {
             if (style->type() == LayerStyleType::Fill) {
                 const auto &fill = static_cast<const FillStyle &>(*style);

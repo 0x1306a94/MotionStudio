@@ -992,7 +992,7 @@ json ContentToJson(const LayerContent &content) {
             node["fontStyle"] = text.fontStyle;
             node["fontSize"] = AnimatableToJson(text.fontSize);
             node["size"] = AnimatableToJson(text.size);
-            node["autoHeight"] = text.autoHeight;
+            node["boxTextMode"] = text.boxTextMode;
             node["align"] = dto::ToString(text.align);
             break;
         }
@@ -1104,12 +1104,12 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
                     return Unexpected(result.error());
                 }
             }
-            if (const json *autoHeightNode = FindChild(node, "autoHeight")) {
-                Expected<bool, std::string> autoHeight = AsBool(*autoHeightNode);
-                if (!autoHeight) {
-                    return Unexpected(autoHeight.error());
+            if (const json *boxTextModeNode = FindChild(node, "boxTextMode")) {
+                Expected<bool, std::string> boxTextMode = AsBool(*boxTextModeNode);
+                if (!boxTextMode) {
+                    return Unexpected(boxTextMode.error());
                 }
-                content->autoHeight = *autoHeight;
+                content->boxTextMode = *boxTextMode;
             }
             if (const json *alignNode = FindChild(node, "align")) {
                 if (!alignNode->is_string()) {

@@ -8,10 +8,10 @@
 
 namespace motion {
 
-// Sets TextContent::autoHeight.
-class SetTextAutoHeightCommand : public Command {
+// Sets TextContent::boxTextMode.
+class SetTextBoxTextModeCommand : public Command {
   public:
-    SetTextAutoHeightCommand(EntityId layerId, bool autoHeight);
+    SetTextBoxTextModeCommand(EntityId layerId, bool boxTextMode);
 
     void execute(Document &document) override;
     void undo(Document &document) override;
@@ -21,8 +21,8 @@ class SetTextAutoHeightCommand : public Command {
 
   private:
     EntityId layerId_;
-    bool autoHeight_ = true;
-    std::optional<bool> oldAutoHeight_;
+    bool boxTextMode_ = false;
+    std::optional<bool> oldBoxTextMode_;
 };
 
 }  // namespace motion

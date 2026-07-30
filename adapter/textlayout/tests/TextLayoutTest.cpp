@@ -101,14 +101,26 @@ TEST(TextLayoutTest, CenterAlign) {
     EXPECT_FLOAT_EQ(result.lines[0].x, 40.0f);  // (100-20)/2
 }
 
-TEST(TextLayoutTest, FixedHeightShrinksFont) {
+TEST(TextLayoutTest, ShrinkToFitReducesFont) {
     FakeGlyphMetrics metrics;
     TextLayoutInput input = MakeInput("abcdefgh", 40.0f, 40.0f);
     input.metrics = &metrics;
     input.boxHeight = 20.0f;  // one line of size-20 metrics height
+    input.shrinkToFit = true;
 
     TextLayoutResult result = LayoutText(input);
     EXPECT_LT(result.appliedFontSize, 40.0f);
     EXPECT_FLOAT_EQ(result.measuredSize.y, 20.0f);
     EXPECT_LE(result.measuredSize.y, 20.01f);
+}
+
+TEST(TextLayoutTest, WithoutShrinkKeepsFontSize) {
+    FakeGlyphMetrics metrics;
+    TextLayoutInput input = MakeInput("abcdefgh", 40.0f, 40.0f);
+    input.metrics = &metrics;
+    input.boxHeight = 20.0f;
+    input.shrinkToFit = false;
+
+    TextLayoutResult result = LayoutText(input);
+    EXPECT_FLOAT_EQ(result.appliedFontSize, 40.0f);
 }

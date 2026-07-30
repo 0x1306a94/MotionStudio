@@ -187,7 +187,7 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
             local.y <= container.y + pad;
     }
     if (layer.textItem.has_value()) {
-        const Vec2 hitSize = layer.textItem->hitSize;
+        const Vec2 hitSize = layer.textItem->containerSize;
         if (hitSize.x <= 0.0f || hitSize.y <= 0.0f) {
             return false;
         }
@@ -259,7 +259,7 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
         return true;
     }
     if (layer.textItem.has_value()) {
-        const Vec2 hitSize = layer.textItem->hitSize;
+        const Vec2 hitSize = layer.textItem->containerSize;
         if (hitSize.x <= 0.0f || hitSize.y <= 0.0f) {
             return false;
         }
@@ -311,7 +311,7 @@ bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPo
         return true;
     }
     if (layer.textItem.has_value()) {
-        const Vec2 hitSize = layer.textItem->hitSize;
+        const Vec2 hitSize = layer.textItem->containerSize;
         if (hitSize.x <= 0.0f || hitSize.y <= 0.0f) {
             return false;
         }

@@ -24,14 +24,12 @@ struct EvaluatedTextItem {
     std::string text;
     float fontSize = 48.0f;
     Vec2 containerSize;
-    bool autoHeight = true;
+    bool boxTextMode = false;
     TextAlign align = TextAlign::Left;
     std::string fontFamily;
     std::string fontStyle;
     // Fill/stroke paints in Layer::styles order. Empty → adapter draws black fill.
     std::vector<TextDrawStyle> styles;
-    // Core sets this to containerSize; Bridge/Canvas may overwrite y after TextLayout.
-    Vec2 hitSize;
 };
 
 }  // namespace motion

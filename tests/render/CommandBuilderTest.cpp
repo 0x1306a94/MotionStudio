@@ -372,7 +372,7 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     text.text = "Hi";
     text.fontSize = 24.0f;
     text.containerSize = {120, 40};
-    text.autoHeight = false;
+    text.boxTextMode = true;
     text.align = motion::TextAlign::Center;
     text.fontFamily = "PingFang SC";
     text.fontStyle = "Bold";
@@ -392,7 +392,7 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     EXPECT_EQ(commands[4].text, "Hi");
     EXPECT_FLOAT_EQ(commands[4].textFontSize, 24.0f);
     EXPECT_FLOAT_EQ(commands[4].textContainerSize.x, 120.0f);
-    EXPECT_FALSE(commands[4].textAutoHeight);
+    EXPECT_TRUE(commands[4].textBoxTextMode);
     EXPECT_EQ(commands[4].textAlign, motion::TextAlign::Center);
     EXPECT_EQ(commands[4].textFontFamily, "PingFang SC");
     EXPECT_EQ(commands[4].textFontStyle, "Bold");

@@ -14,6 +14,6 @@ TEST(TextContentTest, DefaultsMatchSpec) {
     EXPECT_FLOAT_EQ(content.fontSize.staticValue(), 48.0f);
     EXPECT_FLOAT_EQ(content.size.staticValue().x, 400.0f);
     EXPECT_FLOAT_EQ(content.size.staticValue().y, 120.0f);
-    EXPECT_TRUE(content.autoHeight);
+    EXPECT_FALSE(content.boxTextMode);
     EXPECT_EQ(content.align, TextAlign::Left);
 }

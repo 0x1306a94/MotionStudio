@@ -62,7 +62,7 @@ struct DrawCommand {
     std::string text;                                           // DrawText
     float textFontSize = 48.0f;                                 // DrawText
     Vec2 textContainerSize;                                     // DrawText
-    bool textAutoHeight = true;                                 // DrawText
+    bool textBoxTextMode = false;                               // DrawText
     TextAlign textAlign = TextAlign::Left;                      // DrawText
     std::string textFontFamily;                                 // DrawText
     std::string textFontStyle;                                  // DrawText

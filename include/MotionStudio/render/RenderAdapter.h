@@ -98,15 +98,15 @@ class RenderAdapter {
 
     // Draws boxed text in the layer-local container [0,0]–containerSize.
     // text: UTF-8 string (may be empty).
-    // fontSize: model size cap (shrink may apply when autoHeight is false).
-    // containerSize: virtual text box size.
-    // autoHeight: true = wrap and grow; false = fixed height with shrink.
+    // fontSize: model size cap (shrink applies when boxTextMode is true).
+    // containerSize: fixed text box size.
+    // boxTextMode: true = wrap + shrink to fit; false = wrap + clip overflow.
     // align: horizontal alignment within the box.
     // fontFamily: system font family name.
     // fontStyle: system style name within the family; empty = default/Regular.
     // styles: fill/stroke passes in order; empty draws a black fill.
     virtual void drawText(const std::string &text, float fontSize, Vec2 containerSize,
-                          bool autoHeight, TextAlign align, const std::string &fontFamily,
+                          bool boxTextMode, TextAlign align, const std::string &fontFamily,
                           const std::string &fontStyle, const std::vector<TextDrawStyle> &styles) = 0;
 
     // Sets live-preview chrome behind the composition. Default is a no-op;

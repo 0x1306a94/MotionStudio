@@ -11,7 +11,7 @@
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/SetTextAlignCommand.h"
-#include "MotionStudio/undo/SetTextAutoHeightCommand.h"
+#include "MotionStudio/undo/SetTextBoxTextModeCommand.h"
 #include "MotionStudio/undo/SetTextFontCommand.h"
 
 #include "BridgeInternals.h"
@@ -78,7 +78,7 @@ bool ms_command_set_text_font(MSDocument *document, uint64_t layerId, const char
     return true;
 }
 
-bool ms_command_set_text_auto_height(MSDocument *document, uint64_t layerId, bool autoHeight) {
+bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, bool boxTextMode) {
     DocumentLock lock(document);
     if (document == nullptr) {
         return false;
@@ -86,7 +86,7 @@ bool ms_command_set_text_auto_height(MSDocument *document, uint64_t layerId, boo
     if (TextContentOf(FindLayer(document, layerId)) == nullptr) {
         return false;
     }
-    Execute(document, std::make_unique<motion::SetTextAutoHeightCommand>(EntityId{layerId}, autoHeight));
+    Execute(document, std::make_unique<motion::SetTextBoxTextModeCommand>(EntityId{layerId}, boxTextMode));
     return true;
 }
 
@@ -105,10 +105,10 @@ bool ms_command_set_text_align(MSDocument *document, uint64_t layerId, MS_TEXT_A
     return true;
 }
 
-bool ms_layer_text_auto_height(MSDocument *document, uint64_t layerId) {
+bool ms_layer_text_box_text_mode(MSDocument *document, uint64_t layerId) {
     DocumentLock lock(document);
     TextContent *content = TextContentOf(FindLayer(document, layerId));
-    return content != nullptr ? content->autoHeight : true;
+    return content != nullptr ? content->boxTextMode : false;
 }
 
 MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId) {

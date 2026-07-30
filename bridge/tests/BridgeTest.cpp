@@ -931,7 +931,7 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     const uint64_t layerId = ms_command_add_text_layer(document, compositionId);
     ASSERT_NE(layerId, 0u);
     EXPECT_EQ(ms_layer_type(document, layerId), MS_LAYER_TEXT);
-    EXPECT_TRUE(ms_layer_text_auto_height(document, layerId));
+    EXPECT_FALSE(ms_layer_text_box_text_mode(document, layerId));
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);
     {
         BridgeString family;
@@ -965,8 +965,8 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     EXPECT_FLOAT_EQ(sizeX, 300.0f);
     EXPECT_FLOAT_EQ(sizeY, 100.0f);
 
-    ASSERT_TRUE(ms_command_set_text_auto_height(document, layerId, false));
-    EXPECT_FALSE(ms_layer_text_auto_height(document, layerId));
+    ASSERT_TRUE(ms_command_set_text_box_text_mode(document, layerId, true));
+    EXPECT_TRUE(ms_layer_text_box_text_mode(document, layerId));
     ASSERT_TRUE(ms_command_set_text_align(document, layerId, MS_TEXT_ALIGN_CENTER));
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_CENTER);
     ASSERT_TRUE(ms_command_set_text_font(document, layerId, "Helvetica", "Bold"));
@@ -990,8 +990,8 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     }
     ASSERT_TRUE(ms_document_undo(document));  // align
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);
-    ASSERT_TRUE(ms_document_undo(document));  // autoHeight
-    EXPECT_TRUE(ms_layer_text_auto_height(document, layerId));
+    ASSERT_TRUE(ms_document_undo(document));  // boxTextMode
+    EXPECT_FALSE(ms_layer_text_box_text_mode(document, layerId));
 
     ms_document_destroy(document);
 }

@@ -164,7 +164,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     textContent->fontStyle = "Regular";
     textContent->fontSize.setStaticValue(36.0f);
     textContent->size.setStaticValue(Vec2{320, 96});
-    textContent->autoHeight = false;
+    textContent->boxTextMode = true;
     textContent->align = motion::TextAlign::Center;
     composition->layers.push_back(std::move(textLayer));
 
@@ -576,7 +576,7 @@ TEST(SerializerTest, TextLayerRoundTripPreservesBoxFields) {
     EXPECT_FLOAT_EQ(text->fontSize.staticValue(), 36.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().x, 320.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().y, 96.0f);
-    EXPECT_FALSE(text->autoHeight);
+    EXPECT_TRUE(text->boxTextMode);
     EXPECT_EQ(text->align, motion::TextAlign::Center);
 }
 
@@ -586,7 +586,7 @@ TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
     for (auto &layer : json["compositions"][1]["layers"]) {
         if (layer["type"] == "text") {
             layer["content"].erase("size");
-            layer["content"].erase("autoHeight");
+            layer["content"].erase("boxTextMode");
             layer["content"].erase("align");
             layer["content"].erase("fontStyle");
         }
@@ -607,7 +607,7 @@ TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
     auto *text = static_cast<motion::TextContent *>(textLayer->content.get());
     EXPECT_FLOAT_EQ(text->size.staticValue().x, 400.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().y, 120.0f);
-    EXPECT_TRUE(text->autoHeight);
+    EXPECT_FALSE(text->boxTextMode);
     EXPECT_EQ(text->align, motion::TextAlign::Left);
     EXPECT_EQ(text->fontStyle, "");
 }

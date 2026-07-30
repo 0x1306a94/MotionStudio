@@ -37,7 +37,7 @@ struct TextLayerInspector: View {
         let _ = core.revision
         let size = core.evaluateVec2(entityID: layerID, path: textSizePath, frame: playheadFrame)
         let fontSize = core.evaluateFloat(entityID: layerID, path: textFontSizePath, frame: playheadFrame)
-        let autoHeight = core.textAutoHeight(layerID: layerID)
+        let boxTextMode = core.textBoxTextMode(layerID: layerID)
         let align = core.textAlign(layerID: layerID)
         let fontFamily = core.textFontFamily(layerID: layerID)
         let fontStyle = core.textFontStyle(layerID: layerID)
@@ -106,12 +106,12 @@ struct TextLayerInspector: View {
             toggleSizeKeyframe()
         }
 
-        Toggle("Auto Height", isOn: Binding(
-            get: { autoHeight },
+        Toggle("框文本模式", isOn: Binding(
+            get: { boxTextMode },
             set: { newValue in
                 guard isEditable else { return }
-                perform("Set Text Auto Height") {
-                    core.setTextAutoHeight(layerID: layerID, autoHeight: newValue)
+                perform("Set Text Box Text Mode") {
+                    core.setTextBoxTextMode(layerID: layerID, boxTextMode: newValue)
                 }
             },
         ))

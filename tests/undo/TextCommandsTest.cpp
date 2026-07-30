@@ -8,7 +8,7 @@
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/undo/SetTextAlignCommand.h"
-#include "MotionStudio/undo/SetTextAutoHeightCommand.h"
+#include "MotionStudio/undo/SetTextBoxTextModeCommand.h"
 #include "MotionStudio/undo/SetTextFontCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
@@ -18,7 +18,7 @@ using motion::EntityId;
 using motion::Layer;
 using motion::LayerType;
 using motion::SetTextAlignCommand;
-using motion::SetTextAutoHeightCommand;
+using motion::SetTextBoxTextModeCommand;
 using motion::SetTextFontCommand;
 using motion::TextAlign;
 using motion::TextContent;
@@ -34,14 +34,14 @@ TextContent *AddTextLayer(Document &document) {
 
 }  // namespace
 
-TEST(TextCommandsTest, AutoHeightAlignFontUndo) {
+TEST(TextCommandsTest, BoxTextModeAlignFontUndo) {
     Document document;
     TextContent *content = AddTextLayer(document);
     const EntityId layerId = document.compositions[0]->layers[0]->id;
     UndoManager undo;
 
-    undo.execute(document, std::make_unique<SetTextAutoHeightCommand>(layerId, false));
-    EXPECT_FALSE(content->autoHeight);
+    undo.execute(document, std::make_unique<SetTextBoxTextModeCommand>(layerId, true));
+    EXPECT_TRUE(content->boxTextMode);
     undo.execute(document, std::make_unique<SetTextAlignCommand>(layerId, TextAlign::Right));
     EXPECT_EQ(content->align, TextAlign::Right);
     undo.execute(document, std::make_unique<SetTextFontCommand>(layerId, std::string{"Fira Code"}, std::string{"Bold"}));
@@ -54,5 +54,5 @@ TEST(TextCommandsTest, AutoHeightAlignFontUndo) {
     undo.undo(document);
     EXPECT_EQ(content->align, TextAlign::Left);
     undo.undo(document);
-    EXPECT_TRUE(content->autoHeight);
+    EXPECT_FALSE(content->boxTextMode);
 }

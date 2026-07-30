@@ -35,7 +35,7 @@ enum class CommandKind {
     ImportImageAsset,
     SetImageAsset,
     SetImageScaleMode,
-    SetTextAutoHeight,
+    SetTextBoxTextMode,
     SetTextAlign,
     SetTextFont,
     Composite,

@@ -66,7 +66,7 @@ void PlayCommands(const DrawCommandList &commands, RenderAdapter &adapter) {
             }
             case DrawCommandType::DrawText: {
                 adapter.drawText(command.text, command.textFontSize, command.textContainerSize,
-                                 command.textAutoHeight, command.textAlign, command.textFontFamily,
+                                 command.textBoxTextMode, command.textAlign, command.textFontFamily,
                                  command.textFontStyle, command.textStyles);
                 break;
             }
