@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
@@ -275,6 +276,44 @@ TEST(CommandBuilderTest, TrackMatteReplaysSourceWithRelativeTransform) {
         }
     }
     EXPECT_TRUE(foundRelative);
+}
+
+TEST(CommandBuilderTest, TrackMatteReplaysImageSourceAsDrawImage) {
+    SceneState state;
+    EvaluatedLayer source;
+    source.id = EntityId{1};
+    source.usedAsMatteOnly = true;
+    source.worldTransform = Mat3::Translate(Vec2{10, 0});
+    EvaluatedImageItem image;
+    image.absolutePath = "/tmp/project/assets/matte.png";
+    image.containerSize = {100, 100};
+    image.intrinsicSize = {100, 100};
+    image.scaleMode = motion::ImageScaleMode::Stretch;
+    source.imageItem = std::move(image);
+    EvaluatedLayer target;
+    target.id = EntityId{2};
+    target.worldTransform = Mat3::Translate(Vec2{30, 0});
+    target.shapeItems.push_back(MakeFillItem());
+    target.trackMatteType = TrackMatteType::Alpha;
+    target.matteSourceId = EntityId{1};
+    state.layers.push_back(std::move(source));
+    state.layers.push_back(std::move(target));
+
+    auto commands = BuildCommands(state);
+    bool foundImageMatte = false;
+    for (size_t i = 0; i + 3 < commands.size(); ++i) {
+        if (commands[i].type == DrawCommandType::BeginMask &&
+            commands[i].maskApplyMode == MaskApplyMode::AlphaMatte) {
+            EXPECT_EQ(commands[i + 1].type, DrawCommandType::Save);
+            EXPECT_EQ(commands[i + 2].type, DrawCommandType::ConcatTransform);
+            EXPECT_EQ(commands[i + 2].transform, Mat3::Translate(Vec2{-20, 0}));
+            EXPECT_EQ(commands[i + 3].type, DrawCommandType::DrawImage);
+            EXPECT_EQ(commands[i + 3].imagePath, "/tmp/project/assets/matte.png");
+            foundImageMatte = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundImageMatte);
 }
 
 TEST(CommandBuilderTest, ImageLayerEmitsDrawImage) {

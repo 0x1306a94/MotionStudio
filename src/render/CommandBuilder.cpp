@@ -1,8 +1,10 @@
 #include "MotionStudio/render/CommandBuilder.h"
 
+#include <optional>
 #include <utility>
 
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -49,6 +51,19 @@ void AppendShapeItems(const std::vector<EvaluatedShapeItem> &shapeItems, BlendMo
         draw.stroke = item.stroke;
         commands.push_back(std::move(draw));
     }
+}
+
+void AppendImageItem(const std::optional<EvaluatedImageItem> &imageItem, DrawCommandList &commands) {
+    if (!imageItem.has_value() || imageItem->absolutePath.empty()) {
+        return;
+    }
+    DrawCommand drawImage;
+    drawImage.type = DrawCommandType::DrawImage;
+    drawImage.imagePath = imageItem->absolutePath;
+    drawImage.imageContainerSize = imageItem->containerSize;
+    drawImage.imageIntrinsicSize = imageItem->intrinsicSize;
+    drawImage.imageScaleMode = imageItem->scaleMode;
+    commands.push_back(std::move(drawImage));
 }
 
 const EvaluatedLayer *FindLayer(const SceneState &state, EntityId id) {
@@ -104,6 +119,7 @@ void AppendTrackMatte(const SceneState &state, const EvaluatedLayer &layer,
             commands.push_back(relative);
 
             AppendShapeItems(source->shapeItems, source->blendMode, commands);
+            AppendImageItem(source->imageItem, commands);
 
             DrawCommand restore;
             restore.type = DrawCommandType::Restore;
@@ -152,15 +168,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
         }
 
         AppendShapeItems(layer.shapeItems, layer.blendMode, commands);
-        if (layer.imageItem.has_value() && !layer.imageItem->absolutePath.empty()) {
-            DrawCommand drawImage;
-            drawImage.type = DrawCommandType::DrawImage;
-            drawImage.imagePath = layer.imageItem->absolutePath;
-            drawImage.imageContainerSize = layer.imageItem->containerSize;
-            drawImage.imageIntrinsicSize = layer.imageItem->intrinsicSize;
-            drawImage.imageScaleMode = layer.imageItem->scaleMode;
-            commands.push_back(std::move(drawImage));
-        }
+        AppendImageItem(layer.imageItem, commands);
 
         if (!layer.masks.empty()) {
             AppendPathMasks(layer.masks, commands);
