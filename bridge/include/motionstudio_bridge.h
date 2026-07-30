@@ -322,7 +322,7 @@ uint64_t ms_layer_id_at(MSDocument *document, uint64_t compositionId, int index)
 
 // Layer name (malloc'd).
 char *ms_layer_name(MSDocument *document, uint64_t layerId);
-// Layer type tag (MS_LAYER_*), -1 when the layer does not exist.
+// Layer type tag (MS_LAYER_*), MS_LAYER_INVALID when the layer does not exist.
 MS_LAYER ms_layer_type(MSDocument *document, uint64_t layerId);
 int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId);
 int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId);
