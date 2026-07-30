@@ -454,12 +454,13 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
 
 void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 containerSize,
                                  bool autoHeight, TextAlign align, const std::string &fontFamily,
+                                 const std::string &fontStyle,
                                  const std::vector<TextDrawStyle> &styles) {
     tgfx::Canvas *canvas = drawingCanvas();
     if (canvas == nullptr || containerSize.x <= 0.0f || containerSize.y <= 0.0f || styles.empty()) {
         return;
     }
-    std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontFamily);
+    std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontFamily, fontStyle);
     if (typeface == nullptr) {
         return;
     }

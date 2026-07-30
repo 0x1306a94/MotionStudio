@@ -7,7 +7,9 @@
 
 namespace motion {
 
-// Resolves a typeface for text drawing: family name, then PingFang SC, then Helvetica.
-std::shared_ptr<tgfx::Typeface> ResolveTextTypeface(const std::string &fontFamily);
+// Resolves a typeface via public Typeface::MakeFromName(family, style),
+// then PingFang SC, then Helvetica.
+std::shared_ptr<tgfx::Typeface> ResolveTextTypeface(const std::string &fontFamily,
+                                                    const std::string &fontStyle);
 
 }  // namespace motion

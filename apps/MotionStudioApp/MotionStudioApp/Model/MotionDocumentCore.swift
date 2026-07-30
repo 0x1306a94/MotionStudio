@@ -609,9 +609,11 @@ final class MotionDocumentCore {
         return layerID
     }
 
-    func setTextFontFamily(layerID: UInt64, family: String) {
+    func setTextFont(layerID: UInt64, family: String, style: String) {
         family.withCString { cFamily in
-            _ = ms_command_set_text_font_family(handle, layerID, cFamily)
+            style.withCString { cStyle in
+                _ = ms_command_set_text_font(handle, layerID, cFamily, cStyle)
+            }
         }
         changed()
     }
@@ -636,6 +638,10 @@ final class MotionDocumentCore {
 
     func textFontFamily(layerID: UInt64) -> String {
         Self.takeString(ms_layer_text_font_family(handle, layerID)) ?? ""
+    }
+
+    func textFontStyle(layerID: UInt64) -> String {
+        Self.takeString(ms_layer_text_font_style(handle, layerID)) ?? ""
     }
 
     func staticString(entityID: UInt64, path: String) -> String {

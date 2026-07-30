@@ -26,7 +26,7 @@ void ApplyAutoHeightTextHitSizes(motion::SceneState &state) {
             continue;
         }
 
-        std::shared_ptr<tgfx::Typeface> typeface = motion::ResolveTextTypeface(text.fontFamily);
+        std::shared_ptr<tgfx::Typeface> typeface = motion::ResolveTextTypeface(text.fontFamily, text.fontStyle);
         if (typeface == nullptr) {
             continue;
         }

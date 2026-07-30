@@ -103,10 +103,11 @@ class RenderAdapter {
     // autoHeight: true = wrap and grow; false = fixed height with shrink.
     // align: horizontal alignment within the box.
     // fontFamily: system font family name.
+    // fontStyle: system style name within the family; empty = default/Regular.
     // styles: fill/stroke passes in order; empty draws a black fill.
     virtual void drawText(const std::string &text, float fontSize, Vec2 containerSize,
                           bool autoHeight, TextAlign align, const std::string &fontFamily,
-                          const std::vector<TextDrawStyle> &styles) = 0;
+                          const std::string &fontStyle, const std::vector<TextDrawStyle> &styles) = 0;
 
     // Sets live-preview chrome behind the composition. Default is a no-op;
     // on-screen adapters override this. Offscreen adapters ignore it.

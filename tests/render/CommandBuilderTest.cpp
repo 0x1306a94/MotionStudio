@@ -375,6 +375,7 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     text.autoHeight = false;
     text.align = motion::TextAlign::Center;
     text.fontFamily = "PingFang SC";
+    text.fontStyle = "Bold";
     motion::TextDrawStyle fill;
     fill.color = Color{1, 0, 0, 1};
     motion::TextDrawStyle stroke;
@@ -394,6 +395,7 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     EXPECT_FALSE(commands[4].textAutoHeight);
     EXPECT_EQ(commands[4].textAlign, motion::TextAlign::Center);
     EXPECT_EQ(commands[4].textFontFamily, "PingFang SC");
+    EXPECT_EQ(commands[4].textFontStyle, "Bold");
     ASSERT_EQ(commands[4].textStyles.size(), 2u);
     EXPECT_FALSE(commands[4].textStyles[0].isStroke);
     EXPECT_FLOAT_EQ(commands[4].textStyles[0].color.r, 1.0f);

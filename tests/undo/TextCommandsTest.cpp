@@ -9,7 +9,7 @@
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/undo/SetTextAlignCommand.h"
 #include "MotionStudio/undo/SetTextAutoHeightCommand.h"
-#include "MotionStudio/undo/SetTextFontFamilyCommand.h"
+#include "MotionStudio/undo/SetTextFontCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::Composition;
@@ -19,7 +19,7 @@ using motion::Layer;
 using motion::LayerType;
 using motion::SetTextAlignCommand;
 using motion::SetTextAutoHeightCommand;
-using motion::SetTextFontFamilyCommand;
+using motion::SetTextFontCommand;
 using motion::TextAlign;
 using motion::TextContent;
 using motion::UndoManager;
@@ -34,7 +34,7 @@ TextContent *AddTextLayer(Document &document) {
 
 }  // namespace
 
-TEST(TextCommandsTest, AutoHeightAlignFontFamilyUndo) {
+TEST(TextCommandsTest, AutoHeightAlignFontUndo) {
     Document document;
     TextContent *content = AddTextLayer(document);
     const EntityId layerId = document.compositions[0]->layers[0]->id;
@@ -44,12 +44,13 @@ TEST(TextCommandsTest, AutoHeightAlignFontFamilyUndo) {
     EXPECT_FALSE(content->autoHeight);
     undo.execute(document, std::make_unique<SetTextAlignCommand>(layerId, TextAlign::Right));
     EXPECT_EQ(content->align, TextAlign::Right);
-    undo.execute(document,
-                 std::make_unique<SetTextFontFamilyCommand>(layerId, std::string{"Helvetica"}));
-    EXPECT_EQ(content->fontFamily, "Helvetica");
+    undo.execute(document, std::make_unique<SetTextFontCommand>(layerId, std::string{"Fira Code"}, std::string{"Bold"}));
+    EXPECT_EQ(content->fontFamily, "Fira Code");
+    EXPECT_EQ(content->fontStyle, "Bold");
 
     undo.undo(document);
     EXPECT_EQ(content->fontFamily, "PingFang SC");
+    EXPECT_EQ(content->fontStyle, "");
     undo.undo(document);
     EXPECT_EQ(content->align, TextAlign::Left);
     undo.undo(document);

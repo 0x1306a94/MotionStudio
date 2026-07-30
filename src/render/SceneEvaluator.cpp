@@ -234,6 +234,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         textItem.autoHeight = textContent.autoHeight;
         textItem.align = textContent.align;
         textItem.fontFamily = textContent.fontFamily;
+        textItem.fontStyle = textContent.fontStyle;
         textItem.hitSize = textItem.containerSize;
         for (const auto &style : layer.styles) {
             if (style->type() == LayerStyleType::Fill) {

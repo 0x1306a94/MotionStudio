@@ -989,6 +989,7 @@ json ContentToJson(const LayerContent &content) {
             const auto &text = static_cast<const TextContent &>(content);
             node["text"] = AnimatableToJson(text.text);
             node["fontFamily"] = text.fontFamily;
+            node["fontStyle"] = text.fontStyle;
             node["fontSize"] = AnimatableToJson(text.fontSize);
             node["size"] = AnimatableToJson(text.size);
             node["autoHeight"] = text.autoHeight;
@@ -1082,6 +1083,13 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
                 return Unexpected(fontFamily.error());
             }
             content->fontFamily = std::move(*fontFamily);
+            if (const json *fontStyleNode = FindChild(node, "fontStyle")) {
+                Expected<std::string, std::string> fontStyle = AsString(*fontStyleNode);
+                if (!fontStyle) {
+                    return Unexpected(fontStyle.error());
+                }
+                content->fontStyle = std::move(*fontStyle);
+            }
             Expected<const json *, std::string> fontSizeNode = Child(node, "fontSize");
             if (!fontSizeNode) {
                 return Unexpected(fontSizeNode.error());

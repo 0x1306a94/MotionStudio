@@ -8,9 +8,12 @@
 
 namespace motion {
 
-class SetTextFontFamilyCommand : public Command {
+class SetTextFontCommand : public Command {
   public:
-    SetTextFontFamilyCommand(EntityId layerId, std::string fontFamily);
+    // layerId: text layer to update.
+    // fontFamily: system font family name (e.g. "Fira Code").
+    // fontStyle: system style name (e.g. "Bold"); empty means default/Regular traits.
+    SetTextFontCommand(EntityId layerId, std::string fontFamily, std::string fontStyle);
 
     void execute(Document &document) override;
     void undo(Document &document) override;
@@ -21,7 +24,9 @@ class SetTextFontFamilyCommand : public Command {
   private:
     EntityId layerId_;
     std::string fontFamily_;
+    std::string fontStyle_;
     std::optional<std::string> oldFontFamily_;
+    std::optional<std::string> oldFontStyle_;
 };
 
 }  // namespace motion

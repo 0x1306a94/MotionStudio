@@ -27,6 +27,7 @@ struct EvaluatedTextItem {
     bool autoHeight = true;
     TextAlign align = TextAlign::Left;
     std::string fontFamily;
+    std::string fontStyle;
     // Fill/stroke paints in Layer::styles order. Empty → adapter draws black fill.
     std::vector<TextDrawStyle> styles;
     // Core sets this to containerSize; Bridge/Canvas may overwrite y after TextLayout.

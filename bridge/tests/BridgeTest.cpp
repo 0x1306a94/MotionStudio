@@ -969,18 +969,24 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     EXPECT_FALSE(ms_layer_text_auto_height(document, layerId));
     ASSERT_TRUE(ms_command_set_text_align(document, layerId, MS_TEXT_ALIGN_CENTER));
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_CENTER);
-    ASSERT_TRUE(ms_command_set_text_font_family(document, layerId, "Helvetica"));
+    ASSERT_TRUE(ms_command_set_text_font(document, layerId, "Helvetica", "Bold"));
     {
         BridgeString family;
         family.value = ms_layer_text_font_family(document, layerId);
         EXPECT_EQ(family.str(), "Helvetica");
+        BridgeString style;
+        style.value = ms_layer_text_font_style(document, layerId);
+        EXPECT_EQ(style.str(), "Bold");
     }
 
-    ASSERT_TRUE(ms_document_undo(document));  // font family
+    ASSERT_TRUE(ms_document_undo(document));  // font
     {
         BridgeString family;
         family.value = ms_layer_text_font_family(document, layerId);
         EXPECT_EQ(family.str(), "PingFang SC");
+        BridgeString style;
+        style.value = ms_layer_text_font_style(document, layerId);
+        EXPECT_EQ(style.str(), "");
     }
     ASSERT_TRUE(ms_document_undo(document));  // align
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);

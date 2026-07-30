@@ -37,7 +37,7 @@ enum class CommandKind {
     SetImageScaleMode,
     SetTextAutoHeight,
     SetTextAlign,
-    SetTextFontFamily,
+    SetTextFont,
     Composite,
 };
 

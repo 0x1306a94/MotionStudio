@@ -65,6 +65,7 @@ struct DrawCommand {
     bool textAutoHeight = true;                                 // DrawText
     TextAlign textAlign = TextAlign::Left;                      // DrawText
     std::string textFontFamily;                                 // DrawText
+    std::string textFontStyle;                                  // DrawText
     std::vector<TextDrawStyle> textStyles;                      // DrawText fill/stroke passes
 };
 

@@ -16,8 +16,10 @@ class TextContent : public LayerContent {
     ~TextContent() override;
 
     Animatable<std::string> text{std::string{"Text"}};
-    // System font family name (must be installed on the device).
+    // System font family name (must be installed on the device), e.g. "Fira Code".
     std::string fontFamily{"PingFang SC"};
+    // System style name within the family (e.g. "Bold"); empty = default/Regular.
+    std::string fontStyle{};
     // Font size cap; shrink may apply when autoHeight is false.
     Animatable<float> fontSize{48.0f};
     // Virtual container; width always constrains wrapping.

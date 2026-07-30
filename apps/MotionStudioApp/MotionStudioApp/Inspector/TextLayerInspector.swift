@@ -27,8 +27,10 @@ struct TextLayerInspector: View {
         clock.frame
     }
 
-    private var systemFontFamilies: [String] {
-        UIFont.familyNames.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    private var systemFontFaces: [String] {
+        UIFont.familyNames
+            .flatMap { UIFont.fontNames(forFamilyName: $0) }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     var body: some View {
@@ -38,8 +40,10 @@ struct TextLayerInspector: View {
         let autoHeight = core.textAutoHeight(layerID: layerID)
         let align = core.textAlign(layerID: layerID)
         let fontFamily = core.textFontFamily(layerID: layerID)
+        let fontStyle = core.textFontStyle(layerID: layerID)
         let text = core.staticString(entityID: layerID, path: textStringPath)
-        let families = resolvedFontFamilies(current: fontFamily)
+        let selectedFace = displayFace(family: fontFamily, style: fontStyle)
+        let faces = resolvedFontFaces(current: selectedFace)
 
         Text("Text")
             .font(.subheadline)
@@ -141,35 +145,96 @@ struct TextLayerInspector: View {
             Text("Font")
                 .fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 8)
-            Picker("Font", selection: Binding(
-                get: { fontFamily },
-                set: { newValue in
-                    guard isEditable else { return }
-                    perform("Set Text Font Family") {
-                        core.setTextFontFamily(layerID: layerID, family: newValue)
+            Menu {
+                ForEach(faces, id: \.self) { face in
+                    Button {
+                        setFont(face)
+                    } label: {
+                        fontOptionLabel(face)
                     }
-                },
-            )) {
-                ForEach(families, id: \.self) { family in
-                    Text(family).tag(family)
                 }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(selectedFace.isEmpty ? "—" : selectedFace)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .frame(width: Self.fontPickerMaxWidth, alignment: .leading)
             }
-            .labelsHidden()
-            .pickerStyle(.menu)
             .disabled(!isEditable)
-            .frame(maxWidth: Self.fontPickerMaxWidth, alignment: .trailing)
+            .frame(width: Self.fontPickerMaxWidth, alignment: .trailing)
+            .clipped()
         }
         .font(.subheadline)
     }
 
-    private static let fontPickerMaxWidth: CGFloat = 200
+    private static let fontPickerMaxWidth: CGFloat = 168
 
-    private func resolvedFontFamilies(current: String) -> [String] {
-        var families = systemFontFamilies
-        if !current.isEmpty, !families.contains(current) {
-            families.insert(current, at: 0)
+    private func fontOptionLabel(_ title: String) -> some View {
+        Text(title)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: Self.fontPickerMaxWidth, alignment: .trailing)
+    }
+
+    private func resolvedFontFaces(current: String) -> [String] {
+        var faces = systemFontFaces
+        if !current.isEmpty, !faces.contains(current) {
+            faces.insert(current, at: 0)
         }
-        return families
+        return faces
+    }
+
+    private func displayFace(family: String, style: String) -> String {
+        for face in systemFontFaces {
+            let resolved = Self.resolveFace(face)
+            if resolved.family == family, Self.stylesEqual(resolved.style, style) {
+                return face
+            }
+        }
+        if style.isEmpty {
+            return family
+        }
+        return "\(family)-\(style)"
+    }
+
+    private func setFont(_ face: String) {
+        guard isEditable else { return }
+        let resolved = Self.resolveFace(face)
+        perform("Set Text Font") {
+            core.setTextFont(layerID: layerID, family: resolved.family, style: resolved.style)
+        }
+    }
+
+    private static func resolveFace(_ face: String) -> (family: String, style: String) {
+        guard let font = UIFont(name: face, size: 12) else {
+            return (face, "")
+        }
+        let style = (font.fontDescriptor.object(forKey: .face) as? String) ?? ""
+        return (font.familyName, style)
+    }
+
+    private static func stylesEqual(_ left: String, _ right: String) -> Bool {
+        normalizeStyle(left) == normalizeStyle(right)
+    }
+
+    private static func normalizeStyle(_ style: String) -> String {
+        let trimmed = style.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return ""
+        }
+        if trimmed.caseInsensitiveCompare("Regular") == .orderedSame ||
+            trimmed.caseInsensitiveCompare("Normal") == .orderedSame
+        {
+            return ""
+        }
+        return trimmed
     }
 
     private func commitText() {

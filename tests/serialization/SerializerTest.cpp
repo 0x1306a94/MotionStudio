@@ -161,6 +161,7 @@ std::unique_ptr<Document> BuildRichDocument() {
     auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
     textContent->text.setStaticValue(std::string{"hello"});
     textContent->fontFamily = "PingFang SC";
+    textContent->fontStyle = "Regular";
     textContent->fontSize.setStaticValue(36.0f);
     textContent->size.setStaticValue(Vec2{320, 96});
     textContent->autoHeight = false;
@@ -571,6 +572,7 @@ TEST(SerializerTest, TextLayerRoundTripPreservesBoxFields) {
     auto *text = static_cast<motion::TextContent *>(textLayer->content.get());
     EXPECT_EQ(text->text.staticValue(), "hello");
     EXPECT_EQ(text->fontFamily, "PingFang SC");
+    EXPECT_EQ(text->fontStyle, "Regular");
     EXPECT_FLOAT_EQ(text->fontSize.staticValue(), 36.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().x, 320.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().y, 96.0f);
@@ -586,6 +588,7 @@ TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
             layer["content"].erase("size");
             layer["content"].erase("autoHeight");
             layer["content"].erase("align");
+            layer["content"].erase("fontStyle");
         }
     }
 
@@ -606,6 +609,7 @@ TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
     EXPECT_FLOAT_EQ(text->size.staticValue().y, 120.0f);
     EXPECT_TRUE(text->autoHeight);
     EXPECT_EQ(text->align, motion::TextAlign::Left);
+    EXPECT_EQ(text->fontStyle, "");
 }
 
 TEST(SerializerTest, UnboundImageAssetIdSerializesAsNull) {

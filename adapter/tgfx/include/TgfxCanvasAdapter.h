@@ -59,7 +59,7 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
     void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
                    ImageScaleMode mode) override;
     void drawText(const std::string &text, float fontSize, Vec2 containerSize, bool autoHeight,
-                  TextAlign align, const std::string &fontFamily,
+                  TextAlign align, const std::string &fontFamily, const std::string &fontStyle,
                   const std::vector<TextDrawStyle> &styles) override;
 
   protected:

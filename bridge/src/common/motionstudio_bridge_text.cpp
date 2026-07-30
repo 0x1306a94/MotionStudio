@@ -12,7 +12,7 @@
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/SetTextAlignCommand.h"
 #include "MotionStudio/undo/SetTextAutoHeightCommand.h"
-#include "MotionStudio/undo/SetTextFontFamilyCommand.h"
+#include "MotionStudio/undo/SetTextFontCommand.h"
 
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
@@ -65,16 +65,16 @@ uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId)
     return layerId;
 }
 
-bool ms_command_set_text_font_family(MSDocument *document, uint64_t layerId, const char *family) {
+bool ms_command_set_text_font(MSDocument *document, uint64_t layerId, const char *family,
+                              const char *style) {
     DocumentLock lock(document);
-    if (document == nullptr || family == nullptr) {
+    if (document == nullptr || family == nullptr || style == nullptr) {
         return false;
     }
     if (TextContentOf(FindLayer(document, layerId)) == nullptr) {
         return false;
     }
-    Execute(document,
-            std::make_unique<motion::SetTextFontFamilyCommand>(EntityId{layerId}, std::string(family)));
+    Execute(document, std::make_unique<motion::SetTextFontCommand>(EntityId{layerId}, std::string(family), std::string(style)));
     return true;
 }
 
@@ -124,4 +124,10 @@ char *ms_layer_text_font_family(MSDocument *document, uint64_t layerId) {
     DocumentLock lock(document);
     TextContent *content = TextContentOf(FindLayer(document, layerId));
     return content == nullptr ? nullptr : strdup(content->fontFamily.c_str());
+}
+
+char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content == nullptr ? nullptr : strdup(content->fontStyle.c_str());
 }

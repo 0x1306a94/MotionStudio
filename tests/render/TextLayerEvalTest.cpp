@@ -62,6 +62,7 @@ TEST(TextLayerEvalTest, EvaluatesDefaultsAndStyles) {
     EXPECT_EQ(item.hitSize, item.containerSize);
     EXPECT_EQ(item.align, TextAlign::Center);
     EXPECT_EQ(item.fontFamily, "Helvetica");
+    EXPECT_EQ(item.fontStyle, "");
     ASSERT_EQ(item.styles.size(), 2u);
     EXPECT_FALSE(item.styles[0].isStroke);
     EXPECT_FLOAT_EQ(item.styles[0].color.r, 1.0f);
