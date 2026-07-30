@@ -834,6 +834,19 @@ final class MotionDocumentCore {
         changed()
     }
 
+    /// Scales shape geometry and mask paths in layer-local space about `localPivot`.
+    @discardableResult
+    func resizeLayerGeometry(layerID: UInt64, frame: Int64, localPivot: CGPoint, scaleX: CGFloat,
+                             scaleY: CGFloat) -> Bool
+    {
+        let ok = ms_command_resize_layer_geometry(handle, layerID, Double(frame), Float(localPivot.x),
+                                                  Float(localPivot.y), Float(scaleX), Float(scaleY))
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
     func removeLayer(compositionID: UInt64, layerID: UInt64) {
         ms_command_remove_layer(handle, compositionID, layerID)
         changed()

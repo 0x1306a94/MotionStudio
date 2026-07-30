@@ -1,5 +1,6 @@
 #include "motionstudio_bridge.h"
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <utility>
@@ -9,6 +10,7 @@
 #include "MotionStudio/common/PathGeometryEdit.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/Layer.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
@@ -330,4 +332,78 @@ void ms_command_path_edit_recenter_shape(MSDocument *document, uint64_t layerId,
         return;
     }
     RecenterShapePathUnlocked(document, layerId, static_cast<FrameTime>(frame));
+}
+
+namespace {
+
+Vec2 ScaleAboutPivot(Vec2 point, Vec2 pivot, float scaleX, float scaleY) {
+    return Vec2{pivot.x + (point.x - pivot.x) * scaleX, pivot.y + (point.y - pivot.y) * scaleY};
+}
+
+motion::BezierPath ScaleBezierPathAboutPivot(motion::BezierPath path, Vec2 pivot, float scaleX,
+                                             float scaleY) {
+    for (auto &vertex : path.vertices) {
+        vertex.point = ScaleAboutPivot(vertex.point, pivot, scaleX, scaleY);
+        vertex.inTangent = Vec2{vertex.inTangent.x * scaleX, vertex.inTangent.y * scaleY};
+        vertex.outTangent = Vec2{vertex.outTangent.x * scaleX, vertex.outTangent.y * scaleY};
+    }
+    return path;
+}
+
+float ScaledExtent(float value, float scale) {
+    return std::max(1.0f, std::abs(value * scale));
+}
+
+}  // namespace
+
+bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, double frameTime,
+                                      float localPivotX, float localPivotY, float scaleX,
+                                      float scaleY) {
+    DocumentLock guard(document);
+    motion::Layer *layer = FindLayer(document, layerId);
+    if (document == nullptr || layer == nullptr) {
+        return false;
+    }
+    if (std::abs(scaleX - 1.0f) < 1e-6f && std::abs(scaleY - 1.0f) < 1e-6f) {
+        return true;
+    }
+
+    const FrameTime frame = static_cast<FrameTime>(frameTime);
+    const Vec2 pivot{localPivotX, localPivotY};
+    document->undoManager->beginMergeGroup();
+
+    if (AsBezierPath(FindProperty(document, layerId, "path")) != nullptr) {
+        motion::BezierPath path = CurrentBezierPath(document, layerId, "path", frame);
+        if (!path.vertices.empty()) {
+            WriteBezierPathUnlocked(document, layerId, "path", frame,
+                                    ScaleBezierPathAboutPivot(std::move(path), pivot, scaleX,
+                                                              scaleY));
+        }
+    } else if (AsVec2(FindProperty(document, layerId, "size")) != nullptr &&
+               AsVec2(FindProperty(document, layerId, "position")) != nullptr) {
+        const Animatable<Vec2> *sizeProperty = AsVec2(FindProperty(document, layerId, "size"));
+        const Animatable<Vec2> *positionProperty =
+            AsVec2(FindProperty(document, layerId, "position"));
+        const Vec2 size = sizeProperty->evaluate(frame);
+        const Vec2 position = positionProperty->evaluate(frame);
+        WriteVec2AtPlayheadUnlocked(document, layerId, "position", frame,
+                                    ScaleAboutPivot(position, pivot, scaleX, scaleY));
+        WriteVec2AtPlayheadUnlocked(document, layerId, "size", frame,
+                                    Vec2{ScaledExtent(size.x, scaleX), ScaledExtent(size.y, scaleY)});
+    }
+
+    const int maskCount = static_cast<int>(layer->masks.size());
+    for (int index = 0; index < maskCount; ++index) {
+        const std::string propertyPath = PathEditPropertyPath(MS_PATH_EDIT_MASK, index);
+        motion::BezierPath path =
+            CurrentBezierPath(document, layerId, propertyPath.c_str(), frame);
+        if (path.vertices.empty()) {
+            continue;
+        }
+        WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frame,
+                                ScaleBezierPathAboutPivot(std::move(path), pivot, scaleX, scaleY));
+    }
+
+    document->undoManager->endMergeGroup();
+    return true;
 }

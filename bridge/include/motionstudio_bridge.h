@@ -528,6 +528,14 @@ char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId);   // ms_
 
 // Bakes Rect/Ellipse geometry on the layer into a ShapePath at frame.
 void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame);
+
+// Scales shape geometry + all mask paths in layer-local space about localPivot by
+// (scaleX, scaleY). ShapePath vertices/tangents, ShapeRect/Ellipse position+size,
+// and every masks[i].path are written via playhead/static commands in one merge
+// group. Does not modify transform.scale. Returns false if the layer is missing.
+bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, double frameTime,
+                                      float localPivotX, float localPivotY, float scaleX,
+                                      float scaleY);
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);

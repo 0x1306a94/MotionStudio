@@ -996,4 +996,84 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, ResizeLayerGeometryScalesPathMaskAndRect) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t pathId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(pathId, 0u);
+
+    MSBezierVertex vertices[2] = {
+        {0, 0, 0, 0, 2, 0},
+        {10, 0, -2, 0, 0, 0},
+    };
+    MSBezierPath input;
+    input.vertices = vertices;
+    input.count = 2;
+    input.closed = false;
+    ms_command_set_static_bezier_path(document, pathId, "path", &input);
+    ms_command_add_mask(document, pathId, 0);
+    ASSERT_EQ(ms_layer_mask_count(document, pathId), 1);
+
+    MSBezierVertex maskVertices[2] = {
+        {1, 1, 0, 0, 0, 0},
+        {3, 3, 0, 0, 0, 0},
+    };
+    MSBezierPath maskPath;
+    maskPath.vertices = maskVertices;
+    maskPath.count = 2;
+    maskPath.closed = false;
+    ms_command_set_static_bezier_path(document, pathId, "masks[0].path", &maskPath);
+
+    float scaleX = 0.0f;
+    float scaleY = 0.0f;
+    ms_property_static_vec2(document, pathId, "transform.scale", &scaleX, &scaleY);
+    EXPECT_FLOAT_EQ(scaleX, 1.0f);
+    EXPECT_FLOAT_EQ(scaleY, 1.0f);
+
+    ASSERT_TRUE(ms_command_resize_layer_geometry(document, pathId, 0, 0.0f, 0.0f, 2.0f, 2.0f));
+
+    MSBezierPath *scaledPath = ms_property_static_bezier_path(document, pathId, "path");
+    ASSERT_NE(scaledPath, nullptr);
+    ASSERT_EQ(scaledPath->count, 2u);
+    EXPECT_FLOAT_EQ(scaledPath->vertices[0].pointX, 0);
+    EXPECT_FLOAT_EQ(scaledPath->vertices[1].pointX, 20);
+    EXPECT_FLOAT_EQ(scaledPath->vertices[0].outTangentX, 4);
+    EXPECT_FLOAT_EQ(scaledPath->vertices[1].inTangentX, -4);
+    ms_bezier_path_free(scaledPath);
+
+    MSBezierPath *scaledMask = ms_property_static_bezier_path(document, pathId, "masks[0].path");
+    ASSERT_NE(scaledMask, nullptr);
+    ASSERT_EQ(scaledMask->count, 2u);
+    EXPECT_FLOAT_EQ(scaledMask->vertices[0].pointX, 2);
+    EXPECT_FLOAT_EQ(scaledMask->vertices[1].pointY, 6);
+    ms_bezier_path_free(scaledMask);
+
+    ms_property_static_vec2(document, pathId, "transform.scale", &scaleX, &scaleY);
+    EXPECT_FLOAT_EQ(scaleX, 1.0f);
+    EXPECT_FLOAT_EQ(scaleY, 1.0f);
+
+    ASSERT_TRUE(ms_document_undo(document));
+    MSBezierPath *restored = ms_property_static_bezier_path(document, pathId, "path");
+    ASSERT_NE(restored, nullptr);
+    EXPECT_FLOAT_EQ(restored->vertices[1].pointX, 10);
+    ms_bezier_path_free(restored);
+
+    const uint64_t rectId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_TRUE(ms_command_resize_layer_geometry(document, rectId, 0, -100.0f, 0.0f, 2.0f, 1.0f));
+    float posX = 0.0f;
+    float posY = 0.0f;
+    float sizeX = 0.0f;
+    float sizeY = 0.0f;
+    ms_property_static_vec2(document, rectId, "position", &posX, &posY);
+    ms_property_static_vec2(document, rectId, "size", &sizeX, &sizeY);
+    EXPECT_FLOAT_EQ(posX, 100.0f);
+    EXPECT_FLOAT_EQ(posY, 0.0f);
+    EXPECT_FLOAT_EQ(sizeX, 400.0f);
+    EXPECT_FLOAT_EQ(sizeY, 200.0f);
+
+    EXPECT_FALSE(ms_command_resize_layer_geometry(document, 0, 0, 0, 0, 2, 2));
+
+    ms_document_destroy(document);
+}
+
 }  // namespace

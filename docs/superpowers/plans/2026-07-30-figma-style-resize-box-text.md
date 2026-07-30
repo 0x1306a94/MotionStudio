@@ -335,17 +335,17 @@ bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId,
 
 仿射：`p' = pivot + (p - pivot) * (sx, sy)`（sx/sy 可负）
 
-- [ ] **Step 1: 写 bridge 测试（路径 + mask 同步）**
+- [x] **Step 1: 写 bridge 测试（路径 + mask 同步）**
 
-- [ ] **Step 2: 实现 API + Swift 封装**
+- [x] **Step 2: 实现 API + Swift 封装**
 
-- [ ] **Step 3: 接入 `FreeTransformDrag` 单选/多选**
+- [x] **Step 3: 接入 `FreeTransformDrag` 单选/多选**
 
-- [ ] **Step 4: 跑测试 + 手动拖路径层/带 mask 层**
+- [x] **Step 4: 跑测试 + 手动拖路径层/带 mask 层**
 
 Run: `ctest --test-dir build -R bridge_test --output-on-failure`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add bridge/ apps/MotionStudioApp/MotionStudioApp/Canvas/FreeTransformDrag.swift \

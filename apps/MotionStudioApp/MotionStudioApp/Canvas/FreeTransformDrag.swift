@@ -223,6 +223,9 @@ struct FreeTransformDrag {
                                              scaleX: scaleX,
                                              scaleY: scaleY)
                 }
+            } else if core.layerType(start.layerID) == .SHAPE {
+                applyShapeGeometryResize(core: core, frame: frame, start: start,
+                                         scaleX: scaleX, scaleY: scaleY)
             } else {
                 let position = CGVector(dx: pivotScene.x + (start.position.dx - pivotScene.x) * scaleX,
                                         dy: pivotScene.y + (start.position.dy - pivotScene.y) * scaleY)
@@ -230,6 +233,26 @@ struct FreeTransformDrag {
                           frame: frame, value: position, animated: start.positionAnimated)
             }
         }
+    }
+
+    private func applyShapeGeometryResize(core: MotionDocumentCore,
+                                          frame: Int64,
+                                          start: LayerTransformStart,
+                                          scaleX: CGFloat,
+                                          scaleY: CGFloat)
+    {
+        let localPivot: CGPoint
+        if let relative = localPivotRelative, startHandles.isOriented, layerStarts.count == 1 {
+            localPivot = CGPoint(x: relative.x + start.anchor.dx, y: relative.y + start.anchor.dy)
+        } else {
+            let unscaled = inverseRS(CGPoint(x: pivotScene.x - start.position.dx,
+                                             y: pivotScene.y - start.position.dy),
+                                     rotationDegrees: start.rotation,
+                                     scale: start.scale)
+            localPivot = CGPoint(x: unscaled.x + start.anchor.dx, y: unscaled.y + start.anchor.dy)
+        }
+        _ = core.resizeLayerGeometry(layerID: start.layerID, frame: frame, localPivot: localPivot,
+                                     scaleX: scaleX, scaleY: scaleY)
     }
 
     /// Multi-select / AABB box resize: scale size about the shared scene pivot without rewriting localMin.
