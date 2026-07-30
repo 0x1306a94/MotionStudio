@@ -61,12 +61,11 @@ struct EvaluatedTextItem {
     std::string text;
     float fontSize;
     Vec2 containerSize;
-    bool autoHeight;
+    bool boxTextMode;  // true：换行 + 缩字号；false：换行 + clip
     TextAlign align;
     std::string fontFamily;
     std::string fontStyle;
     std::vector<TextDrawStyle> styles;
-    Vec2 hitSize;  // Core 初值为 containerSize；Bridge 可在 autoHeight 时写回测高
 };
 
 struct SceneState {
@@ -112,7 +111,7 @@ struct DrawCommand {
     std::string text;
     float textFontSize;
     Vec2 textContainerSize;
-    bool textAutoHeight;
+    bool textBoxTextMode;
     TextAlign textAlign;
     std::string textFontFamily;
     std::string textFontStyle;
@@ -144,7 +143,7 @@ public:
     virtual void drawImage(const std::string& path, Vec2 container, Vec2 intrinsic,
                            ImageScaleMode mode) = 0;
     virtual void drawText(const std::string& text, float fontSize, Vec2 containerSize,
-                          bool autoHeight, TextAlign align, const std::string& fontFamily,
+                          bool boxTextMode, TextAlign align, const std::string& fontFamily,
                           const std::string& fontStyle,
                           const std::vector<TextDrawStyle>& styles) = 0;
     virtual void clipPath(const BezierPath& path, FillRule rule) = 0;
@@ -158,14 +157,14 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 ### 3.3 已实现后端：tgfx（Metal）
 
-`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。文本绘制走 `TgfxGlyphMetrics` + `adapter/textlayout`（换行 / 对齐 / 固定高缩字），再按行 `TextBlob` 依 `styles` 顺序填充与描边（各 style 自带 blend）；`autoHeight == false` 时 clip 到容器。字体解析：`Typeface::MakeFromName(fontFamily, fontStyle)` → PingFang SC → Helvetica。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
+`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。文本绘制走 `TgfxGlyphMetrics` + `adapter/textlayout`（固定框换行；`boxTextMode` 开则缩字号，关则仅 clip），再按行 `TextBlob` 依 `styles` 顺序填充与描边（各 style 自带 blend）；始终 clip 到容器。字体解析：`Typeface::MakeFromName(fontFamily, fontStyle)` → PingFang SC → Helvetica。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
 
 ## 4. 上屏适配器（应用层预览）
 
 `TgfxOnScreenAdapter`（`adapter/tgfx/`，与离屏适配器同基类 `TgfxCanvasAdapter`）**不属于 Core 层**，基于 tgfx 的 `MetalWindow`：
 
 - 渲染目标：SwiftUI 画布里的 `MTKView`；`tgfx::MetalWindow::MakeFrom(MTKView*)` 包装其 drawable，`beginFrame` 取 window surface，`endFrame` 提交并 present
-- 每帧流程：播放头时间 → `ms_canvas_draw_frame`（桥接层内部完成 `SceneEvaluator::Evaluate` → `autoHeight` 文本测高写回 `hitSize` → `BuildCommands` → `PlayCommands`）→ tgfx 光栅化 → present。**DrawCommand 不越过 C ABI 边界**
+- 每帧流程：播放头时间 → `ms_canvas_draw_frame`（桥接层内部完成 `SceneEvaluator::Evaluate` → `BuildCommands` → `PlayCommands`）→ tgfx 光栅化 → present。**DrawCommand 不越过 C ABI 边界**
 - **路径渲染**：由 tgfx 直接光栅化贝塞尔路径（GPU），应用层无需自行细分三角形
 - 播放驱动：`CADisplayLink`（macOS 14+ / iOS 均支持）按合成帧率推进播放头；暂停时仅在播放头/模型变化时按需重绘（MTKView paused + setNeedsDisplay）
 

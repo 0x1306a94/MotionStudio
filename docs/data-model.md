@@ -214,9 +214,9 @@ class TextContent : public LayerContent {
     Animatable<std::string> text{std::string{"Text"}};
     std::string fontFamily{"PingFang SC"};         // 系统字体族名
     std::string fontStyle{};                       // 族内 style 名（如 Bold）；空 = 默认/Regular
-    Animatable<float> fontSize{48};                // 字号上限（固定高时可缩字）
-    Animatable<Vec2> size{Vec2{400, 120}};         // 虚拟容器；宽始终约束换行
-    bool autoHeight = true;                        // true：高度随内容；false：固定高 + 缩字
+    Animatable<float> fontSize{48};                // 字号上限（boxTextMode 时可缩字）
+    Animatable<Vec2> size{Vec2{400, 120}};         // 固定排版框；hit/选中也用此尺寸
+    bool boxTextMode = false;                      // true：换行 + 缩字号；false：换行 + clip
     TextAlign align = TextAlign::Left;             // Left / Center / Right
 };
 class PrecompContent : public LayerContent {
@@ -226,13 +226,13 @@ class PrecompContent : public LayerContent {
 
 枚举：`enum class TextAlign : uint8_t { Left, Center, Right };`
 
-新建空 Image 层：未绑定 asset、`size` 静态 `200×200`、`anchorPoint = (100,100)`、`position` = 合成中心。Inspector 可「重置为源尺寸」。拖角可在「容器 | 缩放」间切换（单选 Image 时）：容器模式写 `image.size`，缩放模式写 `transform.scale`。
+新建空 Image 层：未绑定 asset、`size` 静态 `200×200`、`anchorPoint = (100,100)`、`position` = 合成中心。Inspector 可「重置为源尺寸」。选中框手柄一律改 `image.size`（可补偿 position/anchor）；`transform.scale` 仅属性面板可改。
 
-新建 Text 层：文案 `"Text"`，`size = 400×120`，`autoHeight = true`，`align = Left`，`fontFamily = "PingFang SC"`，`fontStyle` 空，`anchorPoint = (200,60)`，`position` = 合成中心，并附带黑色 Fill。填充/描边按 `Layer.styles` 顺序全部参与绘制（各自 blend）；Stroke 的 Position / Trim 对文本无效。
+新建 Text 层：文案 `"Text"`，`size = 400×120`，`boxTextMode = false`，`align = Left`，`fontFamily = "PingFang SC"`，`fontStyle` 空，`anchorPoint = (200,60)`，`position` = 合成中心，并附带黑色 Fill。填充/描边按 `Layer.styles` 顺序全部参与绘制（各自 blend）；Stroke 的 Position / Trim 对文本无效。
 
-拖改 `content.size`（Inspector 或画布拖角）时：`anchor' = (ax·w1/w0, ay·h1/h0)`（分母为 0 则该轴保持），**`transform.position` 不变**。`autoHeight` 下排版测得的内容高度只影响 hit/选中框，不回写模型 `size`/`anchor`。
+Inspector 拖改 `content.size` 时：`anchor' = (ax·w1/w0, ay·h1/h0)`（分母为 0 则该轴保持），**`transform.position` 不变**。画布选中框对角/对边固定拖拽会同时补偿 position。Hit/选中框始终等于 `content.size`（无虚拟测高）。
 
-PropertyPath：`content.text`、`content.fontSize`、`content.size`；非 Animatable 字段（`fontFamily`/`fontStyle`/`autoHeight`/`align`）经专用 undo 命令与 bridge API。
+PropertyPath：`content.text`、`content.fontSize`、`content.size`；非 Animatable 字段（`fontFamily`/`fontStyle`/`boxTextMode`/`align`）经专用 undo 命令与 bridge API。
 
 ### 3.5 Shape 模型
 
