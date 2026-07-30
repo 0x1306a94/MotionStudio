@@ -38,6 +38,15 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: ShapeProperty.cornerRadius.path).isEmpty {
         paths.append(ShapeProperty.cornerRadius.path)
     }
+    if !core.keyframes(entityID: layerID, path: ImageProperty.size.path).isEmpty {
+        paths.append(ImageProperty.size.path)
+    }
+    if !core.keyframes(entityID: layerID, path: TextProperty.size.path).isEmpty {
+        paths.append(TextProperty.size.path)
+    }
+    if !core.keyframes(entityID: layerID, path: TextProperty.fontSize.path).isEmpty {
+        paths.append(TextProperty.fontSize.path)
+    }
     if core.hasBezierPath(entityID: layerID, path: "path"),
        !core.keyframes(entityID: layerID, path: "path").isEmpty
     {
@@ -165,18 +174,21 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             path: property.path,
                                             label: property.actionLabel))
         }
-        if animatedPaths.contains(ShapeProperty.size.path) {
+
+        for property in ShapeProperty.allCases where animatedPaths.contains(property.path) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
-                                            path: ShapeProperty.size.path,
-                                            label: ShapeProperty.size.actionLabel))
+                                            path: property.path,
+                                            label: property.actionLabel))
         }
-        if animatedPaths.contains(ShapeProperty.cornerRadius.path) {
+
+        for property in TextProperty.allCases where animatedPaths.contains(property.path) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
-                                            path: ShapeProperty.cornerRadius.path,
-                                            label: ShapeProperty.cornerRadius.actionLabel))
+                                            path: property.path,
+                                            label: property.actionLabel))
         }
+
         if animatedPaths.contains("path") {
             rows.append(timelinePropertyRow(core: core, layerID: layerID, path: "path",
                                             label: "Path"))

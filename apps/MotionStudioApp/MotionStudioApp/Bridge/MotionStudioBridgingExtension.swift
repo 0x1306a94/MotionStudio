@@ -156,6 +156,27 @@ extension MS_IMAGE_SCALE: @retroactive CaseIterable, @retroactive Identifiable {
     }
 }
 
+extension MS_TEXT_ALIGN: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_TEXT_ALIGN] {
+        [.LEFT, .CENTER, .RIGHT]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .LEFT:
+            "Left"
+        case .CENTER:
+            "Center"
+        case .RIGHT:
+            "Right"
+        }
+    }
+}
+
 extension MS_SELECTION_HANDLE {
     var isScaleCorner: Bool {
         switch self {

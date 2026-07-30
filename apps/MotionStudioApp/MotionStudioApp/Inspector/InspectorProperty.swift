@@ -110,6 +110,27 @@ enum ImageProperty: String, CaseIterable {
     }
 }
 
+enum TextProperty: String, CaseIterable {
+    case text = "content.text"
+    case fontSize = "content.fontSize"
+    case size = "content.size"
+
+    var path: String {
+        rawValue
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .text:
+            "Text"
+        case .fontSize:
+            "Font Size"
+        case .size:
+            "Size"
+        }
+    }
+}
+
 enum TransformField {
     case anchorX
     case anchorY

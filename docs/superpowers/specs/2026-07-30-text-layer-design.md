@@ -1,7 +1,7 @@
 # Text Layer — 设计说明
 
 日期：2026-07-30  
-状态：已确认，待实现  
+状态：已落地（Tasks 1–11）  
 分支：`feature/0x1306a94_text_layer`
 
 ## 目标
@@ -16,15 +16,7 @@
 
 ## 现状
 
-| 层级 | 能力 |
-| --- | --- |
-| `LayerType::Text` + `TextContent{text, fontFamily, fontSize}` | 模型骨架已有 |
-| 序列化 Text / PropertyPath `content.text` / `content.fontSize` | 已有 |
-| `Animatable<std::string>`（hold 插值） | 已有 |
-| `AssetType::Font` | 枚举已有，无完整导入/绑定流 |
-| `SceneEvaluator` / `DrawCommand` / Adapter | **无** DrawText |
-| 选中 / hit | 仅 Shape + Image |
-| App Add Text / Text Inspector | **无** |
+已落地：模型 / 序列化 / undo / textlayout / DrawText / tgfx 绘制 / Bridge / App Inspector 与画布拖角。详见 plan `docs/superpowers/plans/2026-07-30-text-layer.md`。
 
 ## 非目标
 

@@ -71,6 +71,7 @@ final class EditorViewController: UIViewController {
     let addRectangleButton = UIButton(type: .system)
     let addEllipseButton = UIButton(type: .system)
     let addImageButton = UIButton(type: .system)
+    let addTextButton = UIButton(type: .system)
     let imageResizeModeControl = UISegmentedControl(items: ["Container", "Scale"])
     let timelinePanel = UIVisualEffectView(effect: nil)
     let timelineHandle = TimelineGrabberView()
@@ -80,6 +81,7 @@ final class EditorViewController: UIViewController {
     var inspectorHostingController: UIHostingController<InspectorView>?
     var timelineViewController: TimelineViewController?
     var imageImportCoordinator: ImageImportCoordinator?
+    var fontImportCoordinator: FontImportCoordinator?
     var timelineHeightConstraint: NSLayoutConstraint?
 
     var timelineHeight = Metrics.timelinePreferredHeight
@@ -150,6 +152,7 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "r", modifierFlags: [.command, .shift], action: #selector(addRectangleLayer)),
             UIKeyCommand(input: "e", modifierFlags: [.command, .shift], action: #selector(addEllipseLayer)),
             UIKeyCommand(input: "i", modifierFlags: [.command, .shift], action: #selector(addImageLayer)),
+            UIKeyCommand(input: "t", modifierFlags: [.command, .shift], action: #selector(addTextLayer)),
             UIKeyCommand(input: "1", modifierFlags: [.command, .alternate], action: #selector(toggleProjectPanel)),
             UIKeyCommand(input: "2", modifierFlags: [.command, .alternate], action: #selector(toggleInspectorPanel)),
             UIKeyCommand(input: "]", modifierFlags: [.command], action: #selector(bringLayersForward)),
@@ -168,6 +171,7 @@ final class EditorViewController: UIViewController {
              #selector(addRectangleLayer),
              #selector(addEllipseLayer),
              #selector(addImageLayer),
+             #selector(addTextLayer),
              #selector(toggleProjectPanel),
              #selector(toggleInspectorPanel),
              #selector(renameCurrentProject),

@@ -211,17 +211,28 @@ class ImageContent : public LayerContent {
     ImageScaleMode scaleMode = ImageScaleMode::LetterBox;
 };
 class TextContent : public LayerContent {
-    Animatable<std::string> text;
-    std::string fontFamily;
-    Animatable<float> fontSize{24};
-    // ...
+    Animatable<std::string> text{std::string{"Text"}};
+    EntityId fontAssetId;                          // 无效 = 未绑定 Font Asset
+    std::string fontFamily{"PingFang SC"};         // 显示名 / 系统回退键
+    Animatable<float> fontSize{48};                // 字号上限（固定高时可缩字）
+    Animatable<Vec2> size{Vec2{400, 120}};         // 虚拟容器；宽始终约束换行
+    bool autoHeight = true;                        // true：高度随内容；false：固定高 + 缩字
+    TextAlign align = TextAlign::Left;             // Left / Center / Right
 };
 class PrecompContent : public LayerContent {
     EntityId compositionId;                 // 引用另一个 Composition
 };
 ```
 
+枚举：`enum class TextAlign : uint8_t { Left, Center, Right };`
+
 新建空 Image 层：未绑定 asset、`size` 静态 `200×200`、`anchorPoint = (100,100)`、`position` = 合成中心。Inspector 可「重置为源尺寸」。拖角可在「容器 | 缩放」间切换（单选 Image 时）：容器模式写 `image.size`，缩放模式写 `transform.scale`。
+
+新建 Text 层：文案 `"Text"`，`size = 400×120`，`autoHeight = true`，`align = Left`，`fontFamily = "PingFang SC"`，`anchorPoint = (200,60)`，`position` = 合成中心，并附带黑色 Fill。填充/描边只读 `Layer.styles` 首个 Fill / Stroke。
+
+拖改 `content.size`（Inspector 或画布拖角）时：`anchor' = (ax·w1/w0, ay·h1/h0)`（分母为 0 则该轴保持），**`transform.position` 不变**。`autoHeight` 下排版测得的内容高度只影响 hit/选中框，不回写模型 `size`/`anchor`。
+
+PropertyPath：`content.text`、`content.fontSize`、`content.size`；非 Animatable 字段经专用 undo 命令与 bridge API。
 
 ### 3.5 Shape 模型
 

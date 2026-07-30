@@ -44,6 +44,24 @@ struct EvaluatedLayer {
     float opacity;          // 已继承父级 opacity
     BlendMode blendMode;
     std::vector<EvaluatedShapeItem> shapeItems;
+    std::optional<EvaluatedImageItem> imageItem;
+    std::optional<EvaluatedTextItem> textItem;  // 与 shape / image 互斥
+};
+
+// 文本层求值只带原始字段；换行 / 缩字在 adapter/textlayout，不进入 Core。
+struct EvaluatedTextItem {
+    std::string text;
+    float fontSize;
+    Vec2 containerSize;
+    bool autoHeight;
+    TextAlign align;
+    EntityId fontAssetId;
+    std::string fontFamily;
+    std::string fontAbsolutePath;  // Font Asset 绝对路径，未绑定为空
+    Color fillColor;
+    std::optional<Color> strokeColor;
+    float strokeWidth = 0;
+    Vec2 hitSize;  // Core 初值为 containerSize；Bridge 可在 autoHeight 时写回测高
 };
 
 struct SceneState {
@@ -63,6 +81,7 @@ enum class DrawCommandType {
     DrawPath,     // 填充
     StrokePath,   // 描边
     DrawImage,    // 图片层：path + container/intrinsic size + ImageScaleMode
+    DrawText,     // 文本层：自包含排版输入（见 text* 字段）
     ClipPath,
     BeginLayer, EndLayer,   // 离屏组（mask / track matte）
     BeginMask, EndMask,     // coverage 记录与应用
@@ -84,6 +103,17 @@ struct DrawCommand {
     Vec2 imageContainerSize;
     Vec2 imageIntrinsicSize;
     ImageScaleMode imageScaleMode;
+    // DrawText（排版由 adapter/textlayout + tgfx GlyphMetrics 完成）
+    std::string text;
+    float textFontSize;
+    Vec2 textContainerSize;
+    bool textAutoHeight;
+    TextAlign textAlign;
+    std::string textFontFamily;
+    std::string textFontAbsolutePath;
+    Color textFillColor;
+    std::optional<Color> textStrokeColor;
+    float textStrokeWidth;
 };
 
 using DrawCommandList = std::vector<DrawCommand>;
@@ -110,6 +140,10 @@ public:
                             float width, LineCap cap, LineJoin join) = 0;
     virtual void drawImage(const std::string& path, Vec2 container, Vec2 intrinsic,
                            ImageScaleMode mode) = 0;
+    virtual void drawText(const std::string& text, float fontSize, Vec2 containerSize,
+                          bool autoHeight, TextAlign align, const std::string& fontFamily,
+                          const std::string& fontAbsolutePath, Color fillColor,
+                          const std::optional<Color>& strokeColor, float strokeWidth) = 0;
     virtual void clipPath(const BezierPath& path, FillRule rule) = 0;
 };
 
@@ -121,14 +155,14 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 ### 3.3 已实现后端：tgfx（Metal）
 
-`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
+`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。文本绘制走 `TgfxGlyphMetrics` + `adapter/textlayout`（换行 / 对齐 / 固定高缩字），再按行 `TextBlob` 填充与描边；`autoHeight == false` 时 clip 到容器。字体解析：Font Asset 路径 → `fontFamily` → PingFang SC → Helvetica。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
 
 ## 4. 上屏适配器（应用层预览）
 
 `TgfxOnScreenAdapter`（`adapter/tgfx/`，与离屏适配器同基类 `TgfxCanvasAdapter`）**不属于 Core 层**，基于 tgfx 的 `MetalWindow`：
 
 - 渲染目标：SwiftUI 画布里的 `MTKView`；`tgfx::MetalWindow::MakeFrom(MTKView*)` 包装其 drawable，`beginFrame` 取 window surface，`endFrame` 提交并 present
-- 每帧流程：播放头时间 → `ms_canvas_draw_frame`（桥接层内部完成 `SceneEvaluator::Evaluate` → `BuildCommands` → `PlayCommands`）→ tgfx 光栅化 → present。**DrawCommand 不越过 C ABI 边界**
+- 每帧流程：播放头时间 → `ms_canvas_draw_frame`（桥接层内部完成 `SceneEvaluator::Evaluate` → `autoHeight` 文本测高写回 `hitSize` → `BuildCommands` → `PlayCommands`）→ tgfx 光栅化 → present。**DrawCommand 不越过 C ABI 边界**
 - **路径渲染**：由 tgfx 直接光栅化贝塞尔路径（GPU），应用层无需自行细分三角形
 - 播放驱动：`CADisplayLink`（macOS 14+ / iOS 均支持）按合成帧率推进播放头；暂停时仅在播放头/模型变化时按需重绘（MTKView paused + setNeedsDisplay）
 

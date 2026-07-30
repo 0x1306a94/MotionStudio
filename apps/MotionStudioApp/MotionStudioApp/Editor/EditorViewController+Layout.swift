@@ -194,6 +194,10 @@ extension EditorViewController {
                                systemName: "photo",
                                accessibilityLabel: "Add Image",
                                action: #selector(addImageLayer))
+        configureToolbarButton(addTextButton,
+                               systemName: "textformat",
+                               accessibilityLabel: "Add Text",
+                               action: #selector(addTextLayer))
 
         imageResizeModeControl.translatesAutoresizingMaskIntoConstraints = false
         imageResizeModeControl.selectedSegmentIndex = editorState.imageResizeMode.rawValue
@@ -208,6 +212,7 @@ extension EditorViewController {
             addRectangleButton,
             addEllipseButton,
             addImageButton,
+            addTextButton,
             imageResizeModeControl,
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -316,6 +321,7 @@ extension EditorViewController {
         updateCreationActionButton(addRectangleButton, enabled: !penActive)
         updateCreationActionButton(addEllipseButton, enabled: !penActive)
         updateCreationActionButton(addImageButton, enabled: !penActive)
+        updateCreationActionButton(addTextButton, enabled: !penActive)
         updateImageResizeModeControlVisibility()
     }
 

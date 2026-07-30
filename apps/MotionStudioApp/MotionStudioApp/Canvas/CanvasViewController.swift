@@ -881,13 +881,19 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
 
         var resizeMode = ImageResizeMode.transform
-        if case .scaleCorner = kind, canResizeImageContainer(layerIDs: layerIDs) {
-            resizeMode = editorState.imageResizeMode
-        } else if case .scaleEdge = kind, canResizeImageContainer(layerIDs: layerIDs) {
-            resizeMode = editorState.imageResizeMode
+        if case .scaleCorner = kind, canResizeBoxContainer(layerIDs: layerIDs) {
+            resizeMode = containerResizeMode(for: layerIDs)
+        } else if case .scaleEdge = kind, canResizeBoxContainer(layerIDs: layerIDs) {
+            resizeMode = containerResizeMode(for: layerIDs)
         }
         if resizeMode == .container {
-            editName = "Resize Image Container"
+            if layerIDs.count == 1, let layerID = layerIDs.first,
+               document.core.layerType(layerID) == .TEXT
+            {
+                editName = "Resize Text Box"
+            } else {
+                editName = "Resize Image Container"
+            }
         }
 
         let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
@@ -906,11 +912,22 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               imageResizeMode: resizeMode)
     }
 
-    private func canResizeImageContainer(layerIDs: [UInt64]) -> Bool {
+    private func canResizeBoxContainer(layerIDs: [UInt64]) -> Bool {
         guard layerIDs.count == 1, let layerID = layerIDs.first else {
             return false
         }
-        return document.core.layerType(layerID) == .IMAGE
+        let type = document.core.layerType(layerID)
+        return type == .IMAGE || type == .TEXT
+    }
+
+    private func containerResizeMode(for layerIDs: [UInt64]) -> ImageResizeMode {
+        guard layerIDs.count == 1, let layerID = layerIDs.first else {
+            return .transform
+        }
+        if document.core.layerType(layerID) == .TEXT {
+            return .container
+        }
+        return editorState.imageResizeMode
     }
 
     private func updateFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
@@ -1031,15 +1048,18 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         return .NONE
     }
 
-    /// Single selected Image layer with Container resize mode active.
+    /// Single selected Image/Text layer using container resize (hides rotate/anchor chrome).
     private var isImageContainerResizeMode: Bool {
-        guard editorState.imageResizeMode == .container,
-              editorState.selectedLayerIDs.count == 1,
+        guard editorState.selectedLayerIDs.count == 1,
               let layerID = editorState.selectedLayerID
         else {
             return false
         }
-        return document.core.layerType(layerID) == .IMAGE
+        let type = document.core.layerType(layerID)
+        if type == .TEXT {
+            return true
+        }
+        return type == .IMAGE && editorState.imageResizeMode == .container
     }
 
     private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {

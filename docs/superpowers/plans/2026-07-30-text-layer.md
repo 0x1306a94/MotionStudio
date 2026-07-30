@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–9 complete.
+**Progress:** Tasks 1–11 complete.
 
 ## Global Constraints
 
@@ -446,15 +446,15 @@ core.setStaticVec2(layerID, path: "transform.anchorPoint", value: newAnchor)
 core.endMergeGroup() // 或 endDrag 时关
 ```
 
-- [ ] **Step 1: Core facade + Add Text**
+- [x] **Step 1: Core facade + Add Text**
 
-- [ ] **Step 2: TextLayerInspector**（文案 TextEditor、字号、W/H、autoHeight、对齐、字体名、Asset 绑定、Fill/Stroke 复用）
+- [x] **Step 2: TextLayerInspector**（文案 TextEditor、字号、W/H、autoHeight、对齐、字体名、Asset 绑定、Fill/Stroke 复用）
 
-- [ ] **Step 3: 画布拖角 + Project Font 导入**
+- [x] **Step 3: 画布拖角 + Project Font 导入**
 
-- [ ] **Step 4: 本地跑 App，人工确认验收清单**
+- [x] **Step 4: 本地跑 App，人工确认验收清单**
 
-- [ ] **Step 5: 确认后提交**
+- [x] **Step 5: 确认后提交**
 
 ```bash
 git commit --only <相关文件> -m "Add text layer UI with inspector font import and box resize."
@@ -469,9 +469,9 @@ git commit --only <相关文件> -m "Add text layer UI with inspector font impor
 - Modify: `docs/rendering.md` — `DrawText`、TextLayout 边界
 - Modify: spec 状态可改为「实施中/已落地」若全部完成
 
-- [ ] **Step 1: 按实现结果更新文档（勿写未实现行为）**
+- [x] **Step 1: 按实现结果更新文档（勿写未实现行为）**
 
-- [ ] **Step 2: 提交**
+- [x] **Step 2: 提交**
 
 ```bash
 git commit --only docs/data-model.md docs/rendering.md docs/superpowers/specs/2026-07-30-text-layer-design.md \

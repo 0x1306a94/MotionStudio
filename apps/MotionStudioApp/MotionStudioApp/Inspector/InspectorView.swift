@@ -48,6 +48,12 @@ struct InspectorView: View {
                                                 isEditable: isEditable,
                                                 perform: perform)
                         }
+                        if core.layerType(layerID) == .TEXT {
+                            TextLayerInspector(core: core,
+                                               layerID: layerID,
+                                               isEditable: isEditable,
+                                               perform: perform)
+                        }
                         if core.hasBezierPath(entityID: layerID, path: "path") {
                             PathKeyframeInspector(core: core,
                                                   layerID: layerID,
@@ -79,7 +85,7 @@ struct InspectorView: View {
                                                 editorState.motionPathSelectedKeyframe = index
                                             })
 
-                        if core.layerType(layerID) == .SHAPE {
+                        if core.layerType(layerID) == .SHAPE || core.layerType(layerID) == .TEXT {
                             FillsInspector(core: core,
                                            layerID: layerID,
                                            isEditable: isEditable,

@@ -15,12 +15,21 @@ struct LayerTransformStart {
     let rotation: Float
     let anchor: CGVector
     let contentSize: CGVector
-    let hasImageSize: Bool
+    /// `image.size` or `content.size` when the layer has a box container.
+    let contentSizePath: String?
     let positionAnimated: Bool
     let scaleAnimated: Bool
     let rotationAnimated: Bool
     let anchorAnimated: Bool
     let contentSizeAnimated: Bool
+
+    var hasContentSize: Bool {
+        contentSizePath != nil
+    }
+
+    var keepsPositionOnContainerResize: Bool {
+        contentSizePath == TextProperty.size.path
+    }
 }
 
 enum FreeTransformKind {
@@ -45,22 +54,30 @@ struct FreeTransformDrag {
 
     static func makeLayerStarts(core: MotionDocumentCore, layerIDs: [UInt64], frame: Int64) -> [LayerTransformStart] {
         layerIDs.map { layerID in
-            let hasImageSize = core.hasProperty(entityID: layerID, path: ImageProperty.size.path)
+            let contentSizePath: String? = if core.hasProperty(entityID: layerID, path: ImageProperty.size.path) {
+                ImageProperty.size.path
+            } else if core.hasProperty(entityID: layerID, path: TextProperty.size.path) {
+                TextProperty.size.path
+            } else {
+                nil
+            }
             return LayerTransformStart(
                 layerID: layerID,
                 position: core.evaluateVec2(entityID: layerID, path: TransformProperty.position.path, frame: frame),
                 scale: core.evaluateVec2(entityID: layerID, path: TransformProperty.scale.path, frame: frame),
                 rotation: core.evaluateFloat(entityID: layerID, path: TransformProperty.rotation.path, frame: frame),
                 anchor: core.evaluateVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame),
-                contentSize: hasImageSize
-                    ? core.evaluateVec2(entityID: layerID, path: ImageProperty.size.path, frame: frame)
-                    : .zero,
-                hasImageSize: hasImageSize,
+                contentSize: contentSizePath.map {
+                    core.evaluateVec2(entityID: layerID, path: $0, frame: frame)
+                } ?? .zero,
+                contentSizePath: contentSizePath,
                 positionAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.position.path),
                 scaleAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.scale.path),
                 rotationAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.rotation.path),
                 anchorAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.anchorPoint.path),
-                contentSizeAnimated: hasImageSize && core.isAnimated(entityID: layerID, path: ImageProperty.size.path),
+                contentSizeAnimated: contentSizePath.map {
+                    core.isAnimated(entityID: layerID, path: $0)
+                } ?? false,
             )
         }
     }
@@ -194,11 +211,12 @@ struct FreeTransformDrag {
 
         if imageResizeMode == .container,
            let start = layerStarts.first,
-           start.hasImageSize
+           let contentSizePath = start.contentSizePath
         {
             applyContainerResize(core: core,
                                  frame: frame,
                                  start: start,
+                                 contentSizePath: contentSizePath,
                                  scaleX: scaleX,
                                  scaleY: scaleY,
                                  alternate: alternate)
@@ -232,6 +250,7 @@ struct FreeTransformDrag {
     private func applyContainerResize(core: MotionDocumentCore,
                                       frame: Int64,
                                       start: LayerTransformStart,
+                                      contentSizePath: String,
                                       scaleX: CGFloat,
                                       scaleY: CGFloat,
                                       alternate: Bool)
@@ -245,10 +264,14 @@ struct FreeTransformDrag {
         let ratioY = start.contentSize.dy > 1e-6 ? newSize.dy / start.contentSize.dy : 1
         let newAnchor = CGVector(dx: start.anchor.dx * ratioX, dy: start.anchor.dy * ratioY)
 
-        writeVec2(core: core, layerID: start.layerID, path: ImageProperty.size.path,
+        writeVec2(core: core, layerID: start.layerID, path: contentSizePath,
                   frame: frame, value: newSize, animated: start.contentSizeAnimated)
         writeVec2(core: core, layerID: start.layerID, path: TransformProperty.anchorPoint.path,
                   frame: frame, value: newAnchor, animated: start.anchorAnimated)
+
+        if start.keepsPositionOnContainerResize {
+            return
+        }
 
         let localRel = Self.containerLocalPivotRelative(for: kind,
                                                         size: newSize,

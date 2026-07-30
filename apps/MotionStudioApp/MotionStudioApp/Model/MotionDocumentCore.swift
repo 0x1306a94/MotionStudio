@@ -602,6 +602,95 @@ final class MotionDocumentCore {
         changed()
     }
 
+    @discardableResult
+    func importFontAsset(sourceURL: URL, preferredFileName: String?) -> UInt64 {
+        let assetID = sourceURL.path(percentEncoded: false).withCString { sourcePath in
+            if let preferredFileName {
+                return preferredFileName.withCString { name in
+                    ms_command_import_font_asset(handle, sourcePath, name)
+                }
+            }
+            return ms_command_import_font_asset(handle, sourcePath, nil)
+        }
+        if assetID != 0 {
+            changed()
+        }
+        return assetID
+    }
+
+    @discardableResult
+    func addTextLayer(compositionID: UInt64) -> UInt64 {
+        let layerID = ms_command_add_text_layer(handle, compositionID)
+        changed()
+        return layerID
+    }
+
+    @discardableResult
+    func setTextFontAsset(layerID: UInt64, assetID: UInt64) -> Bool {
+        let ok = ms_command_set_text_font_asset(handle, layerID, assetID)
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
+    func setTextFontFamily(layerID: UInt64, family: String) {
+        family.withCString { cFamily in
+            _ = ms_command_set_text_font_family(handle, layerID, cFamily)
+        }
+        changed()
+    }
+
+    func setTextAutoHeight(layerID: UInt64, autoHeight: Bool) {
+        _ = ms_command_set_text_auto_height(handle, layerID, autoHeight)
+        changed()
+    }
+
+    func setTextAlign(layerID: UInt64, align: MS_TEXT_ALIGN) {
+        _ = ms_command_set_text_align(handle, layerID, align)
+        changed()
+    }
+
+    func textAutoHeight(layerID: UInt64) -> Bool {
+        ms_layer_text_auto_height(handle, layerID)
+    }
+
+    func textAlign(layerID: UInt64) -> MS_TEXT_ALIGN {
+        ms_layer_text_align(handle, layerID)
+    }
+
+    func textFontAssetID(layerID: UInt64) -> UInt64 {
+        ms_layer_text_font_asset(handle, layerID)
+    }
+
+    func textFontFamily(layerID: UInt64) -> String {
+        Self.takeString(ms_layer_text_font_family(handle, layerID)) ?? ""
+    }
+
+    func staticString(entityID: UInt64, path: String) -> String {
+        Self.takeString(ms_property_static_string(handle, entityID, path)) ?? ""
+    }
+
+    func setStaticString(entityID: UInt64, path: String, value: String) {
+        value.withCString { cValue in
+            ms_command_set_static_string(handle, entityID, path, cValue)
+        }
+        changed()
+    }
+
+    /// Updates text box size and scales the anchor proportionally; position stays fixed.
+    func setTextBoxSize(layerID: UInt64, size: CGVector, frame: Int64) {
+        let oldSize = evaluateVec2(entityID: layerID, path: TextProperty.size.path, frame: frame)
+        let oldAnchor = evaluateVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame)
+        let ratioX = oldSize.dx > 1e-6 ? size.dx / oldSize.dx : 1
+        let ratioY = oldSize.dy > 1e-6 ? size.dy / oldSize.dy : 1
+        let newAnchor = CGVector(dx: oldAnchor.dx * ratioX, dy: oldAnchor.dy * ratioY)
+        beginDrag()
+        writeVec2(entityID: layerID, path: TextProperty.size.path, frame: frame, value: size)
+        writeVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame, value: newAnchor)
+        endDrag()
+    }
+
     func layerBlendMode(layerID: UInt64) -> MS_BLEND {
         ms_layer_blend_mode(handle, layerID)
     }
@@ -674,6 +763,14 @@ final class MotionDocumentCore {
 
     func imageAssetIDs() -> [UInt64] {
         assetIDs().filter { ms_asset_type(handle, $0) == 0 }
+    }
+
+    func fontAssetIDs() -> [UInt64] {
+        assetIDs().filter { ms_asset_type(handle, $0) == 1 }
+    }
+
+    func isFontAsset(_ assetID: UInt64) -> Bool {
+        ms_asset_type(handle, assetID) == 1
     }
 
     func assetName(_ assetID: UInt64) -> String {

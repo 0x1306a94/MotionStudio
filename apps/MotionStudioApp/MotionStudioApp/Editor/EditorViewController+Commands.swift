@@ -207,6 +207,13 @@ extension EditorViewController {
         }
     }
 
+    @objc func addTextLayer() {
+        let compositionID = document.core.firstCompositionID
+        perform("Add Text Layer") {
+            editorState.selectedLayerID = document.core.addTextLayer(compositionID: compositionID)
+        }
+    }
+
     func presentImageImport() {
         if imageImportCoordinator == nil {
             imageImportCoordinator = ImageImportCoordinator(
@@ -218,6 +225,19 @@ extension EditorViewController {
             )
         }
         imageImportCoordinator?.presentImport()
+    }
+
+    func presentFontImport() {
+        if fontImportCoordinator == nil {
+            fontImportCoordinator = FontImportCoordinator(
+                presenter: self,
+                document: document,
+                perform: { [weak self] name, edit in
+                    self?.perform(name, edit: edit)
+                },
+            )
+        }
+        fontImportCoordinator?.presentImport()
     }
 
     func clearSelection() {
