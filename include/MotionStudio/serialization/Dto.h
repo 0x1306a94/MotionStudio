@@ -6,6 +6,7 @@
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerType.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
@@ -52,5 +53,8 @@ Expected<TrackMatteType, std::string> trackMatteTypeFromString(const std::string
 
 const char *ToString(AssetType type);
 Expected<AssetType, std::string> assetTypeFromString(const std::string &text);
+
+const char *ToString(ImageScaleMode mode);
+Expected<ImageScaleMode, std::string> imageScaleModeFromString(const std::string &text);
 
 }  // namespace motion::dto

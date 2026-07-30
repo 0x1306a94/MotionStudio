@@ -5,6 +5,7 @@
 
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -53,6 +54,8 @@ std::unique_ptr<Document> BuildRichDocument() {
     asset.type = AssetType::Image;
     asset.name = "sprite.png";
     asset.path = "assets/sprite.png";
+    asset.width = 640;
+    asset.height = 480;
     document->assets.push_back(asset);
 
     auto precompTarget = std::make_unique<Composition>();
@@ -160,7 +163,10 @@ std::unique_ptr<Document> BuildRichDocument() {
     composition->layers.push_back(std::move(textLayer));
 
     auto imageLayer = std::make_unique<Layer>(LayerType::Image);
-    static_cast<motion::ImageContent *>(imageLayer->content.get())->assetId = asset.id;
+    auto *imageContent = static_cast<motion::ImageContent *>(imageLayer->content.get());
+    imageContent->assetId = asset.id;
+    imageContent->size.setStaticValue(Vec2{320, 240});
+    imageContent->scaleMode = motion::ImageScaleMode::Zoom;
     composition->layers.push_back(std::move(imageLayer));
 
     auto precompLayer = std::make_unique<Layer>(LayerType::Precomp);
@@ -514,4 +520,61 @@ TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
     EXPECT_EQ(anim.keyframes()[1].time, 30);
     EXPECT_EQ(anim.keyframes()[0].value, p0);
     EXPECT_EQ(anim.keyframes()[1].value, p1);
+}
+
+TEST(SerializerTest, ImageLayerRoundTripPreservesContainerAndScaleMode) {
+    auto document = BuildRichDocument();
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(Serializer::serialize(*document));
+    ASSERT_TRUE(restored.hasValue());
+
+    ASSERT_EQ((*restored)->assets.size(), 1u);
+    EXPECT_EQ((*restored)->assets[0].width, 640);
+    EXPECT_EQ((*restored)->assets[0].height, 480);
+
+    Layer *imageLayer = nullptr;
+    for (auto &layer : (*restored)->compositions[1]->layers) {
+        if (layer->type() == LayerType::Image) {
+            imageLayer = layer.get();
+            break;
+        }
+    }
+    ASSERT_NE(imageLayer, nullptr);
+    auto *image = static_cast<motion::ImageContent *>(imageLayer->content.get());
+    EXPECT_FALSE(image->size.isAnimated());
+    EXPECT_FLOAT_EQ(image->size.staticValue().x, 320.0f);
+    EXPECT_FLOAT_EQ(image->size.staticValue().y, 240.0f);
+    EXPECT_EQ(image->scaleMode, motion::ImageScaleMode::Zoom);
+}
+
+TEST(SerializerTest, ImageLayerMissingFieldsUseDefaults) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    json["assets"][0].erase("width");
+    json["assets"][0].erase("height");
+    for (auto &layer : json["compositions"][1]["layers"]) {
+        if (layer["type"] == "image") {
+            layer["content"].erase("size");
+            layer["content"].erase("scaleMode");
+        }
+    }
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(restored.hasValue());
+    EXPECT_EQ((*restored)->assets[0].width, 0);
+    EXPECT_EQ((*restored)->assets[0].height, 0);
+
+    Layer *imageLayer = nullptr;
+    for (auto &layer : (*restored)->compositions[1]->layers) {
+        if (layer->type() == LayerType::Image) {
+            imageLayer = layer.get();
+            break;
+        }
+    }
+    ASSERT_NE(imageLayer, nullptr);
+    auto *image = static_cast<motion::ImageContent *>(imageLayer->content.get());
+    EXPECT_FLOAT_EQ(image->size.staticValue().x, 200.0f);
+    EXPECT_FLOAT_EQ(image->size.staticValue().y, 200.0f);
+    EXPECT_EQ(image->scaleMode, motion::ImageScaleMode::LetterBox);
 }

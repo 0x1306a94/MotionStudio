@@ -975,6 +975,8 @@ json ContentToJson(const LayerContent &content) {
         case LayerType::Image: {
             const auto &image = static_cast<const ImageContent &>(content);
             node["assetId"] = IdToString(image.assetId);
+            node["size"] = AnimatableToJson(image.size);
+            node["scaleMode"] = dto::ToString(image.scaleMode);
             break;
         }
         case LayerType::Text: {
@@ -1029,6 +1031,23 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
                 return Unexpected(assetId.error());
             }
             content->assetId = *assetId;
+            if (const json *sizeNode = FindChild(node, "size")) {
+                Expected<void, std::string> result = AnimatableFromJson(*sizeNode, content->size);
+                if (!result) {
+                    return Unexpected(result.error());
+                }
+            }
+            if (const json *scaleModeNode = FindChild(node, "scaleMode")) {
+                if (!scaleModeNode->is_string()) {
+                    return Unexpected(std::string("Image scaleMode must be a string"));
+                }
+                Expected<ImageScaleMode, std::string> mode =
+                    dto::imageScaleModeFromString(scaleModeNode->get<std::string>());
+                if (!mode) {
+                    return Unexpected(mode.error());
+                }
+                content->scaleMode = *mode;
+            }
             return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Text: {
@@ -1385,7 +1404,9 @@ json AssetToJson(const Asset &asset) {
     return {{"id", IdToString(asset.id)},
             {"type", dto::ToString(asset.type)},
             {"name", asset.name},
-            {"path", asset.path}};
+            {"path", asset.path},
+            {"width", asset.width},
+            {"height", asset.height}};
 }
 
 Expected<Asset, std::string> AssetFromJson(const json &node) {
@@ -1411,6 +1432,18 @@ Expected<Asset, std::string> AssetFromJson(const json &node) {
     }
     asset.name = std::move(*name);
     asset.path = std::move(*path);
+    if (const json *widthNode = FindChild(node, "width")) {
+        if (!widthNode->is_number_integer()) {
+            return Unexpected(std::string("Asset width must be an integer"));
+        }
+        asset.width = widthNode->get<int>();
+    }
+    if (const json *heightNode = FindChild(node, "height")) {
+        if (!heightNode->is_number_integer()) {
+            return Unexpected(std::string("Asset height must be an integer"));
+        }
+        asset.height = heightNode->get<int>();
+    }
     return asset;
 }
 

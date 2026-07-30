@@ -368,4 +368,38 @@ Expected<AssetType, std::string> assetTypeFromString(const std::string &text) {
     return Unexpected(std::string("unknown asset type: " + text));
 }
 
+const char *ToString(ImageScaleMode mode) {
+    switch (mode) {
+        case ImageScaleMode::None: {
+            return "none";
+        }
+        case ImageScaleMode::Stretch: {
+            return "stretch";
+        }
+        case ImageScaleMode::LetterBox: {
+            return "letterBox";
+        }
+        case ImageScaleMode::Zoom: {
+            return "zoom";
+        }
+    }
+    return "unknown";
+}
+
+Expected<ImageScaleMode, std::string> imageScaleModeFromString(const std::string &text) {
+    if (text == "none") {
+        return ImageScaleMode::None;
+    }
+    if (text == "stretch") {
+        return ImageScaleMode::Stretch;
+    }
+    if (text == "letterBox") {
+        return ImageScaleMode::LetterBox;
+    }
+    if (text == "zoom") {
+        return ImageScaleMode::Zoom;
+    }
+    return Unexpected(std::string("unknown image scale mode: " + text));
+}
+
 }  // namespace motion::dto
