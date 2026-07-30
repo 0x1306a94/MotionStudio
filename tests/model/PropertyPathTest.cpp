@@ -168,6 +168,10 @@ TEST(ResolveAnimatableTest, ResolvesTextContent) {
     AnimatableBase *resolved =
         ResolveAnimatable(document, {textLayer->id, "content.fontSize"});
     EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&textContent->fontSize));
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.size"}),
+              static_cast<AnimatableBase *>(&textContent->size));
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.text"}),
+              static_cast<AnimatableBase *>(&textContent->text));
 }
 
 TEST(ResolveAnimatableTest, ResolvesImageSize) {

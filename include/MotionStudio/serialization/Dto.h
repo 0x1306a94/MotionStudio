@@ -13,6 +13,7 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
 
 // Enum ↔ string mappings for the JSON v1 schema (camelCase, aligned with the
@@ -56,5 +57,8 @@ Expected<AssetType, std::string> assetTypeFromString(const std::string &text);
 
 const char *ToString(ImageScaleMode mode);
 Expected<ImageScaleMode, std::string> imageScaleModeFromString(const std::string &text);
+
+const char *ToString(TextAlign align);
+Expected<TextAlign, std::string> textAlignFromString(const std::string &text);
 
 }  // namespace motion::dto

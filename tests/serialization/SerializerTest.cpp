@@ -13,6 +13,7 @@
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
@@ -160,6 +161,10 @@ std::unique_ptr<Document> BuildRichDocument() {
     auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
     textContent->text.setStaticValue(std::string{"hello"});
     textContent->fontFamily = "PingFang SC";
+    textContent->fontSize.setStaticValue(36.0f);
+    textContent->size.setStaticValue(Vec2{320, 96});
+    textContent->autoHeight = false;
+    textContent->align = motion::TextAlign::Center;
     composition->layers.push_back(std::move(textLayer));
 
     auto imageLayer = std::make_unique<Layer>(LayerType::Image);
@@ -547,6 +552,63 @@ TEST(SerializerTest, ImageLayerRoundTripPreservesContainerAndScaleMode) {
     EXPECT_FLOAT_EQ(image->size.staticValue().x, 320.0f);
     EXPECT_FLOAT_EQ(image->size.staticValue().y, 240.0f);
     EXPECT_EQ(image->scaleMode, motion::ImageScaleMode::Zoom);
+}
+
+TEST(SerializerTest, TextLayerRoundTripPreservesBoxFields) {
+    auto document = BuildRichDocument();
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(Serializer::serialize(*document));
+    ASSERT_TRUE(restored.hasValue());
+
+    Layer *textLayer = nullptr;
+    for (auto &layer : (*restored)->compositions[1]->layers) {
+        if (layer->type() == LayerType::Text) {
+            textLayer = layer.get();
+            break;
+        }
+    }
+    ASSERT_NE(textLayer, nullptr);
+    auto *text = static_cast<motion::TextContent *>(textLayer->content.get());
+    EXPECT_EQ(text->text.staticValue(), "hello");
+    EXPECT_FALSE(text->fontAssetId.isValid());
+    EXPECT_EQ(text->fontFamily, "PingFang SC");
+    EXPECT_FLOAT_EQ(text->fontSize.staticValue(), 36.0f);
+    EXPECT_FLOAT_EQ(text->size.staticValue().x, 320.0f);
+    EXPECT_FLOAT_EQ(text->size.staticValue().y, 96.0f);
+    EXPECT_FALSE(text->autoHeight);
+    EXPECT_EQ(text->align, motion::TextAlign::Center);
+}
+
+TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
+    auto document = BuildRichDocument();
+    auto json = nlohmann::json::parse(Serializer::serialize(*document));
+    for (auto &layer : json["compositions"][1]["layers"]) {
+        if (layer["type"] == "text") {
+            layer["content"].erase("fontAssetId");
+            layer["content"].erase("size");
+            layer["content"].erase("autoHeight");
+            layer["content"].erase("align");
+        }
+    }
+
+    Expected<std::unique_ptr<Document>, std::string> restored =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(restored.hasValue()) << restored.error();
+
+    Layer *textLayer = nullptr;
+    for (auto &layer : (*restored)->compositions[1]->layers) {
+        if (layer->type() == LayerType::Text) {
+            textLayer = layer.get();
+            break;
+        }
+    }
+    ASSERT_NE(textLayer, nullptr);
+    auto *text = static_cast<motion::TextContent *>(textLayer->content.get());
+    EXPECT_FALSE(text->fontAssetId.isValid());
+    EXPECT_FLOAT_EQ(text->size.staticValue().x, 400.0f);
+    EXPECT_FLOAT_EQ(text->size.staticValue().y, 120.0f);
+    EXPECT_TRUE(text->autoHeight);
+    EXPECT_EQ(text->align, motion::TextAlign::Left);
 }
 
 TEST(SerializerTest, UnboundImageAssetIdSerializesAsNull) {

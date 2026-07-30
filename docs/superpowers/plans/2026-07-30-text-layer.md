@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–2 complete.
+**Progress:** Tasks 1–3 complete.
 
 ## Global Constraints
 
@@ -107,7 +107,7 @@ inline Vec2 ScaleAnchorForSizeChange(Vec2 oldSize, Vec2 newSize, Vec2 oldAnchor)
 }
 ```
 
-- [ ] **Step 1: 测试**
+- [x] **Step 1: 测试**
 
 ```cpp
 TEST(ScaleAnchorTest, ScalesProportionally) {
@@ -118,7 +118,7 @@ TEST(ScaleAnchorTest, ZeroOldWidthKeepsX) {
 }
 ```
 
-- [ ] **Step 2: 实现 + 通过 + 提交**
+- [x] **Step 2: 实现 + 通过 + 提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ScaleAnchorTest.*'
@@ -140,11 +140,11 @@ git commit --only <相关文件> -m "Add ScaleAnchorForSizeChange helper for box
 - JSON Text content 增：`fontAssetId`（hex 或省略无效）、`size`（Animatable）、`autoHeight`、`align`（`"left"|"center"|"right"`）
 - 缺省字段反序列化：兼容旧 JSON（无新字段时用 §1 默认值）
 
-- [ ] **Step 1: 失败测试** — round-trip 含 size/autoHeight/align/fontAssetId；Resolve `content.size` 非空
+- [x] **Step 1: 失败测试** — round-trip 含 size/autoHeight/align/fontAssetId；Resolve `content.size` 非空
 
-- [ ] **Step 2: 实现**
+- [x] **Step 2: 实现**
 
-- [ ] **Step 3: 通过并提交**
+- [x] **Step 3: 通过并提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SerializerTest.*:PropertyPath*'

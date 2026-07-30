@@ -402,4 +402,32 @@ Expected<ImageScaleMode, std::string> imageScaleModeFromString(const std::string
     return Unexpected(std::string("unknown image scale mode: " + text));
 }
 
+const char *ToString(TextAlign align) {
+    switch (align) {
+        case TextAlign::Left: {
+            return "left";
+        }
+        case TextAlign::Center: {
+            return "center";
+        }
+        case TextAlign::Right: {
+            return "right";
+        }
+    }
+    return "unknown";
+}
+
+Expected<TextAlign, std::string> textAlignFromString(const std::string &text) {
+    if (text == "left") {
+        return TextAlign::Left;
+    }
+    if (text == "center") {
+        return TextAlign::Center;
+    }
+    if (text == "right") {
+        return TextAlign::Right;
+    }
+    return Unexpected(std::string("unknown text align: " + text));
+}
+
 }  // namespace motion::dto

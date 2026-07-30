@@ -988,8 +988,16 @@ json ContentToJson(const LayerContent &content) {
         case LayerType::Text: {
             const auto &text = static_cast<const TextContent &>(content);
             node["text"] = AnimatableToJson(text.text);
+            if (text.fontAssetId.isValid()) {
+                node["fontAssetId"] = IdToString(text.fontAssetId);
+            } else {
+                node["fontAssetId"] = nullptr;
+            }
             node["fontFamily"] = text.fontFamily;
             node["fontSize"] = AnimatableToJson(text.fontSize);
+            node["size"] = AnimatableToJson(text.size);
+            node["autoHeight"] = text.autoHeight;
+            node["align"] = dto::ToString(text.align);
             break;
         }
         case LayerType::Group: {
@@ -1074,6 +1082,19 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
             if (!result) {
                 return Unexpected(result.error());
             }
+            if (const json *fontAssetIdNode = FindChild(node, "fontAssetId")) {
+                if (!fontAssetIdNode->is_null()) {
+                    Expected<std::string, std::string> fontAssetIdText = AsString(*fontAssetIdNode);
+                    if (!fontAssetIdText) {
+                        return Unexpected(fontAssetIdText.error());
+                    }
+                    Expected<EntityId, std::string> fontAssetId = IdFromString(*fontAssetIdText);
+                    if (!fontAssetId) {
+                        return Unexpected(fontAssetId.error());
+                    }
+                    content->fontAssetId = *fontAssetId;
+                }
+            }
             Expected<std::string, std::string> fontFamily = ParseField<std::string>(node, "fontFamily");
             if (!fontFamily) {
                 return Unexpected(fontFamily.error());
@@ -1086,6 +1107,30 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
             result = AnimatableFromJson(**fontSizeNode, content->fontSize);
             if (!result) {
                 return Unexpected(result.error());
+            }
+            if (const json *sizeNode = FindChild(node, "size")) {
+                result = AnimatableFromJson(*sizeNode, content->size);
+                if (!result) {
+                    return Unexpected(result.error());
+                }
+            }
+            if (const json *autoHeightNode = FindChild(node, "autoHeight")) {
+                Expected<bool, std::string> autoHeight = AsBool(*autoHeightNode);
+                if (!autoHeight) {
+                    return Unexpected(autoHeight.error());
+                }
+                content->autoHeight = *autoHeight;
+            }
+            if (const json *alignNode = FindChild(node, "align")) {
+                if (!alignNode->is_string()) {
+                    return Unexpected(std::string("Text align must be a string"));
+                }
+                Expected<TextAlign, std::string> align =
+                    dto::textAlignFromString(alignNode->get<std::string>());
+                if (!align) {
+                    return Unexpected(align.error());
+                }
+                content->align = *align;
             }
             return std::unique_ptr<LayerContent>(std::move(content));
         }
