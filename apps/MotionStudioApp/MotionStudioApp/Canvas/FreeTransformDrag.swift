@@ -45,8 +45,6 @@ struct FreeTransformDrag {
     /// For oriented single-layer scale: localPivot - startAnchor.
     let localPivotRelative: CGPoint?
     let editName: String
-    /// When `.container`, scale handles write `image.size` instead of `transform.scale`.
-    let imageResizeMode: ImageResizeMode
 
     static func makeLayerStarts(core: MotionDocumentCore, layerIDs: [UInt64], frame: Int64) -> [LayerTransformStart] {
         layerIDs.map { layerID in
@@ -205,42 +203,56 @@ struct FreeTransformDrag {
         scaleX = clampedScale(scaleX)
         scaleY = clampedScale(scaleY)
 
-        if imageResizeMode == .container,
-           let start = layerStarts.first,
-           let contentSizePath = start.contentSizePath
-        {
-            applyContainerResize(core: core,
-                                 frame: frame,
-                                 start: start,
-                                 contentSizePath: contentSizePath,
-                                 scaleX: scaleX,
-                                 scaleY: scaleY,
-                                 alternate: alternate)
-            return
-        }
-
-        if startHandles.isOriented, let localRel = localPivotRelative, let start = layerStarts.first {
-            let newScale = CGVector(dx: start.scale.dx * scaleX, dy: start.scale.dy * scaleY)
-            let position = compensatedPosition(pivot: pivotScene,
-                                               rotationDegrees: start.rotation,
-                                               scale: newScale,
-                                               localRelative: localRel)
-            writeVec2(core: core, layerID: start.layerID, path: TransformProperty.scale.path,
-                      frame: frame, value: newScale, animated: start.scaleAnimated)
-            writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
-                      frame: frame, value: position, animated: start.positionAnimated)
-            return
-        }
-
+        // Never write transform.scale — resize boxes / move positions only.
+        let orientedSingle = startHandles.isOriented && layerStarts.count == 1
         for start in layerStarts {
-            let newScale = CGVector(dx: start.scale.dx * scaleX, dy: start.scale.dy * scaleY)
-            let position = CGVector(dx: pivotScene.x + (start.position.dx - pivotScene.x) * scaleX,
-                                    dy: pivotScene.y + (start.position.dy - pivotScene.y) * scaleY)
-            writeVec2(core: core, layerID: start.layerID, path: TransformProperty.scale.path,
-                      frame: frame, value: newScale, animated: start.scaleAnimated)
-            writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
-                      frame: frame, value: position, animated: start.positionAnimated)
+            if let contentSizePath = start.contentSizePath {
+                if orientedSingle {
+                    applyContainerResize(core: core,
+                                         frame: frame,
+                                         start: start,
+                                         contentSizePath: contentSizePath,
+                                         scaleX: scaleX,
+                                         scaleY: scaleY,
+                                         alternate: alternate)
+                } else {
+                    applyBoxResizeAboutPivot(core: core,
+                                             frame: frame,
+                                             start: start,
+                                             contentSizePath: contentSizePath,
+                                             scaleX: scaleX,
+                                             scaleY: scaleY)
+                }
+            } else {
+                let position = CGVector(dx: pivotScene.x + (start.position.dx - pivotScene.x) * scaleX,
+                                        dy: pivotScene.y + (start.position.dy - pivotScene.y) * scaleY)
+                writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
+                          frame: frame, value: position, animated: start.positionAnimated)
+            }
         }
+    }
+
+    /// Multi-select / AABB box resize: scale size about the shared scene pivot without rewriting localMin.
+    private func applyBoxResizeAboutPivot(core: MotionDocumentCore,
+                                          frame: Int64,
+                                          start: LayerTransformStart,
+                                          contentSizePath: String,
+                                          scaleX: CGFloat,
+                                          scaleY: CGFloat)
+    {
+        let newSize = CGVector(dx: max(1, start.contentSize.dx * abs(scaleX)),
+                               dy: max(1, start.contentSize.dy * abs(scaleY)))
+        let relX = start.contentSize.dx > 1e-6 ? start.anchor.dx / start.contentSize.dx : 0.5
+        let relY = start.contentSize.dy > 1e-6 ? start.anchor.dy / start.contentSize.dy : 0.5
+        let newAnchor = CGVector(dx: relX * newSize.dx, dy: relY * newSize.dy)
+        let position = CGVector(dx: pivotScene.x + (start.position.dx - pivotScene.x) * scaleX,
+                                dy: pivotScene.y + (start.position.dy - pivotScene.y) * scaleY)
+        writeVec2(core: core, layerID: start.layerID, path: contentSizePath,
+                  frame: frame, value: newSize, animated: start.contentSizeAnimated)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.anchorPoint.path,
+                  frame: frame, value: newAnchor, animated: start.anchorAnimated)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
+                  frame: frame, value: position, animated: start.positionAnimated)
     }
 
     private func applyContainerResize(core: MotionDocumentCore,

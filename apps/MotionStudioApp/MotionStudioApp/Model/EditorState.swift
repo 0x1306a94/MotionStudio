@@ -21,13 +21,6 @@ struct TimelineSegmentSelection: Equatable {
     let endFrame: Int64
 }
 
-enum ImageResizeMode: Int {
-    /// Dragging handles writes `image.size` (container), not `transform.scale`.
-    case container = 0
-    /// Existing free-transform scale behavior.
-    case transform = 1
-}
-
 /// Transient editor state that is not part of the document model.
 @MainActor
 @Observable
@@ -35,9 +28,6 @@ final class EditorState {
     /// Ordered multi-selection. Last entry is the AE primary selection
     /// (Inspector / anchor handle follow it).
     var selectedLayerIDs: [UInt64] = []
-
-    /// Shown only for a single selected Image layer. Default: container.
-    var imageResizeMode: ImageResizeMode = .container
 
     /// Primary selected layer (last in `selectedLayerIDs`), or nil.
     var selectedLayerID: UInt64? {

@@ -199,13 +199,6 @@ extension EditorViewController {
                                accessibilityLabel: "Add Text",
                                action: #selector(addTextLayer))
 
-        imageResizeModeControl.translatesAutoresizingMaskIntoConstraints = false
-        imageResizeModeControl.selectedSegmentIndex = editorState.imageResizeMode.rawValue
-        imageResizeModeControl.addTarget(self,
-                                         action: #selector(imageResizeModeChanged(_:)),
-                                         for: .valueChanged)
-        imageResizeModeControl.isHidden = true
-
         let stack = UIStackView(arrangedSubviews: [
             selectToolButton,
             penToolButton,
@@ -213,7 +206,6 @@ extension EditorViewController {
             addEllipseButton,
             addImageButton,
             addTextButton,
-            imageResizeModeControl,
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .horizontal
@@ -235,8 +227,6 @@ extension EditorViewController {
             stack.trailingAnchor.constraint(equalTo: creationToolbar.trailingAnchor),
             stack.topAnchor.constraint(equalTo: creationToolbar.topAnchor),
             stack.bottomAnchor.constraint(equalTo: creationToolbar.bottomAnchor),
-
-            imageResizeModeControl.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
         updateCreationToolSelection()
@@ -322,26 +312,6 @@ extension EditorViewController {
         updateCreationActionButton(addEllipseButton, enabled: !penActive)
         updateCreationActionButton(addImageButton, enabled: !penActive)
         updateCreationActionButton(addTextButton, enabled: !penActive)
-        updateImageResizeModeControlVisibility()
-    }
-
-    func updateImageResizeModeControlVisibility() {
-        let show = if editorState.selectedLayerIDs.count == 1,
-                      let layerID = editorState.selectedLayerID,
-                      document.core.layerType(layerID) == .IMAGE
-        {
-            true
-        } else {
-            false
-        }
-        imageResizeModeControl.isHidden = !show
-        if show {
-            imageResizeModeControl.selectedSegmentIndex = editorState.imageResizeMode.rawValue
-        }
-    }
-
-    @objc func imageResizeModeChanged(_ control: UISegmentedControl) {
-        editorState.imageResizeMode = ImageResizeMode(rawValue: control.selectedSegmentIndex) ?? .container
     }
 
     func updateCreationActionButton(_ button: UIButton, enabled: Bool) {
@@ -355,7 +325,6 @@ extension EditorViewController {
         withObservationTracking {
             _ = editorState.tool
             _ = editorState.selectedLayerIDs
-            _ = editorState.imageResizeMode
             _ = document.core.revision
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in

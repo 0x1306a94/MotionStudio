@@ -296,13 +296,13 @@ EOF
 - 无 size 的非 Shape 层：只更新相对 pivot 的 `position`
 - 去掉 `imageResizeMode` 与模式分支
 
-- [ ] **Step 1: 删除 UI 与 enum；编译定位引用**
+- [x] **Step 1: 删除 UI 与 enum；编译定位引用**
 
-- [ ] **Step 2: 改 `FreeTransformDrag.applyScale` 只走容器/几何，不写 scale**
+- [x] **Step 2: 改 `FreeTransformDrag.applyScale` 只走容器/几何，不写 scale**
 
-- [ ] **Step 3: 手动验证** — 图片/文本拖角 size 变、scale 属性不变；模式分段控件消失；面板改 scale 仍有效
+- [x] **Step 3: 手动验证** — 图片/文本拖角 size 变、scale 属性不变；模式分段控件消失；面板改 scale 仍有效
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/MotionStudioApp/

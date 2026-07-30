@@ -270,7 +270,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         withObservationTracking {
             _ = document.core.revision
             _ = editorState.selectedLayerIDs
-            _ = editorState.imageResizeMode
             _ = playheadClock.frame
             _ = editorState.isPlaying
             _ = editorState.previewBackdrop
@@ -732,8 +731,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               startHandles: currentSelectionHandles() ?? SelectionHandlesSnapshot(),
                                               pivotScene: .zero,
                                               localPivotRelative: nil,
-                                              editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer",
-                                              imageResizeMode: .transform)
+                                              editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer")
     }
 
     /// Handles motion-path keyframe / tangent hits. Returns true when the press
@@ -880,20 +878,10 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return
         }
 
-        var resizeMode = ImageResizeMode.transform
-        if case .scaleCorner = kind, canResizeBoxContainer(layerIDs: layerIDs) {
-            resizeMode = containerResizeMode(for: layerIDs)
-        } else if case .scaleEdge = kind, canResizeBoxContainer(layerIDs: layerIDs) {
-            resizeMode = containerResizeMode(for: layerIDs)
-        }
-        if resizeMode == .container {
-            if layerIDs.count == 1, let layerID = layerIDs.first,
-               document.core.layerType(layerID) == .TEXT
-            {
-                editName = "Resize Text Box"
-            } else {
-                editName = "Resize Image Container"
-            }
+        if case .scaleCorner = kind {
+            editName = resizeEditName(for: layerIDs)
+        } else if case .scaleEdge = kind {
+            editName = resizeEditName(for: layerIDs)
         }
 
         let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
@@ -908,26 +896,21 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               startHandles: handles,
                                               pivotScene: pivot,
                                               localPivotRelative: localRel,
-                                              editName: editName,
-                                              imageResizeMode: resizeMode)
+                                              editName: editName)
     }
 
-    private func canResizeBoxContainer(layerIDs: [UInt64]) -> Bool {
-        guard layerIDs.count == 1, let layerID = layerIDs.first else {
-            return false
+    private func resizeEditName(for layerIDs: [UInt64]) -> String {
+        if layerIDs.count == 1, let layerID = layerIDs.first {
+            switch document.core.layerType(layerID) {
+            case .TEXT:
+                return "Resize Text Box"
+            case .IMAGE:
+                return "Resize Image Container"
+            default:
+                break
+            }
         }
-        let type = document.core.layerType(layerID)
-        return type == .IMAGE || type == .TEXT
-    }
-
-    private func containerResizeMode(for layerIDs: [UInt64]) -> ImageResizeMode {
-        guard layerIDs.count == 1, let layerID = layerIDs.first else {
-            return .transform
-        }
-        if document.core.layerType(layerID) == .TEXT {
-            return .container
-        }
-        return editorState.imageResizeMode
+        return layerIDs.count > 1 ? "Resize Layers" : "Resize Layer"
     }
 
     private func updateFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
@@ -1049,17 +1032,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         return .NONE
     }
 
-    /// Image container-resize mode: hide anchor (text keeps anchor; both hide rotate).
+    /// Image layers hide the anchor during box resize (text keeps it).
     private var hidesSelectionAnchor: Bool {
         guard editorState.selectedLayerIDs.count == 1,
               let layerID = editorState.selectedLayerID
         else {
             return false
         }
-        return document.core.layerType(layerID) == .IMAGE && editorState.imageResizeMode == .container
+        return document.core.layerType(layerID) == .IMAGE
     }
 
-    /// Text or Image container-resize: hide rotate hit zones (corners still scale the box).
+    /// Text and Image box resize: hide rotate hit zones (corners still resize the box).
     private var hidesSelectionRotate: Bool {
         guard editorState.selectedLayerIDs.count == 1,
               let layerID = editorState.selectedLayerID
@@ -1067,10 +1050,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return false
         }
         let type = document.core.layerType(layerID)
-        if type == .TEXT {
-            return true
-        }
-        return type == .IMAGE && editorState.imageResizeMode == .container
+        return type == .TEXT || type == .IMAGE
     }
 
     private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {
