@@ -233,29 +233,34 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         textItem.containerSize = textContent.size.evaluatePreview(time);
         textItem.autoHeight = textContent.autoHeight;
         textItem.align = textContent.align;
-        textItem.fontAssetId = textContent.fontAssetId;
         textItem.fontFamily = textContent.fontFamily;
         textItem.hitSize = textItem.containerSize;
-        textItem.fillColor = Color{0, 0, 0, 1};
-        if (const Asset *asset = FindAsset(document, textContent.fontAssetId)) {
-            if (asset->type == AssetType::Font) {
-                textItem.fontAbsolutePath = JoinProjectPath(document.projectRoot, asset->path);
-            }
-        }
-        bool haveFill = false;
         for (const auto &style : layer.styles) {
-            if (!haveFill && style->type() == LayerStyleType::Fill) {
+            if (style->type() == LayerStyleType::Fill) {
                 const auto &fill = static_cast<const FillStyle &>(*style);
-                textItem.fillColor = fill.color.evaluatePreview(time);
-                haveFill = true;
-            } else if (!textItem.strokeColor.has_value() && style->type() == LayerStyleType::Stroke) {
+                TextDrawStyle paint;
+                paint.color = fill.color.evaluatePreview(time);
+                paint.blendMode = fill.blendMode;
+                paint.isStroke = false;
+                textItem.styles.push_back(paint);
+            } else if (style->type() == LayerStyleType::Stroke) {
                 const auto &stroke = static_cast<const StrokeStyle &>(*style);
                 const float width = stroke.width.evaluatePreview(time);
-                if (width > 0.0f) {
-                    textItem.strokeColor = stroke.color.evaluatePreview(time);
-                    textItem.strokeWidth = width;
+                if (width <= 0.0f) {
+                    continue;
                 }
+                TextDrawStyle paint;
+                paint.color = stroke.color.evaluatePreview(time);
+                paint.blendMode = stroke.blendMode;
+                paint.isStroke = true;
+                paint.strokeWidth = width;
+                textItem.styles.push_back(paint);
             }
+        }
+        if (textItem.styles.empty()) {
+            TextDrawStyle paint;
+            paint.color = Color{0, 0, 0, 1};
+            textItem.styles.push_back(paint);
         }
         evaluated.textItem = std::move(textItem);
         out.push_back(std::move(evaluated));

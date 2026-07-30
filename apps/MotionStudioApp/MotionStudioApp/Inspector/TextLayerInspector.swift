@@ -7,6 +7,7 @@
 
 import MotionStudioBridging
 import SwiftUI
+import UIKit
 
 let textSizePath = TextProperty.size.path
 let textFontSizePath = TextProperty.fontSize.path
@@ -26,18 +27,19 @@ struct TextLayerInspector: View {
         clock.frame
     }
 
+    private var systemFontFamilies: [String] {
+        UIFont.familyNames.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
     var body: some View {
         let _ = core.revision
-        let fonts = core.fontAssetIDs()
-        let boundAssetID = core.textFontAssetID(layerID: layerID)
-        let selectedAssetName = boundAssetID == 0 ? "None" : core.assetName(boundAssetID)
         let size = core.evaluateVec2(entityID: layerID, path: textSizePath, frame: playheadFrame)
         let fontSize = core.evaluateFloat(entityID: layerID, path: textFontSizePath, frame: playheadFrame)
         let autoHeight = core.textAutoHeight(layerID: layerID)
         let align = core.textAlign(layerID: layerID)
         let fontFamily = core.textFontFamily(layerID: layerID)
         let text = core.staticString(entityID: layerID, path: textStringPath)
-        let blendMode = core.layerBlendMode(layerID: layerID)
+        let families = resolvedFontFamilies(current: fontFamily)
 
         Text("Text")
             .font(.subheadline)
@@ -136,10 +138,10 @@ struct TextLayerInspector: View {
         .font(.subheadline)
 
         HStack(spacing: 8) {
-            Text("Font Family")
+            Text("Font")
                 .fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 8)
-            TextField("Font Family", text: Binding(
+            Picker("Font", selection: Binding(
                 get: { fontFamily },
                 set: { newValue in
                     guard isEditable else { return }
@@ -147,81 +149,27 @@ struct TextLayerInspector: View {
                         core.setTextFontFamily(layerID: layerID, family: newValue)
                     }
                 },
-            ))
-            .multilineTextAlignment(.trailing)
-            .disabled(!isEditable)
-            .frame(maxWidth: 160)
-        }
-        .font(.subheadline)
-
-        HStack(spacing: 8) {
-            Text("Font Asset")
-                .fixedSize(horizontal: true, vertical: false)
-            Spacer(minLength: 8)
-            Menu {
-                Button {
-                    setFontAsset(0)
-                } label: {
-                    assetOptionLabel("None")
-                }
-                ForEach(fonts, id: \.self) { assetID in
-                    Button {
-                        setFontAsset(assetID)
-                    } label: {
-                        assetOptionLabel(core.assetName(assetID))
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(selectedAssetName)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .frame(width: Self.assetPickerMaxWidth, alignment: .leading)
-            }
-            .disabled(!isEditable)
-            .frame(width: Self.assetPickerMaxWidth, alignment: .trailing)
-            .clipped()
-        }
-        .font(.subheadline)
-
-        HStack(spacing: 8) {
-            Text("Blend Mode")
-                .fixedSize(horizontal: true, vertical: false)
-            Spacer(minLength: 8)
-            Picker("Blend Mode", selection: Binding(
-                get: { blendMode == .INVALID ? .NORMAL : blendMode },
-                set: { newValue in
-                    guard isEditable else { return }
-                    perform("Set Layer Blend Mode") {
-                        core.setLayerBlendMode(layerID: layerID, blendMode: newValue)
-                    }
-                },
             )) {
-                ForEach(MS_BLEND.allCases) { option in
-                    Text(option.label).tag(option)
+                ForEach(families, id: \.self) { family in
+                    Text(family).tag(family)
                 }
             }
             .labelsHidden()
             .pickerStyle(.menu)
             .disabled(!isEditable)
+            .frame(maxWidth: Self.fontPickerMaxWidth, alignment: .trailing)
         }
         .font(.subheadline)
     }
 
-    private static let assetPickerMaxWidth: CGFloat = 168
+    private static let fontPickerMaxWidth: CGFloat = 200
 
-    private func assetOptionLabel(_ title: String) -> some View {
-        Text(title)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .frame(maxWidth: Self.assetPickerMaxWidth, alignment: .trailing)
+    private func resolvedFontFamilies(current: String) -> [String] {
+        var families = systemFontFamilies
+        if !current.isEmpty, !families.contains(current) {
+            families.insert(current, at: 0)
+        }
+        return families
     }
 
     private func commitText() {
@@ -230,13 +178,6 @@ struct TextLayerInspector: View {
         guard draftText != current else { return }
         perform("Set Text") {
             core.setStaticString(entityID: layerID, path: textStringPath, value: draftText)
-        }
-    }
-
-    private func setFontAsset(_ assetID: UInt64) {
-        guard isEditable else { return }
-        perform("Set Text Font Asset") {
-            _ = core.setTextFontAsset(layerID: layerID, assetID: assetID)
         }
     }
 

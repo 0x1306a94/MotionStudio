@@ -235,12 +235,8 @@ int ms_asset_height(MSDocument *document, uint64_t assetId) {
 
 int ms_asset_type(MSDocument *document, uint64_t assetId) {
     DocumentLock lock(document);
-    if (document == nullptr) {
+    if (document == nullptr || FindAsset(*document->document, assetId) == nullptr) {
         return 0;
     }
-    Asset *asset = FindAsset(*document->document, assetId);
-    if (asset == nullptr) {
-        return 0;
-    }
-    return asset->type == AssetType::Font ? 1 : 0;
+    return 0;  // only Image assets remain
 }

@@ -227,19 +227,6 @@ extension EditorViewController {
         imageImportCoordinator?.presentImport()
     }
 
-    func presentFontImport() {
-        if fontImportCoordinator == nil {
-            fontImportCoordinator = FontImportCoordinator(
-                presenter: self,
-                document: document,
-                perform: { [weak self] name, edit in
-                    self?.perform(name, edit: edit)
-                },
-            )
-        }
-        fontImportCoordinator?.presentImport()
-    }
-
     func clearSelection() {
         editorState.clearLayerSelection()
     }

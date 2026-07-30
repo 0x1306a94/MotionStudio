@@ -494,7 +494,9 @@ TEST(TgfxRenderAdapterTest, DrawsTextOverBackground) {
     text.autoHeight = true;
     text.align = motion::TextAlign::Left;
     text.fontFamily = "Helvetica";
-    text.fillColor = Color{0, 0, 0, 1};
+    motion::TextDrawStyle fill;
+    fill.color = Color{0, 0, 0, 1};
+    text.styles = {fill};
     text.hitSize = text.containerSize;
     layer.textItem = std::move(text);
     state.layers.push_back(std::move(layer));

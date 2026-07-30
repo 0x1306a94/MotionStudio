@@ -988,11 +988,6 @@ json ContentToJson(const LayerContent &content) {
         case LayerType::Text: {
             const auto &text = static_cast<const TextContent &>(content);
             node["text"] = AnimatableToJson(text.text);
-            if (text.fontAssetId.isValid()) {
-                node["fontAssetId"] = IdToString(text.fontAssetId);
-            } else {
-                node["fontAssetId"] = nullptr;
-            }
             node["fontFamily"] = text.fontFamily;
             node["fontSize"] = AnimatableToJson(text.fontSize);
             node["size"] = AnimatableToJson(text.size);
@@ -1081,19 +1076,6 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
             Expected<void, std::string> result = AnimatableFromJson(**textNode, content->text);
             if (!result) {
                 return Unexpected(result.error());
-            }
-            if (const json *fontAssetIdNode = FindChild(node, "fontAssetId")) {
-                if (!fontAssetIdNode->is_null()) {
-                    Expected<std::string, std::string> fontAssetIdText = AsString(*fontAssetIdNode);
-                    if (!fontAssetIdText) {
-                        return Unexpected(fontAssetIdText.error());
-                    }
-                    Expected<EntityId, std::string> fontAssetId = IdFromString(*fontAssetIdText);
-                    if (!fontAssetId) {
-                        return Unexpected(fontAssetId.error());
-                    }
-                    content->fontAssetId = *fontAssetId;
-                }
             }
             Expected<std::string, std::string> fontFamily = ParseField<std::string>(node, "fontFamily");
             if (!fontFamily) {
@@ -1557,6 +1539,12 @@ Expected<std::unique_ptr<Document>, std::string> Serializer::deserialize(const s
         return Unexpected(std::string("missing the assets array"));
     }
     for (const json &assetNode : *assetsNode) {
+        // Development-era Font assets are dropped on load; re-save omits them.
+        if (const json *typeNode = FindChild(assetNode, "type")) {
+            if (typeNode->is_string() && typeNode->get<std::string>() == "font") {
+                continue;
+            }
+        }
         Expected<Asset, std::string> asset = AssetFromJson(assetNode);
         if (!asset) {
             return Unexpected(asset.error());

@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Mat3.h"
@@ -10,6 +11,7 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/render/DrawCommand.h"
+#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/PreviewBackdrop.h"
@@ -100,14 +102,11 @@ class RenderAdapter {
     // containerSize: virtual text box size.
     // autoHeight: true = wrap and grow; false = fixed height with shrink.
     // align: horizontal alignment within the box.
-    // fontFamily: system fallback family name.
-    // fontAbsolutePath: optional absolute font file path.
-    // fillColor: fill paint color.
-    // strokeColor / strokeWidth: optional stroke; width 0 skips stroke.
+    // fontFamily: system font family name.
+    // styles: fill/stroke passes in order; empty draws a black fill.
     virtual void drawText(const std::string &text, float fontSize, Vec2 containerSize,
                           bool autoHeight, TextAlign align, const std::string &fontFamily,
-                          const std::string &fontAbsolutePath, Color fillColor,
-                          const std::optional<Color> &strokeColor, float strokeWidth) = 0;
+                          const std::vector<TextDrawStyle> &styles) = 0;
 
     // Sets live-preview chrome behind the composition. Default is a no-op;
     // on-screen adapters override this. Offscreen adapters ignore it.

@@ -355,15 +355,13 @@ Expected<TrackMatteType, std::string> trackMatteTypeFromString(const std::string
 }
 
 const char *ToString(AssetType type) {
-    return type == AssetType::Image ? "image" : "font";
+    (void)type;
+    return "image";
 }
 
 Expected<AssetType, std::string> assetTypeFromString(const std::string &text) {
     if (text == "image") {
         return AssetType::Image;
-    }
-    if (text == "font") {
-        return AssetType::Font;
     }
     return Unexpected(std::string("unknown asset type: " + text));
 }

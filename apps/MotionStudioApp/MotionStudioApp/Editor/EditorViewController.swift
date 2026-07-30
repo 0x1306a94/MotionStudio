@@ -81,7 +81,6 @@ final class EditorViewController: UIViewController {
     var inspectorHostingController: UIHostingController<InspectorView>?
     var timelineViewController: TimelineViewController?
     var imageImportCoordinator: ImageImportCoordinator?
-    var fontImportCoordinator: FontImportCoordinator?
     var timelineHeightConstraint: NSLayoutConstraint?
 
     var timelineHeight = Metrics.timelinePreferredHeight

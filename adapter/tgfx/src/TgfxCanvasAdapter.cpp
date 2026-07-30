@@ -454,13 +454,12 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
 
 void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 containerSize,
                                  bool autoHeight, TextAlign align, const std::string &fontFamily,
-                                 const std::string &fontAbsolutePath, Color fillColor,
-                                 const std::optional<Color> &strokeColor, float strokeWidth) {
+                                 const std::vector<TextDrawStyle> &styles) {
     tgfx::Canvas *canvas = drawingCanvas();
-    if (canvas == nullptr || containerSize.x <= 0.0f || containerSize.y <= 0.0f) {
+    if (canvas == nullptr || containerSize.x <= 0.0f || containerSize.y <= 0.0f || styles.empty()) {
         return;
     }
-    std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontAbsolutePath, fontFamily);
+    std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontFamily);
     if (typeface == nullptr) {
         return;
     }
@@ -496,33 +495,32 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
     }
 
     const tgfx::Font font(typeface, layout.appliedFontSize);
-    for (const textlayout::TextLine &line : layout.lines) {
-        if (line.text.empty()) {
-            continue;
+    for (const TextDrawStyle &style : styles) {
+        for (const textlayout::TextLine &line : layout.lines) {
+            if (line.text.empty()) {
+                continue;
+            }
+            std::shared_ptr<tgfx::TextBlob> blob = tgfx::TextBlob::MakeFrom(line.text, font);
+            if (blob == nullptr) {
+                continue;
+            }
+            Color color = style.color;
+            color.a *= opacity_;
+            tgfx::Paint paint;
+            paint.setAntiAlias(true);
+            paint.setColor(ToTgfxColor(color));
+            paint.setBlendMode(ToTgfxBlendMode(style.blendMode));
+            if (style.isStroke) {
+                if (style.strokeWidth <= 0.0f) {
+                    continue;
+                }
+                paint.setStyle(tgfx::PaintStyle::Stroke);
+                paint.setStrokeWidth(style.strokeWidth);
+            } else {
+                paint.setStyle(tgfx::PaintStyle::Fill);
+            }
+            canvas->drawTextBlob(blob, line.x, line.y, paint);
         }
-        std::shared_ptr<tgfx::TextBlob> blob = tgfx::TextBlob::MakeFrom(line.text, font);
-        if (blob == nullptr) {
-            continue;
-        }
-        if (strokeColor.has_value() && strokeWidth > 0.0f) {
-            Color stroke = *strokeColor;
-            stroke.a *= opacity_;
-            tgfx::Paint strokePaint;
-            strokePaint.setAntiAlias(true);
-            strokePaint.setStyle(tgfx::PaintStyle::Stroke);
-            strokePaint.setStrokeWidth(strokeWidth);
-            strokePaint.setColor(ToTgfxColor(stroke));
-            strokePaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-            canvas->drawTextBlob(blob, line.x, line.y, strokePaint);
-        }
-        Color fill = fillColor;
-        fill.a *= opacity_;
-        tgfx::Paint fillPaint;
-        fillPaint.setAntiAlias(true);
-        fillPaint.setStyle(tgfx::PaintStyle::Fill);
-        fillPaint.setColor(ToTgfxColor(fill));
-        fillPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-        canvas->drawTextBlob(blob, line.x, line.y, fillPaint);
     }
 }
 

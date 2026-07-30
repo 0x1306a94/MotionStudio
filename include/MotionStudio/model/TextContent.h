@@ -3,7 +3,6 @@
 #include <string>
 
 #include "MotionStudio/animation/Animatable.h"
-#include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/LayerContent.h"
 #include "MotionStudio/model/TextAlign.h"
@@ -17,9 +16,7 @@ class TextContent : public LayerContent {
     ~TextContent() override;
 
     Animatable<std::string> text{std::string{"Text"}};
-    // References a document-level Font Asset. Invalid = unbound (system fallback).
-    EntityId fontAssetId;
-    // Display name / system fallback key when no font asset is bound.
+    // System font family name (must be installed on the device).
     std::string fontFamily{"PingFang SC"};
     // Font size cap; shrink may apply when autoHeight is false.
     Animatable<float> fontSize{48.0f};

@@ -933,7 +933,6 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     EXPECT_EQ(ms_layer_type(document, layerId), MS_LAYER_TEXT);
     EXPECT_TRUE(ms_layer_text_auto_height(document, layerId));
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);
-    EXPECT_EQ(ms_layer_text_font_asset(document, layerId), 0u);
     {
         BridgeString family;
         family.value = ms_layer_text_font_family(document, layerId);
@@ -977,32 +976,6 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
         EXPECT_EQ(family.str(), "Helvetica");
     }
 
-    const auto root = std::filesystem::temp_directory_path() /
-        ("ms_font_bridge_" + std::to_string(reinterpret_cast<uintptr_t>(document)));
-    std::filesystem::create_directories(root / "assets");
-    ms_document_set_project_root(document, root.string().c_str());
-    const auto source = root / "source.ttf";
-    {
-        std::ofstream out(source, std::ios::binary);
-        out.write("otfake", 6);
-    }
-    const uint64_t assetId =
-        ms_command_import_font_asset(document, source.string().c_str(), "Custom.ttf");
-    ASSERT_NE(assetId, 0u);
-    EXPECT_EQ(ms_asset_type(document, assetId), 1);
-    EXPECT_TRUE(std::filesystem::exists(root / "assets" / "Custom.ttf"));
-    ASSERT_TRUE(ms_command_set_text_font_asset(document, layerId, assetId));
-    EXPECT_EQ(ms_layer_text_font_asset(document, layerId), assetId);
-
-    ASSERT_TRUE(ms_document_undo(document));  // bind font
-    EXPECT_EQ(ms_layer_text_font_asset(document, layerId), 0u);
-    {
-        BridgeString family;
-        family.value = ms_layer_text_font_family(document, layerId);
-        EXPECT_EQ(family.str(), "Helvetica");
-    }
-    ASSERT_TRUE(ms_document_undo(document));  // import font
-    EXPECT_EQ(ms_document_asset_count(document), 0);
     ASSERT_TRUE(ms_document_undo(document));  // font family
     {
         BridgeString family;
@@ -1014,8 +987,6 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     ASSERT_TRUE(ms_document_undo(document));  // autoHeight
     EXPECT_TRUE(ms_layer_text_auto_height(document, layerId));
 
-    std::error_code removeError;
-    std::filesystem::remove_all(root, removeError);
     ms_document_destroy(document);
 }
 

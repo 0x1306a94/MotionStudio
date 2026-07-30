@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 端到端文本图层：虚拟容器框排版（换行 / `autoHeight` / 固定高缩字）、`Layer.styles` 填充描边、Font Asset + PingFang SC 回退、画布绘制与 Inspector 编辑。
+**Goal:** 端到端文本图层：虚拟容器框排版（换行 / `autoHeight` / 固定高缩字）、`Layer.styles` 多 Fill/Stroke（各自 blend）、系统 `fontFamily`（默认 PingFang SC）、画布绘制与 Inspector 编辑。
 
 **Architecture:** Core 只求值原始 `EvaluatedTextItem` → `DrawCommand::DrawText`。独立 `adapter/textlayout` 做换行/对齐/缩字（`GlyphMetrics` 抽象）；tgfx adapter 提供 metrics 与绘制。拖改 `content.size` 时等比更新 `anchorPoint`、保持 `position`。
 
@@ -10,14 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–11 complete.
+**Progress:** Tasks 1–11 complete。后续修订：去掉 Font Asset；文本仅系统字体；多 style 绘制；文本选中恢复锚点。
 
 ## Global Constraints
 
 - 不升 `schemaVersion`；直接改当前 JSON。
 - Core **不**依赖 tgfx；排版在 `adapter/textlayout`，绘制在 tgfx adapter。
-- 默认 `fontFamily = "PingFang SC"`；解析顺序：Font Asset 路径 → `fontFamily` → PingFang SC → Helvetica。
-- 填充/描边只读 `Layer.styles` 首个 Fill / Stroke；不做垂直对齐、字距行距、富文本、画布原地编辑、导出。
+- 默认 `fontFamily = "PingFang SC"`；解析顺序：`fontFamily` → PingFang SC → Helvetica。无项目 Font Asset。
+- 填充/描边按 `Layer.styles` 顺序全部参与；文本忽略 Stroke Position / Trim。
 - 拖改 size：`anchor' = (ax*w1/w0, ay*h1/h0)`，`position` 不变；同一 undo merge group。
 - `autoHeight` 测高**不**回写模型 `size`/`anchor`。
 - Core / textlayout / 适配器 / 测试：任务完成后可自动提交（不推送）。
@@ -28,14 +28,14 @@
 | 区域 | 文件 |
 |---|---|
 | 模型 | `include/MotionStudio/model/TextContent.h`、新建 `TextAlign.h`、`PropertyPath.cpp` |
-| Undo | 新建 `SetTextAutoHeightCommand` / `SetTextAlignCommand` / `SetTextFontFamilyCommand` / `SetTextFontAssetCommand` / `ImportFontAssetCommand`；可选复用 Image 的 import 模式 |
-| 序列化 | `Serializer.cpp`、`Dto.cpp` / `Dto.h` |
-| 求值/指令 | `EvaluatedTextItem.h`、`EvaluatedLayer.h`、`SceneEvaluator.cpp`、`DrawCommand.h`、`CommandBuilder.cpp`、`RenderAdapter.*`、`HitTest.cpp`、`SelectionHandles`（若按容器矩形） |
-| 锚点辅助 | 新建 `include/MotionStudio/common/ScaleAnchor.h`（或放 `render/`） |
-| 排版 | 新建 `adapter/textlayout/`（`GlyphMetrics.h`、`TextLayout.h/.cpp`、CMake、tests） |
-| tgfx | `TgfxCanvasAdapter.*`、`TgfxGlyphMetrics.*`、`adapter/tgfx/CMakeLists.txt` |
-| 桥接 | `motionstudio_bridge.h`、新建 `motionstudio_bridge_text.cpp`、property string API、canvas 测高挂钩 |
-| App | `MotionDocumentCore`、`TextLayerInspector`、`InspectorView`、Commands/Layout、`FreeTransformDrag` / `CanvasViewController`、Project Font 导入 |
+| Undo | `SetTextAutoHeightCommand` / `SetTextAlignCommand` / `SetTextFontFamilyCommand` |
+| 序列化 | `Serializer.cpp`、`Dto.cpp` / `Dto.h`（`AssetType` 仅 Image；加载跳过 `"font"` asset） |
+| 求值/指令 | `EvaluatedTextItem.h`、`EvaluatedLayer.h`、`SceneEvaluator.cpp`、`DrawCommand.h`、`CommandBuilder.cpp`、`RenderAdapter.*`、`HitTest.cpp` |
+| 锚点辅助 | `include/MotionStudio/common/ScaleAnchor.h` |
+| 排版 | `adapter/textlayout/` |
+| tgfx | `TgfxCanvasAdapter.*`、`TgfxGlyphMetrics.*`、`TgfxTextTypeface.*` |
+| 桥接 | `motionstudio_bridge.h`、`motionstudio_bridge_text.cpp`、canvas 测高挂钩 |
+| App | `MotionDocumentCore`、`TextLayerInspector`（系统字体 Picker）、`InspectorView`、`FreeTransformDrag` / `CanvasViewController` |
 | 文档 | `docs/data-model.md`、`docs/rendering.md` |
 
 ---

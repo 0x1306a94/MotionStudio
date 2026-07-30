@@ -9,7 +9,6 @@ using motion::TextContent;
 TEST(TextContentTest, DefaultsMatchSpec) {
     TextContent content;
     EXPECT_EQ(content.text.staticValue(), "Text");
-    EXPECT_FALSE(content.fontAssetId.isValid());
     EXPECT_EQ(content.fontFamily, "PingFang SC");
     EXPECT_FLOAT_EQ(content.fontSize.staticValue(), 48.0f);
     EXPECT_FLOAT_EQ(content.size.staticValue().x, 400.0f);

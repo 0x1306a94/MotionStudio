@@ -27,6 +27,7 @@ struct StrokesInspector: View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.revision
         let strokes = strokeIndices()
+        let isTextLayer = core.layerType(layerID) == .TEXT
         HStack {
             Text("Strokes")
                 .font(.subheadline)
@@ -69,22 +70,26 @@ struct StrokesInspector: View {
                         Image(systemName: "minus")
                     }
                 }
-                HStack(spacing: 6) {
-                    Text("Position")
-                        .font(.callout)
-                        .frame(width: 78, alignment: .leading)
-                    Picker("", selection: positionBinding(styleIndex: styleIndex)) {
-                        ForEach(MS_STROKE_POSITION.allCases) { tag in
-                            Text(tag.label).tag(tag)
+                if !isTextLayer {
+                    HStack(spacing: 6) {
+                        Text("Position")
+                            .font(.callout)
+                            .frame(width: 78, alignment: .leading)
+                        Picker("", selection: positionBinding(styleIndex: styleIndex)) {
+                            ForEach(MS_STROKE_POSITION.allCases) { tag in
+                                Text(tag.label).tag(tag)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
                 }
                 floatRow(styleIndex: styleIndex, label: "Width", property: "width")
-                floatRow(styleIndex: styleIndex, label: "Trim Start", property: "trimStart")
-                floatRow(styleIndex: styleIndex, label: "Trim End", property: "trimEnd")
-                floatRow(styleIndex: styleIndex, label: "Trim Offset", property: "trimOffset")
+                if !isTextLayer {
+                    floatRow(styleIndex: styleIndex, label: "Trim Start", property: "trimStart")
+                    floatRow(styleIndex: styleIndex, label: "Trim End", property: "trimEnd")
+                    floatRow(styleIndex: styleIndex, label: "Trim Offset", property: "trimOffset")
+                }
             }
             .disabled(!isEditable)
         }

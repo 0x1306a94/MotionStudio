@@ -375,10 +375,13 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     text.autoHeight = false;
     text.align = motion::TextAlign::Center;
     text.fontFamily = "PingFang SC";
-    text.fontAbsolutePath = "/tmp/fonts/a.ttf";
-    text.fillColor = Color{1, 0, 0, 1};
-    text.strokeColor = Color{0, 0, 1, 1};
-    text.strokeWidth = 1.5f;
+    motion::TextDrawStyle fill;
+    fill.color = Color{1, 0, 0, 1};
+    motion::TextDrawStyle stroke;
+    stroke.color = Color{0, 0, 1, 1};
+    stroke.isStroke = true;
+    stroke.strokeWidth = 1.5f;
+    text.styles = {fill, stroke};
     layer.textItem = std::move(text);
     state.layers.push_back(std::move(layer));
 
@@ -391,8 +394,9 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     EXPECT_FALSE(commands[4].textAutoHeight);
     EXPECT_EQ(commands[4].textAlign, motion::TextAlign::Center);
     EXPECT_EQ(commands[4].textFontFamily, "PingFang SC");
-    EXPECT_EQ(commands[4].textFontAbsolutePath, "/tmp/fonts/a.ttf");
-    EXPECT_FLOAT_EQ(commands[4].textFillColor.r, 1.0f);
-    ASSERT_TRUE(commands[4].textStrokeColor.has_value());
-    EXPECT_FLOAT_EQ(commands[4].textStrokeWidth, 1.5f);
+    ASSERT_EQ(commands[4].textStyles.size(), 2u);
+    EXPECT_FALSE(commands[4].textStyles[0].isStroke);
+    EXPECT_FLOAT_EQ(commands[4].textStyles[0].color.r, 1.0f);
+    EXPECT_TRUE(commands[4].textStyles[1].isStroke);
+    EXPECT_FLOAT_EQ(commands[4].textStyles[1].strokeWidth, 1.5f);
 }

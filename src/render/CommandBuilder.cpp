@@ -79,10 +79,7 @@ void AppendTextItem(const std::optional<EvaluatedTextItem> &textItem, DrawComman
     drawText.textAutoHeight = textItem->autoHeight;
     drawText.textAlign = textItem->align;
     drawText.textFontFamily = textItem->fontFamily;
-    drawText.textFontAbsolutePath = textItem->fontAbsolutePath;
-    drawText.textFillColor = textItem->fillColor;
-    drawText.textStrokeColor = textItem->strokeColor;
-    drawText.textStrokeWidth = textItem->strokeWidth;
+    drawText.textStyles = textItem->styles;
     commands.push_back(std::move(drawText));
 }
 

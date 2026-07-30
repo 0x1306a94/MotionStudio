@@ -570,7 +570,6 @@ TEST(SerializerTest, TextLayerRoundTripPreservesBoxFields) {
     ASSERT_NE(textLayer, nullptr);
     auto *text = static_cast<motion::TextContent *>(textLayer->content.get());
     EXPECT_EQ(text->text.staticValue(), "hello");
-    EXPECT_FALSE(text->fontAssetId.isValid());
     EXPECT_EQ(text->fontFamily, "PingFang SC");
     EXPECT_FLOAT_EQ(text->fontSize.staticValue(), 36.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().x, 320.0f);
@@ -584,7 +583,6 @@ TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
     auto json = nlohmann::json::parse(Serializer::serialize(*document));
     for (auto &layer : json["compositions"][1]["layers"]) {
         if (layer["type"] == "text") {
-            layer["content"].erase("fontAssetId");
             layer["content"].erase("size");
             layer["content"].erase("autoHeight");
             layer["content"].erase("align");
@@ -604,7 +602,6 @@ TEST(SerializerTest, TextLayerMissingFieldsUseDefaults) {
     }
     ASSERT_NE(textLayer, nullptr);
     auto *text = static_cast<motion::TextContent *>(textLayer->content.get());
-    EXPECT_FALSE(text->fontAssetId.isValid());
     EXPECT_FLOAT_EQ(text->size.staticValue().x, 400.0f);
     EXPECT_FLOAT_EQ(text->size.staticValue().y, 120.0f);
     EXPECT_TRUE(text->autoHeight);

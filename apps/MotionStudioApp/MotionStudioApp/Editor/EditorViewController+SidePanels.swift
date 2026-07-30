@@ -24,9 +24,6 @@ extension EditorViewController {
             importImage: { [weak self] in
                 self?.presentImageImport()
             },
-            importFont: { [weak self] in
-                self?.presentFontImport()
-            },
         ))
         embed(projectHost, in: projectPanel)
         projectHostingController = projectHost

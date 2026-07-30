@@ -9,8 +9,8 @@
 端到端可用的文本图层（接近 PAG 框文本子集）：
 
 1. 虚拟容器内排版：宽约束换行；`autoHeight` 或固定高缩字
-2. 填充 / 描边复用 `Layer.styles`
-3. Font Asset（项目包）+ 系统字体回退（默认 PingFang SC）
+2. 填充 / 描边复用 `Layer.styles`（按顺序全部参与，各自 blend）
+3. 系统已安装字体（`fontFamily`，默认 PingFang SC）；自定义字体由用户安装到系统
 4. 多行（`\n`）+ 水平对齐（左/中/右）
 5. 画布绘制、选中、undo、存盘重开；Inspector 编辑文案
 
@@ -23,6 +23,7 @@
 - 画布双击原地编辑
 - 垂直对齐、字距 / 行距、富文本 span
 - CoreText / HarfBuzz（首版用自研框排版 + tgfx 量字）
+- 项目内嵌 Font Asset（用户自行安装系统字体）
 - Lottie / PAG 文本导出
 - 复杂文种双向排版
 
@@ -35,8 +36,7 @@ enum class TextAlign : uint8_t { Left = 0, Center = 1, Right = 2 };
 
 class TextContent : public LayerContent {
     Animatable<std::string> text{std::string{"Text"}};
-    EntityId fontAssetId;                 // 无效 = 未绑定
-    std::string fontFamily{"PingFang SC"}; // 显示名 / 系统回退键
+    std::string fontFamily{"PingFang SC"}; // 系统字体族名
     Animatable<float> fontSize{48.0f};    // 字号上限（固定高时由排版缩字）
     Animatable<Vec2> size{Vec2{400, 120}}; // 虚拟容器；宽始终约束换行
     bool autoHeight = true;               // true：高度随内容；false：固定高 + 缩字
@@ -44,12 +44,12 @@ class TextContent : public LayerContent {
 };
 ```
 
-**填充 / 描边**：复用 `Layer.styles`（首个 Fill + 首个 Stroke）。无 Fill 时绘制默认黑色；无 Stroke 或不描边宽度为 0 则不描边。
+**填充 / 描边**：复用 `Layer.styles`（按顺序全部 Fill/Stroke，各自 blend）。无 style 时绘制默认黑色 Fill；Stroke 宽度 ≤ 0 跳过。文本忽略 Stroke Position / Trim。
 
 **新建层约定**
 
 - 文案 `"Text"`，`size = 400×120`，`autoHeight = true`，`align = Left`
-- `fontFamily = "PingFang SC"`，`fontAssetId` 无效
+- `fontFamily = "PingFang SC"`
 - `anchorPoint = (200, 60)`，`position` = 合成中心
 - 附带一个黑色 Fill（与形状层新建时 styles 习惯一致）
 
@@ -57,14 +57,11 @@ class TextContent : public LayerContent {
 
 - 已有：`content.text`、`content.fontSize`
 - 新增：`content.size`
-- 非 Animatable：`autoHeight`、`align`、`fontFamily`、`fontAssetId` → 专用 bridge setter + undo 命令
+- 非 Animatable：`autoHeight`、`align`、`fontFamily` → 专用 bridge setter + undo 命令
 
-**Font Asset**
+**字体**：仅系统 `fontFamily`（Inspector 枚举 `UIFont.familyNames`）。不设项目 Font Asset；加载时跳过历史 `type:"font"` asset 与忽略 `fontAssetId` 字段，再保存即消失。
 
-- `AssetType::Font`，`path` 相对 `projectRoot`（如 `assets/MyFont.ttf`）
-- 绑定后可同步更新 `fontFamily` 显示名；解绑不删磁盘文件
-
-**序列化**：补齐 `fontAssetId`、`size`、`autoHeight`、`align`（及已有字段）。开发阶段**不升** `schemaVersion`。
+**序列化**：`fontFamily`、`size`、`autoHeight`、`align`（及已有字段）。开发阶段**不升** `schemaVersion`。
 
 **拖改容器尺寸时的锚点（必做）**
 
@@ -84,25 +81,29 @@ class TextContent : public LayerContent {
 
 ### 架构原则
 
-- **Core** 只处理原始数据求值（字符串、字号上限、容器、对齐、字体路径、styles）
+- **Core** 只处理原始数据求值（字符串、字号上限、容器、对齐、`fontFamily`、styles）
 - **文本排版**独立模块（adapter 侧），供绘制与 hit 共用；不链进 Core
 - 管线对齐 Image：自包含 `DrawText` 命令
 
 ### 求值（Core）
 
 ```cpp
+struct TextDrawStyle {
+    Color color;
+    BlendMode blendMode;
+    bool isStroke;
+    float strokeWidth;
+};
+
 struct EvaluatedTextItem {
     std::string text;
     float fontSize;                 // 模型字号上限（缩字前）
     Vec2 containerSize;             // evaluate(size)
     bool autoHeight;
     TextAlign align;
-    EntityId fontAssetId;
     std::string fontFamily;
-    std::string fontAbsolutePath;   // 有 Font Asset 则为绝对路径，否则空
-    Color fillColor;                // 首个 Fill，缺省黑
-    std::optional<Color> strokeColor;
-    float strokeWidth = 0.0f;       // 首个 Stroke；0 = 不描边
+    std::vector<TextDrawStyle> styles;  // Layer::styles 顺序；空 → 黑 Fill
+    Vec2 hitSize;                   // Core 初值 = containerSize；autoHeight 时可写回测高
 };
 
 struct EvaluatedLayer {
@@ -114,7 +115,7 @@ struct EvaluatedLayer {
 
 ### DrawCommand
 
-新增 `DrawCommandType::DrawText`，字段与 `EvaluatedTextItem` 对齐（自包含，同 `DrawImage`）。
+新增 `DrawCommandType::DrawText`，字段与 `EvaluatedTextItem` 对齐（自包含，同 `DrawImage`；含 `textStyles`）。
 
 CommandBuilder：对 `textItem` 追加 `DrawText`；track matte 源层若含文本亦需回放（与 Image 一致）。
 
@@ -142,11 +143,10 @@ TgfxGlyphMetrics      // tgfx::Font 实现
 
 **字体解析顺序（Adapter）**
 
-1. `fontAbsolutePath` → `Typeface::MakeFromPath`
-2. 否则 `Typeface::MakeFromName(fontFamily, …)`
-3. 再否则 `PingFang SC` → `Helvetica`
+1. `Typeface::MakeFromName(fontFamily, …)`
+2. 再否则 `PingFang SC` → `Helvetica`
 
-**调用**：`TgfxCanvasAdapter` 绘制前 `Layout`；hit/选中用同一 `Layout` 得到测量框（`autoHeight` 时高度用 `measuredSize.y`）。测量结果不持久化进 Document。
+**调用**：`TgfxCanvasAdapter` 绘制前 `Layout` 一次，再按 `styles` 顺序画 fill/stroke；hit/选中用同一 `Layout` 得到测量框（`autoHeight` 时高度用 `measuredSize.y`）。测量结果不持久化进 Document。
 
 局部坐标：容器矩形为 `[0, 0]–[width, height]`（与 Image 容器一致）；锚点相对该矩形；文本在框内顶起排版。
 
@@ -158,18 +158,16 @@ TgfxGlyphMetrics      // tgfx::Font 实现
 
 - `ms_document_add_text_layer(compositionId)` → §1 默认值，返回 layerId
 - Animatable：`content.text` / `content.fontSize` / `content.size`（含 string 的 get/set，若尚缺则补齐）
-- 专用 API：`fontFamily`、`fontAssetId`、`autoHeight`、`align`
-- `ms_document_import_font_asset(path)`：拷入 `assets/`，写入 `AssetType::Font`
-- `ms_document_set_text_font_asset(layerId, assetId)`（无效 id = 解绑）
+- 专用 API：`fontFamily`、`autoHeight`、`align`
 - 拖角改 size：bridge/App 同时提交等比 `anchor` 更新（同一 merge group）
 
 ### App
 
 - 工具栏 **Add Text**
-- `TextLayerInspector`：文案、字号、容器 W/H、`autoHeight`、对齐、字体（家族名 + 绑定 Font Asset）、复用 Fill/Stroke 面板
-- 拖角改 `content.size`，并按 §1 同步等比锚点、保持 position
+- `TextLayerInspector`：文案、字号、容器 W/H、`autoHeight`、对齐、系统字体列表（`UIFont.familyNames`）、复用 Fill/Stroke 面板（文本 Stroke 隐藏 Position/Trim）
+- 拖角改 `content.size`，并按 §1 同步等比锚点、保持 position；选中显示锚点、隐藏旋转
 - `autoHeight == true` 时仍允许改 `size.y`（存盘用）；仅 `autoHeight == false` 时 `size.y` 参与缩字
-- Project 面板：Font Asset 与 Image 并列；导入入口对齐 Image
+- Project 面板仅 Image Asset；**不做**字体导入
 - **不做**画布原地编辑
 
 ### 测试
@@ -179,15 +177,15 @@ TgfxGlyphMetrics      // tgfx::Font 实现
 | Core | 序列化 round-trip；PropertyPath；Evaluator `textItem`；`DrawText` 命令 |
 | TextLayout | 换行、对齐、`autoHeight` 量高、固定高缩字（假 `GlyphMetrics`） |
 | Adapter | 快照：单行 / 多行 / 缩字 / fill+stroke（若已有基建） |
-| 交互 | 拖 size → 锚点等比、position 不变；undo；绑字体重开 |
+| 交互 | 拖 size → 锚点等比、position 不变；undo；改系统字体重开 |
 
 ### 验收
 
 1. Add Text → 画布显示苹方「Text」
 2. 文案含 `\n` + 改宽 → 换行正确；关 `autoHeight` → 缩字塞进框
-3. Fill/Stroke 可见；undo 正确
+3. 多 Fill/Stroke + blend 可见；undo 正确
 4. 拖容器角：视觉位置不跳，锚点相对比例保持
-5. 导入字体绑定后存盘重开仍用项目字体
+5. Inspector 从系统字体列表切换 `fontFamily` 后存盘重开仍正确
 
 ---
 

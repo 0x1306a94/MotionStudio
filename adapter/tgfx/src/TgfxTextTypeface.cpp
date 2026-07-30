@@ -15,13 +15,7 @@ std::shared_ptr<tgfx::Typeface> MakeFromFamily(const std::string &family) {
 
 }  // namespace
 
-std::shared_ptr<tgfx::Typeface> ResolveTextTypeface(const std::string &fontAbsolutePath,
-                                                    const std::string &fontFamily) {
-    if (!fontAbsolutePath.empty()) {
-        if (auto typeface = tgfx::Typeface::MakeFromPath(fontAbsolutePath)) {
-            return typeface;
-        }
-    }
+std::shared_ptr<tgfx::Typeface> ResolveTextTypeface(const std::string &fontFamily) {
     if (auto typeface = MakeFromFamily(fontFamily)) {
         return typeface;
     }

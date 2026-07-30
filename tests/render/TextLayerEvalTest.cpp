@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-#include "MotionStudio/model/Asset.h"
-#include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
@@ -13,13 +11,10 @@
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 
-using motion::Asset;
-using motion::AssetType;
 using motion::BoundsOfLayerLocal;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
-using motion::EntityId;
 using motion::FillStyle;
 using motion::HitTestLayer;
 using motion::Layer;
@@ -32,7 +27,6 @@ using motion::Vec2;
 
 TEST(TextLayerEvalTest, EvaluatesDefaultsAndStyles) {
     Document document;
-    document.projectRoot = "/tmp/project";
     Composition *composition = document.addComposition(std::make_unique<Composition>());
     composition->width = 800;
     composition->height = 600;
@@ -45,14 +39,7 @@ TEST(TextLayerEvalTest, EvaluatesDefaultsAndStyles) {
     text->fontSize.setStaticValue(32.0f);
     text->size.setStaticValue(Vec2{200, 80});
     text->align = TextAlign::Center;
-
-    Asset font;
-    font.id = EntityId::Generate();
-    font.type = AssetType::Font;
-    font.name = "Demo";
-    font.path = "assets/Demo.ttf";
-    document.assets.push_back(font);
-    text->fontAssetId = font.id;
+    text->fontFamily = "Helvetica";
 
     auto fill = std::make_unique<FillStyle>();
     fill->color.setStaticValue(Color{1, 0, 0, 1});
@@ -74,11 +61,13 @@ TEST(TextLayerEvalTest, EvaluatesDefaultsAndStyles) {
     EXPECT_FLOAT_EQ(item.containerSize.y, 80.0f);
     EXPECT_EQ(item.hitSize, item.containerSize);
     EXPECT_EQ(item.align, TextAlign::Center);
-    EXPECT_EQ(item.fontAbsolutePath, "/tmp/project/assets/Demo.ttf");
-    EXPECT_FLOAT_EQ(item.fillColor.r, 1.0f);
-    ASSERT_TRUE(item.strokeColor.has_value());
-    EXPECT_FLOAT_EQ(item.strokeColor->b, 1.0f);
-    EXPECT_FLOAT_EQ(item.strokeWidth, 2.0f);
+    EXPECT_EQ(item.fontFamily, "Helvetica");
+    ASSERT_EQ(item.styles.size(), 2u);
+    EXPECT_FALSE(item.styles[0].isStroke);
+    EXPECT_FLOAT_EQ(item.styles[0].color.r, 1.0f);
+    EXPECT_TRUE(item.styles[1].isStroke);
+    EXPECT_FLOAT_EQ(item.styles[1].color.b, 1.0f);
+    EXPECT_FLOAT_EQ(item.styles[1].strokeWidth, 2.0f);
 
     Vec2 minPoint;
     Vec2 maxPoint;
@@ -105,7 +94,8 @@ TEST(TextLayerEvalTest, DefaultFillIsBlackWithoutStyles) {
     ASSERT_TRUE(state.hasValue()) << state.error();
     ASSERT_EQ(state->layers.size(), 1u);
     ASSERT_TRUE(state->layers[0].textItem.has_value());
-    EXPECT_FLOAT_EQ(state->layers[0].textItem->fillColor.r, 0.0f);
-    EXPECT_FLOAT_EQ(state->layers[0].textItem->fillColor.a, 1.0f);
-    EXPECT_FALSE(state->layers[0].textItem->strokeColor.has_value());
+    ASSERT_EQ(state->layers[0].textItem->styles.size(), 1u);
+    EXPECT_FALSE(state->layers[0].textItem->styles[0].isStroke);
+    EXPECT_FLOAT_EQ(state->layers[0].textItem->styles[0].color.r, 0.0f);
+    EXPECT_FLOAT_EQ(state->layers[0].textItem->styles[0].color.a, 1.0f);
 }

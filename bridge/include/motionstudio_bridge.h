@@ -512,22 +512,15 @@ char *ms_asset_name(MSDocument *document, uint64_t assetId);
 char *ms_asset_path(MSDocument *document, uint64_t assetId);
 int ms_asset_width(MSDocument *document, uint64_t assetId);
 int ms_asset_height(MSDocument *document, uint64_t assetId);
-int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 image, 1 font
+int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 = image
 
-// Copies sourceAbsolutePath into {projectRoot}/assets/ (requires projectRoot),
-// registers a Font Asset, and returns the new asset id (0 on failure).
-uint64_t ms_command_import_font_asset(MSDocument *document, const char *sourceAbsolutePath,
-                                      const char *preferredFileName);
 // Adds a Text layer (400x120, autoHeight, PingFang SC, black fill, centered).
 uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId);
-// Binds text layer to font assetId; assetId 0 unbinds.
-bool ms_command_set_text_font_asset(MSDocument *document, uint64_t layerId, uint64_t assetId);
 bool ms_command_set_text_font_family(MSDocument *document, uint64_t layerId, const char *family);
 bool ms_command_set_text_auto_height(MSDocument *document, uint64_t layerId, bool autoHeight);
 bool ms_command_set_text_align(MSDocument *document, uint64_t layerId, MS_TEXT_ALIGN align);
 bool ms_layer_text_auto_height(MSDocument *document, uint64_t layerId);
 MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId);
-uint64_t ms_layer_text_font_asset(MSDocument *document, uint64_t layerId);
 char *ms_layer_text_font_family(MSDocument *document, uint64_t layerId);  // ms_string_free
 
 // Bakes Rect/Ellipse geometry on the layer into a ShapePath at frame.
