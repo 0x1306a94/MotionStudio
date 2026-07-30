@@ -299,11 +299,11 @@ struct EvaluatedTextItem {
 - Hit/Bounds：有 `textItem` 时用局部矩形 `[0,0]–[hitSize.x, hitSize.y]`（`hitSize` 默认等于 `containerSize`）
 - Text 层不填 `shapeItems` / `imageItem`
 
-- [ ] **Step 1: 失败测试** — 默认层 evaluate 出 textItem；Fill 色进 fillColor；Stroke 进 stroke；bounds/hit 用容器
+- [x] **Step 1: 失败测试** — 默认层 evaluate 出 textItem；Fill 色进 fillColor；Stroke 进 stroke；bounds/hit 用容器
 
-- [ ] **Step 2: 实现**
+- [x] **Step 2: 实现**
 
-- [ ] **Step 3: 通过并提交**
+- [x] **Step 3: 通过并提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='TextLayerEvalTest.*'
