@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–3 complete.
+**Progress:** Tasks 1–4 complete.
 
 ## Global Constraints
 
@@ -169,11 +169,11 @@ git commit --only <相关文件> -m "Serialize text box fields and resolve conte
 - `SetTextFontAssetCommand(EntityId layerId, EntityId assetId)` — 无效 id 解绑；绑定时可把 `fontFamily` 设为 asset.name（与 spec「可同步显示名」一致）
 - `ImportFontAssetCommand`：向 `document.assets` 追加 Font asset（path 相对、已由调用方拷贝文件）
 
-- [ ] **Step 1: 失败测试** — execute/undo 还原字段；绑/解绑 fontAssetId
+- [x] **Step 1: 失败测试** — execute/undo 还原字段；绑/解绑 fontAssetId
 
-- [ ] **Step 2: 实现**
+- [x] **Step 2: 实现**
 
-- [ ] **Step 3: 通过并提交**
+- [x] **Step 3: 通过并提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='TextCommandsTest.*'
