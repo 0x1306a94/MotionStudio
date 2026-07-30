@@ -56,6 +56,9 @@ class Document {
     std::string name;
     std::vector<std::unique_ptr<Composition>> compositions;
     std::vector<Asset> assets;  // document-level resources (images, fonts)
+    // Absolute path of the project package directory. Not serialized; set by
+    // the host when opening a package so Asset.path can resolve to disk.
+    std::string projectRoot;
 
   private:
     EntityIndex entityIndex_;

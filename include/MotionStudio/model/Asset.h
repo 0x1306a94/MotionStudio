@@ -12,7 +12,11 @@ struct Asset {
     EntityId id = EntityId::Generate();
     AssetType type = AssetType::Image;
     std::string name;
+    // Path relative to Document::projectRoot, e.g. "assets/photo.png".
     std::string path;
+    // Intrinsic pixel size for image assets (written at import time).
+    int width = 0;
+    int height = 0;
 };
 
 }  // namespace motion
