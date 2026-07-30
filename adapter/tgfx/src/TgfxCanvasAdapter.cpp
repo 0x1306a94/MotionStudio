@@ -16,6 +16,8 @@
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Context.h>
 
+#include "MotionStudio/render/ImageScaleLayout.h"
+#include "TgfxImageCache.h"
 #include "TgfxIsolation.h"
 #include "TgfxPathCache.h"
 #include "TgfxProfileTiming.h"
@@ -39,7 +41,8 @@ void DrawMaskPathContribution(tgfx::Canvas *target, const tgfx::Path &path, floa
 
 TgfxCanvasAdapter::TgfxCanvasAdapter()
     : pathCache_(std::make_unique<TgfxPathCache>())
-    , isolationStack_(std::make_unique<TgfxIsolationStack>()) {
+    , isolationStack_(std::make_unique<TgfxIsolationStack>())
+    , imageCache_(std::make_unique<TgfxImageCache>()) {
 }
 
 TgfxCanvasAdapter::~TgfxCanvasAdapter() {
@@ -51,6 +54,9 @@ void TgfxCanvasAdapter::releaseGpuCaches(tgfx::Context *context) {
     compositionClipSaved_ = false;
     if (pathCache_ != nullptr) {
         pathCache_->Clear();
+    }
+    if (imageCache_ != nullptr) {
+        imageCache_->Clear();
     }
     if (isolationStack_ != nullptr) {
         isolationStack_->layers.clear();
@@ -412,9 +418,43 @@ void TgfxCanvasAdapter::drawMaskPath(const ShapeGeometry &geometry, MaskMode mod
     DrawMaskPathContribution(canvas, path, opacity, mode);
 }
 
-void TgfxCanvasAdapter::drawImage(const std::string & /*path*/, Vec2 /*containerSize*/,
-                                  Vec2 /*intrinsicSize*/, ImageScaleMode /*mode*/) {
-    // Implemented in Task 7 (image decode + cache).
+void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
+                                  ImageScaleMode mode) {
+    tgfx::Canvas *canvas = drawingCanvas();
+    if (canvas == nullptr || imageCache_ == nullptr) {
+        return;
+    }
+    if (containerSize.x <= 0.0f || containerSize.y <= 0.0f) {
+        return;
+    }
+    std::shared_ptr<tgfx::Image> image = imageCache_->GetOrLoad(path);
+    if (image == nullptr) {
+        return;
+    }
+    Vec2 resolvedIntrinsic = intrinsicSize;
+    if (resolvedIntrinsic.x <= 0.0f || resolvedIntrinsic.y <= 0.0f) {
+        resolvedIntrinsic = {static_cast<float>(image->width()),
+                             static_cast<float>(image->height())};
+    }
+    const ImageRect destination =
+        ComputeImageDestinationRect(containerSize, resolvedIntrinsic, mode);
+    if (destination.isEmpty()) {
+        return;
+    }
+
+    tgfx::Paint paint;
+    paint.setAntiAlias(true);
+    paint.setAlpha(opacity_);
+    paint.setBlendMode(ToTgfxBlendMode(blendMode_));
+
+    canvas->save();
+    canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
+    const tgfx::Rect src = tgfx::Rect::MakeWH(static_cast<float>(image->width()),
+                                              static_cast<float>(image->height()));
+    const tgfx::Rect dst =
+        tgfx::Rect::MakeXYWH(destination.x, destination.y, destination.width, destination.height);
+    canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
+    canvas->restore();
 }
 
 }  // namespace motion

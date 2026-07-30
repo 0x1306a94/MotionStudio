@@ -18,6 +18,7 @@ namespace motion {
 
 struct TgfxPathCache;
 struct TgfxIsolationStack;
+class TgfxImageCache;
 
 // Shared PreviewCanvasAdapter implementation backed by a tgfx canvas.
 // Subclasses only supply the render target: an offscreen texture
@@ -100,6 +101,7 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
     std::unique_ptr<tgfx::AutoCanvasRestore> frameRestore_;
     std::unique_ptr<TgfxPathCache> pathCache_;
     std::unique_ptr<TgfxIsolationStack> isolationStack_;
+    std::unique_ptr<TgfxImageCache> imageCache_;
 };
 
 }  // namespace motion

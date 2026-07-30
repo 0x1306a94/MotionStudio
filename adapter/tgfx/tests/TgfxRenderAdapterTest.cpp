@@ -1,16 +1,20 @@
 #include <cstdint>
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedMask.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -57,6 +61,10 @@ Pixel PixelAt(const std::vector<uint8_t> &pixels, int width, int x, int y) {
     const size_t offset =
         (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
     return {pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]};
+}
+
+std::string RedFixturePath() {
+    return (std::filesystem::path(__FILE__).parent_path() / "fixtures" / "red_2x2.png").string();
 }
 
 }  // namespace
@@ -394,4 +402,74 @@ TEST(TgfxRenderAdapterTest, StrokeEmptyTrimDrawsNothing) {
     const Pixel center = PixelAt(pixels, 100, 50, 50);
     EXPECT_NEAR(center.r, 255, 8);
     EXPECT_NEAR(center.b, 255, 8);
+}
+
+TEST(TgfxRenderAdapterTest, DrawsStretchedImageIntoContainer) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    const std::string path = RedFixturePath();
+    ASSERT_TRUE(std::filesystem::exists(path)) << path;
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    motion::EvaluatedImageItem image;
+    image.absolutePath = path;
+    image.containerSize = {100, 100};
+    image.intrinsicSize = {2, 2};
+    image.scaleMode = motion::ImageScaleMode::Stretch;
+    layer.imageItem = std::move(image);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(center.r, 255, 20);
+    EXPECT_NEAR(center.g, 0, 20);
+    EXPECT_NEAR(center.b, 0, 20);
+}
+
+TEST(TgfxRenderAdapterTest, LetterBoxLeavesSideMargins) {
+    auto adapter = TgfxRenderAdapter::Make(100, 50);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    const std::string path = RedFixturePath();
+    ASSERT_TRUE(std::filesystem::exists(path)) << path;
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 50;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    motion::EvaluatedImageItem image;
+    image.absolutePath = path;
+    image.containerSize = {100, 50};
+    image.intrinsicSize = {2, 2};
+    image.scaleMode = motion::ImageScaleMode::LetterBox;
+    layer.imageItem = std::move(image);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 50, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 25);
+    EXPECT_NEAR(center.r, 255, 20);
+    const Pixel leftMargin = PixelAt(pixels, 100, 5, 25);
+    EXPECT_NEAR(leftMargin.r, 0, 20);
+    EXPECT_NEAR(leftMargin.g, 0, 20);
+    EXPECT_NEAR(leftMargin.b, 0, 20);
 }
