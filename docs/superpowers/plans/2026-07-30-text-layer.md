@@ -407,11 +407,11 @@ char *ms_layer_text_font_family(...); // ms_string_free
 - `styles` 推入黑色 `FillStyle`
 - `inPoint/outPoint` 对齐合成时长（同 add image/shape）
 
-- [ ] **Step 1: Bridge 测试** — add → 查默认；set string/size；import font + bind；undo
+- [x] **Step 1: Bridge 测试** — add → 查默认；set string/size；import font + bind；undo
 
-- [ ] **Step 2: 实现**
+- [x] **Step 2: 实现**
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 ctest --test-dir build -R Bridge --output-on-failure
