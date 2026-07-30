@@ -50,8 +50,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             configureLauncherWindow(window)
         }
 
+        configureWindowSizeRestrictions(for: windowScene, role: role)
+        configureInitialWindowSize(for: windowScene, role: role)
         window.makeKeyAndVisible()
-        configureWindowSize(for: windowScene, role: role)
     }
 
     func scene(_: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
@@ -160,16 +161,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
-    private func configureWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
-        configureWindowSizeRestrictions(for: windowScene, role: role)
-        configureInitialWindowSize(for: windowScene, role: role)
-        DispatchQueue.main.async { [weak windowScene] in
-            guard let windowScene else { return }
-            self.configureWindowSizeRestrictions(for: windowScene, role: role)
-            self.configureInitialWindowSize(for: windowScene, role: role)
-        }
-    }
-
     private func minimumWindowSize(for role: WindowRole) -> CGSize {
         #if targetEnvironment(macCatalyst)
             switch role {
@@ -190,26 +181,50 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     private func configureWindowSizeRestrictions(for windowScene: UIWindowScene, role: WindowRole) {
         windowScene.sizeRestrictions?.minimumSize = minimumWindowSize(for: role)
+        #if targetEnvironment(macCatalyst)
+            switch role {
+            case .launcher:
+                windowScene.sizeRestrictions?.maximumSize = minimumWindowSize(for: role)
+            case .editor:
+                windowScene.sizeRestrictions?.maximumSize = CGSize(width: CGFloat.greatestFiniteMagnitude,
+                                                                   height: CGFloat.greatestFiniteMagnitude)
+            }
+        #endif
     }
 
     private func configureInitialWindowSize(for windowScene: UIWindowScene, role: WindowRole) {
         #if targetEnvironment(macCatalyst)
-            let preferredSize = switch role {
+            let frame = initialWindowFrame(for: windowScene, role: role)
+            let preferences = UIWindowScene.GeometryPreferences.Mac(systemFrame: frame)
+            windowScene.requestGeometryUpdate(preferences) { error in
+                NSLog("MotionStudio: failed to set initial window frame: %@", error.localizedDescription)
+            }
+        #endif
+    }
+
+    #if targetEnvironment(macCatalyst)
+        private func preferredWindowSize(for role: WindowRole) -> CGSize {
+            switch role {
             case .launcher:
-                CGSize(width: 980, height: 680)
+                CGSize(width: 820, height: 560)
             case .editor:
                 CGSize(width: 1440, height: 920)
             }
+        }
 
+        private func initialWindowFrame(for windowScene: UIWindowScene, role: WindowRole) -> CGRect {
+            let preferredSize = preferredWindowSize(for: role)
+            let minimumSize = minimumWindowSize(for: role)
             let screenFrame = windowScene.screen.bounds
-            let size = CGSize(width: min(preferredSize.width, screenFrame.width * 0.9),
-                              height: min(preferredSize.height, screenFrame.height * 0.9))
+            let maximumSize = CGSize(width: screenFrame.width * 0.9,
+                                     height: screenFrame.height * 0.9)
+            let size = CGSize(width: min(preferredSize.width, max(minimumSize.width, maximumSize.width)),
+                              height: min(preferredSize.height, max(minimumSize.height, maximumSize.height)))
             let origin = CGPoint(x: screenFrame.midX - size.width * 0.5,
                                  y: screenFrame.midY - size.height * 0.5)
-            let preferences = UIWindowScene.GeometryPreferences.Mac(systemFrame: CGRect(origin: origin, size: size))
-            windowScene.requestGeometryUpdate(preferences)
-        #endif
-    }
+            return CGRect(origin: origin, size: size)
+        }
+    #endif
 
     func sceneDidDisconnect(_: UIScene) {
         (window?.rootViewController as? EditorViewController)?.saveBeforeSceneDisconnect()

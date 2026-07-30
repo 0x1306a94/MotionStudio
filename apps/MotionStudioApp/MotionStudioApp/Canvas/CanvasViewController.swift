@@ -315,8 +315,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     // MARK: - MTKViewDelegate
 
-    func mtkView(_: MTKView, drawableSizeWillChange size: CGSize) {
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
+        view.releaseDrawables()
         applyInitialFitIfNeeded()
         requestDraw()
     }
