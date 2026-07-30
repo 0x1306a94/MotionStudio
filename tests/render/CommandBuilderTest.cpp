@@ -2,9 +2,11 @@
 
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
+#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -19,6 +21,7 @@ using motion::EvaluatedImageItem;
 using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
+using motion::EvaluatedTextItem;
 using motion::LineCap;
 using motion::LineJoin;
 using motion::MakePathGeometry;
@@ -359,4 +362,37 @@ TEST(CommandBuilderTest, ImageLayerWithoutPathSkipsDrawImage) {
     ASSERT_FALSE(commands.empty());
     EXPECT_EQ(commands.front().type, DrawCommandType::Save);
     EXPECT_EQ(commands.back().type, DrawCommandType::Restore);
+}
+
+TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.opacity = 1.0f;
+    EvaluatedTextItem text;
+    text.text = "Hi";
+    text.fontSize = 24.0f;
+    text.containerSize = {120, 40};
+    text.autoHeight = false;
+    text.align = motion::TextAlign::Center;
+    text.fontFamily = "PingFang SC";
+    text.fontAbsolutePath = "/tmp/fonts/a.ttf";
+    text.fillColor = Color{1, 0, 0, 1};
+    text.strokeColor = Color{0, 0, 1, 1};
+    text.strokeWidth = 1.5f;
+    layer.textItem = std::move(text);
+    state.layers.push_back(std::move(layer));
+
+    auto commands = BuildCommands(state);
+    ASSERT_EQ(commands.size(), 6u);
+    EXPECT_EQ(commands[4].type, DrawCommandType::DrawText);
+    EXPECT_EQ(commands[4].text, "Hi");
+    EXPECT_FLOAT_EQ(commands[4].textFontSize, 24.0f);
+    EXPECT_FLOAT_EQ(commands[4].textContainerSize.x, 120.0f);
+    EXPECT_FALSE(commands[4].textAutoHeight);
+    EXPECT_EQ(commands[4].textAlign, motion::TextAlign::Center);
+    EXPECT_EQ(commands[4].textFontFamily, "PingFang SC");
+    EXPECT_EQ(commands[4].textFontAbsolutePath, "/tmp/fonts/a.ttf");
+    EXPECT_FLOAT_EQ(commands[4].textFillColor.r, 1.0f);
+    ASSERT_TRUE(commands[4].textStrokeColor.has_value());
+    EXPECT_FLOAT_EQ(commands[4].textStrokeWidth, 1.5f);
 }

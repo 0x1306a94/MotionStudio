@@ -1,9 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
+#include "MotionStudio/common/Color.h"
 #include "MotionStudio/model/BlendMode.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/render/PreviewCanvasAdapter.h"
 
 namespace tgfx {
@@ -55,6 +58,10 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
                       float feather, float expansion) override;
     void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
                    ImageScaleMode mode) override;
+    void drawText(const std::string &text, float fontSize, Vec2 containerSize, bool autoHeight,
+                  TextAlign align, const std::string &fontFamily,
+                  const std::string &fontAbsolutePath, Color fillColor,
+                  const std::optional<Color> &strokeColor, float strokeWidth) override;
 
   protected:
     TgfxCanvasAdapter();

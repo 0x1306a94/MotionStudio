@@ -446,4 +446,13 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
     canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
 }
 
+void TgfxCanvasAdapter::drawText(const std::string & /*text*/, float /*fontSize*/,
+                                 Vec2 /*containerSize*/, bool /*autoHeight*/, TextAlign /*align*/,
+                                 const std::string & /*fontFamily*/,
+                                 const std::string & /*fontAbsolutePath*/, Color /*fillColor*/,
+                                 const std::optional<Color> & /*strokeColor*/,
+                                 float /*strokeWidth*/) {
+    // Implemented in the text-layer draw task (layout + TextBlob).
+}
+
 }  // namespace motion

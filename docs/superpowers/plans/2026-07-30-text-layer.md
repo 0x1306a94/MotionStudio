@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–6 complete.
+**Progress:** Tasks 1–7 complete.
 
 ## Global Constraints
 
@@ -326,11 +326,11 @@ git commit --only <相关文件> -m "Evaluate text layers into scene state with 
 - `BuildCommands`：有 `textItem` 即追加 DrawText（空字符串仍可发，adapter no-op 字形）
 - Track matte 源回放：`AppendTextItem` 与 Image 并列
 
-- [ ] **Step 1: 失败测试** — evaluate+build 含 DrawText 字段
+- [x] **Step 1: 失败测试** — evaluate+build 含 DrawText 字段
 
-- [ ] **Step 2: 实现**
+- [x] **Step 2: 实现**
 
-- [ ] **Step 3: 编译全绿 + 提交**
+- [x] **Step 3: 编译全绿 + 提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='TextCommandBuilderTest.*'

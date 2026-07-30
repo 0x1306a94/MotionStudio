@@ -5,6 +5,7 @@
 
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
+#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -66,6 +67,25 @@ void AppendImageItem(const std::optional<EvaluatedImageItem> &imageItem, DrawCom
     commands.push_back(std::move(drawImage));
 }
 
+void AppendTextItem(const std::optional<EvaluatedTextItem> &textItem, DrawCommandList &commands) {
+    if (!textItem.has_value()) {
+        return;
+    }
+    DrawCommand drawText;
+    drawText.type = DrawCommandType::DrawText;
+    drawText.text = textItem->text;
+    drawText.textFontSize = textItem->fontSize;
+    drawText.textContainerSize = textItem->containerSize;
+    drawText.textAutoHeight = textItem->autoHeight;
+    drawText.textAlign = textItem->align;
+    drawText.textFontFamily = textItem->fontFamily;
+    drawText.textFontAbsolutePath = textItem->fontAbsolutePath;
+    drawText.textFillColor = textItem->fillColor;
+    drawText.textStrokeColor = textItem->strokeColor;
+    drawText.textStrokeWidth = textItem->strokeWidth;
+    commands.push_back(std::move(drawText));
+}
+
 const EvaluatedLayer *FindLayer(const SceneState &state, EntityId id) {
     for (const EvaluatedLayer &layer : state.layers) {
         if (layer.id == id) {
@@ -120,6 +140,7 @@ void AppendTrackMatte(const SceneState &state, const EvaluatedLayer &layer,
 
             AppendShapeItems(source->shapeItems, source->blendMode, commands);
             AppendImageItem(source->imageItem, commands);
+            AppendTextItem(source->textItem, commands);
 
             DrawCommand restore;
             restore.type = DrawCommandType::Restore;
@@ -169,6 +190,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
 
         AppendShapeItems(layer.shapeItems, layer.blendMode, commands);
         AppendImageItem(layer.imageItem, commands);
+        AppendTextItem(layer.textItem, commands);
 
         if (!layer.masks.empty()) {
             AppendPathMasks(layer.masks, commands);

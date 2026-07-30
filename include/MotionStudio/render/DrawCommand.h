@@ -1,14 +1,17 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -31,6 +34,7 @@ enum class DrawCommandType {
     EndMask,
     DrawMaskPath,
     DrawImage,
+    DrawText,
 };
 
 // Flat tagged draw command. Only the fields belonging to the command's type
@@ -54,6 +58,16 @@ struct DrawCommand {
     Vec2 imageContainerSize;                                    // DrawImage
     Vec2 imageIntrinsicSize;                                    // DrawImage
     ImageScaleMode imageScaleMode = ImageScaleMode::LetterBox;  // DrawImage
+    std::string text;                                           // DrawText
+    float textFontSize = 48.0f;                                 // DrawText
+    Vec2 textContainerSize;                                     // DrawText
+    bool textAutoHeight = true;                                 // DrawText
+    TextAlign textAlign = TextAlign::Left;                      // DrawText
+    std::string textFontFamily;                                 // DrawText
+    std::string textFontAbsolutePath;                           // DrawText
+    Color textFillColor{0, 0, 0, 1};                            // DrawText
+    std::optional<Color> textStrokeColor;                       // DrawText
+    float textStrokeWidth = 0.0f;                               // DrawText
 };
 
 using DrawCommandList = std::vector<DrawCommand>;

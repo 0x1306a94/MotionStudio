@@ -1,10 +1,14 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/render/DrawCommand.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
@@ -89,6 +93,21 @@ class RenderAdapter {
     // mode: how pixels map into the container (PAGScaleMode semantics).
     virtual void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
                            ImageScaleMode mode) = 0;
+
+    // Draws boxed text in the layer-local container [0,0]–containerSize.
+    // text: UTF-8 string (may be empty).
+    // fontSize: model size cap (shrink may apply when autoHeight is false).
+    // containerSize: virtual text box size.
+    // autoHeight: true = wrap and grow; false = fixed height with shrink.
+    // align: horizontal alignment within the box.
+    // fontFamily: system fallback family name.
+    // fontAbsolutePath: optional absolute font file path.
+    // fillColor: fill paint color.
+    // strokeColor / strokeWidth: optional stroke; width 0 skips stroke.
+    virtual void drawText(const std::string &text, float fontSize, Vec2 containerSize,
+                          bool autoHeight, TextAlign align, const std::string &fontFamily,
+                          const std::string &fontAbsolutePath, Color fillColor,
+                          const std::optional<Color> &strokeColor, float strokeWidth) = 0;
 
     // Sets live-preview chrome behind the composition. Default is a no-op;
     // on-screen adapters override this. Offscreen adapters ignore it.
