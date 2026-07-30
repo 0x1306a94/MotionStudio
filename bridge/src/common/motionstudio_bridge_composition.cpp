@@ -15,6 +15,7 @@
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
 #include "MSDocument.h"
+#include "TextLayoutHits.h"
 
 using namespace bridge;
 
@@ -114,7 +115,8 @@ uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositio
     if (!result.hasValue()) {
         return 0;
     }
-    const motion::SceneState &state = result.value();
+    motion::SceneState &state = result.value();
+    ApplyAutoHeightTextHitSizes(state);
     for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
         const Layer *layer = doc->entityIndex().findLayer(it->id);
         if (layer != nullptr && !layer->locked && motion::HitTestLayer(*it, Vec2{x, y}, tolerance)) {
@@ -135,7 +137,9 @@ bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, u
     if (!result.hasValue()) {
         return false;
     }
-    for (const motion::EvaluatedLayer &layer : result.value().layers) {
+    motion::SceneState &state = result.value();
+    ApplyAutoHeightTextHitSizes(state);
+    for (const motion::EvaluatedLayer &layer : state.layers) {
         if (layer.id.value != layerId) {
             continue;
         }
@@ -177,13 +181,15 @@ bool ms_composition_selection_handles(MSDocument *document, uint64_t composition
     if (!result.hasValue()) {
         return false;
     }
+    motion::SceneState &state = result.value();
+    ApplyAutoHeightTextHitSizes(state);
     std::vector<EntityId> selected;
     selected.reserve(count);
     for (size_t index = 0; index < count; ++index) {
         selected.push_back(EntityId{layerIds[index]});
     }
     motion::SelectionHandles handles;
-    if (!motion::BuildSelectionHandles(result.value(), selected, EntityId{primaryLayerId}, handles)) {
+    if (!motion::BuildSelectionHandles(state, selected, EntityId{primaryLayerId}, handles)) {
         return false;
     }
     if (out == nullptr) {

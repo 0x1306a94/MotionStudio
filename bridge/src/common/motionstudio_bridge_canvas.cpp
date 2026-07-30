@@ -10,6 +10,7 @@
 #include "FrameCommandCache.h"
 #include "MSCanvas.h"
 #include "MSDocument.h"
+#include "TextLayoutHits.h"
 
 #include <cmath>
 
@@ -207,7 +208,8 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document, ui
     if (!result.hasValue()) {
         return hit;
     }
-    const motion::SceneState &state = result.value();
+    motion::SceneState &state = result.value();
+    bridge::ApplyAutoHeightTextHitSizes(state);
     motion::PathEditHandles handles;
     if (!motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
         return hit;
@@ -248,7 +250,8 @@ MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document
     if (!result.hasValue()) {
         return hit;
     }
-    const motion::SceneState &state = result.value();
+    motion::SceneState &state = result.value();
+    bridge::ApplyAutoHeightTextHitSizes(state);
     const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
     const float handleRadius = 8.0f * viewUnit;
 
@@ -364,7 +367,8 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
             }
             return;
         }
-        const motion::SceneState &state = result.value();
+        motion::SceneState &state = result.value();
+        bridge::ApplyAutoHeightTextHitSizes(state);
         profile.layerCount = state.layers.size();
         viewportWidth = state.viewportWidth;
         viewportHeight = state.viewportHeight;

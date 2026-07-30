@@ -33,6 +33,9 @@ add_source_group(BRIDGE_PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/include "Header
 target_include_directories(bridge PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../adapter/tgfx/src")
+if (APPLE)
+  target_include_directories(bridge PRIVATE "${PROJECT_SOURCE_DIR}/third_party/tgfx/include")
+endif()
 target_link_libraries(bridge PUBLIC ${BRIDGE_LINK_LIBRARIES})
 target_compile_options(bridge PRIVATE -Wall -Wextra)
 

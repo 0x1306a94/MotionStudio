@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 
 #include "MotionStudio/animation/Animatable.h"
@@ -73,6 +74,12 @@ void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, 
                                        const MSBezierPath *value) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+}
+
+void ms_command_set_static_string(MSDocument *document, uint64_t entityId, const char *path,
+                                  const char *value) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value == nullptr ? std::string{} : std::string(value))));
 }
 
 void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a) {

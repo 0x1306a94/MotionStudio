@@ -923,4 +923,100 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+
+    const uint64_t layerId = ms_command_add_text_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+    EXPECT_EQ(ms_layer_type(document, layerId), MS_LAYER_TEXT);
+    EXPECT_TRUE(ms_layer_text_auto_height(document, layerId));
+    EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);
+    EXPECT_EQ(ms_layer_text_font_asset(document, layerId), 0u);
+    {
+        BridgeString family;
+        family.value = ms_layer_text_font_family(document, layerId);
+        EXPECT_EQ(family.str(), "PingFang SC");
+    }
+    {
+        BridgeString text;
+        text.value = ms_property_static_string(document, layerId, "content.text");
+        EXPECT_EQ(text.str(), "Text");
+    }
+    float sizeX = 0.0f;
+    float sizeY = 0.0f;
+    ms_property_static_vec2(document, layerId, "content.size", &sizeX, &sizeY);
+    EXPECT_FLOAT_EQ(sizeX, 400.0f);
+    EXPECT_FLOAT_EQ(sizeY, 120.0f);
+    float anchorX = 0.0f;
+    float anchorY = 0.0f;
+    ms_property_static_vec2(document, layerId, "transform.anchorPoint", &anchorX, &anchorY);
+    EXPECT_FLOAT_EQ(anchorX, 200.0f);
+    EXPECT_FLOAT_EQ(anchorY, 60.0f);
+
+    ms_command_set_static_string(document, layerId, "content.text", "Hello\nWorld");
+    {
+        BridgeString text;
+        text.value = ms_property_static_string(document, layerId, "content.text");
+        EXPECT_EQ(text.str(), "Hello\nWorld");
+    }
+    ms_command_set_static_vec2(document, layerId, "content.size", 300.0f, 100.0f);
+    ms_property_static_vec2(document, layerId, "content.size", &sizeX, &sizeY);
+    EXPECT_FLOAT_EQ(sizeX, 300.0f);
+    EXPECT_FLOAT_EQ(sizeY, 100.0f);
+
+    ASSERT_TRUE(ms_command_set_text_auto_height(document, layerId, false));
+    EXPECT_FALSE(ms_layer_text_auto_height(document, layerId));
+    ASSERT_TRUE(ms_command_set_text_align(document, layerId, MS_TEXT_ALIGN_CENTER));
+    EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_CENTER);
+    ASSERT_TRUE(ms_command_set_text_font_family(document, layerId, "Helvetica"));
+    {
+        BridgeString family;
+        family.value = ms_layer_text_font_family(document, layerId);
+        EXPECT_EQ(family.str(), "Helvetica");
+    }
+
+    const auto root = std::filesystem::temp_directory_path() /
+        ("ms_font_bridge_" + std::to_string(reinterpret_cast<uintptr_t>(document)));
+    std::filesystem::create_directories(root / "assets");
+    ms_document_set_project_root(document, root.string().c_str());
+    const auto source = root / "source.ttf";
+    {
+        std::ofstream out(source, std::ios::binary);
+        out.write("otfake", 6);
+    }
+    const uint64_t assetId =
+        ms_command_import_font_asset(document, source.string().c_str(), "Custom.ttf");
+    ASSERT_NE(assetId, 0u);
+    EXPECT_EQ(ms_asset_type(document, assetId), 1);
+    EXPECT_TRUE(std::filesystem::exists(root / "assets" / "Custom.ttf"));
+    ASSERT_TRUE(ms_command_set_text_font_asset(document, layerId, assetId));
+    EXPECT_EQ(ms_layer_text_font_asset(document, layerId), assetId);
+
+    ASSERT_TRUE(ms_document_undo(document));  // bind font
+    EXPECT_EQ(ms_layer_text_font_asset(document, layerId), 0u);
+    {
+        BridgeString family;
+        family.value = ms_layer_text_font_family(document, layerId);
+        EXPECT_EQ(family.str(), "Helvetica");
+    }
+    ASSERT_TRUE(ms_document_undo(document));  // import font
+    EXPECT_EQ(ms_document_asset_count(document), 0);
+    ASSERT_TRUE(ms_document_undo(document));  // font family
+    {
+        BridgeString family;
+        family.value = ms_layer_text_font_family(document, layerId);
+        EXPECT_EQ(family.str(), "PingFang SC");
+    }
+    ASSERT_TRUE(ms_document_undo(document));  // align
+    EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);
+    ASSERT_TRUE(ms_document_undo(document));  // autoHeight
+    EXPECT_TRUE(ms_layer_text_auto_height(document, layerId));
+
+    std::error_code removeError;
+    std::filesystem::remove_all(root, removeError);
+    ms_document_destroy(document);
+}
+
 }  // namespace

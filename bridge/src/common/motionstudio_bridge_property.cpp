@@ -1,5 +1,6 @@
 #include "motionstudio_bridge.h"
 
+#include <cstdlib>
 #include <string>
 
 #include "MotionStudio/animation/Animatable.h"
@@ -110,6 +111,16 @@ void ms_property_static_color(MSDocument *document, uint64_t entityId, const cha
     if (a != nullptr) {
         *a = value.a;
     }
+}
+
+char *ms_property_static_string(MSDocument *document, uint64_t entityId, const char *path) {
+    DocumentLock guard(document);
+    AnimatableBase *base = FindProperty(document, entityId, path);
+    if (base == nullptr || base->valueType() != AnimatableType::String) {
+        return nullptr;
+    }
+    const auto *property = static_cast<const Animatable<std::string> *>(base);
+    return strdup(property->staticValue().c_str());
 }
 
 MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path) {

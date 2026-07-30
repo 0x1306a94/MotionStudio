@@ -102,6 +102,13 @@ typedef CF_CLOSED_ENUM(int, MS_IMAGE_SCALE) {
     MS_IMAGE_SCALE_ZOOM = 3,
 };
 
+// Horizontal text alignment, mirrors motion::TextAlign.
+typedef CF_CLOSED_ENUM(int, MS_TEXT_ALIGN) {
+    MS_TEXT_ALIGN_LEFT = 0,
+    MS_TEXT_ALIGN_CENTER = 1,
+    MS_TEXT_ALIGN_RIGHT = 2,
+};
+
 // Blend mode tag, mirrors motion::BlendMode ordinals (Lottie "bm" value set).
 typedef CF_CLOSED_ENUM(int, MS_BLEND) {
     MS_BLEND_INVALID = -1,
@@ -379,6 +386,9 @@ void ms_property_static_color(MSDocument *document, uint64_t entityId, const cha
 // Returns a heap-allocated path copy. Release with ms_bezier_path_free.
 // Returns NULL when the property is missing or not a BezierPath.
 MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path);
+// Returns a malloc'd UTF-8 string. Release with ms_string_free.
+// Returns NULL when the property is missing or not a String.
+char *ms_property_static_string(MSDocument *document, uint64_t entityId, const char *path);
 
 // Keyframe accessors (index into the ascending-time keyframe list).
 int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path);
@@ -420,6 +430,8 @@ void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const c
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a);
 // value may be NULL (treated as empty open path).
 void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path, const MSBezierPath *value);
+// value may be NULL (treated as empty string).
+void ms_command_set_static_string(MSDocument *document, uint64_t entityId, const char *path, const char *value);
 void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a);
 void ms_command_set_composition_corner_radius(MSDocument *document, uint64_t compositionId, float cornerRadius);
 void ms_command_set_composition_size(MSDocument *document, uint64_t compositionId, int width, int height);
@@ -501,6 +513,22 @@ char *ms_asset_path(MSDocument *document, uint64_t assetId);
 int ms_asset_width(MSDocument *document, uint64_t assetId);
 int ms_asset_height(MSDocument *document, uint64_t assetId);
 int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 image, 1 font
+
+// Copies sourceAbsolutePath into {projectRoot}/assets/ (requires projectRoot),
+// registers a Font Asset, and returns the new asset id (0 on failure).
+uint64_t ms_command_import_font_asset(MSDocument *document, const char *sourceAbsolutePath,
+                                      const char *preferredFileName);
+// Adds a Text layer (400x120, autoHeight, PingFang SC, black fill, centered).
+uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId);
+// Binds text layer to font assetId; assetId 0 unbinds.
+bool ms_command_set_text_font_asset(MSDocument *document, uint64_t layerId, uint64_t assetId);
+bool ms_command_set_text_font_family(MSDocument *document, uint64_t layerId, const char *family);
+bool ms_command_set_text_auto_height(MSDocument *document, uint64_t layerId, bool autoHeight);
+bool ms_command_set_text_align(MSDocument *document, uint64_t layerId, MS_TEXT_ALIGN align);
+bool ms_layer_text_auto_height(MSDocument *document, uint64_t layerId);
+MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId);
+uint64_t ms_layer_text_font_asset(MSDocument *document, uint64_t layerId);
+char *ms_layer_text_font_family(MSDocument *document, uint64_t layerId);  // ms_string_free
 
 // Bakes Rect/Ellipse geometry on the layer into a ShapePath at frame.
 void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame);
