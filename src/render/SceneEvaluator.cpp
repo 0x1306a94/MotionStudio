@@ -5,7 +5,9 @@
 #include <utility>
 #include <vector>
 
+#include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -20,6 +22,55 @@ namespace motion {
 namespace {
 
 constexpr int kMaxPrecompDepth = 1024;
+
+std::string JoinProjectPath(const std::string &projectRoot, const std::string &relativePath) {
+    if (projectRoot.empty() || relativePath.empty()) {
+        return {};
+    }
+    if (projectRoot.back() == '/') {
+        return projectRoot + relativePath;
+    }
+    return projectRoot + "/" + relativePath;
+}
+
+const Asset *FindAsset(const Document &document, EntityId assetId) {
+    if (!assetId.isValid()) {
+        return nullptr;
+    }
+    for (const Asset &asset : document.assets) {
+        if (asset.id == assetId) {
+            return &asset;
+        }
+    }
+    return nullptr;
+}
+
+void FillCommonLayerFields(const Document &document, const Layer &layer, PreviewTime time,
+                           const Mat3 &world, float opacity, EvaluatedLayer &evaluated) {
+    evaluated.id = layer.id;
+    evaluated.worldTransform = world;
+    evaluated.worldAnchor =
+        world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
+    evaluated.opacity = opacity;
+    evaluated.blendMode = layer.blendMode;
+    for (const Mask &mask : layer.masks) {
+        EvaluatedMask evaluatedMask;
+        evaluatedMask.path = mask.path.evaluatePreview(time);
+        evaluatedMask.mode = mask.mode;
+        evaluatedMask.opacity = mask.opacity.evaluatePreview(time);
+        evaluatedMask.inverted = mask.inverted;
+        evaluatedMask.feather = mask.feather.evaluatePreview(time);
+        evaluatedMask.expansion = mask.expansion.evaluatePreview(time);
+        evaluated.masks.push_back(std::move(evaluatedMask));
+    }
+    if (layer.trackMatteType != TrackMatteType::None && layer.trackMatteLayerId.isValid() &&
+        layer.trackMatteLayerId != layer.id) {
+        if (document.entityIndex().findLayer(layer.trackMatteLayerId) != nullptr) {
+            evaluated.trackMatteType = layer.trackMatteType;
+            evaluated.matteSourceId = layer.trackMatteLayerId;
+        }
+    }
+}
 
 void CollectGeometry(const ShapeElement &element, PreviewTime time,
                      std::vector<ShapeGeometry> &geometries) {
@@ -153,34 +204,29 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
                             opacity, depth + 1, out);
         return;
     }
+    if (layer.content->type() == LayerType::Image) {
+        const auto &imageContent = static_cast<const ImageContent &>(*layer.content);
+        EvaluatedLayer evaluated;
+        FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
+        EvaluatedImageItem imageItem;
+        imageItem.assetId = imageContent.assetId;
+        imageItem.containerSize = imageContent.size.evaluatePreview(time);
+        imageItem.scaleMode = imageContent.scaleMode;
+        if (const Asset *asset = FindAsset(document, imageContent.assetId)) {
+            imageItem.intrinsicSize = {static_cast<float>(asset->width),
+                                       static_cast<float>(asset->height)};
+            imageItem.absolutePath = JoinProjectPath(document.projectRoot, asset->path);
+        }
+        evaluated.imageItem = std::move(imageItem);
+        out.push_back(std::move(evaluated));
+        return;
+    }
     if (layer.content->type() != LayerType::Shape) {
-        return;  // M2: Null/Image/Text layers produce no draw items
+        return;  // Group/Text layers produce no draw items
     }
     const auto &shapeContent = static_cast<const ShapeContent &>(*layer.content);
     EvaluatedLayer evaluated;
-    evaluated.id = layer.id;
-    evaluated.worldTransform = world;
-    evaluated.worldAnchor =
-        world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
-    evaluated.opacity = opacity;
-    evaluated.blendMode = layer.blendMode;
-    for (const Mask &mask : layer.masks) {
-        EvaluatedMask evaluatedMask;
-        evaluatedMask.path = mask.path.evaluatePreview(time);
-        evaluatedMask.mode = mask.mode;
-        evaluatedMask.opacity = mask.opacity.evaluatePreview(time);
-        evaluatedMask.inverted = mask.inverted;
-        evaluatedMask.feather = mask.feather.evaluatePreview(time);
-        evaluatedMask.expansion = mask.expansion.evaluatePreview(time);
-        evaluated.masks.push_back(std::move(evaluatedMask));
-    }
-    if (layer.trackMatteType != TrackMatteType::None && layer.trackMatteLayerId.isValid() &&
-        layer.trackMatteLayerId != layer.id) {
-        if (document.entityIndex().findLayer(layer.trackMatteLayerId) != nullptr) {
-            evaluated.trackMatteType = layer.trackMatteType;
-            evaluated.matteSourceId = layer.trackMatteLayerId;
-        }
-    }
+    FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
     if (!layer.styles.empty()) {
         std::vector<ShapeGeometry> geometries;
         if (shapeContent.geometry) {

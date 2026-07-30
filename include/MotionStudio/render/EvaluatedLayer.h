@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "MotionStudio/common/EntityId.h"
@@ -7,6 +8,7 @@
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedMask.h"
 #include "MotionStudio/render/EvaluatedShapeItem.h"
 
@@ -22,6 +24,7 @@ struct EvaluatedLayer {
     float opacity = 1;  // inherited from ancestors
     BlendMode blendMode = BlendMode::Normal;
     std::vector<EvaluatedShapeItem> shapeItems;
+    std::optional<EvaluatedImageItem> imageItem;
     std::vector<EvaluatedMask> masks;
     TrackMatteType trackMatteType = TrackMatteType::None;
     EntityId matteSourceId;

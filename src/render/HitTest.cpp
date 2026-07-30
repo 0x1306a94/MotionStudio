@@ -172,6 +172,20 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
     if (layer.opacity <= 0.0f) {
         return false;
     }
+    if (layer.imageItem.has_value()) {
+        const Vec2 container = layer.imageItem->containerSize;
+        if (container.x <= 0.0f || container.y <= 0.0f) {
+            return false;
+        }
+        Mat3 inverse;
+        if (!layer.worldTransform.tryInvert(inverse)) {
+            return false;
+        }
+        const Vec2 local = inverse.transformPoint(point);
+        const float pad = std::max(tolerance, 0.0f);
+        return local.x >= -pad && local.y >= -pad && local.x <= container.x + pad &&
+            local.y <= container.y + pad;
+    }
     const float safeTolerance = std::max(tolerance, 0.0f);
     Vec2 minPoint{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
     Vec2 maxPoint{std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
@@ -206,7 +220,31 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
 }
 
 bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) {
-    if (layer.opacity <= 0.0f || layer.shapeItems.empty()) {
+    if (layer.opacity <= 0.0f) {
+        return false;
+    }
+    if (layer.imageItem.has_value()) {
+        const Vec2 container = layer.imageItem->containerSize;
+        if (container.x <= 0.0f || container.y <= 0.0f) {
+            return false;
+        }
+        const Vec2 corners[4] = {
+            layer.worldTransform.transformPoint({0.0f, 0.0f}),
+            layer.worldTransform.transformPoint({container.x, 0.0f}),
+            layer.worldTransform.transformPoint({container.x, container.y}),
+            layer.worldTransform.transformPoint({0.0f, container.y}),
+        };
+        minPoint = corners[0];
+        maxPoint = corners[0];
+        for (int i = 1; i < 4; ++i) {
+            minPoint.x = std::min(minPoint.x, corners[i].x);
+            minPoint.y = std::min(minPoint.y, corners[i].y);
+            maxPoint.x = std::max(maxPoint.x, corners[i].x);
+            maxPoint.y = std::max(maxPoint.y, corners[i].y);
+        }
+        return true;
+    }
+    if (layer.shapeItems.empty()) {
         return false;
     }
     minPoint = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
@@ -225,7 +263,19 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
 }
 
 bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) {
-    if (layer.opacity <= 0.0f || layer.shapeItems.empty()) {
+    if (layer.opacity <= 0.0f) {
+        return false;
+    }
+    if (layer.imageItem.has_value()) {
+        const Vec2 container = layer.imageItem->containerSize;
+        if (container.x <= 0.0f || container.y <= 0.0f) {
+            return false;
+        }
+        minPoint = {0.0f, 0.0f};
+        maxPoint = container;
+        return true;
+    }
+    if (layer.shapeItems.empty()) {
         return false;
     }
     minPoint = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
