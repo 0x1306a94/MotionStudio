@@ -3,6 +3,7 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -13,6 +14,7 @@ using motion::BuildSelectionOutlineCommands;
 using motion::Color;
 using motion::DrawCommandType;
 using motion::EntityId;
+using motion::EvaluatedImageItem;
 using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
@@ -273,4 +275,49 @@ TEST(CommandBuilderTest, TrackMatteReplaysSourceWithRelativeTransform) {
         }
     }
     EXPECT_TRUE(foundRelative);
+}
+
+TEST(CommandBuilderTest, ImageLayerEmitsDrawImage) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.opacity = 1.0f;
+    EvaluatedImageItem image;
+    image.absolutePath = "/tmp/project/assets/a.png";
+    image.containerSize = {200, 100};
+    image.intrinsicSize = {400, 200};
+    image.scaleMode = motion::ImageScaleMode::LetterBox;
+    layer.imageItem = std::move(image);
+    state.layers.push_back(std::move(layer));
+
+    auto commands = BuildCommands(state);
+    ASSERT_EQ(commands.size(), 6u);
+    EXPECT_EQ(commands[0].type, DrawCommandType::Save);
+    EXPECT_EQ(commands[1].type, DrawCommandType::ConcatTransform);
+    EXPECT_EQ(commands[2].type, DrawCommandType::SetOpacity);
+    EXPECT_EQ(commands[3].type, DrawCommandType::SetBlendMode);
+    EXPECT_EQ(commands[4].type, DrawCommandType::DrawImage);
+    EXPECT_EQ(commands[4].imagePath, "/tmp/project/assets/a.png");
+    EXPECT_FLOAT_EQ(commands[4].imageContainerSize.x, 200.f);
+    EXPECT_FLOAT_EQ(commands[4].imageContainerSize.y, 100.f);
+    EXPECT_FLOAT_EQ(commands[4].imageIntrinsicSize.x, 400.f);
+    EXPECT_FLOAT_EQ(commands[4].imageIntrinsicSize.y, 200.f);
+    EXPECT_EQ(commands[4].imageScaleMode, motion::ImageScaleMode::LetterBox);
+    EXPECT_EQ(commands[5].type, DrawCommandType::Restore);
+}
+
+TEST(CommandBuilderTest, ImageLayerWithoutPathSkipsDrawImage) {
+    SceneState state;
+    EvaluatedLayer layer;
+    EvaluatedImageItem image;
+    image.containerSize = {200, 100};
+    layer.imageItem = std::move(image);
+    state.layers.push_back(std::move(layer));
+
+    auto commands = BuildCommands(state);
+    for (const auto &command : commands) {
+        EXPECT_NE(command.type, DrawCommandType::DrawImage);
+    }
+    ASSERT_FALSE(commands.empty());
+    EXPECT_EQ(commands.front().type, DrawCommandType::Save);
+    EXPECT_EQ(commands.back().type, DrawCommandType::Restore);
 }

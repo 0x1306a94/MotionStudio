@@ -1,10 +1,13 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
@@ -27,6 +30,7 @@ enum class DrawCommandType {
     BeginMask,
     EndMask,
     DrawMaskPath,
+    DrawImage,
 };
 
 // Flat tagged draw command. Only the fields belonging to the command's type
@@ -46,6 +50,10 @@ struct DrawCommand {
     bool maskInverted = false;                                  // DrawMaskPath
     float maskFeather = 0.0f;                                   // DrawMaskPath
     float maskExpansion = 0.0f;                                 // DrawMaskPath
+    std::string imagePath;                                      // DrawImage (absolute)
+    Vec2 imageContainerSize;                                    // DrawImage
+    Vec2 imageIntrinsicSize;                                    // DrawImage
+    ImageScaleMode imageScaleMode = ImageScaleMode::LetterBox;  // DrawImage
 };
 
 using DrawCommandList = std::vector<DrawCommand>;

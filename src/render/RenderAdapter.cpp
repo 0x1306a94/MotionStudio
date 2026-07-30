@@ -59,6 +59,11 @@ void PlayCommands(const DrawCommandList &commands, RenderAdapter &adapter) {
                                      command.maskExpansion);
                 break;
             }
+            case DrawCommandType::DrawImage: {
+                adapter.drawImage(command.imagePath, command.imageContainerSize,
+                                  command.imageIntrinsicSize, command.imageScaleMode);
+                break;
+            }
         }
     }
 }

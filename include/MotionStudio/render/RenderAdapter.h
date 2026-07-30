@@ -82,6 +82,14 @@ class RenderAdapter {
     virtual void drawMaskPath(const ShapeGeometry &geometry, MaskMode mode, float opacity,
                               bool inverted, float feather, float expansion) = 0;
 
+    // Draws an image into the layer-local container rectangle [0,0]–container.
+    // path: absolute filesystem path to the image file.
+    // containerSize: layer-local container size in pixels.
+    // intrinsicSize: source image pixel size.
+    // mode: how pixels map into the container (PAGScaleMode semantics).
+    virtual void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
+                           ImageScaleMode mode) = 0;
+
     // Sets live-preview chrome behind the composition. Default is a no-op;
     // on-screen adapters override this. Offscreen adapters ignore it.
     // backdrop: solid black or transparency checkerboard.

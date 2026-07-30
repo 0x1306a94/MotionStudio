@@ -152,6 +152,15 @@ DrawCommandList BuildCommands(const SceneState &state) {
         }
 
         AppendShapeItems(layer.shapeItems, layer.blendMode, commands);
+        if (layer.imageItem.has_value() && !layer.imageItem->absolutePath.empty()) {
+            DrawCommand drawImage;
+            drawImage.type = DrawCommandType::DrawImage;
+            drawImage.imagePath = layer.imageItem->absolutePath;
+            drawImage.imageContainerSize = layer.imageItem->containerSize;
+            drawImage.imageIntrinsicSize = layer.imageItem->intrinsicSize;
+            drawImage.imageScaleMode = layer.imageItem->scaleMode;
+            commands.push_back(std::move(drawImage));
+        }
 
         if (!layer.masks.empty()) {
             AppendPathMasks(layer.masks, commands);

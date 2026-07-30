@@ -412,4 +412,9 @@ void TgfxCanvasAdapter::drawMaskPath(const ShapeGeometry &geometry, MaskMode mod
     DrawMaskPathContribution(canvas, path, opacity, mode);
 }
 
+void TgfxCanvasAdapter::drawImage(const std::string & /*path*/, Vec2 /*containerSize*/,
+                                  Vec2 /*intrinsicSize*/, ImageScaleMode /*mode*/) {
+    // Implemented in Task 7 (image decode + cache).
+}
+
 }  // namespace motion

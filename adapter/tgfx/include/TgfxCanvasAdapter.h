@@ -52,6 +52,8 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
     void endMask() override;
     void drawMaskPath(const ShapeGeometry &geometry, MaskMode mode, float opacity, bool inverted,
                       float feather, float expansion) override;
+    void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
+                   ImageScaleMode mode) override;
 
   protected:
     TgfxCanvasAdapter();
