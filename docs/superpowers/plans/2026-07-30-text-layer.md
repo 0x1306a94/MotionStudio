@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
-**Progress:** Tasks 1–4 complete.
+**Progress:** Tasks 1–5 complete.
 
 ## Global Constraints
 
@@ -244,13 +244,13 @@ TextLayoutResult LayoutText(const TextLayoutInput &input);
 - `boxHeight` 有值：二分缩字（下限如 1.0f）直到 `measuredHeight <= boxHeight` 且行宽不超 `boxWidth`；`measuredSize = {boxWidth, *boxHeight}`
 - 对齐改每行 `x`；垂直顶对齐；行距 = ascent+descent+leading
 
-- [ ] **Step 1: FakeGlyphMetrics**（等宽 advance = fontSize * 0.5，ascent=0.8*size，descent=0.2*size，leading=0）
+- [x] **Step 1: FakeGlyphMetrics**（等宽 advance = fontSize * 0.5，ascent=0.8*size，descent=0.2*size，leading=0）
 
-- [ ] **Step 2: 失败测试** — 单行；`a\nb` 两行；窄宽强制软换行；固定高缩字 `appliedFontSize < fontSize`；Center 行 `x > 0`
+- [x] **Step 2: 失败测试** — 单行；`a\nb` 两行；窄宽强制软换行；固定高缩字 `appliedFontSize < fontSize`；Center 行 `x > 0`
 
-- [ ] **Step 3: 实现 LayoutText**
+- [x] **Step 3: 实现 LayoutText**
 
-- [ ] **Step 4: CMake 目标 `textlayout` + `textlayout_tests`，ctest 注册**
+- [x] **Step 4: CMake 目标 `textlayout` + `textlayout_tests`，ctest 注册**
 
 ```bash
 cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON
@@ -258,7 +258,7 @@ cmake --build build --target textlayout_tests
 ./build/adapter/textlayout/tests/textlayout_tests  # 或 ctest -R TextLayout
 ```
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Add textlayout module with wrap align and font shrink."

@@ -32,6 +32,9 @@ add_subdirectory(third_party/json EXCLUDE_FROM_ALL)
 
 add_subdirectory(src)
 
+# Boxed text layout (Core-independent; used by tgfx adapter / bridge).
+add_subdirectory(adapter/textlayout)
+
 enable_testing()
 add_subdirectory(tests)
 add_subdirectory(benchmarks)
