@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-30-text-layer-design.md`
 
+**Progress:** Task 1 complete.
+
 ## Global Constraints
 
 - 不升 `schemaVersion`；直接改当前 JSON。
@@ -50,7 +52,7 @@
   - `enum class TextAlign : uint8_t { Left=0, Center=1, Right=2 };`
   - `TextContent::{text{"Text"}, fontAssetId, fontFamily{"PingFang SC"}, fontSize{48}, size{400,120}, autoHeight{true}, align{Left}}`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(TextContentTest, DefaultsMatchSpec) {
@@ -66,7 +68,7 @@ TEST(TextContentTest, DefaultsMatchSpec) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 ```bash
 cmake --build build --target core_tests
@@ -75,9 +77,9 @@ cmake --build build --target core_tests
 
 Expected: 编译失败或断言失败。
 
-- [ ] **Step 3: 最小实现** — 按 Interfaces 改头文件（`TextContent.cpp` 若无需改则不动）。
+- [x] **Step 3: 最小实现** — 按 Interfaces 改头文件（`TextContent.cpp` 若无需改则不动）。
 
-- [ ] **Step 4: 测试通过并提交**
+- [x] **Step 4: 测试通过并提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='TextContentTest.*'
