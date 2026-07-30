@@ -1,0 +1,213 @@
+# Text Layer — 设计说明
+
+日期：2026-07-30  
+状态：已确认，待实现  
+分支：`feature/0x1306a94_text_layer`
+
+## 目标
+
+端到端可用的文本图层（接近 PAG 框文本子集）：
+
+1. 虚拟容器内排版：宽约束换行；`autoHeight` 或固定高缩字
+2. 填充 / 描边复用 `Layer.styles`
+3. Font Asset（项目包）+ 系统字体回退（默认 PingFang SC）
+4. 多行（`\n`）+ 水平对齐（左/中/右）
+5. 画布绘制、选中、undo、存盘重开；Inspector 编辑文案
+
+## 现状
+
+| 层级 | 能力 |
+| --- | --- |
+| `LayerType::Text` + `TextContent{text, fontFamily, fontSize}` | 模型骨架已有 |
+| 序列化 Text / PropertyPath `content.text` / `content.fontSize` | 已有 |
+| `Animatable<std::string>`（hold 插值） | 已有 |
+| `AssetType::Font` | 枚举已有，无完整导入/绑定流 |
+| `SceneEvaluator` / `DrawCommand` / Adapter | **无** DrawText |
+| 选中 / hit | 仅 Shape + Image |
+| App Add Text / Text Inspector | **无** |
+
+## 非目标
+
+- 画布双击原地编辑
+- 垂直对齐、字距 / 行距、富文本 span
+- CoreText / HarfBuzz（首版用自研框排版 + tgfx 量字）
+- Lottie / PAG 文本导出
+- 复杂文种双向排版
+
+---
+
+## §1 数据模型
+
+```cpp
+enum class TextAlign : uint8_t { Left = 0, Center = 1, Right = 2 };
+
+class TextContent : public LayerContent {
+    Animatable<std::string> text{std::string{"Text"}};
+    EntityId fontAssetId;                 // 无效 = 未绑定
+    std::string fontFamily{"PingFang SC"}; // 显示名 / 系统回退键
+    Animatable<float> fontSize{48.0f};    // 字号上限（固定高时由排版缩字）
+    Animatable<Vec2> size{Vec2{400, 120}}; // 虚拟容器；宽始终约束换行
+    bool autoHeight = true;               // true：高度随内容；false：固定高 + 缩字
+    TextAlign align = TextAlign::Left;
+};
+```
+
+**填充 / 描边**：复用 `Layer.styles`（首个 Fill + 首个 Stroke）。无 Fill 时绘制默认黑色；无 Stroke 或不描边宽度为 0 则不描边。
+
+**新建层约定**
+
+- 文案 `"Text"`，`size = 400×120`，`autoHeight = true`，`align = Left`
+- `fontFamily = "PingFang SC"`，`fontAssetId` 无效
+- `anchorPoint = (200, 60)`，`position` = 合成中心
+- 附带一个黑色 Fill（与形状层新建时 styles 习惯一致）
+
+**PropertyPath**
+
+- 已有：`content.text`、`content.fontSize`
+- 新增：`content.size`
+- 非 Animatable：`autoHeight`、`align`、`fontFamily`、`fontAssetId` → 专用 bridge setter + undo 命令
+
+**Font Asset**
+
+- `AssetType::Font`，`path` 相对 `projectRoot`（如 `assets/MyFont.ttf`）
+- 绑定后可同步更新 `fontFamily` 显示名；解绑不删磁盘文件
+
+**序列化**：补齐 `fontAssetId`、`size`、`autoHeight`、`align`（及已有字段）。开发阶段**不升** `schemaVersion`。
+
+**拖改容器尺寸时的锚点（必做）**
+
+选中文本层，拖角或 Inspector 修改 `content.size` 时：
+
+1. `anchorPoint` 按比例同步：  
+   `anchor' = (anchor.x * w1/w0, anchor.y * h1/h0)`（若 `w0` 或 `h0` 为 0，该轴保持原值）
+2. `transform.position` **不变**  
+   → 锚点相对容器比例不变，图层视觉位置不跳
+3. `size` 与 `anchor` 写入同一 undo 合并窗口
+
+仅用户改模型 `size` 时触发。`autoHeight` 下排版测得的内容高度只影响 hit/选中测量，**不**回写 `size`/`anchor`。
+
+---
+
+## §2 渲染管线 + TextLayout
+
+### 架构原则
+
+- **Core** 只处理原始数据求值（字符串、字号上限、容器、对齐、字体路径、styles）
+- **文本排版**独立模块（adapter 侧），供绘制与 hit 共用；不链进 Core
+- 管线对齐 Image：自包含 `DrawText` 命令
+
+### 求值（Core）
+
+```cpp
+struct EvaluatedTextItem {
+    std::string text;
+    float fontSize;                 // 模型字号上限（缩字前）
+    Vec2 containerSize;             // evaluate(size)
+    bool autoHeight;
+    TextAlign align;
+    EntityId fontAssetId;
+    std::string fontFamily;
+    std::string fontAbsolutePath;   // 有 Font Asset 则为绝对路径，否则空
+    Color fillColor;                // 首个 Fill，缺省黑
+    std::optional<Color> strokeColor;
+    float strokeWidth = 0.0f;       // 首个 Stroke；0 = 不描边
+};
+
+struct EvaluatedLayer {
+    // ...existing...
+    std::optional<EvaluatedImageItem> imageItem;
+    std::optional<EvaluatedTextItem> textItem;  // 与 shapeItems / imageItem 互斥
+};
+```
+
+### DrawCommand
+
+新增 `DrawCommandType::DrawText`，字段与 `EvaluatedTextItem` 对齐（自包含，同 `DrawImage`）。
+
+CommandBuilder：对 `textItem` 追加 `DrawText`；track matte 源层若含文本亦需回放（与 Image 一致）。
+
+### TextLayout 模块（推荐 L1）
+
+位置：`adapter/textlayout/`（独立于 Core；tgfx metrics 实现可放其旁或 `adapter/tgfx/`）。
+
+```text
+GlyphMetrics          // 抽象：advance(unichar, size) / fontMetrics(size)
+TextLayoutInput       // text, boxWidth, optional boxHeight, fontSize, align, metrics
+TextLayoutResult      // appliedFontSize, measuredSize, lines[{origin, width, runs}]
+TgfxGlyphMetrics      // tgfx::Font 实现
+```
+
+| `autoHeight` | 行为 |
+| --- | --- |
+| `true` | 宽 = `size.x` 换行；高 = 内容高；**不缩字**；hit/选中高 = `measuredHeight` |
+| `false` | 宽高固定；二分缩字直至塞进框；hit/选中 = `containerSize`；仍溢出则 **clip** 兜底 |
+
+- 硬换行：`\n`
+- 软换行：优先空白，否则按字符（兼顾中文）
+- 水平对齐：每行在 `boxWidth` 内 Left / Center / Right
+- 垂直：顶对齐（本里程碑不做垂直居中）
+- 行高：由 `FontMetrics`（ascent/descent/leading）得出
+
+**字体解析顺序（Adapter）**
+
+1. `fontAbsolutePath` → `Typeface::MakeFromPath`
+2. 否则 `Typeface::MakeFromName(fontFamily, …)`
+3. 再否则 `PingFang SC` → `Helvetica`
+
+**调用**：`TgfxCanvasAdapter` 绘制前 `Layout`；hit/选中用同一 `Layout` 得到测量框（`autoHeight` 时高度用 `measuredSize.y`）。测量结果不持久化进 Document。
+
+局部坐标：容器矩形为 `[0, 0]–[width, height]`（与 Image 容器一致）；锚点相对该矩形；文本在框内顶起排版。
+
+---
+
+## §3 App / Bridge / 测试
+
+### Bridge
+
+- `ms_document_add_text_layer(compositionId)` → §1 默认值，返回 layerId
+- Animatable：`content.text` / `content.fontSize` / `content.size`（含 string 的 get/set，若尚缺则补齐）
+- 专用 API：`fontFamily`、`fontAssetId`、`autoHeight`、`align`
+- `ms_document_import_font_asset(path)`：拷入 `assets/`，写入 `AssetType::Font`
+- `ms_document_set_text_font_asset(layerId, assetId)`（无效 id = 解绑）
+- 拖角改 size：bridge/App 同时提交等比 `anchor` 更新（同一 merge group）
+
+### App
+
+- 工具栏 **Add Text**
+- `TextLayerInspector`：文案、字号、容器 W/H、`autoHeight`、对齐、字体（家族名 + 绑定 Font Asset）、复用 Fill/Stroke 面板
+- 拖角改 `content.size`，并按 §1 同步等比锚点、保持 position
+- `autoHeight == true` 时仍允许改 `size.y`（存盘用）；仅 `autoHeight == false` 时 `size.y` 参与缩字
+- Project 面板：Font Asset 与 Image 并列；导入入口对齐 Image
+- **不做**画布原地编辑
+
+### 测试
+
+| 层 | 覆盖 |
+| --- | --- |
+| Core | 序列化 round-trip；PropertyPath；Evaluator `textItem`；`DrawText` 命令 |
+| TextLayout | 换行、对齐、`autoHeight` 量高、固定高缩字（假 `GlyphMetrics`） |
+| Adapter | 快照：单行 / 多行 / 缩字 / fill+stroke（若已有基建） |
+| 交互 | 拖 size → 锚点等比、position 不变；undo；绑字体重开 |
+
+### 验收
+
+1. Add Text → 画布显示苹方「Text」
+2. 文案含 `\n` + 改宽 → 换行正确；关 `autoHeight` → 缩字塞进框
+3. Fill/Stroke 可见；undo 正确
+4. 拖容器角：视觉位置不跳，锚点相对比例保持
+5. 导入字体绑定后存盘重开仍用项目字体
+
+---
+
+## 关键接口伪代码（实现指引）
+
+```cpp
+// Core — 求值产出原始文本项（无排版）
+EvaluatedTextItem EvaluateText(const TextContent&, const Layer& styles, const Document&);
+
+// adapter/textlayout — 与渲染解耦
+TextLayoutResult LayoutText(const TextLayoutInput&);
+
+// Adapter — 解析字体 → Layout → clip(可选) → drawTextBlob / stroke
+void PlayDrawText(const DrawCommand&, Canvas&);
+```
