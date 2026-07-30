@@ -514,7 +514,10 @@ private final class TimelineTrackRowView: UIView {
                 guard let origin = dragOriginFrame else {
                     return
                 }
-                let pointer = Int64((CGFloat(origin) + translationWidth / pointsPerFrame).rounded())
+                let pointer = timelineEvaluationFrame(
+                    Int64((CGFloat(origin) + translationWidth / pointsPerFrame).rounded()),
+                    duration: duration,
+                )
                 updateKeyframeDrag(path: path, originFrame: origin, pointerFrame: pointer, prev: prev, next: next)
                 syncKeyframeTrackGeometry(path: path)
             }
@@ -586,7 +589,9 @@ private final class TimelineTrackRowView: UIView {
     }
 
     private func contentX(for frame: Int64) -> CGFloat {
-        trackLeadingInset + timelineX(for: frame, pointsPerFrame: pointsPerFrame) - scrollX
+        // Layout only: never place track chrome past last inclusive frame (AE [0, duration)).
+        let displayFrame = timelineEvaluationFrame(frame, duration: duration)
+        return trackLeadingInset + timelineX(for: displayFrame, pointsPerFrame: pointsPerFrame) - scrollX
     }
 
     private func keyframeRange(paths: [String]) -> TimeRangeDraft? {
@@ -656,7 +661,10 @@ private final class TimelineTrackRowView: UIView {
     }
 
     private func updateLayerScaleDrag(edge: TimeRangeDragEdge, locationX: CGFloat) {
-        let pointerFrame = Int64(((locationX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
+        let pointerFrame = timelineEvaluationFrame(
+            Int64(((locationX - trackLeadingInset + scrollX) / pointsPerFrame).rounded()),
+            duration: duration,
+        )
         if dragSession == nil {
             let paths = timelineAnimatedPropertyPaths(core: document.core, layerID: row.layerID)
             guard let range = keyframeRange(paths: paths) else {
@@ -675,13 +683,16 @@ private final class TimelineTrackRowView: UIView {
             else {
                 return
             }
-            beginSession(session, pointerFrame: pointerFrame, edgeFrame: range.frame(for: edge), editName: "Scale Time Range")
+            beginSession(session,
+                         pointerFrame: pointerFrame,
+                         edgeFrame: timelineEvaluationFrame(range.frame(for: edge), duration: duration),
+                         editName: "Scale Time Range")
             selectLayerRow()
         }
         guard let session = dragSession else {
             return
         }
-        let newEdge = pointerFrame - dragFrameOffset
+        let newEdge = timelineEvaluationFrame(pointerFrame - dragFrameOffset, duration: duration)
         let moves = TimelineDragEngine.resolve(session: session,
                                                pointerFrame: newEdge,
                                                duration: duration,
@@ -709,7 +720,10 @@ private final class TimelineTrackRowView: UIView {
     }
 
     private func updatePropertyEdgeDrag(path: String, edge: TimeRangeDragEdge, locationX: CGFloat) {
-        let pointerFrame = Int64(((locationX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
+        let pointerFrame = timelineEvaluationFrame(
+            Int64(((locationX - trackLeadingInset + scrollX) / pointsPerFrame).rounded()),
+            duration: duration,
+        )
         if dragSession == nil {
             let frames = document.core.keyframes(entityID: row.layerID, path: path).map(\.frame)
             guard let start = frames.min(), let end = frames.max(), start < end,
@@ -720,7 +734,7 @@ private final class TimelineTrackRowView: UIView {
             else {
                 return
             }
-            let edgeFrame = edge == .leading ? start : end
+            let edgeFrame = timelineEvaluationFrame(edge == .leading ? start : end, duration: duration)
             beginSession(session, pointerFrame: pointerFrame, edgeFrame: edgeFrame, editName: "Move Property Range")
             editorState.selectedLayerID = row.layerID
             editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: row.layerID, path: path)
@@ -729,7 +743,7 @@ private final class TimelineTrackRowView: UIView {
         guard let session = dragSession else {
             return
         }
-        let newEdge = pointerFrame - dragFrameOffset
+        let newEdge = timelineEvaluationFrame(pointerFrame - dragFrameOffset, duration: duration)
         let moves = TimelineDragEngine.resolve(session: session,
                                                pointerFrame: newEdge,
                                                duration: duration,

@@ -73,7 +73,8 @@ final class TimelineScrollCoordinator {
     }
 
     func visibleContentX(for frame: Int64) -> CGFloat {
-        trackLeadingInset + timelineX(for: frame, pointsPerFrame: pointsPerFrame) - scrollX
+        let displayFrame = timelineEvaluationFrame(frame, duration: duration)
+        return trackLeadingInset + timelineX(for: displayFrame, pointsPerFrame: pointsPerFrame) - scrollX
     }
 
     func frame(atVisibleX visibleX: CGFloat) -> Int64 {

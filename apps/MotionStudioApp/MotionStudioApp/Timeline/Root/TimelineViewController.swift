@@ -305,7 +305,8 @@ final class TimelineViewController: UIViewController {
     }
 
     private func updatePlayheadPosition() {
-        let visibleX = timelineX(for: playheadClock.frame, pointsPerFrame: scrollCoordinator.pointsPerFrame)
+        let frame = timelineEvaluationFrame(playheadClock.frame, duration: scrollCoordinator.duration)
+        let visibleX = timelineX(for: frame, pointsPerFrame: scrollCoordinator.pointsPerFrame)
             - scrollCoordinator.scrollX
         let contentX: CGFloat?
         if visibleX >= 0, visibleX <= scrollCoordinator.trackViewportWidth {

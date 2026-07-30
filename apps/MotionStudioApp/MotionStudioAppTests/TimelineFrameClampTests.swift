@@ -7,6 +7,7 @@ import Foundation
 @testable import MotionStudio
 import Testing
 
+@MainActor
 struct TimelineFrameClampTests {
     @Test
     func `track span matches last inclusive frame`() {
@@ -45,6 +46,18 @@ struct TimelineFrameClampTests {
         #expect(timelineEvaluationFrame(150, duration: 150) == 149)
         #expect(timelineEvaluationFrame(149, duration: 150) == 149)
         #expect(timelineEvaluationTime(150, duration: 150) == 149)
+    }
+
+    @Test
+    func `display x for duration marker matches last inclusive frame`() {
+        let duration: Int64 = 150
+        let pointsPerFrame: CGFloat = 6
+        let last = timelineEvaluationFrame(duration, duration: duration)
+        let staleX = timelineX(for: duration, pointsPerFrame: pointsPerFrame)
+        let displayX = timelineX(for: last, pointsPerFrame: pointsPerFrame)
+        #expect(last == duration - 1)
+        #expect(displayX == CGFloat(duration - 1) * pointsPerFrame)
+        #expect(staleX != displayX)
     }
 
     @Test
