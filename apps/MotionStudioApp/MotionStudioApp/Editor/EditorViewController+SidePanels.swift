@@ -16,10 +16,15 @@ extension EditorViewController {
         view.addSubview(projectPanel)
         view.addSubview(inspectorPanel)
 
-        let projectHost = UIHostingController(rootView: ProjectPanelView(document: document.modelDocument,
-                                                                         clearSelection: { [weak self] in
-                                                                             self?.clearSelection()
-                                                                         }))
+        let projectHost = UIHostingController(rootView: ProjectPanelView(
+            document: document.modelDocument,
+            clearSelection: { [weak self] in
+                self?.clearSelection()
+            },
+            importImage: { [weak self] in
+                self?.presentImageImport()
+            },
+        ))
         embed(projectHost, in: projectPanel)
         projectHostingController = projectHost
 

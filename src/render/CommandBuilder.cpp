@@ -186,12 +186,13 @@ DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
                                               const std::vector<EntityId> &selectedLayerIds,
                                               EntityId primaryLayerId,
                                               float strokeWidth,
-                                              float handleSize) {
+                                              float handleSize,
+                                              bool showAnchor) {
     SelectionHandles handles;
     if (!BuildSelectionHandles(state, selectedLayerIds, primaryLayerId, handles)) {
         return {};
     }
-    return BuildSelectionHandleCommands(handles, strokeWidth, handleSize);
+    return BuildSelectionHandleCommands(handles, strokeWidth, handleSize, showAnchor);
 }
 
 }  // namespace motion

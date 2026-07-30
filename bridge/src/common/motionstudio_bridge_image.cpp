@@ -153,12 +153,12 @@ uint64_t ms_layer_image_asset_id(MSDocument *document, uint64_t layerId) {
     return static_cast<ImageContent *>(layer->content.get())->assetId.value;
 }
 
-void ms_layer_set_image_scale_mode(MSDocument *document, uint64_t layerId, int mode) {
+void ms_layer_set_image_scale_mode(MSDocument *document, uint64_t layerId, MS_IMAGE_SCALE mode) {
     DocumentLock lock(document);
     if (document == nullptr) {
         return;
     }
-    if (mode < 0 || mode > 3) {
+    if (mode < MS_IMAGE_SCALE_NONE || mode > MS_IMAGE_SCALE_ZOOM) {
         return;
     }
     Layer *layer = FindLayer(document, layerId);
@@ -168,16 +168,17 @@ void ms_layer_set_image_scale_mode(MSDocument *document, uint64_t layerId, int m
     Execute(document, std::make_unique<motion::SetImageScaleModeCommand>(EntityId{layerId}, static_cast<ImageScaleMode>(mode)));
 }
 
-int ms_layer_image_scale_mode(MSDocument *document, uint64_t layerId) {
+MS_IMAGE_SCALE ms_layer_image_scale_mode(MSDocument *document, uint64_t layerId) {
     DocumentLock lock(document);
     if (document == nullptr) {
-        return static_cast<int>(ImageScaleMode::LetterBox);
+        return MS_IMAGE_SCALE_LETTER_BOX;
     }
     Layer *layer = FindLayer(document, layerId);
     if (layer == nullptr || layer->type() != LayerType::Image) {
-        return static_cast<int>(ImageScaleMode::LetterBox);
+        return MS_IMAGE_SCALE_LETTER_BOX;
     }
-    return static_cast<int>(static_cast<ImageContent *>(layer->content.get())->scaleMode);
+    return static_cast<MS_IMAGE_SCALE>(
+        static_cast<ImageContent *>(layer->content.get())->scaleMode);
 }
 
 int ms_document_asset_count(MSDocument *document) {

@@ -14,10 +14,13 @@ struct LayerTransformStart {
     let scale: CGVector
     let rotation: Float
     let anchor: CGVector
+    let contentSize: CGVector
+    let hasImageSize: Bool
     let positionAnimated: Bool
     let scaleAnimated: Bool
     let rotationAnimated: Bool
     let anchorAnimated: Bool
+    let contentSizeAnimated: Bool
 }
 
 enum FreeTransformKind {
@@ -37,19 +40,27 @@ struct FreeTransformDrag {
     /// For oriented single-layer scale: localPivot - startAnchor.
     let localPivotRelative: CGPoint?
     let editName: String
+    /// When `.container`, scale handles write `image.size` instead of `transform.scale`.
+    let imageResizeMode: ImageResizeMode
 
     static func makeLayerStarts(core: MotionDocumentCore, layerIDs: [UInt64], frame: Int64) -> [LayerTransformStart] {
         layerIDs.map { layerID in
-            LayerTransformStart(
+            let hasImageSize = core.hasProperty(entityID: layerID, path: ImageProperty.size.path)
+            return LayerTransformStart(
                 layerID: layerID,
                 position: core.evaluateVec2(entityID: layerID, path: TransformProperty.position.path, frame: frame),
                 scale: core.evaluateVec2(entityID: layerID, path: TransformProperty.scale.path, frame: frame),
                 rotation: core.evaluateFloat(entityID: layerID, path: TransformProperty.rotation.path, frame: frame),
                 anchor: core.evaluateVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame),
+                contentSize: hasImageSize
+                    ? core.evaluateVec2(entityID: layerID, path: ImageProperty.size.path, frame: frame)
+                    : .zero,
+                hasImageSize: hasImageSize,
                 positionAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.position.path),
                 scaleAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.scale.path),
                 rotationAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.rotation.path),
                 anchorAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.anchorPoint.path),
+                contentSizeAnimated: hasImageSize && core.isAnimated(entityID: layerID, path: ImageProperty.size.path),
             )
         }
     }
@@ -144,7 +155,7 @@ struct FreeTransformDrag {
                             frame: Int64,
                             scenePoint: CGPoint,
                             shift: Bool,
-                            alternate _: Bool)
+                            alternate: Bool)
     {
         let axisX = normalized(startHandles.corners[1] - startHandles.corners[0])
         let axisY = normalized(startHandles.corners[3] - startHandles.corners[0])
@@ -181,6 +192,19 @@ struct FreeTransformDrag {
         scaleX = clampedScale(scaleX)
         scaleY = clampedScale(scaleY)
 
+        if imageResizeMode == .container,
+           let start = layerStarts.first,
+           start.hasImageSize
+        {
+            applyContainerResize(core: core,
+                                 frame: frame,
+                                 start: start,
+                                 scaleX: scaleX,
+                                 scaleY: scaleY,
+                                 alternate: alternate)
+            return
+        }
+
         if startHandles.isOriented, let localRel = localPivotRelative, let start = layerStarts.first {
             let newScale = CGVector(dx: start.scale.dx * scaleX, dy: start.scale.dy * scaleY)
             let position = compensatedPosition(pivot: pivotScene,
@@ -202,6 +226,73 @@ struct FreeTransformDrag {
                       frame: frame, value: newScale, animated: start.scaleAnimated)
             writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
                       frame: frame, value: position, animated: start.positionAnimated)
+        }
+    }
+
+    private func applyContainerResize(core: MotionDocumentCore,
+                                      frame: Int64,
+                                      start: LayerTransformStart,
+                                      scaleX: CGFloat,
+                                      scaleY: CGFloat,
+                                      alternate: Bool)
+    {
+        let sizeScaleX = max(abs(scaleX), 1e-3)
+        let sizeScaleY = max(abs(scaleY), 1e-3)
+        let newSize = CGVector(dx: max(1, start.contentSize.dx * sizeScaleX),
+                               dy: max(1, start.contentSize.dy * sizeScaleY))
+        // Keep anchor at the same relative point inside the container.
+        let ratioX = start.contentSize.dx > 1e-6 ? newSize.dx / start.contentSize.dx : 1
+        let ratioY = start.contentSize.dy > 1e-6 ? newSize.dy / start.contentSize.dy : 1
+        let newAnchor = CGVector(dx: start.anchor.dx * ratioX, dy: start.anchor.dy * ratioY)
+
+        writeVec2(core: core, layerID: start.layerID, path: ImageProperty.size.path,
+                  frame: frame, value: newSize, animated: start.contentSizeAnimated)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.anchorPoint.path,
+                  frame: frame, value: newAnchor, animated: start.anchorAnimated)
+
+        let localRel = Self.containerLocalPivotRelative(for: kind,
+                                                        size: newSize,
+                                                        localMin: startHandles.localMin,
+                                                        anchor: newAnchor,
+                                                        alternate: alternate)
+        let position = compensatedPosition(pivot: pivotScene,
+                                           rotationDegrees: start.rotation,
+                                           scale: start.scale,
+                                           localRelative: localRel)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
+                  frame: frame, value: position, animated: start.positionAnimated)
+    }
+
+    static func containerLocalPivotRelative(for kind: FreeTransformKind,
+                                            size: CGVector,
+                                            localMin: CGPoint,
+                                            anchor: CGVector,
+                                            alternate: Bool) -> CGPoint
+    {
+        let localMax = CGPoint(x: localMin.x + size.dx, y: localMin.y + size.dy)
+        if alternate {
+            let localCenter = CGPoint(x: (localMin.x + localMax.x) * 0.5,
+                                      y: (localMin.y + localMax.y) * 0.5)
+            return CGPoint(x: localCenter.x - anchor.dx, y: localCenter.y - anchor.dy)
+        }
+        let localCorners = [
+            CGPoint(x: localMin.x, y: localMin.y),
+            CGPoint(x: localMax.x, y: localMin.y),
+            CGPoint(x: localMax.x, y: localMax.y),
+            CGPoint(x: localMin.x, y: localMax.y),
+        ]
+        switch kind {
+        case let .scaleCorner(index):
+            let pivot = localCorners[(index + 2) % 4]
+            return CGPoint(x: pivot.x - anchor.dx, y: pivot.y - anchor.dy)
+        case let .scaleEdge(index):
+            let oppositeA = localCorners[(index + 2) % 4]
+            let oppositeB = localCorners[(index + 3) % 4]
+            let oppositeMid = CGPoint(x: (oppositeA.x + oppositeB.x) * 0.5,
+                                      y: (oppositeA.y + oppositeB.y) * 0.5)
+            return CGPoint(x: oppositeMid.x - anchor.dx, y: oppositeMid.y - anchor.dy)
+        default:
+            return .zero
         }
     }
 

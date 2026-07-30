@@ -76,11 +76,8 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
         return;
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
-    const tgfx::Rect compositionBounds =
-        tgfx::Rect::MakeWH(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight));
-    const float radius =
-        std::clamp(cornerRadius, 0.0f,
-                   std::min(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight)) * 0.5f);
+    const tgfx::Rect compositionBounds = tgfx::Rect::MakeWH(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight));
+    const float radius = std::clamp(cornerRadius, 0.0f, std::min(static_cast<float>(sceneWidth), static_cast<float>(sceneHeight)) * 0.5f);
     tgfx::Paint paint;
     paint.setStyle(tgfx::PaintStyle::Fill);
     paint.setColor(ToTgfxColor(backgroundColor));
@@ -251,9 +248,7 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
 
     // Inside/outside: cache the boolean outline so PathRef identity stays
     // stable and tgfx GPU shape proxies can hit across frames.
-    const tgfx::Path outline =
-        pathCache_->ResolvePositionedOutline(geometry, paint.fillRule, hasTrim, trimWindow, options,
-                                             fullPath, strokeGeometry);
+    const tgfx::Path outline = pathCache_->ResolvePositionedOutline(geometry, paint.fillRule, hasTrim, trimWindow, options, fullPath, strokeGeometry);
     if (outline.isEmpty()) {
         return;
     }
@@ -295,16 +290,14 @@ void TgfxCanvasAdapter::endLayer() {
         tgfx::Context *context = surface_->getContext();
         CoverageImage combined = layer.coverages.front();
         for (size_t i = 1; i < layer.coverages.size(); ++i) {
-            CoverageImage intersected =
-                IntersectCoverageImages(context, combined, layer.coverages[i]);
+            CoverageImage intersected = IntersectCoverageImages(context, combined, layer.coverages[i]);
             if (intersected.image == nullptr) {
                 continue;
             }
             combined = std::move(intersected);
         }
         if (combined.image != nullptr) {
-            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal,
-                                                        tgfx::TileMode::Decal);
+            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal, tgfx::TileMode::Decal);
             if (shader != nullptr) {
                 shader = shader->makeWithMatrix(combined.localMatrix);
                 paint.setMaskFilter(tgfx::MaskFilter::MakeShader(shader, combined.invertAlpha));
@@ -357,8 +350,7 @@ void TgfxCanvasAdapter::endMask() {
     const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
     const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
     tgfx::Matrix pictureMatrix = tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top);
-    std::shared_ptr<tgfx::Image> image =
-        tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
+    std::shared_ptr<tgfx::Image> image = tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
     if (image == nullptr) {
         return;
     }
@@ -436,8 +428,7 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
         resolvedIntrinsic = {static_cast<float>(image->width()),
                              static_cast<float>(image->height())};
     }
-    const ImageRect destination =
-        ComputeImageDestinationRect(containerSize, resolvedIntrinsic, mode);
+    const ImageRect destination = ComputeImageDestinationRect(containerSize, resolvedIntrinsic, mode);
     if (destination.isEmpty()) {
         return;
     }
@@ -447,14 +438,12 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
     paint.setAlpha(opacity_);
     paint.setBlendMode(ToTgfxBlendMode(blendMode_));
 
-    canvas->save();
+    tgfx::AutoCanvasRestore restore(canvas);
     canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
     const tgfx::Rect src = tgfx::Rect::MakeWH(static_cast<float>(image->width()),
                                               static_cast<float>(image->height()));
-    const tgfx::Rect dst =
-        tgfx::Rect::MakeXYWH(destination.x, destination.y, destination.width, destination.height);
+    const tgfx::Rect dst = tgfx::Rect::MakeXYWH(destination.x, destination.y, destination.width, destination.height);
     canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
-    canvas->restore();
 }
 
 }  // namespace motion

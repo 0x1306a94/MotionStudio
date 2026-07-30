@@ -101,4 +101,7 @@ TEST(SelectionHandlesTest, CommandsIncludeBoxAndHandles) {
     ASSERT_FALSE(commands.empty());
     EXPECT_EQ(commands.front().type, DrawCommandType::StrokePath);
     EXPECT_EQ(commands.front().geometry.kind, ShapeGeometryKind::Path);
+
+    auto withoutAnchor = BuildSelectionHandleCommands(handles, 1.5f, 7.0f, false);
+    EXPECT_LT(withoutAnchor.size(), commands.size());
 }

@@ -42,6 +42,12 @@ struct InspectorView: View {
                                                isEditable: isEditable,
                                                perform: perform)
                         }
+                        if core.layerType(layerID) == .IMAGE {
+                            ImageLayerInspector(core: core,
+                                                layerID: layerID,
+                                                isEditable: isEditable,
+                                                perform: perform)
+                        }
                         if core.hasBezierPath(entityID: layerID, path: "path") {
                             PathKeyframeInspector(core: core,
                                                   layerID: layerID,

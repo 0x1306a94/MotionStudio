@@ -71,6 +71,7 @@ final class EditorViewController: UIViewController {
     let addRectangleButton = UIButton(type: .system)
     let addEllipseButton = UIButton(type: .system)
     let addImageButton = UIButton(type: .system)
+    let imageResizeModeControl = UISegmentedControl(items: ["Container", "Scale"])
     let timelinePanel = UIVisualEffectView(effect: nil)
     let timelineHandle = TimelineGrabberView()
 
@@ -78,6 +79,7 @@ final class EditorViewController: UIViewController {
     var projectHostingController: UIHostingController<ProjectPanelView>?
     var inspectorHostingController: UIHostingController<InspectorView>?
     var timelineViewController: TimelineViewController?
+    var imageImportCoordinator: ImageImportCoordinator?
     var timelineHeightConstraint: NSLayoutConstraint?
 
     var timelineHeight = Metrics.timelinePreferredHeight

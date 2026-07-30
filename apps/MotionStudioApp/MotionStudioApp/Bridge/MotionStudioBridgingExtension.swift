@@ -133,6 +133,29 @@ extension MS_STROKE_POSITION: @retroactive CaseIterable, @retroactive Identifiab
     }
 }
 
+extension MS_IMAGE_SCALE: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_IMAGE_SCALE] {
+        [.NONE, .STRETCH, .LETTER_BOX, .ZOOM]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .NONE:
+            "None"
+        case .STRETCH:
+            "Stretch"
+        case .LETTER_BOX:
+            "Letter Box"
+        case .ZOOM:
+            "Zoom"
+        }
+    }
+}
+
 extension MS_SELECTION_HANDLE {
     var isScaleCorner: Bool {
         switch self {

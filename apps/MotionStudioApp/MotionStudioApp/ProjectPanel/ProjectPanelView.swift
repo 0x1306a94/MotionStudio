@@ -2,8 +2,8 @@
 //  ProjectPanelView.swift
 //  MotionStudioApp
 //
-//  Left panel: project assets (empty for now) plus the composition list. The
-//  layer stack itself lives in the timeline.
+//  Left panel: project assets plus the composition list. The layer stack
+//  itself lives in the timeline.
 //
 
 import SwiftUI
@@ -11,10 +11,12 @@ import SwiftUI
 struct ProjectPanelView: View {
     let document: MotionProjectState
     let clearSelection: () -> Void
+    let importImage: () -> Void
 
     var body: some View {
         let core = document.core
         let _ = core.revision
+        let assets = core.imageAssetIDs()
 
         VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -27,13 +29,45 @@ struct ProjectPanelView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Assets")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ContentUnavailableView("No Assets",
-                                       systemImage: "tray",
-                                       description: Text("Import assets to use them here."))
-                    .frame(maxHeight: 140)
+                HStack {
+                    Text("Assets")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Import", action: importImage)
+                        .font(.caption)
+                        .buttonStyle(.borderless)
+                }
+
+                if assets.isEmpty {
+                    ContentUnavailableView("No Assets",
+                                           systemImage: "tray",
+                                           description: Text("Import images to use them here."))
+                        .frame(maxHeight: 140)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(assets, id: \.self) { assetID in
+                                HStack(spacing: 8) {
+                                    Image(systemName: "photo")
+                                        .frame(width: 16)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(core.assetName(assetID))
+                                            .lineLimit(1)
+                                        Text("\(core.assetWidth(assetID))×\(core.assetHeight(assetID))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .font(.subheadline)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 180)
+                }
             }
             .padding(8)
 

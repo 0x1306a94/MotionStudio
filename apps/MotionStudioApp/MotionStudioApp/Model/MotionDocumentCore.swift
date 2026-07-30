@@ -531,6 +531,167 @@ final class MotionDocumentCore {
         return layerID
     }
 
+    // MARK: - Image assets / layers
+
+    nonisolated func setProjectRoot(_ absolutePath: String?) {
+        if let absolutePath {
+            absolutePath.withCString { ms_document_set_project_root(handle, $0) }
+        } else {
+            ms_document_set_project_root(handle, nil)
+        }
+    }
+
+    nonisolated func projectRoot() -> String? {
+        Self.takeString(ms_document_project_root(handle))
+    }
+
+    /// Copies the file into `{projectRoot}/assets/` and registers a document asset.
+    @discardableResult
+    func importImageAsset(sourceURL: URL, preferredFileName: String?, width: Int, height: Int) -> UInt64 {
+        let assetID = sourceURL.path(percentEncoded: false).withCString { sourcePath in
+            if let preferredFileName {
+                return preferredFileName.withCString { name in
+                    ms_command_import_image_asset(handle, sourcePath, name, Int32(width), Int32(height))
+                }
+            }
+            return ms_command_import_image_asset(handle, sourcePath, nil, Int32(width), Int32(height))
+        }
+        if assetID != 0 {
+            changed()
+        }
+        return assetID
+    }
+
+    @discardableResult
+    func addImageLayer(compositionID: UInt64) -> UInt64 {
+        let layerID = ms_command_add_image_layer(handle, compositionID)
+        changed()
+        return layerID
+    }
+
+    @discardableResult
+    func setImageAsset(layerID: UInt64, assetID: UInt64, frame: Int64? = nil) -> Bool {
+        let previousAssetID = imageAssetID(layerID: layerID)
+        let firstBind = previousAssetID == 0 && assetID != 0
+        if firstBind {
+            beginDrag()
+        }
+        let ok = ms_layer_set_image_asset(handle, layerID, assetID)
+        if ok {
+            changed()
+            if firstBind, let frame {
+                applyResetImageSizeToIntrinsic(layerID: layerID, frame: frame)
+            }
+        }
+        if firstBind {
+            endDrag()
+        }
+        return ok
+    }
+
+    func imageAssetID(layerID: UInt64) -> UInt64 {
+        ms_layer_image_asset_id(handle, layerID)
+    }
+
+    func imageScaleMode(layerID: UInt64) -> MS_IMAGE_SCALE {
+        ms_layer_image_scale_mode(handle, layerID)
+    }
+
+    func setImageScaleMode(layerID: UInt64, mode: MS_IMAGE_SCALE) {
+        ms_layer_set_image_scale_mode(handle, layerID, mode)
+        changed()
+    }
+
+    func layerBlendMode(layerID: UInt64) -> MS_BLEND {
+        ms_layer_blend_mode(handle, layerID)
+    }
+
+    func setLayerBlendMode(layerID: UInt64, blendMode: MS_BLEND) {
+        ms_command_set_layer_blend_mode(handle, layerID, blendMode)
+        changed()
+    }
+
+    /// Sets `image.size` to the bound asset's intrinsic pixel size, centers the
+    /// anchor on the new size, and compensates `position` so the container center
+    /// stays fixed in scene space.
+    func resetImageSizeToIntrinsic(layerID: UInt64, frame: Int64) {
+        beginDrag()
+        applyResetImageSizeToIntrinsic(layerID: layerID, frame: frame)
+        endDrag()
+    }
+
+    /// Caller must own the merge group when combining with other edits.
+    private func applyResetImageSizeToIntrinsic(layerID: UInt64, frame: Int64) {
+        let assetID = imageAssetID(layerID: layerID)
+        guard assetID != 0 else {
+            return
+        }
+        let width = Float(ms_asset_width(handle, assetID))
+        let height = Float(ms_asset_height(handle, assetID))
+        guard width > 0, height > 0 else {
+            return
+        }
+
+        let oldSize = evaluateVec2(entityID: layerID, path: ImageProperty.size.path, frame: frame)
+        let oldAnchor = evaluateVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame)
+        let oldPosition = evaluateVec2(entityID: layerID, path: TransformProperty.position.path, frame: frame)
+        let rotation = evaluateFloat(entityID: layerID, path: TransformProperty.rotation.path, frame: frame)
+        let scale = evaluateVec2(entityID: layerID, path: TransformProperty.scale.path, frame: frame)
+
+        let oldCenterLocal = CGPoint(x: oldSize.dx * 0.5, y: oldSize.dy * 0.5)
+        let localRelative = CGPoint(x: oldCenterLocal.x - oldAnchor.dx, y: oldCenterLocal.y - oldAnchor.dy)
+        let scaled = CGPoint(x: localRelative.x * scale.dx, y: localRelative.y * scale.dy)
+        let radians = CGFloat(rotation) * .pi / 180
+        let cosine = cos(radians)
+        let sine = sin(radians)
+        let rotated = CGPoint(x: scaled.x * cosine - scaled.y * sine,
+                              y: scaled.x * sine + scaled.y * cosine)
+        let centerScene = CGVector(dx: oldPosition.dx + rotated.x, dy: oldPosition.dy + rotated.y)
+
+        let newSize = CGVector(dx: CGFloat(width), dy: CGFloat(height))
+        let newAnchor = CGVector(dx: CGFloat(width) * 0.5, dy: CGFloat(height) * 0.5)
+
+        writeVec2(entityID: layerID, path: ImageProperty.size.path, frame: frame, value: newSize)
+        writeVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame, value: newAnchor)
+        writeVec2(entityID: layerID, path: TransformProperty.position.path, frame: frame, value: centerScene)
+    }
+
+    private func writeVec2(entityID: UInt64, path: String, frame: Int64, value: CGVector) {
+        if isAnimated(entityID: entityID, path: path) {
+            addKeyframeVec2(entityID: entityID, path: path, frame: frame, value: value)
+        } else {
+            setStaticVec2(entityID: entityID, path: path, value: value)
+        }
+    }
+
+    func assetIDs() -> [UInt64] {
+        let count = ms_document_asset_count(handle)
+        return (0 ..< Int(count)).compactMap { index in
+            let id = ms_document_asset_id_at(handle, Int32(index))
+            return id == 0 ? nil : id
+        }
+    }
+
+    func imageAssetIDs() -> [UInt64] {
+        assetIDs().filter { ms_asset_type(handle, $0) == 0 }
+    }
+
+    func assetName(_ assetID: UInt64) -> String {
+        Self.takeString(ms_asset_name(handle, assetID)) ?? ""
+    }
+
+    func assetPath(_ assetID: UInt64) -> String {
+        Self.takeString(ms_asset_path(handle, assetID)) ?? ""
+    }
+
+    func assetWidth(_ assetID: UInt64) -> Int {
+        Int(ms_asset_width(handle, assetID))
+    }
+
+    func assetHeight(_ assetID: UInt64) -> Int {
+        Int(ms_asset_height(handle, assetID))
+    }
+
     func convertGeometryToPath(layerID: UInt64, frame: Int64) {
         ms_command_convert_geometry_to_path(handle, layerID, frame)
         changed()

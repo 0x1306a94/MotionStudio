@@ -15,14 +15,16 @@ namespace motion {
 // state: evaluated scene snapshot.
 DrawCommandList BuildCommands(const SceneState &state);
 
-// Builds preview-only selection chrome (oriented box, scale handles, anchor)
-// for selectedLayerIds. primaryLayerId is the AE primary selection; when
+// Builds preview-only selection chrome (oriented box, scale handles, optional
+// anchor) for selectedLayerIds. primaryLayerId is the AE primary selection; when
 // invalid, the last id in selectedLayerIds is used.
 // strokeWidth / handleSize: chrome sizes in scene units.
+// showAnchor: false omits the anchor crosshair.
 DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
                                               const std::vector<EntityId> &selectedLayerIds,
                                               EntityId primaryLayerId,
                                               float strokeWidth,
-                                              float handleSize);
+                                              float handleSize,
+                                              bool showAnchor = true);
 
 }  // namespace motion

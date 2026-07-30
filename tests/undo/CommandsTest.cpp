@@ -27,6 +27,7 @@
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetFollowPathCommand.h"
+#include "MotionStudio/undo/SetLayerBlendModeCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
@@ -66,6 +67,7 @@ using motion::RemoveMaskCommand;
 using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
 using motion::SetFollowPathCommand;
+using motion::SetLayerBlendModeCommand;
 using motion::SetMaskInvertedCommand;
 using motion::SetMaskModeCommand;
 using motion::SetSpatialTangentsCommand;
@@ -488,6 +490,38 @@ TEST(SetStyleBlendModeCommandTest, ExecuteSkipsMissingLayer) {
     scene.execute<SetStyleBlendModeCommand>(EntityId{999}, 0, motion::BlendMode::Add);
     scene.undo.undo(scene.document);
     EXPECT_TRUE(scene.layer->styles.empty());
+}
+
+TEST(SetLayerBlendModeCommandTest, SetAndUndo) {
+    Scene scene;
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Normal);
+
+    scene.execute<SetLayerBlendModeCommand>(scene.layer->id, motion::BlendMode::Multiply);
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Multiply);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Normal);
+
+    scene.undo.redo(scene.document);
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Multiply);
+}
+
+TEST(SetLayerBlendModeCommandTest, MergesSameTargetKeepsOriginalValue) {
+    Scene scene;
+
+    scene.execute<SetLayerBlendModeCommand>(scene.layer->id, motion::BlendMode::Multiply);
+    scene.execute<SetLayerBlendModeCommand>(scene.layer->id, motion::BlendMode::Screen);
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Screen);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Normal);
+}
+
+TEST(SetLayerBlendModeCommandTest, ExecuteSkipsMissingLayer) {
+    Scene scene;
+    scene.execute<SetLayerBlendModeCommand>(EntityId{999}, motion::BlendMode::Add);
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Normal);
 }
 
 TEST(AddLayerStyleCommandTest, AddStrokeUndoRedo) {

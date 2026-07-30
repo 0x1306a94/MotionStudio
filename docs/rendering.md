@@ -62,6 +62,7 @@ enum class DrawCommandType {
     Save, Restore, ConcatTransform, SetOpacity, SetBlendMode,
     DrawPath,     // 填充
     StrokePath,   // 描边
+    DrawImage,    // 图片层：path + container/intrinsic size + ImageScaleMode
     ClipPath,
     BeginLayer, EndLayer,   // 离屏组（mask / track matte）
     BeginMask, EndMask,     // coverage 记录与应用
@@ -78,6 +79,11 @@ struct DrawCommand {
     float strokeWidth;
     LineCap cap; LineJoin join;
     FillRule fillRule;
+    // DrawImage
+    std::string imagePath;
+    Vec2 imageContainerSize;
+    Vec2 imageIntrinsicSize;
+    ImageScaleMode imageScaleMode;
 };
 
 using DrawCommandList = std::vector<DrawCommand>;
@@ -102,6 +108,8 @@ public:
     virtual void drawPath(const BezierPath& path, const Paint& paint) = 0;
     virtual void strokePath(const BezierPath& path, const Paint& paint,
                             float width, LineCap cap, LineJoin join) = 0;
+    virtual void drawImage(const std::string& path, Vec2 container, Vec2 intrinsic,
+                           ImageScaleMode mode) = 0;
     virtual void clipPath(const BezierPath& path, FillRule rule) = 0;
 };
 

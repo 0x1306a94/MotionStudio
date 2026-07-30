@@ -188,6 +188,23 @@ TEST(BridgeCommandTest, FollowPathLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, LayerBlendModeSetAndUndo) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_image_layer(document, compositionId);
+
+    EXPECT_EQ(ms_layer_blend_mode(document, layerId), MS_BLEND_NORMAL);
+    ms_command_set_layer_blend_mode(document, layerId, MS_BLEND_MULTIPLY);
+    EXPECT_EQ(ms_layer_blend_mode(document, layerId), MS_BLEND_MULTIPLY);
+    ms_command_set_layer_blend_mode(document, layerId, MS_BLEND_SCREEN);
+    EXPECT_EQ(ms_layer_blend_mode(document, layerId), MS_BLEND_SCREEN);
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_layer_blend_mode(document, layerId), MS_BLEND_NORMAL);
+    EXPECT_EQ(ms_layer_blend_mode(document, 0), MS_BLEND_INVALID);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, FillStyleLifecycle) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
@@ -885,15 +902,15 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
     const uint64_t layerId = ms_command_add_image_layer(document, compositionId);
     ASSERT_NE(layerId, 0u);
     EXPECT_EQ(ms_layer_image_asset_id(document, layerId), 0u);
-    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), 2);  // LetterBox
+    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), MS_IMAGE_SCALE_LETTER_BOX);
 
     ASSERT_TRUE(ms_layer_set_image_asset(document, layerId, assetId));
     EXPECT_EQ(ms_layer_image_asset_id(document, layerId), assetId);
-    ms_layer_set_image_scale_mode(document, layerId, 1);  // Stretch
-    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), 1);
+    ms_layer_set_image_scale_mode(document, layerId, MS_IMAGE_SCALE_STRETCH);
+    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), MS_IMAGE_SCALE_STRETCH);
 
     ASSERT_TRUE(ms_document_undo(document));  // scale mode
-    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), 2);
+    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), MS_IMAGE_SCALE_LETTER_BOX);
     ASSERT_TRUE(ms_document_undo(document));  // bind
     EXPECT_EQ(ms_layer_image_asset_id(document, layerId), 0u);
     ASSERT_TRUE(ms_document_undo(document));  // add layer

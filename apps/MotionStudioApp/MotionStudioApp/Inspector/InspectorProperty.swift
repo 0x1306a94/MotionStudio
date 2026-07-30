@@ -95,6 +95,21 @@ enum ShapeProperty: String, CaseIterable {
     }
 }
 
+enum ImageProperty: String, CaseIterable {
+    case size = "image.size"
+
+    var path: String {
+        rawValue
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .size:
+            "Size"
+        }
+    }
+}
+
 enum TransformField {
     case anchorX
     case anchorY

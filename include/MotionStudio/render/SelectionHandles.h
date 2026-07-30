@@ -65,10 +65,12 @@ SelectionHandleKind HitTestSelectionHandle(const SelectionHandles &handles,
                                            float rotateInner,
                                            float rotateOuter);
 
-// Draws the selection box, scale handles, and (when valid) the primary anchor.
+// Draws the selection box, scale handles, and optionally the primary anchor.
 // strokeWidth / handleSize are in scene units (typically derived from view points).
+// showAnchor: false hides the anchor crosshair (e.g. image container-resize mode).
 DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
                                              float strokeWidth,
-                                             float handleSize);
+                                             float handleSize,
+                                             bool showAnchor = true);
 
 }  // namespace motion

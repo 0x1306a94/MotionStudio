@@ -21,6 +21,7 @@ enum class CommandKind {
     AddLayerStyle,
     RemoveStyle,
     SetStyleBlendMode,
+    SetLayerBlendMode,
     SetStrokePosition,
     AddMask,
     RemoveMask,

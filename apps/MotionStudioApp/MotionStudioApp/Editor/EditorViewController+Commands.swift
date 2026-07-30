@@ -200,11 +200,24 @@ extension EditorViewController {
     }
 
     @objc func addImageLayer() {
-        let alert = UIAlertController(title: "Image Layers",
-                                      message: "Image layer creation needs the bridge API before it can be wired here.",
-                                      preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
+        let compositionID = document.core.firstCompositionID
+        document.syncProjectRoot()
+        perform("Add Image Layer") {
+            editorState.selectedLayerID = document.core.addImageLayer(compositionID: compositionID)
+        }
+    }
+
+    func presentImageImport() {
+        if imageImportCoordinator == nil {
+            imageImportCoordinator = ImageImportCoordinator(
+                presenter: self,
+                document: document,
+                perform: { [weak self] name, edit in
+                    self?.perform(name, edit: edit)
+                },
+            )
+        }
+        imageImportCoordinator?.presentImport()
     }
 
     func clearSelection() {

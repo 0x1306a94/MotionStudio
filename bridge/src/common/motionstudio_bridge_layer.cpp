@@ -99,6 +99,15 @@ MS_STYLE ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int inde
     return MS_STYLE_INVALID;
 }
 
+MS_BLEND ms_layer_blend_mode(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return MS_BLEND_INVALID;
+    }
+    return static_cast<MS_BLEND>(layer->blendMode);
+}
+
 MS_BLEND ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);

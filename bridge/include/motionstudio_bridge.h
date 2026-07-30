@@ -94,6 +94,14 @@ typedef CF_CLOSED_ENUM(int, MS_STROKE_POSITION) {
     MS_STROKE_POSITION_OUTSIDE = 2,
 };
 
+// How image pixels map into the layer container (aligns with ImageScaleMode / PAGScaleMode).
+typedef CF_CLOSED_ENUM(int, MS_IMAGE_SCALE) {
+    MS_IMAGE_SCALE_NONE = 0,
+    MS_IMAGE_SCALE_STRETCH = 1,
+    MS_IMAGE_SCALE_LETTER_BOX = 2,
+    MS_IMAGE_SCALE_ZOOM = 3,
+};
+
 // Blend mode tag, mirrors motion::BlendMode ordinals (Lottie "bm" value set).
 typedef CF_CLOSED_ENUM(int, MS_BLEND) {
     MS_BLEND_INVALID = -1,
@@ -322,6 +330,8 @@ int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId);
 uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId);
 bool ms_layer_visible(MSDocument *document, uint64_t layerId);
 bool ms_layer_locked(MSDocument *document, uint64_t layerId);
+// Layer-level blend mode (MS_BLEND_*); MS_BLEND_INVALID when the layer is missing.
+MS_BLEND ms_layer_blend_mode(MSDocument *document, uint64_t layerId);
 
 /* ============================ layer style queries ============================ */
 
@@ -482,9 +492,8 @@ uint64_t ms_command_add_image_layer(MSDocument *document, uint64_t compositionId
 // Binds image layer to assetId; assetId 0 unbinds. Does not change container size.
 bool ms_layer_set_image_asset(MSDocument *document, uint64_t layerId, uint64_t assetId);
 uint64_t ms_layer_image_asset_id(MSDocument *document, uint64_t layerId);
-// mode: ImageScaleMode as int (0 None, 1 Stretch, 2 LetterBox, 3 Zoom).
-void ms_layer_set_image_scale_mode(MSDocument *document, uint64_t layerId, int mode);
-int ms_layer_image_scale_mode(MSDocument *document, uint64_t layerId);
+void ms_layer_set_image_scale_mode(MSDocument *document, uint64_t layerId, MS_IMAGE_SCALE mode);
+MS_IMAGE_SCALE ms_layer_image_scale_mode(MSDocument *document, uint64_t layerId);
 int ms_document_asset_count(MSDocument *document);
 uint64_t ms_document_asset_id_at(MSDocument *document, int index);
 char *ms_asset_name(MSDocument *document, uint64_t assetId);
@@ -499,6 +508,8 @@ void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint6
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked);
+// blendMode: MS_BLEND_* tag. Sets Layer::blendMode (not fill/stroke style).
+void ms_command_set_layer_blend_mode(MSDocument *document, uint64_t layerId, MS_BLEND blendMode);
 
 // Appends a default fill (black, normal blend) to the layer's style list.
 void ms_command_add_fill_style(MSDocument *document, uint64_t layerId);
@@ -571,6 +582,10 @@ void ms_canvas_set_preview_backdrop(MSCanvas *canvas, MS_PREVIEWER_BACKDROP back
 // layerIds may be null only when count is 0. Supports multiple IDs so callers
 // can pass future multi-selection without changing the canvas API.
 void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, size_t count);
+
+// When showAnchor is false, subsequent draws omit the selection anchor crosshair
+// (used for image container-resize mode). Default is true. Ignored when canvas is null.
+void ms_canvas_set_selection_show_anchor(MSCanvas *canvas, bool showAnchor);
 
 // Sets the user view transform applied on top of the fit-to-drawable
 // transform, effective for every subsequent draw call.

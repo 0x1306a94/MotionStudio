@@ -270,6 +270,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         withObservationTracking {
             _ = document.core.revision
             _ = editorState.selectedLayerIDs
+            _ = editorState.imageResizeMode
             _ = playheadClock.frame
             _ = editorState.isPlaying
             _ = editorState.previewBackdrop
@@ -731,7 +732,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               startHandles: currentSelectionHandles() ?? SelectionHandlesSnapshot(),
                                               pivotScene: .zero,
                                               localPivotRelative: nil,
-                                              editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer")
+                                              editName: layerIDs.count > 1 ? "Move Layers" : "Move Layer",
+                                              imageResizeMode: .transform)
     }
 
     /// Handles motion-path keyframe / tangent hits. Returns true when the press
@@ -853,7 +855,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                       alternate: Bool)
     {
         let kind: FreeTransformKind
-        let editName: String
+        var editName: String
         if hit == .ANCHOR {
             kind = .anchor
             editName = "Move Anchor"
@@ -877,6 +879,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard !layerIDs.isEmpty else {
             return
         }
+
+        var resizeMode = ImageResizeMode.transform
+        if case .scaleCorner = kind, canResizeImageContainer(layerIDs: layerIDs) {
+            resizeMode = editorState.imageResizeMode
+        } else if case .scaleEdge = kind, canResizeImageContainer(layerIDs: layerIDs) {
+            resizeMode = editorState.imageResizeMode
+        }
+        if resizeMode == .container {
+            editName = "Resize Image Container"
+        }
+
         let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
         let pivot = FreeTransformDrag.pivot(for: kind, handles: handles, alternate: alternate)
         let localRel = starts.first.flatMap {
@@ -889,7 +902,15 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                               startHandles: handles,
                                               pivotScene: pivot,
                                               localPivotRelative: localRel,
-                                              editName: editName)
+                                              editName: editName,
+                                              imageResizeMode: resizeMode)
+    }
+
+    private func canResizeImageContainer(layerIDs: [UInt64]) -> Bool {
+        guard layerIDs.count == 1, let layerID = layerIDs.first else {
+            return false
+        }
+        return document.core.layerType(layerID) == .IMAGE
     }
 
     private func updateFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
@@ -959,6 +980,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard handles.valid, let transform = currentScreenTransform() else {
             return .NONE
         }
+        let hideAnchorAndRotate = isImageContainerResizeMode
         let radius = Self.handleHitPoints
         func isNear(_ scenePoint: CGPoint) -> Bool {
             let point = transform.viewPoint(fromScenePoint: scenePoint)
@@ -966,7 +988,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             let dy = point.y - viewPoint.y
             return dx * dx + dy * dy <= radius * radius
         }
-        if isNear(handles.anchor) {
+        if !hideAnchorAndRotate, isNear(handles.anchor) {
             return .ANCHOR
         }
         let cornerHits: [MS_SELECTION_HANDLE] = [.SCALE_CORNER0, .SCALE_CORNER1, .SCALE_CORNER2, .SCALE_CORNER3]
@@ -976,6 +998,10 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let edgeHits: [MS_SELECTION_HANDLE] = [.SCALE_EDGE0, .SCALE_EDGE1, .SCALE_EDGE2, .SCALE_EDGE3]
         for index in 0 ..< 4 where isNear(handles.edgeMids[index]) {
             return edgeHits[index]
+        }
+
+        if hideAnchorAndRotate {
+            return .NONE
         }
 
         let centerView = transform.viewPoint(fromScenePoint: handles.center)
@@ -1005,6 +1031,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         return .NONE
     }
 
+    /// Single selected Image layer with Container resize mode active.
+    private var isImageContainerResizeMode: Bool {
+        guard editorState.imageResizeMode == .container,
+              editorState.selectedLayerIDs.count == 1,
+              let layerID = editorState.selectedLayerID
+        else {
+            return false
+        }
+        return document.core.layerType(layerID) == .IMAGE
+    }
+
     private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {
         guard let transform = currentScreenTransform() else {
             return nil
@@ -1022,6 +1059,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
+        ms_canvas_set_selection_show_anchor(canvas, !isImageContainerResizeMode)
         document.core.setMotionPathSelection(canvas: canvas,
                                              layerID: editorState.motionPathLayerID,
                                              selectedKeyframe: editorState.motionPathSelectedKeyframe)

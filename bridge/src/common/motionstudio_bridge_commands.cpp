@@ -25,6 +25,7 @@
 #include "MotionStudio/undo/SetCompositionSettingsCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetFollowPathCommand.h"
+#include "MotionStudio/undo/SetLayerBlendModeCommand.h"
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
@@ -240,6 +241,11 @@ void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool v
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetLayerLockedCommand>(EntityId{layerId}, locked));
+}
+
+void ms_command_set_layer_blend_mode(MSDocument *document, uint64_t layerId, MS_BLEND blendMode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerBlendModeCommand>(EntityId{layerId}, MakeBlendMode(blendMode)));
 }
 
 void ms_command_add_fill_style(MSDocument *document, uint64_t layerId) {

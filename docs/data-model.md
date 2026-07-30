@@ -71,6 +71,9 @@ public:
     std::vector<std::unique_ptr<Composition>> compositions;
     std::vector<Asset> assets;                 // 图片/字体等文档级资源
 
+    // 非持久化：打开/保存包时由 App 设为包绝对路径。Asset.path 相对此根。
+    std::string projectRoot;
+
     // ID → 实体的全局扁平索引，add/remove 时同步维护
     // 供 undo 命令和桥接层 O(1) 寻址目标
     class EntityIndex {
@@ -81,6 +84,17 @@ public:
         // 返回 nullptr 表示实体不存在（可能已被删除）
     };
     EntityIndex& entityIndex();
+};
+
+enum class AssetType { Image, Font };
+
+struct Asset {
+    EntityId id;
+    AssetType type = AssetType::Image;
+    std::string name;
+    std::string path;   // 相对 projectRoot，如 "assets/photo.png"
+    int width = 0;      // 源图像素宽（导入时写入；字体可为 0）
+    int height = 0;
 };
 ```
 
@@ -181,11 +195,20 @@ Mat3 Layer::worldTransform(FrameTime t, const Document& doc) const {
 ### 3.4 LayerContent（多态）
 
 ```cpp
+enum class ImageScaleMode : uint8_t {
+    None = 0,
+    Stretch = 1,
+    LetterBox = 2,  // 默认（对齐 PAGScaleMode）
+    Zoom = 3,
+};
+
 class ShapeContent : public LayerContent {
     std::unique_ptr<ShapeElement> geometry;  // 单几何：Path / Rect / Ellipse / TrimPath
 };
 class ImageContent : public LayerContent {
-    EntityId assetId;                       // 引用 Document 级 Asset
+    EntityId assetId;                          // 无效 = 未绑定
+    Animatable<Vec2> size{Vec2{200, 200}};     // 容器尺寸（可关键帧）；绑定 asset 不自动改
+    ImageScaleMode scaleMode = ImageScaleMode::LetterBox;
 };
 class TextContent : public LayerContent {
     Animatable<std::string> text;
@@ -197,6 +220,8 @@ class PrecompContent : public LayerContent {
     EntityId compositionId;                 // 引用另一个 Composition
 };
 ```
+
+新建空 Image 层：未绑定 asset、`size` 静态 `200×200`、`anchorPoint = (100,100)`、`position` = 合成中心。Inspector 可「重置为源尺寸」。拖角可在「容器 | 缩放」间切换（单选 Image 时）：容器模式写 `image.size`，缩放模式写 `transform.scale`。
 
 ### 3.5 Shape 模型
 

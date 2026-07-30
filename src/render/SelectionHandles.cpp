@@ -257,7 +257,8 @@ SelectionHandleKind HitTestSelectionHandle(const SelectionHandles &handles,
 
 DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
                                              float strokeWidth,
-                                             float handleSize) {
+                                             float handleSize,
+                                             bool showAnchor) {
     DrawCommandList commands;
     if (!handles.valid) {
         return commands;
@@ -271,6 +272,10 @@ DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
         AppendStroke(commands, AxisAlignedSquare(handles.corners[index], safeHandle), safeStroke);
         AppendFill(commands, AxisAlignedSquare(handles.edgeMids[index], safeHandle), kHandleFillColor);
         AppendStroke(commands, AxisAlignedSquare(handles.edgeMids[index], safeHandle), safeStroke);
+    }
+
+    if (!showAnchor) {
+        return commands;
     }
 
     const float anchorRadius = safeHandle * 0.55f;
