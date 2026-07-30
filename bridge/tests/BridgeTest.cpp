@@ -1052,14 +1052,18 @@ TEST(BridgeCommandTest, ResizeLayerGeometryScalesPathMaskAndRect) {
     EXPECT_FLOAT_EQ(scaleX, 1.0f);
     EXPECT_FLOAT_EQ(scaleY, 1.0f);
 
-    ASSERT_TRUE(ms_document_undo(document));
+    // Path + mask writes are separate undo steps unless wrapped in a merge group.
+    ASSERT_TRUE(ms_document_undo(document));  // mask
+    ASSERT_TRUE(ms_document_undo(document));  // path
     MSBezierPath *restored = ms_property_static_bezier_path(document, pathId, "path");
     ASSERT_NE(restored, nullptr);
     EXPECT_FLOAT_EQ(restored->vertices[1].pointX, 10);
     ms_bezier_path_free(restored);
 
     const uint64_t rectId = ms_command_add_rect_layer(document, compositionId);
+    ms_document_begin_merge_group(document);
     ASSERT_TRUE(ms_command_resize_layer_geometry(document, rectId, 0, -100.0f, 0.0f, 2.0f, 1.0f));
+    ms_document_end_merge_group(document);
     float posX = 0.0f;
     float posY = 0.0f;
     float sizeX = 0.0f;
@@ -1072,6 +1076,39 @@ TEST(BridgeCommandTest, ResizeLayerGeometryScalesPathMaskAndRect) {
     EXPECT_FLOAT_EQ(sizeY, 200.0f);
 
     EXPECT_FALSE(ms_command_resize_layer_geometry(document, 0, 0, 0, 0, 2, 2));
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCommandTest, ResizeLayerGeometryKeepsOuterDragMergeOpen) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t pathId = ms_command_add_path_layer(document, compositionId);
+    MSBezierVertex vertices[2] = {
+        {0, 0, 0, 0, 0, 0},
+        {10, 0, 0, 0, 0, 0},
+    };
+    MSBezierPath input;
+    input.vertices = vertices;
+    input.count = 2;
+    input.closed = false;
+    ms_command_set_static_bezier_path(document, pathId, "path", &input);
+
+    ms_document_begin_merge_group(document);
+    ASSERT_TRUE(ms_command_resize_layer_geometry(document, pathId, 0, 0.0f, 0.0f, 2.0f, 2.0f));
+    ms_command_set_static_vec2(document, pathId, "transform.position", 50.0f, 60.0f);
+    ms_document_end_merge_group(document);
+
+    // One undo must revert both the geometry resize and the position write.
+    ASSERT_TRUE(ms_document_undo(document));
+    MSBezierPath *restored = ms_property_static_bezier_path(document, pathId, "path");
+    ASSERT_NE(restored, nullptr);
+    EXPECT_FLOAT_EQ(restored->vertices[1].pointX, 10);
+    ms_bezier_path_free(restored);
+    float posX = 0.0f;
+    float posY = 0.0f;
+    ms_property_static_vec2(document, pathId, "transform.position", &posX, &posY);
+    EXPECT_NE(posX, 50.0f);
 
     ms_document_destroy(document);
 }

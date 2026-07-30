@@ -835,6 +835,7 @@ final class MotionDocumentCore {
     }
 
     /// Scales shape geometry and mask paths in layer-local space about `localPivot`.
+    /// One-shot relative to *current* geometry — FreeTransform must apply from a drag-start snapshot.
     @discardableResult
     func resizeLayerGeometry(layerID: UInt64, frame: Int64, localPivot: CGPoint, scaleX: CGFloat,
                              scaleY: CGFloat) -> Bool
@@ -845,6 +846,24 @@ final class MotionDocumentCore {
             changed()
         }
         return ok
+    }
+
+    /// Evaluated BezierPath copy at `frame`, or nil when missing / empty.
+    func evaluateBezierPath(entityID: UInt64, path: String, frame: Int64) -> CapturedBezierPath? {
+        guard let evaluated = ms_property_evaluate_bezier_path(handle, entityID, path, frame) else {
+            return nil
+        }
+        defer { ms_bezier_path_free(evaluated) }
+        return CapturedBezierPath(msPath: evaluated)
+    }
+
+    func writeBezierPathAtPlayhead(entityID: UInt64, path: String, frame: Int64,
+                                   value: CapturedBezierPath)
+    {
+        value.withMSBezierPath { msPath in
+            ms_command_write_bezier_path_at_playhead(handle, entityID, path, frame, msPath)
+        }
+        changed()
     }
 
     func removeLayer(compositionID: UInt64, layerID: UInt64) {

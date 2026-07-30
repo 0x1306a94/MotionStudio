@@ -530,9 +530,10 @@ char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId);   // ms_
 void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame);
 
 // Scales shape geometry + all mask paths in layer-local space about localPivot by
-// (scaleX, scaleY). ShapePath vertices/tangents, ShapeRect/Ellipse position+size,
-// and every masks[i].path are written via playhead/static commands in one merge
-// group. Does not modify transform.scale. Returns false if the layer is missing.
+// (scaleX, scaleY) relative to the *current* geometry (one-shot). Does not open a
+// merge group — wrap with begin/end merge for a single undo unit, or call inside
+// an existing drag merge. Does not modify transform.scale / anchor / position.
+// Returns false if the layer is missing.
 bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, double frameTime,
                                       float localPivotX, float localPivotY, float scaleX,
                                       float scaleY);

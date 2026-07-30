@@ -370,7 +370,9 @@ bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, do
 
     const FrameTime frame = static_cast<FrameTime>(frameTime);
     const Vec2 pivot{localPivotX, localPivotY};
-    document->undoManager->beginMergeGroup();
+    // Do not begin/end merge here: FreeTransform already opens a drag merge group,
+    // and nesting endMergeGroup would close it mid-drag. Callers that need one
+    // undo unit for a standalone call should wrap with begin/end merge group.
 
     if (AsBezierPath(FindProperty(document, layerId, "path")) != nullptr) {
         motion::BezierPath path = CurrentBezierPath(document, layerId, "path", frame);
@@ -404,6 +406,5 @@ bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, do
                                 ScaleBezierPathAboutPivot(std::move(path), pivot, scaleX, scaleY));
     }
 
-    document->undoManager->endMergeGroup();
     return true;
 }

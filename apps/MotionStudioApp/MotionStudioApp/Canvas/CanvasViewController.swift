@@ -980,8 +980,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard handles.valid, let transform = currentScreenTransform() else {
             return .NONE
         }
-        let hideAnchor = hidesSelectionAnchor
-        let hideRotate = hidesSelectionRotate
         let radius = Self.handleHitPoints
         func isNear(_ scenePoint: CGPoint) -> Bool {
             let point = transform.viewPoint(fromScenePoint: scenePoint)
@@ -989,7 +987,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             let dy = point.y - viewPoint.y
             return dx * dx + dy * dy <= radius * radius
         }
-        if !hideAnchor, isNear(handles.anchor) {
+        if isNear(handles.anchor) {
             return .ANCHOR
         }
         let cornerHits: [MS_SELECTION_HANDLE] = [.SCALE_CORNER0, .SCALE_CORNER1, .SCALE_CORNER2, .SCALE_CORNER3]
@@ -999,10 +997,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let edgeHits: [MS_SELECTION_HANDLE] = [.SCALE_EDGE0, .SCALE_EDGE1, .SCALE_EDGE2, .SCALE_EDGE3]
         for index in 0 ..< 4 where isNear(handles.edgeMids[index]) {
             return edgeHits[index]
-        }
-
-        if hideRotate {
-            return .NONE
         }
 
         let centerView = transform.viewPoint(fromScenePoint: handles.center)
@@ -1032,27 +1026,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         return .NONE
     }
 
-    /// Image layers hide the anchor during box resize (text keeps it).
-    private var hidesSelectionAnchor: Bool {
-        guard editorState.selectedLayerIDs.count == 1,
-              let layerID = editorState.selectedLayerID
-        else {
-            return false
-        }
-        return document.core.layerType(layerID) == .IMAGE
-    }
-
-    /// Text and Image box resize: hide rotate hit zones (corners still resize the box).
-    private var hidesSelectionRotate: Bool {
-        guard editorState.selectedLayerIDs.count == 1,
-              let layerID = editorState.selectedLayerID
-        else {
-            return false
-        }
-        let type = document.core.layerType(layerID)
-        return type == .TEXT || type == .IMAGE
-    }
-
     private func scenePoint(fromViewPoint point: CGPoint) -> CGPoint? {
         guard let transform = currentScreenTransform() else {
             return nil
@@ -1070,7 +1043,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
-        ms_canvas_set_selection_show_anchor(canvas, !hidesSelectionAnchor)
+        ms_canvas_set_selection_show_anchor(canvas, true)
         document.core.setMotionPathSelection(canvas: canvas,
                                              layerID: editorState.motionPathLayerID,
                                              selectedKeyframe: editorState.motionPathSelectedKeyframe)

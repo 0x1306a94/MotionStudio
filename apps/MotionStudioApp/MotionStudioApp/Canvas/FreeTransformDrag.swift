@@ -7,6 +7,46 @@
 
 import CoreGraphics
 import Foundation
+import MotionStudioBridging
+
+/// Snapshot of a BezierPath for drag-start absolute rewrites.
+struct CapturedBezierPath {
+    var vertices: [MSBezierVertex]
+    var closed: Bool
+
+    init(msPath: UnsafePointer<MSBezierPath>) {
+        let count = Int(msPath.pointee.count)
+        if count > 0, let base = msPath.pointee.vertices {
+            vertices = Array(UnsafeBufferPointer(start: base, count: count))
+        } else {
+            vertices = []
+        }
+        closed = msPath.pointee.closed
+    }
+
+    func scaled(about pivot: CGPoint, scaleX: CGFloat, scaleY: CGFloat) -> CapturedBezierPath {
+        var copy = self
+        for index in copy.vertices.indices {
+            var vertex = copy.vertices[index]
+            vertex.pointX = Float(pivot.x + (CGFloat(vertex.pointX) - pivot.x) * scaleX)
+            vertex.pointY = Float(pivot.y + (CGFloat(vertex.pointY) - pivot.y) * scaleY)
+            vertex.inTangentX = Float(CGFloat(vertex.inTangentX) * scaleX)
+            vertex.inTangentY = Float(CGFloat(vertex.inTangentY) * scaleY)
+            vertex.outTangentX = Float(CGFloat(vertex.outTangentX) * scaleX)
+            vertex.outTangentY = Float(CGFloat(vertex.outTangentY) * scaleY)
+            copy.vertices[index] = vertex
+        }
+        return copy
+    }
+
+    func withMSBezierPath<Result>(_ body: (UnsafePointer<MSBezierPath>) -> Result) -> Result {
+        var verts = vertices
+        return verts.withUnsafeMutableBufferPointer { buffer in
+            var path = MSBezierPath(vertices: buffer.baseAddress, count: buffer.count, closed: closed)
+            return withUnsafePointer(to: &path, body)
+        }
+    }
+}
 
 struct LayerTransformStart {
     let layerID: UInt64
@@ -17,14 +57,27 @@ struct LayerTransformStart {
     let contentSize: CGVector
     /// `image.size` or `content.size` when the layer has a box container.
     let contentSizePath: String?
+    /// ShapePath baseline (drag-start), when present.
+    let shapePath: CapturedBezierPath?
+    /// ShapeRect / ShapeEllipse center + size baseline.
+    let shapePosition: CGVector?
+    let shapeSize: CGVector?
+    let maskPaths: [(index: Int, path: CapturedBezierPath, animated: Bool)]
     let positionAnimated: Bool
     let scaleAnimated: Bool
     let rotationAnimated: Bool
     let anchorAnimated: Bool
     let contentSizeAnimated: Bool
+    let shapePathAnimated: Bool
+    let shapePositionAnimated: Bool
+    let shapeSizeAnimated: Bool
 
     var hasContentSize: Bool {
         contentSizePath != nil
+    }
+
+    var hasShapeGeometry: Bool {
+        shapePath != nil || (shapePosition != nil && shapeSize != nil) || !maskPaths.isEmpty
     }
 }
 
@@ -55,6 +108,38 @@ struct FreeTransformDrag {
             } else {
                 nil
             }
+            var shapePath: CapturedBezierPath?
+            var shapePosition: CGVector?
+            var shapeSize: CGVector?
+            var shapePathAnimated = false
+            var shapePositionAnimated = false
+            var shapeSizeAnimated = false
+            var maskPaths: [(index: Int, path: CapturedBezierPath, animated: Bool)] = []
+            if core.layerType(layerID) == .SHAPE {
+                if core.hasProperty(entityID: layerID, path: "path"),
+                   let path = core.evaluateBezierPath(entityID: layerID, path: "path", frame: frame)
+                {
+                    shapePath = path
+                    shapePathAnimated = core.isAnimated(entityID: layerID, path: "path")
+                } else if core.hasProperty(entityID: layerID, path: "size"),
+                          core.hasProperty(entityID: layerID, path: "position")
+                {
+                    shapePosition = core.evaluateVec2(entityID: layerID, path: "position", frame: frame)
+                    shapeSize = core.evaluateVec2(entityID: layerID, path: "size", frame: frame)
+                    shapePositionAnimated = core.isAnimated(entityID: layerID, path: "position")
+                    shapeSizeAnimated = core.isAnimated(entityID: layerID, path: "size")
+                }
+                let maskCount = core.maskCount(layerID: layerID)
+                for index in 0 ..< maskCount {
+                    let maskPathKey = "masks[\(index)].path"
+                    guard let path = core.evaluateBezierPath(entityID: layerID, path: maskPathKey, frame: frame),
+                          !path.vertices.isEmpty
+                    else {
+                        continue
+                    }
+                    maskPaths.append((index, path, core.isAnimated(entityID: layerID, path: maskPathKey)))
+                }
+            }
             return LayerTransformStart(
                 layerID: layerID,
                 position: core.evaluateVec2(entityID: layerID, path: TransformProperty.position.path, frame: frame),
@@ -65,6 +150,10 @@ struct FreeTransformDrag {
                     core.evaluateVec2(entityID: layerID, path: $0, frame: frame)
                 } ?? .zero,
                 contentSizePath: contentSizePath,
+                shapePath: shapePath,
+                shapePosition: shapePosition,
+                shapeSize: shapeSize,
+                maskPaths: maskPaths,
                 positionAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.position.path),
                 scaleAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.scale.path),
                 rotationAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.rotation.path),
@@ -72,6 +161,9 @@ struct FreeTransformDrag {
                 contentSizeAnimated: contentSizePath.map {
                     core.isAnimated(entityID: layerID, path: $0)
                 } ?? false,
+                shapePathAnimated: shapePathAnimated,
+                shapePositionAnimated: shapePositionAnimated,
+                shapeSizeAnimated: shapeSizeAnimated,
             )
         }
     }
@@ -223,7 +315,7 @@ struct FreeTransformDrag {
                                              scaleX: scaleX,
                                              scaleY: scaleY)
                 }
-            } else if core.layerType(start.layerID) == .SHAPE {
+            } else if start.hasShapeGeometry {
                 applyShapeGeometryResize(core: core, frame: frame, start: start,
                                          scaleX: scaleX, scaleY: scaleY)
             } else {
@@ -251,8 +343,43 @@ struct FreeTransformDrag {
                                      scale: start.scale)
             localPivot = CGPoint(x: unscaled.x + start.anchor.dx, y: unscaled.y + start.anchor.dy)
         }
-        _ = core.resizeLayerGeometry(layerID: start.layerID, frame: frame, localPivot: localPivot,
-                                     scaleX: scaleX, scaleY: scaleY)
+
+        // Always rewrite from drag-start geometry — never scale the already-resized path.
+        if let shapePath = start.shapePath {
+            let scaled = shapePath.scaled(about: localPivot, scaleX: scaleX, scaleY: scaleY)
+            core.writeBezierPathAtPlayhead(entityID: start.layerID, path: "path", frame: frame, value: scaled)
+        } else if let shapePosition = start.shapePosition, let shapeSize = start.shapeSize {
+            let newPosition = CGVector(
+                dx: localPivot.x + (shapePosition.dx - localPivot.x) * scaleX,
+                dy: localPivot.y + (shapePosition.dy - localPivot.y) * scaleY,
+            )
+            let newSize = CGVector(dx: max(1, abs(shapeSize.dx * scaleX)),
+                                   dy: max(1, abs(shapeSize.dy * scaleY)))
+            writeVec2(core: core, layerID: start.layerID, path: "position", frame: frame,
+                      value: newPosition, animated: start.shapePositionAnimated)
+            writeVec2(core: core, layerID: start.layerID, path: "size", frame: frame,
+                      value: newSize, animated: start.shapeSizeAnimated)
+        }
+
+        for mask in start.maskPaths {
+            let scaled = mask.path.scaled(about: localPivot, scaleX: scaleX, scaleY: scaleY)
+            core.writeBezierPathAtPlayhead(entityID: start.layerID, path: "masks[\(mask.index)].path",
+                                           frame: frame, value: scaled)
+        }
+
+        // Keep anchor at the same relative point in local space; compensate position so
+        // the fixed local pivot stays put in the scene.
+        let newAnchor = CGVector(dx: localPivot.x + (start.anchor.dx - localPivot.x) * scaleX,
+                                 dy: localPivot.y + (start.anchor.dy - localPivot.y) * scaleY)
+        let anchorDelta = CGPoint(x: newAnchor.dx - start.anchor.dx, y: newAnchor.dy - start.anchor.dy)
+        let worldDelta = rotate(CGPoint(x: anchorDelta.x * start.scale.dx, y: anchorDelta.y * start.scale.dy),
+                                degrees: CGFloat(start.rotation))
+        let newLayerPosition = CGVector(dx: start.position.dx + worldDelta.x,
+                                        dy: start.position.dy + worldDelta.y)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.anchorPoint.path,
+                  frame: frame, value: newAnchor, animated: start.anchorAnimated)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
+                  frame: frame, value: newLayerPosition, animated: start.positionAnimated)
     }
 
     /// Multi-select / AABB box resize: scale size about the shared scene pivot without rewriting localMin.
