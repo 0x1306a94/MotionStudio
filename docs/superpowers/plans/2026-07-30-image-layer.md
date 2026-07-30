@@ -1,6 +1,6 @@
 # Image Layer 实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 端到端图片图层：包内 `assets/` 资源、空占位层 + Inspector 绑定、容器 size 与 transform 分离、PAG 对齐的 scaleMode、画布绘制与存盘重开。
 
@@ -9,6 +9,8 @@
 **Tech Stack:** C++17 core、GoogleTest、tgfx Metal 适配器、C bridge、SwiftUI/UIKit App（Catalyst + iPad）。
 
 **Spec:** `docs/superpowers/specs/2026-07-30-image-layer-design.md`
+
+**Progress (2026-07-30):** Tasks 1–8 complete and committed on this branch (model → serialize → property path → layout → evaluate → DrawImage → tgfx → bridge). Tasks 9–12 App UI / docs implemented in working tree; pending review commit.
 
 ## Global Constraints
 
@@ -56,7 +58,7 @@
   - `ImageContent::{assetId, Animatable<Vec2> size{Vec2{200,200}}, ImageScaleMode scaleMode = LetterBox}`
   - `Document::projectRoot`：`std::string`，**不序列化**
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(ImageContentTest, DefaultsMatchSpec) {
@@ -75,7 +77,7 @@ TEST(AssetTest, DefaultSizeZero) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target core_tests
@@ -84,7 +86,7 @@ cmake --build build --target core_tests
 
 Expected: 编译失败或断言失败（字段不存在）。
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 `ImageScaleMode.h`：
 
@@ -105,7 +107,7 @@ enum class ImageScaleMode : uint8_t {
 `ImageContent` 增加 `Animatable<Vec2> size{Vec2{200, 200}}; ImageScaleMode scaleMode = ImageScaleMode::LetterBox;`  
 `Document` 增加 `std::string projectRoot;`（注释标明非持久化）。
 
-- [ ] **Step 4: 测试通过后提交**
+- [x] **Step 4: 测试通过后提交**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ImageContentTest.*:AssetTest.DefaultSizeZero'
@@ -127,22 +129,22 @@ git commit --only <相关文件> -m "Add image layer model fields for container 
   - Asset: `width` / `height`（int）
   - Image content: `size`（Animatable Vec2）、`scaleMode`（`"none"|"stretch"|"letterBox"|"zoom"`，默认 letterBox）
 
-- [ ] **Step 1: 写失败 round-trip 测试**
+- [x] **Step 1: 写失败 round-trip 测试**
 
 扩展现有 Image 序列化测试：asset 带 width/height；ImageContent 带 animated 或静态 size + scaleMode Zoom；deserialize 后字段一致。
 
-- [ ] **Step 2: 实现 DTO + Serializer**
+- [x] **Step 2: 实现 DTO + Serializer**
 
 `AssetToJson` 增加 width/height；`AssetFromJson` 读取（缺省 0，兼容旧 JSON）。  
 Image 分支写/读 `size`、`scaleMode`。缺 `scaleMode` → LetterBox；缺 `size` → `200,200`。
 
-- [ ] **Step 3: 跑测试**
+- [x] **Step 3: 跑测试**
 
 ```bash
 ctest --test-dir build -R SerializerTest --output-on-failure
 ```
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Serialize image asset dimensions container size and scale mode."
@@ -161,7 +163,7 @@ git commit --only <相关文件> -m "Serialize image asset dimensions container 
 - Produces: `ResolveAnimatable(doc, {layerId, "image.size"})` → `&ImageContent::size`
 - 说明：路径为 `image.size`（两段），**不是**裸 `size`（避免与 Shape 几何 size 冲突）
 
-- [ ] **Step 1: 失败测试**
+- [x] **Step 1: 失败测试**
 
 ```cpp
 TEST(PropertyPathImageTest, ResolvesImageSize) {
@@ -176,7 +178,7 @@ TEST(PropertyPathImageTest, ResolvesImageSize) {
 
 （按仓库现有 Document/Composition 构造方式改写。）
 
-- [ ] **Step 2: 在 ResolveAnimatable 的 Layer 分支增加**
+- [x] **Step 2: 在 ResolveAnimatable 的 Layer 分支增加**
 
 ```cpp
 if (first.name == "image" && segments.size() == 2 &&
@@ -189,8 +191,8 @@ if (first.name == "image" && segments.size() == 2 &&
 }
 ```
 
-- [ ] **Step 3: 测试通过；确认 `SetStaticValueCommand` 可写 Vec2**
-- [ ] **Step 4: 提交**
+- [x] **Step 3: 测试通过；确认 `SetStaticValueCommand` 可写 Vec2**
+- [x] **Step 4: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Resolve image.size property path for image layer containers."
@@ -223,7 +225,7 @@ Rect2 ComputeImageDestinationRect(Vec2 containerSize, Vec2 intrinsicSize, ImageS
 - Zoom：等比盖满，居中
 - container 或 intrinsic ≤ 0：返回空矩形（width/height ≤ 0）
 
-- [ ] **Step 1: 写失败测试（至少 4 个 mode + 边界）**
+- [x] **Step 1: 写失败测试（至少 4 个 mode + 边界）**
 
 ```cpp
 TEST(ImageScaleLayoutTest, LetterBoxCentersInside) {
@@ -245,13 +247,13 @@ TEST(ImageScaleLayoutTest, StretchFills) {
 
 再补 Zoom（宽容器矮图应裁左右或上下）、None。
 
-- [ ] **Step 2: 实现并跑通**
+- [x] **Step 2: 实现并跑通**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ImageScaleLayoutTest.*'
 ```
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Add ImageScaleLayout helpers matching PAG scale modes."
@@ -274,16 +276,16 @@ git commit --only <相关文件> -m "Add ImageScaleLayout helpers matching PAG s
 - 绝对路径：`projectRoot` 非空且 asset 有效时拼接；用平台无关方式（`projectRoot + "/" + path`，注意已有分隔符）
 - Hit/Bounds：若有 `imageItem`（即使 path 空），用容器 `[0,0]–[cw,ch]`；`cw/ch ≤ 0` 则失败
 
-- [ ] **Step 1: 失败测试**
+- [x] **Step 1: 失败测试**
 
 1. Image 层绑定 asset、设 projectRoot → evaluated 含 absolutePath、containerSize、intrinsicSize、scaleMode  
 2. 未绑定 asset → `imageItem` 仍有（容器 bounds），`absolutePath` 空  
 3. `BoundsOfLayerLocal` 返回容器尺寸  
 4. `HitTestLayer` 点在容器内命中
 
-- [ ] **Step 2: 实现 EvaluateLayer 的 Image 分支**（与 Shape 分支并列；Image 不填 shapeItems）
-- [ ] **Step 3: 改 HitTest / BoundsOfLayer / BoundsOfLayerLocal**
-- [ ] **Step 4: 测试通过并提交**
+- [x] **Step 2: 实现 EvaluateLayer 的 Image 分支**（与 Shape 分支并列；Image 不填 shapeItems）
+- [x] **Step 3: 改 HitTest / BoundsOfLayer / BoundsOfLayerLocal**
+- [x] **Step 4: 测试通过并提交**
 
 ```bash
 git commit --only <相关文件> -m "Evaluate image layers into scene state with container bounds."
@@ -308,10 +310,10 @@ git commit --only <相关文件> -m "Evaluate image layers into scene state with
   - `PlayCommands` 分发到 `drawImage`
   - `BuildCommands`：`imageItem` 且 `!absolutePath.empty()` 时追加 DrawImage（仍包在 Save/Transform/Opacity/Blend/masks 中）
 
-- [ ] **Step 1: 失败测试** — Image 层 + 有效 path → 命令列表含 DrawImage，字段正确；path 空 → 无 DrawImage但仍有 Save/Transform
-- [ ] **Step 2: 改 DrawCommand / CommandBuilder / RenderAdapter / PlayCommands**
-- [ ] **Step 3: 所有实现 `RenderAdapter` 的类加 `drawImage` 默认空实现或纯虚实现**（编译全过）
-- [ ] **Step 4: 测试通过并提交**
+- [x] **Step 1: 失败测试** — Image 层 + 有效 path → 命令列表含 DrawImage，字段正确；path 空 → 无 DrawImage但仍有 Save/Transform
+- [x] **Step 2: 改 DrawCommand / CommandBuilder / RenderAdapter / PlayCommands**
+- [x] **Step 3: 所有实现 `RenderAdapter` 的类加 `drawImage` 默认空实现或纯虚实现**（编译全过）
+- [x] **Step 4: 测试通过并提交**
 
 ```bash
 git commit --only <相关文件> -m "Emit DrawImage commands for evaluated image layers."
@@ -331,15 +333,15 @@ git commit --only <相关文件> -m "Emit DrawImage commands for evaluated image
 - Consumes: `drawImage(path, container, intrinsic, mode)`
 - 行为：LRU 按 path 缓存 `tgfx::Image`；clip 容器；`ComputeImageDestinationRect` 后 `drawImageRect`；失败 no-op
 
-- [ ] **Step 1: 失败快照测试** — LetterBox 与 Stretch 各一帧（固定容器/图尺寸）
-- [ ] **Step 2: 实现 drawImage + 缓存**
-- [ ] **Step 3: 跑 tgfx 测试**
+- [x] **Step 1: 失败快照测试** — LetterBox 与 Stretch 各一帧（固定容器/图尺寸）
+- [x] **Step 2: 实现 drawImage + 缓存**
+- [x] **Step 3: 跑 tgfx 测试**
 
 ```bash
 ctest --test-dir build -R Tgfx --output-on-failure
 ```
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Draw image layers in tgfx with path based image cache."
@@ -382,16 +384,16 @@ int ms_layer_image_scale_mode(MSDocument *doc, uint64_t layerId);
 - `add_image_layer`：空层，size 200×200，anchor (100,100)，position = 合成中心，scaleMode LetterBox
 - `set_image_asset(0)` 解绑；绑定**不**改 size
 
-- [ ] **Step 1: 迁移现有 `ms_document_load` → `ms_document_load_json`，全部 bridge 测试改名调用**
-- [ ] **Step 2: 实现 `ms_document_load(packagePath)` + set/get project_root；加测试**
-- [ ] **Step 3: 实现 import / add_image_layer / set asset / scaleMode + undo 测试**
-- [ ] **Step 4: 跑 bridge_test**
+- [x] **Step 1: 迁移现有 `ms_document_load` → `ms_document_load_json`，全部 bridge 测试改名调用**
+- [x] **Step 2: 实现 `ms_document_load(packagePath)` + set/get project_root；加测试**
+- [x] **Step 3: 实现 import / add_image_layer / set asset / scaleMode + undo 测试**
+- [x] **Step 4: 跑 bridge_test**
 
 ```bash
 ctest --test-dir build -R Bridge --output-on-failure
 ```
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git commit --only <相关文件> -m "Add bridge APIs for package load image import and image layers."
