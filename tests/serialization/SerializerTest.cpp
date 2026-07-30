@@ -541,10 +541,33 @@ TEST(SerializerTest, ImageLayerRoundTripPreservesContainerAndScaleMode) {
     }
     ASSERT_NE(imageLayer, nullptr);
     auto *image = static_cast<motion::ImageContent *>(imageLayer->content.get());
+    EXPECT_TRUE(image->assetId.isValid());
+    EXPECT_EQ(image->assetId, (*restored)->assets[0].id);
     EXPECT_FALSE(image->size.isAnimated());
     EXPECT_FLOAT_EQ(image->size.staticValue().x, 320.0f);
     EXPECT_FLOAT_EQ(image->size.staticValue().y, 240.0f);
     EXPECT_EQ(image->scaleMode, motion::ImageScaleMode::Zoom);
+}
+
+TEST(SerializerTest, UnboundImageAssetIdSerializesAsNull) {
+    auto document = std::make_unique<Document>();
+    auto composition = std::make_unique<Composition>();
+    composition->duration = 30;
+    composition->width = 100;
+    composition->height = 100;
+    composition->layers.push_back(std::make_unique<Layer>(LayerType::Image));
+    document->compositions.push_back(std::move(composition));
+    document->refreshEntityIndex();
+
+    const std::string jsonText = Serializer::serialize(*document);
+    auto json = nlohmann::json::parse(jsonText);
+    ASSERT_TRUE(json["compositions"][0]["layers"][0]["content"]["assetId"].is_null());
+
+    Expected<std::unique_ptr<Document>, std::string> restored = Serializer::deserialize(jsonText);
+    ASSERT_TRUE(restored.hasValue()) << restored.error();
+    auto *image = static_cast<motion::ImageContent *>(
+        (*restored)->compositions[0]->layers[0]->content.get());
+    EXPECT_FALSE(image->assetId.isValid());
 }
 
 TEST(SerializerTest, ImageLayerMissingFieldsUseDefaults) {
@@ -554,6 +577,7 @@ TEST(SerializerTest, ImageLayerMissingFieldsUseDefaults) {
     json["assets"][0].erase("height");
     for (auto &layer : json["compositions"][1]["layers"]) {
         if (layer["type"] == "image") {
+            layer["content"].erase("assetId");
             layer["content"].erase("size");
             layer["content"].erase("scaleMode");
         }
@@ -574,6 +598,7 @@ TEST(SerializerTest, ImageLayerMissingFieldsUseDefaults) {
     }
     ASSERT_NE(imageLayer, nullptr);
     auto *image = static_cast<motion::ImageContent *>(imageLayer->content.get());
+    EXPECT_FALSE(image->assetId.isValid());
     EXPECT_FLOAT_EQ(image->size.staticValue().x, 200.0f);
     EXPECT_FLOAT_EQ(image->size.staticValue().y, 200.0f);
     EXPECT_EQ(image->scaleMode, motion::ImageScaleMode::LetterBox);

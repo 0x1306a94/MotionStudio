@@ -974,7 +974,13 @@ json ContentToJson(const LayerContent &content) {
         }
         case LayerType::Image: {
             const auto &image = static_cast<const ImageContent &>(content);
-            node["assetId"] = IdToString(image.assetId);
+            // Optional ref: invalid → null (same as parentId). Never emit
+            // "000…0" — IdFromString rejects zero as invalid.
+            if (image.assetId.isValid()) {
+                node["assetId"] = IdToString(image.assetId);
+            } else {
+                node["assetId"] = nullptr;
+            }
             node["size"] = AnimatableToJson(image.size);
             node["scaleMode"] = dto::ToString(image.scaleMode);
             break;
@@ -1026,11 +1032,19 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
         }
         case LayerType::Image: {
             auto content = std::make_unique<ImageContent>();
-            Expected<EntityId, std::string> assetId = IdField(node, "assetId");
-            if (!assetId) {
-                return Unexpected(assetId.error());
+            if (const json *assetIdNode = FindChild(node, "assetId")) {
+                if (!assetIdNode->is_null()) {
+                    Expected<std::string, std::string> assetIdText = AsString(*assetIdNode);
+                    if (!assetIdText) {
+                        return Unexpected(assetIdText.error());
+                    }
+                    Expected<EntityId, std::string> assetId = IdFromString(*assetIdText);
+                    if (!assetId) {
+                        return Unexpected(assetId.error());
+                    }
+                    content->assetId = *assetId;
+                }
             }
-            content->assetId = *assetId;
             if (const json *sizeNode = FindChild(node, "size")) {
                 Expected<void, std::string> result = AnimatableFromJson(*sizeNode, content->size);
                 if (!result) {
