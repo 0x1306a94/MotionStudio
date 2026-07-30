@@ -366,21 +366,21 @@ EOF
 - Grep 清零：`autoHeight` / `ImageResizeMode` / `textAutoHeight` / `TextLayoutHits` / `SetTextAutoHeight`（`third_party/` 与历史 plan 除外）
 - Inspector `setTextBoxSize`：保持「只等比 anchor、不动 position」（与手柄对角固定区分）
 
-- [ ] **Step 1: Grep 清零残留代码引用**
+- [x] **Step 1: Grep 清零残留代码引用**
 
 ```bash
 rg -n 'autoHeight|ImageResizeMode|TextLayoutHits|textAutoHeight|SetTextAutoHeight' \
   --glob '!third_party/**' --glob '!docs/superpowers/plans/2026-07-30-text-layer.md'
 ```
 
-- [ ] **Step 2: 更新 `docs/rendering.md`**
+- [x] **Step 2: 更新 `docs/rendering.md`**
 
-- [ ] **Step 3: 全量测试**
+- [x] **Step 3: 全量测试**
 
 Run: `ctest --test-dir build --output-on-failure -LE benchmark`  
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/
