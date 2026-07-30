@@ -4,6 +4,8 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <thread>
 
@@ -60,7 +62,7 @@ TEST(BridgeDocumentTest, SaveLoadRoundTrip) {
     ASSERT_NE(saved.value, nullptr);
     ms_document_destroy(document);
 
-    MSDocument *loaded = ms_document_load(saved.value, std::strlen(saved.value), nullptr);
+    MSDocument *loaded = ms_document_load_json(saved.value, std::strlen(saved.value), nullptr);
     ASSERT_NE(loaded, nullptr);
     const uint64_t loadedCompositionId = ms_document_composition_id_at(loaded, 0);
     EXPECT_EQ(ms_composition_layer_count(loaded, loadedCompositionId), 1);
@@ -73,7 +75,7 @@ TEST(BridgeDocumentTest, SaveLoadRoundTrip) {
 
 TEST(BridgeDocumentTest, LoadInvalidJsonReportsError) {
     char *error = nullptr;
-    MSDocument *document = ms_document_load("not json", 8, &error);
+    MSDocument *document = ms_document_load_json("not json", 8, &error);
     EXPECT_EQ(document, nullptr);
     ASSERT_NE(error, nullptr);
     EXPECT_FALSE(std::string(error).empty());
@@ -566,7 +568,7 @@ TEST(BridgeTest, NullHandlesAreSafe) {
     EXPECT_EQ(ms_document_save(nullptr), nullptr);
     EXPECT_EQ(ms_document_composition_count(nullptr), 0);
     EXPECT_EQ(ms_layer_name(nullptr, 1), nullptr);
-    EXPECT_EQ(ms_document_load(nullptr, 0, nullptr), nullptr);
+    EXPECT_EQ(ms_document_load_json(nullptr, 0, nullptr), nullptr);
     ms_canvas_draw_frame(nullptr, nullptr, 0, 0);
     ms_canvas_set_draw_mode(nullptr, MS_CANVAS_DRAW_MODE_PLAYBACK);
     EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
@@ -845,6 +847,62 @@ TEST(BridgeBezierPathTest, WriteAtPlayheadStaticThenAnimated) {
     ms_command_write_bezier_path_at_playhead(document, layerId, "path", 10, &keyed);
     EXPECT_EQ(ms_property_keyframe_count(document, layerId, "path"), 2);
 
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+
+    // Temp package root with assets/.
+    const auto root = std::filesystem::temp_directory_path() /
+        ("ms_image_bridge_" + std::to_string(reinterpret_cast<uintptr_t>(document)));
+    std::filesystem::create_directories(root / "assets");
+    ms_document_set_project_root(document, root.string().c_str());
+
+    const auto source = root / "source.png";
+    {
+        // Minimal valid 1x1 PNG.
+        static const unsigned char kPng[] = {
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+            0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+            0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8,
+            0xCF, 0xC0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0xFE, 0x02, 0xFE, 0x00, 0x00,
+            0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82};
+        std::ofstream out(source, std::ios::binary);
+        out.write(reinterpret_cast<const char *>(kPng), sizeof(kPng));
+    }
+
+    const uint64_t assetId =
+        ms_command_import_image_asset(document, source.string().c_str(), "photo.png", 64, 32);
+    ASSERT_NE(assetId, 0u);
+    EXPECT_EQ(ms_document_asset_count(document), 1);
+    EXPECT_EQ(ms_asset_width(document, assetId), 64);
+    EXPECT_EQ(ms_asset_height(document, assetId), 32);
+    EXPECT_TRUE(std::filesystem::exists(root / "assets" / "photo.png"));
+
+    const uint64_t layerId = ms_command_add_image_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+    EXPECT_EQ(ms_layer_image_asset_id(document, layerId), 0u);
+    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), 2);  // LetterBox
+
+    ASSERT_TRUE(ms_layer_set_image_asset(document, layerId, assetId));
+    EXPECT_EQ(ms_layer_image_asset_id(document, layerId), assetId);
+    ms_layer_set_image_scale_mode(document, layerId, 1);  // Stretch
+    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), 1);
+
+    ASSERT_TRUE(ms_document_undo(document));  // scale mode
+    EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), 2);
+    ASSERT_TRUE(ms_document_undo(document));  // bind
+    EXPECT_EQ(ms_layer_image_asset_id(document, layerId), 0u);
+    ASSERT_TRUE(ms_document_undo(document));  // add layer
+    ASSERT_TRUE(ms_document_undo(document));  // import asset
+    EXPECT_EQ(ms_document_asset_count(document), 0);
+    EXPECT_TRUE(std::filesystem::exists(root / "assets" / "photo.png"));
+
+    std::error_code error;
+    std::filesystem::remove_all(root, error);
     ms_document_destroy(document);
 }
 

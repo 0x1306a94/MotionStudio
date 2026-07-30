@@ -191,12 +191,22 @@ typedef CF_CLOSED_ENUM(int, MS_PATH_EDIT) {
 // (1920x1080, 30 fps, 150 frames).
 MSDocument *ms_document_create(void);
 
-// Loads a document from JSON text.
+// Loads a document from JSON text (in-memory). Does not set projectRoot.
 // jsonText: JSON payload (need not be null-terminated).
 // length: byte length of jsonText.
 // errorOut: optional; on failure receives a malloc'd error message.
 // Returns NULL on failure.
-MSDocument *ms_document_load(const char *jsonText, size_t length, char **errorOut);
+MSDocument *ms_document_load_json(const char *jsonText, size_t length, char **errorOut);
+
+// Loads a document package directory: reads {packagePath}/document.json and
+// sets projectRoot to packagePath.
+// packagePath: absolute path to the package directory.
+// errorOut: optional; on failure receives a malloc'd error message.
+MSDocument *ms_document_load(const char *packagePath, char **errorOut);
+
+// Sets / gets the non-persistent project package root used to resolve Asset.path.
+void ms_document_set_project_root(MSDocument *document, const char *absolutePath);
+char *ms_document_project_root(MSDocument *document);
 
 void ms_document_destroy(MSDocument *document);
 
@@ -461,6 +471,28 @@ uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t composition
 // Adds an empty open ShapePath layer with a default fill, centered on the
 // composition. Returns the new layer ID, 0 on failure.
 uint64_t ms_command_add_path_layer(MSDocument *document, uint64_t compositionId);
+
+// Copies sourceAbsolutePath into {projectRoot}/assets/ (requires projectRoot),
+// registers a document Asset with the given intrinsic pixel size, and returns
+// the new asset id (0 on failure). Undo removes the Asset entry only.
+uint64_t ms_command_import_image_asset(MSDocument *document, const char *sourceAbsolutePath,
+                                       const char *preferredFileName, int width, int height);
+// Adds an unbound placeholder Image layer (200x200, centered). Returns layer id.
+uint64_t ms_command_add_image_layer(MSDocument *document, uint64_t compositionId);
+// Binds image layer to assetId; assetId 0 unbinds. Does not change container size.
+bool ms_layer_set_image_asset(MSDocument *document, uint64_t layerId, uint64_t assetId);
+uint64_t ms_layer_image_asset_id(MSDocument *document, uint64_t layerId);
+// mode: ImageScaleMode as int (0 None, 1 Stretch, 2 LetterBox, 3 Zoom).
+void ms_layer_set_image_scale_mode(MSDocument *document, uint64_t layerId, int mode);
+int ms_layer_image_scale_mode(MSDocument *document, uint64_t layerId);
+int ms_document_asset_count(MSDocument *document);
+uint64_t ms_document_asset_id_at(MSDocument *document, int index);
+char *ms_asset_name(MSDocument *document, uint64_t assetId);
+char *ms_asset_path(MSDocument *document, uint64_t assetId);
+int ms_asset_width(MSDocument *document, uint64_t assetId);
+int ms_asset_height(MSDocument *document, uint64_t assetId);
+int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 image, 1 font
+
 // Bakes Rect/Ellipse geometry on the layer into a ShapePath at frame.
 void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame);
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);

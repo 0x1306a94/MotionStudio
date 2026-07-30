@@ -43,7 +43,7 @@ final class MotionDocumentCore {
     nonisolated init(json: Data) throws {
         var error: UnsafeMutablePointer<CChar>?
         let handle = json.withUnsafeBytes { buffer in
-            ms_document_load(buffer.bindMemory(to: CChar.self).baseAddress, buffer.count, &error)
+            ms_document_load_json(buffer.bindMemory(to: CChar.self).baseAddress, buffer.count, &error)
         }
         guard let handle else {
             let message = Self.takeString(error) ?? "unknown load error"

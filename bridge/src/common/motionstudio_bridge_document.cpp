@@ -1,6 +1,8 @@
 #include "motionstudio_bridge.h"
 
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -32,7 +34,7 @@ MSDocument *ms_document_create(void) {
     return handle;
 }
 
-MSDocument *ms_document_load(const char *jsonText, size_t length, char **errorOut) {
+MSDocument *ms_document_load_json(const char *jsonText, size_t length, char **errorOut) {
     if (jsonText == nullptr) {
         return nullptr;
     }
@@ -47,6 +49,48 @@ MSDocument *ms_document_load(const char *jsonText, size_t length, char **errorOu
     handle->document = std::move(result).value();
     handle->undoManager = std::make_unique<UndoManager>();
     return handle;
+}
+
+MSDocument *ms_document_load(const char *packagePath, char **errorOut) {
+    if (packagePath == nullptr || packagePath[0] == '\0') {
+        if (errorOut != nullptr) {
+            *errorOut = strdup("package path is empty");
+        }
+        return nullptr;
+    }
+    const std::filesystem::path root(packagePath);
+    const std::filesystem::path documentPath = root / "document.json";
+    std::ifstream input(documentPath, std::ios::binary);
+    if (!input) {
+        if (errorOut != nullptr) {
+            *errorOut = strdup("failed to open document.json");
+        }
+        return nullptr;
+    }
+    const std::string json((std::istreambuf_iterator<char>(input)),
+                           std::istreambuf_iterator<char>());
+    MSDocument *handle = ms_document_load_json(json.data(), json.size(), errorOut);
+    if (handle == nullptr) {
+        return nullptr;
+    }
+    handle->document->projectRoot = root.lexically_normal().string();
+    return handle;
+}
+
+void ms_document_set_project_root(MSDocument *document, const char *absolutePath) {
+    DocumentLock guard(document);
+    if (document == nullptr) {
+        return;
+    }
+    document->document->projectRoot = absolutePath == nullptr ? std::string{} : absolutePath;
+}
+
+char *ms_document_project_root(MSDocument *document) {
+    DocumentLock guard(document);
+    if (document == nullptr) {
+        return nullptr;
+    }
+    return strdup(document->document->projectRoot.c_str());
 }
 
 void ms_document_destroy(MSDocument *document) {

@@ -31,6 +31,9 @@ enum class CommandKind {
     ConvertGeometryToPath,
     SetSpatialTangents,
     SetFollowPath,
+    ImportImageAsset,
+    SetImageAsset,
+    SetImageScaleMode,
     Composite,
 };
 
