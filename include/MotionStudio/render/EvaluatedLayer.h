@@ -11,6 +11,7 @@
 #include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedMask.h"
 #include "MotionStudio/render/EvaluatedShapeItem.h"
+#include "MotionStudio/render/EvaluatedTextItem.h"
 
 namespace motion {
 
@@ -25,6 +26,7 @@ struct EvaluatedLayer {
     BlendMode blendMode = BlendMode::Normal;
     std::vector<EvaluatedShapeItem> shapeItems;
     std::optional<EvaluatedImageItem> imageItem;
+    std::optional<EvaluatedTextItem> textItem;
     std::vector<EvaluatedMask> masks;
     TrackMatteType trackMatteType = TrackMatteType::None;
     EntityId matteSourceId;

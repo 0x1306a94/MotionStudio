@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "MotionStudio/model/Asset.h"
+#include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
@@ -14,6 +15,7 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/render/FollowPathEval.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -221,8 +223,46 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         out.push_back(std::move(evaluated));
         return;
     }
+    if (layer.content->type() == LayerType::Text) {
+        const auto &textContent = static_cast<const TextContent &>(*layer.content);
+        EvaluatedLayer evaluated;
+        FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
+        EvaluatedTextItem textItem;
+        textItem.text = textContent.text.evaluatePreview(time);
+        textItem.fontSize = textContent.fontSize.evaluatePreview(time);
+        textItem.containerSize = textContent.size.evaluatePreview(time);
+        textItem.autoHeight = textContent.autoHeight;
+        textItem.align = textContent.align;
+        textItem.fontAssetId = textContent.fontAssetId;
+        textItem.fontFamily = textContent.fontFamily;
+        textItem.hitSize = textItem.containerSize;
+        textItem.fillColor = Color{0, 0, 0, 1};
+        if (const Asset *asset = FindAsset(document, textContent.fontAssetId)) {
+            if (asset->type == AssetType::Font) {
+                textItem.fontAbsolutePath = JoinProjectPath(document.projectRoot, asset->path);
+            }
+        }
+        bool haveFill = false;
+        for (const auto &style : layer.styles) {
+            if (!haveFill && style->type() == LayerStyleType::Fill) {
+                const auto &fill = static_cast<const FillStyle &>(*style);
+                textItem.fillColor = fill.color.evaluatePreview(time);
+                haveFill = true;
+            } else if (!textItem.strokeColor.has_value() && style->type() == LayerStyleType::Stroke) {
+                const auto &stroke = static_cast<const StrokeStyle &>(*style);
+                const float width = stroke.width.evaluatePreview(time);
+                if (width > 0.0f) {
+                    textItem.strokeColor = stroke.color.evaluatePreview(time);
+                    textItem.strokeWidth = width;
+                }
+            }
+        }
+        evaluated.textItem = std::move(textItem);
+        out.push_back(std::move(evaluated));
+        return;
+    }
     if (layer.content->type() != LayerType::Shape) {
-        return;  // Group/Text layers produce no draw items
+        return;  // Group layers produce no draw items
     }
     const auto &shapeContent = static_cast<const ShapeContent &>(*layer.content);
     EvaluatedLayer evaluated;
