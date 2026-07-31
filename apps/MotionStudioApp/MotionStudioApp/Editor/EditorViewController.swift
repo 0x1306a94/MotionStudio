@@ -89,11 +89,13 @@ final class EditorViewController: UIViewController {
     var isInspectorPanelVisible = true
     var saveAsTemporaryDirectoryURL: URL?
     var videoExportSession: VideoExportSession?
+    var pagExportSession: PagExportSession?
     var documentPickerPurpose: DocumentPickerPurpose = .saveAs
 
     enum DocumentPickerPurpose {
         case saveAs
         case exportMP4
+        case exportPAG
     }
 
     init(document: MotionProjectDocument) {
@@ -156,6 +158,7 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "s", modifierFlags: [.command], action: #selector(saveCurrentDocument)),
             UIKeyCommand(input: "s", modifierFlags: [.command, .shift], action: #selector(saveDocumentAs)),
             UIKeyCommand(input: "e", modifierFlags: [.command, .alternate], action: #selector(exportMP4)),
+            UIKeyCommand(input: "p", modifierFlags: [.command, .alternate], action: #selector(exportPAG)),
             UIKeyCommand(input: "r", modifierFlags: [.command, .shift], action: #selector(addRectangleLayer)),
             UIKeyCommand(input: "e", modifierFlags: [.command, .shift], action: #selector(addEllipseLayer)),
             UIKeyCommand(input: "i", modifierFlags: [.command, .shift], action: #selector(addImageLayer)),
@@ -172,10 +175,11 @@ final class EditorViewController: UIViewController {
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         switch action {
         case #selector(saveCurrentDocument):
-            videoExportSession == nil && hasUnsavedChanges
+            !isExportInProgress && hasUnsavedChanges
         case #selector(saveDocumentAs),
-             #selector(exportMP4):
-            videoExportSession == nil
+             #selector(exportMP4),
+             #selector(exportPAG):
+            !isExportInProgress
         case #selector(requestCloseWindow),
              #selector(addRectangleLayer),
              #selector(addEllipseLayer),

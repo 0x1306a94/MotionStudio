@@ -29,7 +29,7 @@ LIBRARY_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) $(SRCROOT)/../gen_xcode/tgfx_
 LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) $(SRCROOT)/../gen_xcode/tgfx_prebuilt/$(CONFIGURATION)/ios/arm64-simulator
 
 // Core + bridge + adapters + prebuilt tgfx, and their framework deps.
-CORE_LINK_FLAGS = -lmotionstudio_bridge -lmotionstudio_core -lmotionstudio_tgfx_adapter -lmotionstudio_avf_adapter -ltextlayout -ltgfx -lc++ -liconv -framework Metal -framework MetalKit -framework Foundation -framework QuartzCore -framework CoreMedia -framework CoreVideo -framework AVFoundation -framework ImageIO
+CORE_LINK_FLAGS = -lmotionstudio_bridge -lmotionstudio_pag_export -lpag_codec -lmotionstudio_core -lmotionstudio_tgfx_adapter -lmotionstudio_avf_adapter -ltextlayout -ltgfx -lc++ -liconv -framework Metal -framework MetalKit -framework Foundation -framework QuartzCore -framework CoreMedia -framework CoreVideo -framework AVFoundation -framework ImageIO
 OTHER_LDFLAGS = $(inherited) $(CORE_LINK_FLAGS)
 OTHER_LDFLAGS[sdk=macosx*] = $(inherited) -framework UIKit -framework CoreGraphics
 OTHER_LDFLAGS[sdk=iphoneos*] = $(inherited) -framework UIKit -framework CoreGraphics

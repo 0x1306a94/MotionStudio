@@ -10,7 +10,7 @@ import UIKit
 @MainActor
 extension EditorViewController {
     @objc func exportMP4() {
-        guard videoExportSession == nil else { return }
+        guard !isExportInProgress else { return }
 
         // Pause live preview for the export flow; do not resume afterward.
         if editorState.isPlaying {
@@ -190,14 +190,14 @@ extension EditorViewController {
 
     func updateExportButtonState() {
         #if !targetEnvironment(macCatalyst)
-            let enabled = videoExportSession == nil
+            let enabled = !isExportInProgress
             exportButton.isEnabled = enabled
             // Match a normal toolbar control (not the muted secondaryLabel used by idle Save).
             exportButton.tintColor = enabled ? .label : .tertiaryLabel
         #endif
     }
 
-    private func presentExportAlert(title: String, message: String) {
+    func presentExportAlert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)

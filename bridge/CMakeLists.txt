@@ -15,7 +15,7 @@ if (APPLE)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/apple
     )
     list(APPEND BRIDGE_ALL_SOURCES ${APPLE_SOURCES})
-    list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter motionstudio_avf_adapter)
+    list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter motionstudio_avf_adapter pag_export)
 endif()
 
 message(STATUS "BRIDGE_PUBLIC_HEADERS: ${BRIDGE_PUBLIC_HEADERS}")
@@ -57,4 +57,9 @@ disable_xcode_target_signing(bridge_test)
 
 target_include_directories(bridge_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/common")
 target_link_libraries(bridge_test PRIVATE bridge GTest::gtest_main)
+if (APPLE)
+  # Static pag_export/pag_codec/tgfx symbols are not re-exported by bridge.a.
+  motionstudio_add_tgfx_prebuild(bridge_test)
+  motionstudio_link_prebuilt_tgfx(bridge_test)
+endif()
 gtest_discover_tests(bridge_test)

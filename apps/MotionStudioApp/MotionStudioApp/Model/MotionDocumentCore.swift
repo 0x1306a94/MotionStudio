@@ -15,6 +15,10 @@ enum VideoExportError: Error {
     case failed(String)
 }
 
+enum PagExportError: Error {
+    case failed(String)
+}
+
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
 ///
@@ -190,6 +194,26 @@ final class MotionDocumentCore {
                 throw VideoExportError.cancelled
             }
             throw VideoExportError.failed(message)
+        }
+    }
+
+    nonisolated func exportPAG(compositionID: UInt64,
+                               outputPath: String,
+                               allowBitmapFallback: Bool) throws
+    {
+        try outputPath.withCString { path in
+            var options = MSPagExportOptions()
+            options.outputPath = path
+            options.allowBitmapFallback = allowBitmapFallback
+            options.bitmapScale = 1.0
+
+            var error: UnsafeMutablePointer<CChar>?
+            let ok = ms_pag_export(handle, compositionID, &options, &error)
+            if ok {
+                return
+            }
+            let message = Self.takeString(error) ?? "export failed"
+            throw PagExportError.failed(message)
         }
     }
 

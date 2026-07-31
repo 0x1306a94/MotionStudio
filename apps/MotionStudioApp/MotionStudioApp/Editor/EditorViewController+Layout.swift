@@ -76,10 +76,7 @@ extension EditorViewController {
                                action: #selector(toggleInspectorPanel))
 
         #if !targetEnvironment(macCatalyst)
-            configureToolbarButton(exportButton,
-                                   systemName: "square.and.arrow.up",
-                                   accessibilityLabel: "Export MP4",
-                                   action: #selector(exportMP4))
+            configureExportToolbarButton()
             configureToolbarButton(undoButton,
                                    systemName: "arrow.uturn.left",
                                    accessibilityLabel: "Undo",
@@ -307,6 +304,27 @@ extension EditorViewController {
         button.addTarget(self, action: action, for: .primaryActionTriggered)
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: Metrics.toolbarButtonSize),
+        ])
+    }
+
+    func configureExportToolbarButton() {
+        exportButton.translatesAutoresizingMaskIntoConstraints = false
+        exportButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+        exportButton.accessibilityLabel = "Export"
+        exportButton.layer.cornerRadius = Metrics.toolButtonCornerRadius
+        exportButton.layer.cornerCurve = .continuous
+        exportButton.clipsToBounds = true
+        exportButton.showsMenuAsPrimaryAction = true
+        exportButton.menu = UIMenu(children: [
+            UIAction(title: "Export MP4...") { [weak self] _ in
+                self?.exportMP4()
+            },
+            UIAction(title: "Export PAG...") { [weak self] _ in
+                self?.exportPAG()
+            },
+        ])
+        NSLayoutConstraint.activate([
+            exportButton.widthAnchor.constraint(equalToConstant: Metrics.toolbarButtonSize),
         ])
     }
 

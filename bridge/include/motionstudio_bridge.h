@@ -601,6 +601,19 @@ bool ms_video_export(MSDocument *document, uint64_t compositionId,
                      const MSVideoExportOptions *options,
                      bool (*progress)(void *ctx, int64_t completed, int64_t total), void *progressCtx,
                      const volatile int *cancelFlag, char **errorOut);
+
+/* ============================ pag export (Apple platforms) ============================ */
+
+typedef struct MSPagExportOptions {
+    const char *outputPath;
+    bool allowBitmapFallback;
+    float bitmapScale;  // <=0 → 1.0
+} MSPagExportOptions;
+
+// Exports composition to a binary .pag file via PagExporter (no FrameSource).
+// On failure *errorOut is malloc'd (ms_string_free).
+bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExportOptions *options,
+                   char **errorOut);
 #endif
 
 void ms_canvas_destroy(MSCanvas *canvas);

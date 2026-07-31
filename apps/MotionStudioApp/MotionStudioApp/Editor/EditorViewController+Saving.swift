@@ -135,6 +135,8 @@ extension EditorViewController: UIDocumentPickerDelegate {
             removeSaveAsTemporaryDocument()
         case .exportMP4:
             cleanupVideoExportSession()
+        case .exportPAG:
+            cleanupPagExportSession()
         }
     }
 
@@ -144,6 +146,8 @@ extension EditorViewController: UIDocumentPickerDelegate {
             removeSaveAsTemporaryDocument()
         case .exportMP4:
             cleanupVideoExportSession()
+        case .exportPAG:
+            cleanupPagExportSession()
         }
     }
 }

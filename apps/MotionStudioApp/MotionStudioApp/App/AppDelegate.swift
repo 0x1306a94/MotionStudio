@@ -37,9 +37,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                             action: #selector(EditorViewController.exportMP4),
                                             input: "e",
                                             modifierFlags: [.command, .alternate])
+        let exportPAGCommand = UIKeyCommand(title: "Export PAG...",
+                                            image: nil,
+                                            action: #selector(EditorViewController.exportPAG),
+                                            input: "p",
+                                            modifierFlags: [.command, .alternate])
         let saveMenu = UIMenu(title: "",
                               options: .displayInline,
-                              children: [saveCommand, saveAsCommand, exportMP4Command])
+                              children: [saveCommand, saveAsCommand, exportMP4Command, exportPAGCommand])
         builder.insertSibling(saveMenu, beforeMenu: .close)
 
         let closeCommand = UIKeyCommand(title: "Close",
