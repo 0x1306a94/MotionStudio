@@ -134,25 +134,25 @@ PagExporter::Export(const Document&, const PagExportOptions&)
 
 ### Task 11: Text + Image
 
-- [ ] TextLayer / TextDocument；无法表达的细节 → warning，尽量保矢量
-- [ ] ImageBytes + scaleMode；缺 asset → `MappingFailed`（或占位，实现时锁定一种）
-- [ ] Commit — `Export text and image layers into editable PAG content.`
+- [x] TextLayer / TextDocument；无法表达的细节 → warning，尽量保矢量
+- [x] ImageBytes + scaleMode；缺 asset → `MappingFailed`（非 WebP 经 tgfx 重编码为 WebP）
+- [x] Commit — included in 1b mapping commit
 
 ---
 
 ### Task 12: Mask / TrackMatte / BlendMode
 
-- [ ] MaskData、trackMatte 顺序、BlendMode 子集
-- [ ] 无 PAG 对应且不能近似 → 本阶段可走 Bitmap（Task 14）或 `MappingFailed`
-- [ ] Commit — `Export masks track mattes and blend modes into PAG.`
+- [x] MaskData、trackMatte 顺序、BlendMode 子集
+- [x] 无 PAG 对应且不能近似 → 本阶段 `MappingFailed`（Bitmap 后置）
+- [x] Commit — included in 1b mapping commit
 
 ---
 
 ### Task 13: Precomp
 
-- [ ] `PreComposeLayer`；时间：`innerTime = (outer - inPoint) × timeStretch + startTime`
-- [ ] 多 Composition 进同一 `pag::File`
-- [ ] Commit — `Export precomps into PAG layer graphs.`
+- [x] `PreComposeLayer`；`compositionStartTime` / `stretch`；多 Composition，root 在 `compositions` 末尾
+- [x] 多 Composition 进同一 `pag::File`
+- [x] Commit — included in 1b mapping commit
 
 ---
 
@@ -176,10 +176,10 @@ PagExporter::Export(const Document&, const PagExportOptions&)
 | Encode / PagExporter API | 5–6 | 1a |
 | Shape / KF / Group | 7–9 | 1a |
 | 未支持 → MappingFailed（无 Bitmap） | 9 | 1a |
-| Text / Image | 11 | 1b |
-| Mask / Matte / Blend | 12 | 1b |
-| Precomp | 13 | 1b |
-| BitmapFallback / FollowPath | 14 | 1b |
+| Text / Image | 11 | 1b 完成 |
+| Mask / Matte / Blend | 12 | 1b 完成 |
+| Precomp | 13 | 1b 完成 |
+| BitmapFallback / FollowPath | 14 | 进行中 |
 | 无 UI/Bridge | 全局 | — |
 
 ## 执行说明

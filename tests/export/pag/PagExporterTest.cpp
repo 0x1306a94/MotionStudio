@@ -1,21 +1,33 @@
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <string>
 
 #include <gtest/gtest.h>
 
 #include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/export/PagExporter.h"
+#include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TextContent.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "pag/file.h"
 
+using motion::Asset;
+using motion::AssetType;
+using motion::BezierPath;
 using motion::BlendMode;
 using motion::Color;
 using motion::Composition;
@@ -24,17 +36,24 @@ using motion::Easing;
 using motion::EntityId;
 using motion::FillStyle;
 using motion::FrameTime;
+using motion::ImageContent;
+using motion::ImageScaleMode;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
+using motion::Mask;
+using motion::MaskMode;
 using motion::PagExporter;
 using motion::PagExportError;
 using motion::PagExportOptions;
+using motion::PrecompContent;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::StrokeStyle;
+using motion::TextContent;
+using motion::TrackMatteType;
 using motion::Vec2;
 
 namespace {
@@ -191,10 +210,165 @@ TEST(PagExporterTest, FollowPathFails) {
     EXPECT_EQ(result.error(), PagExportError::MappingFailed);
 }
 
-TEST(PagExporterTest, TextLayerFails) {
+TEST(PagExporterTest, TextLayerExports) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
     auto layer = std::make_unique<Layer>(LayerType::Text);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto *content = static_cast<TextContent *>(layer->content.get());
+    content->text.setStaticValue("Hello PAG");
+    content->fontFamily = "PingFang SC";
+    content->fontSize.setStaticValue(36.0f);
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers.size(), 1u);
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Text);
+    auto *textLayer = static_cast<pag::TextLayer *>(vector->layers[0]);
+    ASSERT_NE(textLayer->sourceText, nullptr);
+    EXPECT_EQ(textLayer->sourceText->value->text, "Hello PAG");
+    EXPECT_FLOAT_EQ(textLayer->sourceText->value->fontSize, 36.0f);
+}
+
+TEST(PagExporterTest, ImageLayerExports) {
+    // Valid 1x1 RGB PNG (red).
+    static const unsigned char kPng[] = {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8,
+        0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0xC9, 0xFE, 0x92, 0xEF, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82};
+
+    const std::string dir = "/tmp/motionstudio_pag_export_test";
+    std::error_code error;
+    std::filesystem::create_directories(dir + "/assets", error);
+    ASSERT_FALSE(error) << error.message();
+    const std::string relative = "assets/pixel.png";
+    {
+        std::ofstream output(dir + "/" + relative, std::ios::binary);
+        ASSERT_TRUE(output);
+        output.write(reinterpret_cast<const char *>(kPng), sizeof(kPng));
+    }
+
+    Document document = MakeEmptyDoc(400, 300, 30);
+    document.projectRoot = dir;
+    Asset asset;
+    asset.type = AssetType::Image;
+    asset.path = relative;
+    asset.width = 1;
+    asset.height = 1;
+    document.assets.push_back(asset);
+
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto *content = static_cast<ImageContent *>(layer->content.get());
+    content->assetId = asset.id;
+    content->scaleMode = ImageScaleMode::LetterBox;
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    ASSERT_EQ(file->images.size(), 1u);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Image);
+}
+
+TEST(PagExporterTest, MaskExports) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 100});
+    Mask mask;
+    BezierPath path;
+    path.closed = true;
+    path.vertices.push_back({Vec2{0, 0}, {}, {}});
+    path.vertices.push_back({Vec2{50, 0}, {}, {}});
+    path.vertices.push_back({Vec2{50, 50}, {}, {}});
+    mask.path.setStaticValue(path);
+    mask.mode = MaskMode::Add;
+    layer->masks.push_back(mask);
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers[0]->masks.size(), 1u);
+    EXPECT_EQ(vector->layers[0]->masks[0]->maskMode, pag::MaskMode::Add);
+}
+
+TEST(PagExporterTest, TrackMatteExports) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *matte = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{80, 80});
+    matte->name = "Matte";
+    Layer *target = AddShapeRect(document, composition, Vec2{10, 10}, Vec2{80, 80});
+    target->name = "Target";
+    target->trackMatteType = TrackMatteType::Alpha;
+    target->trackMatteLayerId = matte->id;
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers.size(), 2u);
+    EXPECT_EQ(vector->layers[1]->trackMatteType, pag::TrackMatteType::Alpha);
+    EXPECT_EQ(vector->layers[1]->trackMatteLayer, vector->layers[0]);
+}
+
+TEST(PagExporterTest, PrecompExports) {
+    Document document;
+    auto nested = std::make_unique<Composition>();
+    nested->width = 100;
+    nested->height = 80;
+    nested->duration = 20;
+    nested->frameRate = {30, 1};
+    Composition *nestedPtr = document.addComposition(std::move(nested));
+    AddShapeRect(document, nestedPtr, Vec2{0, 0}, Vec2{40, 40});
+
+    auto root = std::make_unique<Composition>();
+    root->width = 400;
+    root->height = 300;
+    root->duration = 30;
+    root->frameRate = {30, 1};
+    Composition *rootPtr = document.addComposition(std::move(root));
+
+    auto layer = std::make_unique<Layer>(LayerType::Precomp);
+    layer->inPoint = 0;
+    layer->outPoint = rootPtr->duration;
+    layer->startTime = 5;
+    layer->timeStretch = 1.0;
+    static_cast<PrecompContent *>(layer->content.get())->compositionId = nestedPtr->id;
+    document.addLayer(rootPtr->id, std::move(layer));
+
+    PagExportOptions options;
+    options.compositionId = rootPtr->id;
+    auto result = PagExporter::Export(document, options);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    ASSERT_EQ(file->compositions.size(), 2u);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(main->layers.size(), 1u);
+    ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    auto *precomp = static_cast<pag::PreComposeLayer *>(main->layers[0]);
+    ASSERT_NE(precomp->composition, nullptr);
+    EXPECT_EQ(precomp->compositionStartTime, 5);
+}
+
+TEST(PagExporterTest, MissingImageAssetFails) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Image);
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
     document.addLayer(composition->id, std::move(layer));
