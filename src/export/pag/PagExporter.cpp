@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include "MotionStudio/export/BitmapFrameSource.h"
 #include "MotionStudio/model/Document.h"
 #include "PagFileBuilder.h"
 
@@ -43,13 +44,18 @@ Expected<void, PagExportError> WriteBytes(const std::string &path,
 }  // namespace
 
 Expected<PagExportResult, PagExportError> PagExporter::Export(const Document &document,
-                                                              const PagExportOptions &options) {
+                                                              const PagExportOptions &options,
+                                                              BitmapFrameSource *frameSource) {
+    if (options.bitmapScale <= 0.0f) {
+        return Unexpected(PagExportError::InvalidOptions);
+    }
+
     const Composition *composition = ResolveComposition(document, options.compositionId);
     if (composition == nullptr) {
         return Unexpected(PagExportError::InvalidComposition);
     }
 
-    pag_export::PagFileBuilder builder(document, *composition);
+    pag_export::PagFileBuilder builder(document, *composition, options, frameSource);
     Expected<pag_export::PagBuildResult, PagExportError> built = builder.build();
     if (!built.hasValue()) {
         return Unexpected(built.error());

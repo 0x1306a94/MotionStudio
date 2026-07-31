@@ -158,12 +158,12 @@ PagExporter::Export(const Document&, const PagExportOptions&)
 
 ### Task 14: BitmapFallback + FollowPath
 
-**Files:** `PagBitmapFallback.*`、`tests/export/FakeBitmapFrameSource.h`
+**Files:** `PagBitmapFallback.*`、`tests/export/pag/FakeBitmapFrameSource.h`
 
-- [ ] FollowPath + Fake → warning + BitmapComposition + Load
-- [ ] `allowBitmapFallback=false` → `MappingFailed`
-- [ ] Group 自身触发 → 子树光栅化
-- [ ] Commit — `Rasterize unsupported layers into PAG bitmap compositions.`
+- [x] FollowPath + Fake → warning + BitmapComposition + Load
+- [x] `allowBitmapFallback=false` → `MappingFailed`
+- [x] Group 自身触发 → 子树光栅化
+- [x] Commit — `Rasterize unsupported layers into PAG bitmap compositions.`
 
 ---
 
@@ -179,7 +179,7 @@ PagExporter::Export(const Document&, const PagExportOptions&)
 | Text / Image | 11 | 1b 完成 |
 | Mask / Matte / Blend | 12 | 1b 完成 |
 | Precomp | 13 | 1b 完成 |
-| BitmapFallback / FollowPath | 14 | 进行中 |
+| BitmapFallback / FollowPath | 14 | 完成 |
 | 无 UI/Bridge | 全局 | — |
 
 ## 执行说明

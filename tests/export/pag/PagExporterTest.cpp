@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "FakeBitmapFrameSource.h"
 #include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/export/PagExporter.h"
@@ -34,6 +35,7 @@ using motion::Composition;
 using motion::Document;
 using motion::Easing;
 using motion::EntityId;
+using motion::FakeBitmapFrameSource;
 using motion::FillStyle;
 using motion::FrameTime;
 using motion::ImageContent;
@@ -199,15 +201,98 @@ TEST(PagExporterTest, GroupParent) {
     EXPECT_EQ(vector->layers[1]->parent, vector->layers[0]);
 }
 
-TEST(PagExporterTest, FollowPathFails) {
+TEST(PagExporterTest, FollowPathFailsWhenFallbackDisabled) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
     Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
     layer->followPath.enabled = true;
 
-    auto result = PagExporter::Export(document, {});
+    PagExportOptions options;
+    options.allowBitmapFallback = false;
+    auto result = PagExporter::Export(document, options);
     ASSERT_FALSE(result.hasValue());
     EXPECT_EQ(result.error(), PagExportError::MappingFailed);
+}
+
+TEST(PagExporterTest, FollowPathFailsWithoutFrameSource) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
+    layer->followPath.enabled = true;
+
+    PagExportOptions options;
+    options.allowBitmapFallback = true;
+    auto result = PagExporter::Export(document, options, nullptr);
+    ASSERT_FALSE(result.hasValue());
+    EXPECT_EQ(result.error(), PagExportError::MappingFailed);
+}
+
+TEST(PagExporterTest, FollowPathBitmapFallback) {
+    Document document = MakeEmptyDoc(40, 30, 3);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
+    layer->followPath.enabled = true;
+
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.allowBitmapFallback = true;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+
+    bool foundFollowPathWarning = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "UnsupportedFollowPath") {
+            foundFollowPathWarning = true;
+        }
+    }
+    EXPECT_TRUE(foundFollowPathWarning);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    bool foundBitmap = false;
+    for (pag::Composition *comp : file->compositions) {
+        if (comp->type() == pag::CompositionType::Bitmap) {
+            foundBitmap = true;
+        }
+    }
+    EXPECT_TRUE(foundBitmap);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(main->layers.size(), 1u);
+    EXPECT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+}
+
+TEST(PagExporterTest, GroupFollowPathRasterizesSubtree) {
+    Document document = MakeEmptyDoc(40, 30, 2);
+    Composition *composition = Primary(document);
+
+    auto group = std::make_unique<Layer>(LayerType::Group);
+    group->name = "Group";
+    group->inPoint = 0;
+    group->outPoint = composition->duration;
+    group->followPath.enabled = true;
+    Layer *groupLayer = document.addLayer(composition->id, std::move(group));
+
+    Layer *child = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{10, 10});
+    ASSERT_TRUE(child->setParent(groupLayer->id, document));
+
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+
+    bool foundGroupWarning = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "GroupSubtreeRasterized") {
+            foundGroupWarning = true;
+        }
+    }
+    EXPECT_TRUE(foundGroupWarning);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(main->layers.size(), 1u);
+    EXPECT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
 }
 
 TEST(PagExporterTest, TextLayerExports) {

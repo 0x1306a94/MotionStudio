@@ -10,6 +10,7 @@
 
 namespace motion {
 
+class BitmapFrameSource;
 class Document;
 
 struct PagExportWarning {
@@ -39,9 +40,12 @@ enum class PagExportError {
 class PagExporter {
   public:
     // document: source document (immutable for the call duration).
-    // options: composition selection and optional output path.
-    static Expected<PagExportResult, PagExportError> Export(const Document &document,
-                                                            const PagExportOptions &options);
+    // options: composition selection, bitmap fallback flags, optional output path.
+    // frameSource: required when allowBitmapFallback is true and a layer needs
+    // rasterization; may be nullptr when fallback is not triggered.
+    static Expected<PagExportResult, PagExportError> Export(
+        const Document &document, const PagExportOptions &options,
+        BitmapFrameSource *frameSource = nullptr);
 };
 
 }  // namespace motion

@@ -23,6 +23,7 @@
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "PagAnimatableConvert.h"
+#include "PagBitmapFallback.h"
 #include "codec/utils/WebpDecoder.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
@@ -207,25 +208,36 @@ std::unique_ptr<pag::ByteData> LoadImageAsWebP(const std::string &fullPath, int 
 
 }  // namespace
 
-PagFileBuilder::PagFileBuilder(const Document &document, const Composition &composition)
+PagFileBuilder::PagFileBuilder(const Document &document, const Composition &composition,
+                               const PagExportOptions &options, BitmapFrameSource *frameSource)
     : document_(document)
-    , rootComposition_(composition) {
+    , rootComposition_(composition)
+    , options_(options)
+    , frameSource_(frameSource) {
 }
 
 Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
+    if (options_.bitmapScale <= 0.0f) {
+        return Unexpected(PagExportError::InvalidOptions);
+    }
+
     Expected<void, PagExportError> collected = collectCompositionOrder(rootComposition_.id);
     if (!collected.hasValue()) {
         return Unexpected(collected.error());
     }
 
-    std::vector<pag::Composition *> compositions;
-    compositions.reserve(compositionOrder_.size());
+    std::vector<pag::Composition *> vectorCompositions;
+    vectorCompositions.reserve(compositionOrder_.size());
     for (EntityId compositionId : compositionOrder_) {
         const Composition *source = findComposition(compositionId);
         if (source == nullptr) {
-            for (pag::Composition *owned : compositions) {
+            for (pag::Composition *owned : vectorCompositions) {
                 delete owned;
             }
+            for (pag::Composition *owned : bitmapCompositions_) {
+                delete owned;
+            }
+            bitmapCompositions_.clear();
             for (pag::ImageBytes *image : imageBytesList_) {
                 delete image;
             }
@@ -233,16 +245,27 @@ Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
         }
         Expected<pag::VectorComposition *, PagExportError> built = buildComposition(*source);
         if (!built.hasValue()) {
-            for (pag::Composition *owned : compositions) {
+            for (pag::Composition *owned : vectorCompositions) {
                 delete owned;
             }
+            for (pag::Composition *owned : bitmapCompositions_) {
+                delete owned;
+            }
+            bitmapCompositions_.clear();
             for (pag::ImageBytes *image : imageBytesList_) {
                 delete image;
             }
             return Unexpected(built.error());
         }
-        compositions.push_back(built.value());
+        vectorCompositions.push_back(built.value());
     }
+
+    // Root vector composition stays last (File uses compositions.back() as main).
+    std::vector<pag::Composition *> compositions;
+    compositions.reserve(bitmapCompositions_.size() + vectorCompositions.size());
+    compositions.insert(compositions.end(), bitmapCompositions_.begin(), bitmapCompositions_.end());
+    compositions.insert(compositions.end(), vectorCompositions.begin(), vectorCompositions.end());
+    bitmapCompositions_.clear();
 
     std::shared_ptr<pag::File> file = pag::Codec::VerifyAndMake(compositions, imageBytesList_);
     imageBytesList_.clear();
@@ -290,6 +313,52 @@ Expected<void, PagExportError> PagFileBuilder::collectCompositionOrder(EntityId 
     return Expected<void, PagExportError>();
 }
 
+bool PagFileBuilder::needsBitmapFallback(const Layer &layer) const {
+    return layer.followPath.enabled;
+}
+
+void PagFileBuilder::collectDescendants(EntityId rootLayerId,
+                                        std::unordered_set<uint64_t> *out) const {
+    if (currentHostComposition_ == nullptr || out == nullptr) {
+        return;
+    }
+    bool added = true;
+    while (added) {
+        added = false;
+        for (const auto &layerPtr : currentHostComposition_->layers) {
+            if (layerPtr == nullptr || !layerPtr->parentId.isValid()) {
+                continue;
+            }
+            if (out->count(layerPtr->id.value) != 0) {
+                continue;
+            }
+            const uint64_t parentValue = layerPtr->parentId.value;
+            if (parentValue == rootLayerId.value || out->count(parentValue) != 0) {
+                out->insert(layerPtr->id.value);
+                added = true;
+            }
+        }
+    }
+}
+
+Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
+    const Layer &layer, const Composition &hostComposition) {
+    if (!options_.allowBitmapFallback) {
+        return Unexpected(PagExportError::MappingFailed);
+    }
+    if (frameSource_ == nullptr) {
+        return Unexpected(PagExportError::MappingFailed);
+    }
+    Expected<BitmapFallbackResult, PagExportError> built = PagBitmapFallback::Build(
+        document_, hostComposition, layer, options_.bitmapScale, frameSource_, nextCompositionId_++,
+        nextLayerId_++, &warnings_);
+    if (!built.hasValue()) {
+        return Unexpected(built.error());
+    }
+    bitmapCompositions_.push_back(built.value().composition);
+    return built.value().layer;
+}
+
 Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposition(
     const Composition &composition) {
     if (composition.width <= 0 || composition.height <= 0 || composition.duration <= 0) {
@@ -300,6 +369,7 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     }
 
     layerByEntity_.clear();
+    currentHostComposition_ = &composition;
 
     auto *pagComposition = new pag::VectorComposition();
     pagComposition->id = nextCompositionId_++;
@@ -311,8 +381,22 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     pagComposition->backgroundColor = ToPagColor(composition.backgroundColor);
     compositionByEntity_[composition.id.value] = pagComposition;
 
+    std::unordered_set<uint64_t> skippedDescendants;
     for (const auto &layerPtr : composition.layers) {
-        Expected<pag::Layer *, PagExportError> layerResult = buildLayer(*layerPtr);
+        if (layerPtr == nullptr || skippedDescendants.count(layerPtr->id.value) != 0) {
+            continue;
+        }
+
+        Expected<pag::Layer *, PagExportError> layerResult =
+            Expected<pag::Layer *, PagExportError>(Unexpected(PagExportError::MappingFailed));
+        if (needsBitmapFallback(*layerPtr)) {
+            layerResult = buildFallbackLayer(*layerPtr, composition);
+            if (layerResult.hasValue() && layerPtr->type() == LayerType::Group) {
+                collectDescendants(layerPtr->id, &skippedDescendants);
+            }
+        } else {
+            layerResult = buildLayer(*layerPtr);
+        }
         if (!layerResult.hasValue()) {
             delete pagComposition;
             return Unexpected(layerResult.error());
@@ -351,29 +435,11 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
         }
     }
 
+    currentHostComposition_ = nullptr;
     return pagComposition;
 }
 
-Expected<void, PagExportError> PagFileBuilder::rejectUnsupported(const Layer &layer) {
-    if (layer.followPath.enabled) {
-        return Unexpected(PagExportError::MappingFailed);
-    }
-    switch (layer.type()) {
-        case LayerType::Shape:
-        case LayerType::Group:
-        case LayerType::Text:
-        case LayerType::Image:
-        case LayerType::Precomp:
-            return Expected<void, PagExportError>();
-    }
-    return Unexpected(PagExportError::MappingFailed);
-}
-
 Expected<pag::Layer *, PagExportError> PagFileBuilder::buildLayer(const Layer &layer) {
-    Expected<void, PagExportError> unsupported = rejectUnsupported(layer);
-    if (!unsupported.hasValue()) {
-        return Unexpected(unsupported.error());
-    }
     switch (layer.type()) {
         case LayerType::Shape: {
             Expected<pag::ShapeLayer *, PagExportError> shape = buildShapeLayer(layer);
