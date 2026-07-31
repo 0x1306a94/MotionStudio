@@ -189,6 +189,8 @@ public:
 
 **序列帧 PNG 导出**：走渲染路径——Metal offscreen（`MTLTexture` render target）逐帧渲染 `SceneState` 后回读像素编码 PNG。
 
+**MP4（H.264）导出**走渲染路径：`VideoExporter` 逐帧 `Evaluate → BuildCommands → PlayCommands`，经可替换 `VideoEncoder` 封装。Apple 默认 `TgfxVideoFrameSource`（CVPixelBuffer 零拷贝）+ `AvfVideoEncoder`（`AVAssetWriter`）。导出强制 `cornerRadius = 0`、不透明背景（MP4 无透明轨）；音轨接口预留，首版无声。桥接 API：`ms_video_export`。Lottie 仍为模型直转例外。
+
 ## 6. 线程模型
 
 - **M3 首版**：UI 与求值都在主线程同步执行（简单优先，场景规模小时足够）

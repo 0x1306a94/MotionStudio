@@ -578,6 +578,29 @@ void ms_command_set_follow_path(MSDocument *document, uint64_t layerId, bool ena
 // mtkView: an MTKView instance (paused, drawable-driven). Ownership stays
 // with the caller. Returns NULL when Metal is unavailable or mtkView is null.
 MSCanvas *ms_canvas_create(void *mtkView);
+
+/* ============================ video export (Apple platforms) ============================ */
+
+typedef struct MSVideoExportOptions {
+    const char *outputPath;
+    int64_t startFrame;  // <0 → 0
+    int64_t endFrame;    // <0 → composition.duration
+    int width;           // 0 → composition
+    int height;
+    int frameRateNum;  // 0 → composition
+    int frameRateDen;
+    int bitrateBps;
+    int keyframeInterval;
+    int profile;  // 0 Baseline / 1 Main / 2 High
+} MSVideoExportOptions;
+
+// Exports composition to H.264 MP4. progress may be NULL. Returns false to cancel.
+// cancelFlag non-null and non-zero also cancels. On failure *errorOut is malloc'd
+// (ms_string_free); may be NULL when the caller does not need the message.
+bool ms_video_export(MSDocument *document, uint64_t compositionId,
+                     const MSVideoExportOptions *options,
+                     bool (*progress)(void *ctx, int64_t completed, int64_t total), void *progressCtx,
+                     const volatile int *cancelFlag, char **errorOut);
 #endif
 
 void ms_canvas_destroy(MSCanvas *canvas);

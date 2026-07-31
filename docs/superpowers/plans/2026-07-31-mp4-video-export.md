@@ -948,7 +948,7 @@ git commit --only adapter/avf/tests/VideoExportIntegrationTest.mm adapter/avf/CM
 **Interfaces:**
 - Produces: spec §2.6 的 C API
 
-- [ ] **Step 1: 头文件声明**
+- [x] **Step 1: 头文件声明**
 
 在 `motionstudio_bridge.h` 的 canvas/Apple 相关区域旁加入（可用 `#if defined(__APPLE__)` 或与现有 canvas 声明同一无条件——若头文件对全平台可见，则声明始终存在，非 Apple 链接时不提供符号；与项目现有 canvas API 风格对齐）：
 
@@ -972,7 +972,7 @@ bool ms_video_export(MSDocument *document, uint64_t compositionId,
                      void *progressCtx, const volatile int *cancelFlag, char **errorOut);
 ```
 
-- [ ] **Step 2: 实现 `.mm`**
+- [x] **Step 2: 实现 `.mm`**
 
 ```objc
 bool ms_video_export(...) {
@@ -1004,7 +1004,7 @@ bool ms_video_export(...) {
 
 错误字符串分配方式对齐现有 bridge（查找 `ms_string_free` 配套的 `strdup` / 项目 helper，不要混用新分配器）。
 
-- [ ] **Step 3: Bridge 测试**
+- [x] **Step 3: Bridge 测试**
 
 ```cpp
 TEST(VideoExportBridgeTest, NullDocumentFails) {
@@ -1017,13 +1017,13 @@ TEST(VideoExportBridgeTest, NullDocumentFails) {
 }
 ```
 
-- [ ] **Step 4: 构建 bridge_test + 更新 docs/rendering.md**
+- [x] **Step 4: 构建 bridge_test + 更新 docs/rendering.md**
 
 在 §5 增加段落：
 
 > **MP4（H.264）导出**走渲染路径：`VideoExporter` 逐帧 `Evaluate → BuildCommands → PlayCommands`，经可替换 `VideoEncoder` 封装。Apple 默认 `TgfxVideoFrameSource`（CVPixelBuffer 零拷贝）+ `AvfVideoEncoder`。导出强制 `cornerRadius=0`、不透明背景；音轨接口预留。Lottie 仍为模型直转例外。
 
-- [ ] **Step 5: 全量相关测试**
+- [x] **Step 5: 全量相关测试**
 
 ```bash
 cmake --build build
@@ -1035,7 +1035,7 @@ cmake --build build
 
 Expected: PASS（Metal skip 可接受）。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only bridge/include/motionstudio_bridge.h \

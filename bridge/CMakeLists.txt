@@ -15,7 +15,7 @@ if (APPLE)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/apple
     )
     list(APPEND BRIDGE_ALL_SOURCES ${APPLE_SOURCES})
-    list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter)
+    list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter motionstudio_avf_adapter)
 endif()
 
 message(STATUS "BRIDGE_PUBLIC_HEADERS: ${BRIDGE_PUBLIC_HEADERS}")
@@ -34,7 +34,10 @@ target_include_directories(bridge PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../adapter/tgfx/src")
 if (APPLE)
-  target_include_directories(bridge PRIVATE "${PROJECT_SOURCE_DIR}/third_party/tgfx/include")
+  target_include_directories(bridge PRIVATE
+    "${PROJECT_SOURCE_DIR}/third_party/tgfx/include"
+    "${PROJECT_SOURCE_DIR}/adapter/tgfx/include"
+    "${PROJECT_SOURCE_DIR}/adapter/avf/include")
 endif()
 target_link_libraries(bridge PUBLIC ${BRIDGE_LINK_LIBRARIES})
 target_compile_options(bridge PRIVATE -Wall -Wextra)
