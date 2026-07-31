@@ -1,3 +1,4 @@
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -108,6 +109,7 @@ TEST(PagExporterTest, InvalidComposition) {
 
 TEST(PagExporterTest, EmptyCompositionRoundTrip) {
     Document document = MakeEmptyDoc(200, 100, 60);
+    Primary(document)->backgroundColor = Color{0.2f, 0.4f, 0.6f, 1.0f};
     PagExportOptions options;
     auto result = PagExporter::Export(document, options);
     ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
@@ -119,6 +121,44 @@ TEST(PagExporterTest, EmptyCompositionRoundTrip) {
     EXPECT_EQ(file->height(), 100);
     EXPECT_EQ(file->frameRate(), 30.0f);
     EXPECT_EQ(file->duration(), 60);
+    EXPECT_EQ(file->backgroundColor().red, static_cast<uint8_t>(std::lround(0.2f * 255.0f)));
+    EXPECT_EQ(file->backgroundColor().green, static_cast<uint8_t>(std::lround(0.4f * 255.0f)));
+    EXPECT_EQ(file->backgroundColor().blue, static_cast<uint8_t>(std::lround(0.6f * 255.0f)));
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers.size(), 1u);
+    EXPECT_EQ(vector->layers[0]->name, "CompositionBackground");
+}
+
+TEST(PagExporterTest, CompositionCornerRadiusAddsBackdrop) {
+    Document document = MakeEmptyDoc(100, 80, 10);
+    Composition *composition = Primary(document);
+    composition->backgroundColor = Color{1.0f, 0.0f, 0.0f, 1.0f};
+    composition->cornerRadius = 12.0f;
+    AddShapeRect(document, composition, Vec2{10, 10}, Vec2{20, 20});
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *root = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(root->layers.size(), 1u);
+    ASSERT_EQ(root->layers[0]->type(), pag::LayerType::PreCompose);
+    auto *wrap = static_cast<pag::PreComposeLayer *>(root->layers[0]);
+    ASSERT_FALSE(wrap->masks.empty());
+    ASSERT_NE(wrap->composition, nullptr);
+    auto *inner = static_cast<pag::VectorComposition *>(wrap->composition);
+    ASSERT_GE(inner->layers.size(), 2u);
+    // PAG File: index 0 = topmost; backdrop must be last so it stays under content.
+    EXPECT_EQ(inner->layers.back()->type(), pag::LayerType::Shape);
+    EXPECT_EQ(inner->layers.back()->name, "CompositionBackground");
+    EXPECT_EQ(inner->layers.front()->name, "Rect");
+    bool foundCornerWarning = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "CompositionCornerRadiusApproximated") {
+            foundCornerWarning = true;
+        }
+    }
+    EXPECT_TRUE(foundCornerWarning);
 }
 
 TEST(PagExporterTest, ShapeRectStaticTransform) {
@@ -136,8 +176,9 @@ TEST(PagExporterTest, ShapeRectStaticTransform) {
     ASSERT_NE(file, nullptr);
     ASSERT_EQ(file->compositions.size(), 1u);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
-    ASSERT_EQ(vector->layers.size(), 1u);
+    ASSERT_EQ(vector->layers.size(), 2u);
     ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+    EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
     auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
     ASSERT_FALSE(shapeLayer->contents.empty());
     EXPECT_FLOAT_EQ(shapeLayer->transform->position->value.x, 10.0f);
@@ -195,26 +236,43 @@ TEST(PagExporterTest, GroupParent) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
-    ASSERT_EQ(vector->layers.size(), 2u);
-    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Null);
-    EXPECT_EQ(vector->layers[1]->type(), pag::LayerType::Shape);
-    EXPECT_EQ(vector->layers[1]->parent, vector->layers[0]);
+    ASSERT_EQ(vector->layers.size(), 3u);
+    // Top-first PAG order: child Shape above Null group; backdrop last.
+    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+    EXPECT_EQ(vector->layers[1]->type(), pag::LayerType::Null);
+    EXPECT_EQ(vector->layers[0]->parent, vector->layers[1]);
+    EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
 }
 
-TEST(PagExporterTest, FollowPathFailsWhenFallbackDisabled) {
+TEST(PagExporterTest, FollowPathSkippedWhenFallbackDisabled) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
+    Layer *kept = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
+    kept->name = "Kept";
     Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
+    layer->name = "Follow";
     layer->followPath.enabled = true;
 
     PagExportOptions options;
     options.allowBitmapFallback = false;
     auto result = PagExporter::Export(document, options);
-    ASSERT_FALSE(result.hasValue());
-    EXPECT_EQ(result.error(), PagExportError::MappingFailed);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    bool foundSkip = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "UnsupportedFollowPath") {
+            foundSkip = true;
+        }
+    }
+    EXPECT_TRUE(foundSkip);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers.size(), 2u);
+    EXPECT_EQ(vector->layers[0]->name, "Kept");
+    EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
 }
 
-TEST(PagExporterTest, FollowPathFailsWithoutFrameSource) {
+TEST(PagExporterTest, FollowPathSkippedWithoutFrameSource) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
     Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
@@ -223,8 +281,14 @@ TEST(PagExporterTest, FollowPathFailsWithoutFrameSource) {
     PagExportOptions options;
     options.allowBitmapFallback = true;
     auto result = PagExporter::Export(document, options, nullptr);
-    ASSERT_FALSE(result.hasValue());
-    EXPECT_EQ(result.error(), PagExportError::MappingFailed);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    bool found = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "BitmapFallbackUnavailable") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
 }
 
 TEST(PagExporterTest, FollowPathBitmapFallback) {
@@ -257,8 +321,9 @@ TEST(PagExporterTest, FollowPathBitmapFallback) {
     }
     EXPECT_TRUE(foundBitmap);
     auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
-    ASSERT_EQ(main->layers.size(), 1u);
+    ASSERT_EQ(main->layers.size(), 2u);
     EXPECT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    EXPECT_EQ(main->layers.back()->name, "CompositionBackground");
 }
 
 TEST(PagExporterTest, GroupFollowPathRasterizesSubtree) {
@@ -291,8 +356,9 @@ TEST(PagExporterTest, GroupFollowPathRasterizesSubtree) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
-    ASSERT_EQ(main->layers.size(), 1u);
+    ASSERT_EQ(main->layers.size(), 2u);
     EXPECT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    EXPECT_EQ(main->layers.back()->name, "CompositionBackground");
 }
 
 TEST(PagExporterTest, TextLayerExports) {
@@ -305,6 +371,13 @@ TEST(PagExporterTest, TextLayerExports) {
     content->text.setStaticValue("Hello PAG");
     content->fontFamily = "PingFang SC";
     content->fontSize.setStaticValue(36.0f);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.0f, 210.0f / 255.0f, 186.0f / 255.0f, 1.0f});
+    layer->styles.push_back(std::move(fill));
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(Color{0, 0, 0, 1});
+    stroke->width.setStaticValue(2.0f);
+    layer->styles.push_back(std::move(stroke));
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
@@ -312,12 +385,22 @@ TEST(PagExporterTest, TextLayerExports) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    ASSERT_EQ(vector->layers.size(), 1u);
+    ASSERT_EQ(vector->layers.size(), 2u);
     ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Text);
     auto *textLayer = static_cast<pag::TextLayer *>(vector->layers[0]);
     ASSERT_NE(textLayer->sourceText, nullptr);
     EXPECT_EQ(textLayer->sourceText->value->text, "Hello PAG");
     EXPECT_FLOAT_EQ(textLayer->sourceText->value->fontSize, 36.0f);
+    EXPECT_TRUE(textLayer->sourceText->value->applyFill);
+    EXPECT_EQ(textLayer->sourceText->value->fillColor.red, 0);
+    EXPECT_EQ(textLayer->sourceText->value->fillColor.green, 210);
+    EXPECT_EQ(textLayer->sourceText->value->fillColor.blue, 186);
+    EXPECT_TRUE(textLayer->sourceText->value->applyStroke);
+    EXPECT_EQ(textLayer->sourceText->value->strokeColor.red, 0);
+    EXPECT_EQ(textLayer->sourceText->value->strokeColor.green, 0);
+    EXPECT_EQ(textLayer->sourceText->value->strokeColor.blue, 0);
+    EXPECT_FLOAT_EQ(textLayer->sourceText->value->strokeWidth, 2.0f);
+    EXPECT_TRUE(textLayer->sourceText->value->strokeOverFill);
 }
 
 TEST(PagExporterTest, ImageLayerExports) {
@@ -353,8 +436,11 @@ TEST(PagExporterTest, ImageLayerExports) {
     auto layer = std::make_unique<Layer>(LayerType::Image);
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
+    layer->transform.anchorPoint.setStaticValue(Vec2{50, 50});
+    layer->transform.scale.setStaticValue(Vec2{1, 1});
     auto *content = static_cast<ImageContent *>(layer->content.get());
     content->assetId = asset.id;
+    content->size.setStaticValue(Vec2{100, 100});
     content->scaleMode = ImageScaleMode::LetterBox;
     document.addLayer(composition->id, std::move(layer));
 
@@ -363,8 +449,18 @@ TEST(PagExporterTest, ImageLayerExports) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     ASSERT_EQ(file->images.size(), 1u);
+    EXPECT_EQ(file->images[0]->width, 1);
+    EXPECT_EQ(file->images[0]->height, 1);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
     ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Image);
+    auto *imageLayer = static_cast<pag::ImageLayer *>(vector->layers[0]);
+    // 1x1 source into 100x100 LetterBox → fit scale 100 baked into transform.
+    ASSERT_NE(imageLayer->transform, nullptr);
+    ASSERT_NE(imageLayer->transform->scale, nullptr);
+    EXPECT_FLOAT_EQ(imageLayer->transform->scale->value.x, 100.0f);
+    EXPECT_FLOAT_EQ(imageLayer->transform->scale->value.y, 100.0f);
+    EXPECT_FLOAT_EQ(imageLayer->transform->anchorPoint->value.x, 0.5f);
+    EXPECT_FLOAT_EQ(imageLayer->transform->anchorPoint->value.y, 0.5f);
 }
 
 TEST(PagExporterTest, MaskExports) {
@@ -405,9 +501,12 @@ TEST(PagExporterTest, TrackMatteExports) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    ASSERT_EQ(vector->layers.size(), 2u);
+    ASSERT_EQ(vector->layers.size(), 3u);
     EXPECT_EQ(vector->layers[1]->trackMatteType, pag::TrackMatteType::Alpha);
     EXPECT_EQ(vector->layers[1]->trackMatteLayer, vector->layers[0]);
+    EXPECT_FALSE(vector->layers[0]->isActive);
+    EXPECT_TRUE(vector->layers[1]->isActive);
+    EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
 }
 
 TEST(PagExporterTest, PrecompExports) {
@@ -443,14 +542,15 @@ TEST(PagExporterTest, PrecompExports) {
     ASSERT_NE(file, nullptr);
     ASSERT_EQ(file->compositions.size(), 2u);
     auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
-    ASSERT_EQ(main->layers.size(), 1u);
+    ASSERT_EQ(main->layers.size(), 2u);
     ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    EXPECT_EQ(main->layers.back()->name, "CompositionBackground");
     auto *precomp = static_cast<pag::PreComposeLayer *>(main->layers[0]);
     ASSERT_NE(precomp->composition, nullptr);
     EXPECT_EQ(precomp->compositionStartTime, 5);
 }
 
-TEST(PagExporterTest, MissingImageAssetFails) {
+TEST(PagExporterTest, MissingImageAssetSkipped) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
     auto layer = std::make_unique<Layer>(LayerType::Image);
@@ -459,8 +559,14 @@ TEST(PagExporterTest, MissingImageAssetFails) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_FALSE(result.hasValue());
-    EXPECT_EQ(result.error(), PagExportError::MappingFailed);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    bool foundSkip = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "LayerSkipped" || warning.code == "ImageAssetMissing") {
+            foundSkip = true;
+        }
+    }
+    EXPECT_TRUE(foundSkip);
 }
 
 TEST(PagExporterTest, ShapePath) {

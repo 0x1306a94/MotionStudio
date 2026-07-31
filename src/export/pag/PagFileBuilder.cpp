@@ -1,9 +1,13 @@
 #include "PagFileBuilder.h"
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <functional>
 #include <set>
 #include <vector>
 
+#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
@@ -22,6 +26,8 @@
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/ImageScaleLayout.h"
+#include "MotionStudio/render/ShapeGeometry.h"
 #include "PagAnimatableConvert.h"
 #include "PagBitmapFallback.h"
 #include "codec/utils/WebpDecoder.h"
@@ -163,10 +169,43 @@ std::string JoinPath(const std::string &root, const std::string &relative) {
     if (root.empty()) {
         return relative;
     }
-    if (!root.empty() && root.back() == '/') {
+    if (root.back() == '/') {
         return root + relative;
     }
     return root + "/" + relative;
+}
+
+void MapPointProperty(pag::Property<pag::Point> *property,
+                      const std::function<pag::Point(pag::Point)> &map) {
+    if (property == nullptr) {
+        return;
+    }
+    if (!property->animatable()) {
+        property->value = map(property->value);
+        return;
+    }
+    auto *animated = static_cast<pag::AnimatableProperty<pag::Point> *>(property);
+    for (pag::Keyframe<pag::Point> *keyframe : animated->keyframes) {
+        keyframe->startValue = map(keyframe->startValue);
+        keyframe->endValue = map(keyframe->endValue);
+    }
+    animated->value = map(animated->value);
+}
+
+void MultiplyPointProperty(pag::Property<pag::Point> *property, float scaleX, float scaleY) {
+    MapPointProperty(property, [scaleX, scaleY](pag::Point point) {
+        return pag::Point::Make(point.x * scaleX, point.y * scaleY);
+    });
+}
+
+void DeleteCompositions(std::vector<pag::Composition *> *compositions) {
+    if (compositions == nullptr) {
+        return;
+    }
+    for (pag::Composition *owned : *compositions) {
+        delete owned;
+    }
+    compositions->clear();
 }
 
 // PAG Codec::Encode only writes ImageBytes that WebPGetInfo accepts.
@@ -226,46 +265,41 @@ Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
         return Unexpected(collected.error());
     }
 
+    auto cleanupOwned = [this](std::vector<pag::Composition *> &vectorCompositions) {
+        DeleteCompositions(&vectorCompositions);
+        DeleteCompositions(&bitmapCompositions_);
+        DeleteCompositions(&nestedCompositions_);
+        for (pag::ImageBytes *image : imageBytesList_) {
+            delete image;
+        }
+        imageBytesList_.clear();
+    };
+
     std::vector<pag::Composition *> vectorCompositions;
     vectorCompositions.reserve(compositionOrder_.size());
     for (EntityId compositionId : compositionOrder_) {
         const Composition *source = findComposition(compositionId);
         if (source == nullptr) {
-            for (pag::Composition *owned : vectorCompositions) {
-                delete owned;
-            }
-            for (pag::Composition *owned : bitmapCompositions_) {
-                delete owned;
-            }
-            bitmapCompositions_.clear();
-            for (pag::ImageBytes *image : imageBytesList_) {
-                delete image;
-            }
+            cleanupOwned(vectorCompositions);
             return Unexpected(PagExportError::InvalidComposition);
         }
         Expected<pag::VectorComposition *, PagExportError> built = buildComposition(*source);
         if (!built.hasValue()) {
-            for (pag::Composition *owned : vectorCompositions) {
-                delete owned;
-            }
-            for (pag::Composition *owned : bitmapCompositions_) {
-                delete owned;
-            }
-            bitmapCompositions_.clear();
-            for (pag::ImageBytes *image : imageBytesList_) {
-                delete image;
-            }
+            cleanupOwned(vectorCompositions);
             return Unexpected(built.error());
         }
         vectorCompositions.push_back(built.value());
     }
 
-    // Root vector composition stays last (File uses compositions.back() as main).
+    // Nested clip inners first; MS composition roots last (File uses compositions.back() as main).
     std::vector<pag::Composition *> compositions;
-    compositions.reserve(bitmapCompositions_.size() + vectorCompositions.size());
+    compositions.reserve(bitmapCompositions_.size() + nestedCompositions_.size() +
+                         vectorCompositions.size());
     compositions.insert(compositions.end(), bitmapCompositions_.begin(), bitmapCompositions_.end());
+    compositions.insert(compositions.end(), nestedCompositions_.begin(), nestedCompositions_.end());
     compositions.insert(compositions.end(), vectorCompositions.begin(), vectorCompositions.end());
     bitmapCompositions_.clear();
+    nestedCompositions_.clear();
 
     std::shared_ptr<pag::File> file = pag::Codec::VerifyAndMake(compositions, imageBytesList_);
     imageBytesList_.clear();
@@ -341,6 +375,162 @@ void PagFileBuilder::collectDescendants(EntityId rootLayerId,
     }
 }
 
+void PagFileBuilder::skipLayerWithWarning(const Layer &layer, const char *code, const char *message,
+                                          std::unordered_set<uint64_t> *skippedDescendants) {
+    Warn(&warnings_, layer.id, code, message);
+    if (layer.type() == LayerType::Group && skippedDescendants != nullptr) {
+        collectDescendants(layer.id, skippedDescendants);
+    }
+}
+
+pag::VectorComposition *PagFileBuilder::wrapCompositionWithCornerClip(
+    pag::VectorComposition *inner, const Composition &composition) {
+    auto *root = new pag::VectorComposition();
+    root->id = nextCompositionId_++;
+    root->width = inner->width;
+    root->height = inner->height;
+    root->duration = inner->duration;
+    root->frameRate = inner->frameRate;
+    root->backgroundColor = inner->backgroundColor;
+
+    auto *wrap = new pag::PreComposeLayer();
+    wrap->id = nextLayerId_++;
+    wrap->name = "CompositionClip";
+    wrap->startTime = 0;
+    wrap->duration = inner->duration;
+    wrap->isActive = true;
+    wrap->composition = inner;
+    wrap->compositionStartTime = 0;
+    wrap->containingComposition = root;
+    wrap->transform = new pag::Transform2D();
+    wrap->transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    wrap->transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    wrap->transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    wrap->transform->rotation = new pag::Property<float>(0);
+    wrap->transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+
+    const float width = static_cast<float>(composition.width);
+    const float height = static_cast<float>(composition.height);
+    BezierPath maskPath = ShapeGeometryToBezierPath(
+        MakeRectGeometry(Vec2{width * 0.5f, height * 0.5f}, Vec2{width, height},
+                         composition.cornerRadius));
+    Animatable<BezierPath> maskAnimatable;
+    maskAnimatable.setStaticValue(maskPath);
+
+    auto *mask = new pag::MaskData();
+    mask->id = nextMaskId_++;
+    mask->inverted = false;
+    mask->maskMode = pag::MaskMode::Add;
+    mask->maskPath = ConvertPath(maskAnimatable, &warnings_, composition.id);
+    mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
+    mask->maskExpansion = new pag::Property<float>(0);
+    wrap->masks.push_back(mask);
+
+    root->layers.push_back(wrap);
+    nestedCompositions_.push_back(inner);
+    compositionByEntity_[composition.id.value] = root;
+    return root;
+}
+
+void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Layer &layer,
+                                            const ImageContent &content, int intrinsicWidth,
+                                            int intrinsicHeight) {
+    if (pagLayer == nullptr || pagLayer->transform == nullptr || intrinsicWidth <= 0 ||
+        intrinsicHeight <= 0) {
+        return;
+    }
+
+    if (content.size.isAnimated()) {
+        Warn(&warnings_, layer.id, "ImageSizeAnimationBakedAsStatic",
+             "Animated image container size baked using in-point value");
+    }
+    const Vec2 container = content.size.evaluate(layer.inPoint);
+    const Vec2 intrinsic{static_cast<float>(intrinsicWidth), static_cast<float>(intrinsicHeight)};
+    const ImageRect destination = ComputeImageDestinationRect(container, intrinsic, content.scaleMode);
+    if (destination.isEmpty()) {
+        return;
+    }
+
+    const float fitX = destination.width / intrinsic.x;
+    const float fitY = destination.height / intrinsic.y;
+    if (fitX <= 0.0f || fitY <= 0.0f) {
+        return;
+    }
+
+    // AE model: ImageBytes stays at source size; container fit is baked into Transform.
+    MultiplyPointProperty(pagLayer->transform->scale, fitX, fitY);
+    MapPointProperty(pagLayer->transform->anchorPoint, [&](pag::Point point) {
+        return pag::Point::Make((point.x - destination.x) / fitX, (point.y - destination.y) / fitY);
+    });
+
+    const bool overflows = destination.x < -0.001f || destination.y < -0.001f ||
+        destination.x + destination.width > container.x + 0.001f ||
+        destination.y + destination.height > container.y + 0.001f;
+    if (!overflows) {
+        return;
+    }
+
+    const float maskX = -destination.x / fitX;
+    const float maskY = -destination.y / fitY;
+    const float maskW = container.x / fitX;
+    const float maskH = container.y / fitY;
+    BezierPath clipPath = ShapeGeometryToBezierPath(
+        MakeRectGeometry(Vec2{maskX + maskW * 0.5f, maskY + maskH * 0.5f}, Vec2{maskW, maskH}, 0.0f));
+    Animatable<BezierPath> clipAnimatable;
+    clipAnimatable.setStaticValue(clipPath);
+    auto *mask = new pag::MaskData();
+    mask->id = nextMaskId_++;
+    mask->inverted = false;
+    mask->maskMode = pag::MaskMode::Add;
+    mask->maskPath = ConvertPath(clipAnimatable, &warnings_, layer.id);
+    mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
+    mask->maskExpansion = new pag::Property<float>(0);
+    pagLayer->masks.push_back(mask);
+}
+
+pag::ShapeLayer *PagFileBuilder::buildCompositionBackdrop(const Composition &composition) {
+    auto *pagLayer = new pag::ShapeLayer();
+    pagLayer->id = nextLayerId_++;
+    pagLayer->name = "CompositionBackground";
+    pagLayer->startTime = 0;
+    pagLayer->duration = composition.duration;
+    pagLayer->isActive = true;
+    pagLayer->transform = new pag::Transform2D();
+    pagLayer->transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    pagLayer->transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    pagLayer->transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    pagLayer->transform->rotation = new pag::Property<float>(0);
+    pagLayer->transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+
+    auto *group = new pag::ShapeGroupElement();
+    group->transform = new pag::ShapeTransform();
+    group->transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    group->transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    group->transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    group->transform->skew = new pag::Property<float>(0);
+    group->transform->skewAxis = new pag::Property<float>(0);
+    group->transform->rotation = new pag::Property<float>(0);
+    group->transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+
+    auto *rect = new pag::RectangleElement();
+    const float width = static_cast<float>(composition.width);
+    const float height = static_cast<float>(composition.height);
+    rect->position = new pag::Property<pag::Point>(pag::Point::Make(width * 0.5f, height * 0.5f));
+    rect->size = new pag::Property<pag::Point>(pag::Point::Make(width, height));
+    rect->roundness = new pag::Property<float>(composition.cornerRadius);
+
+    auto *fill = new pag::FillElement();
+    fill->blendMode = pag::BlendMode::Normal;
+    fill->fillRule = pag::FillRule::NonZeroWinding;
+    fill->color = new pag::Property<pag::Color>(ToPagColor(composition.backgroundColor));
+    fill->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+
+    group->elements.push_back(rect);
+    group->elements.push_back(fill);
+    pagLayer->contents.push_back(group);
+    return pagLayer;
+}
+
 Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
     const Layer &layer, const Composition &hostComposition) {
     if (!options_.allowBitmapFallback) {
@@ -381,7 +571,11 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     pagComposition->backgroundColor = ToPagColor(composition.backgroundColor);
     compositionByEntity_[composition.id.value] = pagComposition;
 
+    // Build in MS order (bottom→top) so Group fallback can skip descendants before they emit.
+    // Then reverse into PAG File order (index 0 = topmost; CompositionRenderer draws back→front).
     std::unordered_set<uint64_t> skippedDescendants;
+    std::vector<pag::Layer *> contentLayers;
+    contentLayers.reserve(composition.layers.size());
     for (const auto &layerPtr : composition.layers) {
         if (layerPtr == nullptr || skippedDescendants.count(layerPtr->id.value) != 0) {
             continue;
@@ -398,12 +592,31 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
             layerResult = buildLayer(*layerPtr);
         }
         if (!layerResult.hasValue()) {
+            // Soft-fail MappingFailed (and fallback unavailable): skip layer, keep exporting.
+            if (layerResult.error() == PagExportError::MappingFailed) {
+                const char *code = "LayerSkipped";
+                const char *message = "Layer skipped due to mapping failure";
+                if (needsBitmapFallback(*layerPtr)) {
+                    if (options_.allowBitmapFallback && frameSource_ == nullptr) {
+                        code = "BitmapFallbackUnavailable";
+                        message = "Bitmap fallback is not available yet";
+                    } else if (layerPtr->followPath.enabled) {
+                        code = "UnsupportedFollowPath";
+                        message = "FollowPath layer skipped";
+                    }
+                }
+                skipLayerWithWarning(*layerPtr, code, message, &skippedDescendants);
+                continue;
+            }
+            for (pag::Layer *owned : contentLayers) {
+                delete owned;
+            }
             delete pagComposition;
             return Unexpected(layerResult.error());
         }
         pag::Layer *pagLayer = layerResult.value();
         pagLayer->containingComposition = pagComposition;
-        pagComposition->layers.push_back(pagLayer);
+        contentLayers.push_back(pagLayer);
         layerByEntity_[layerPtr->id.value] = pagLayer;
     }
 
@@ -415,24 +628,85 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
         if (layerPtr->parentId.isValid()) {
             auto parentIt = layerByEntity_.find(layerPtr->parentId.value);
             if (parentIt == layerByEntity_.end()) {
-                delete pagComposition;
-                return Unexpected(PagExportError::MappingFailed);
+                Warn(&warnings_, layerPtr->id, "SkippedParent",
+                     "Parent layer was skipped; clearing parent link");
+            } else {
+                childIt->second->parent = parentIt->second;
             }
-            childIt->second->parent = parentIt->second;
         }
         if (layerPtr->trackMatteType != TrackMatteType::None) {
             if (!layerPtr->trackMatteLayerId.isValid()) {
-                delete pagComposition;
-                return Unexpected(PagExportError::MappingFailed);
+                Warn(&warnings_, layerPtr->id, "SkippedTrackMatte",
+                     "Track matte source missing; clearing track matte");
+                continue;
             }
             auto matteIt = layerByEntity_.find(layerPtr->trackMatteLayerId.value);
             if (matteIt == layerByEntity_.end()) {
-                delete pagComposition;
-                return Unexpected(PagExportError::MappingFailed);
+                Warn(&warnings_, layerPtr->id, "SkippedTrackMatte",
+                     "Track matte source was skipped; clearing track matte");
+                continue;
             }
             childIt->second->trackMatteType = MapTrackMatte(layerPtr->trackMatteType);
             childIt->second->trackMatteLayer = matteIt->second;
         }
+    }
+
+    std::reverse(contentLayers.begin(), contentLayers.end());
+
+    // PAG decode rebinds track matte to layers[index-1]; place matte immediately above target.
+    for (size_t index = 0; index < contentLayers.size(); ++index) {
+        pag::Layer *pagLayer = contentLayers[index];
+        if (pagLayer->trackMatteLayer == nullptr ||
+            pagLayer->trackMatteType == pag::TrackMatteType::None) {
+            continue;
+        }
+        pag::Layer *matteLayer = pagLayer->trackMatteLayer;
+        size_t matteIndex = contentLayers.size();
+        for (size_t probe = 0; probe < contentLayers.size(); ++probe) {
+            if (contentLayers[probe] == matteLayer) {
+                matteIndex = probe;
+                break;
+            }
+        }
+        if (matteIndex >= contentLayers.size()) {
+            continue;
+        }
+        // Already immediately above this layer (PAG decode uses layers[index - 1]).
+        if (matteIndex + 1 == index) {
+            continue;
+        }
+        contentLayers.erase(contentLayers.begin() + static_cast<std::ptrdiff_t>(matteIndex));
+        if (matteIndex < index) {
+            --index;
+        }
+        contentLayers.insert(contentLayers.begin() + static_cast<std::ptrdiff_t>(index), matteLayer);
+        pagLayer->trackMatteLayer = matteLayer;
+    }
+
+    // AE/PAG: track-matte sources are not drawn as normal layers (CompositionRenderer skips
+    // !isActive); they are only sampled via trackMatteLayer. Matches MS usedAsMatteOnly.
+    for (pag::Layer *pagLayer : contentLayers) {
+        if (pagLayer->trackMatteLayer != nullptr &&
+            pagLayer->trackMatteType != pag::TrackMatteType::None) {
+            pagLayer->trackMatteLayer->isActive = false;
+        }
+    }
+
+    pagComposition->layers = std::move(contentLayers);
+
+    // Many PAG viewers ignore Composition.backgroundColor and only draw layers; always emit a
+    // bottom backdrop so the MS composition background is visible.
+    pag::ShapeLayer *backdrop = buildCompositionBackdrop(composition);
+    backdrop->containingComposition = pagComposition;
+    pagComposition->layers.push_back(backdrop);
+
+    // PAG has no composition cornerRadius: rounded fill already on backdrop + Precomp mask clip.
+    if (composition.cornerRadius > 0.0f) {
+        pag::VectorComposition *clipped = wrapCompositionWithCornerClip(pagComposition, composition);
+        Warn(&warnings_, composition.id, "CompositionCornerRadiusApproximated",
+             "Composition corner radius exported as rounded fill and clip mask");
+        currentHostComposition_ = nullptr;
+        return clipped;
     }
 
     currentHostComposition_ = nullptr;
@@ -502,37 +776,80 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
         Warn(&warnings_, layer.id, "TextFeatureApproximated",
              "boxTextMode shrink-to-fit is not fully represented in PAG TextDocument");
     }
-    pagLayer->sourceText = buildSourceText(content, layer.id);
+    pagLayer->sourceText = buildSourceText(layer, content);
     return pagLayer;
 }
 
-pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const TextContent &content,
-                                                         FrameTime time) const {
+pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
+                                                         const TextContent &content,
+                                                         FrameTime time) {
     auto document = std::make_shared<pag::TextDocument>();
     document->text = content.text.evaluate(time);
     document->fontFamily = content.fontFamily;
     document->fontStyle = content.fontStyle;
     document->fontSize = content.fontSize.evaluate(time);
     document->justification = MapAlign(content.align);
-    document->applyFill = true;
     document->boxText = true;
     const Vec2 box = content.size.evaluate(time);
     document->boxTextPos = pag::Point::Zero();
     document->boxTextSize = pag::Point::Make(box.x, box.y);
+
+    // PAG TextDocument supports one fill + one stroke; MS draws styles in order (fill then stroke).
+    document->applyFill = false;
+    document->applyStroke = false;
+    document->strokeOverFill = true;
+    bool sawFill = false;
+    bool sawStroke = false;
+    for (const auto &stylePtr : layer.styles) {
+        if (stylePtr == nullptr) {
+            continue;
+        }
+        if (stylePtr->type() == LayerStyleType::Fill) {
+            if (sawFill) {
+                Warn(&warnings_, layer.id, "TextStyleApproximated",
+                     "Multiple text fills collapsed to the first FillStyle");
+                continue;
+            }
+            const auto &fill = static_cast<const FillStyle &>(*stylePtr);
+            document->applyFill = true;
+            document->fillColor = ToPagColor(fill.color.evaluate(time));
+            sawFill = true;
+            continue;
+        }
+        if (stylePtr->type() == LayerStyleType::Stroke) {
+            if (sawStroke) {
+                Warn(&warnings_, layer.id, "TextStyleApproximated",
+                     "Multiple text strokes collapsed to the first StrokeStyle");
+                continue;
+            }
+            const auto &stroke = static_cast<const StrokeStyle &>(*stylePtr);
+            const float width = stroke.width.evaluate(time);
+            if (width <= 0.0f) {
+                continue;
+            }
+            document->applyStroke = true;
+            document->strokeColor = ToPagColor(stroke.color.evaluate(time));
+            document->strokeWidth = width;
+            sawStroke = true;
+        }
+    }
+    if (!sawFill) {
+        document->applyFill = true;
+        document->fillColor = pag::Black;
+    }
     return document;
 }
 
-pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const TextContent &content,
-                                                                        EntityId layerId) {
-    (void)layerId;
+pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const Layer &layer,
+                                                                        const TextContent &content) {
     if (!content.text.isAnimated() && !content.fontSize.isAnimated() && !content.size.isAnimated()) {
-        return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(content, 0));
+        return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(layer, content, 0));
     }
     std::set<FrameTime> times;
     CollectKeyframeTimes(content.text, content.fontSize, content.size, &times);
     if (times.size() < 2) {
         const FrameTime time = times.empty() ? 0 : *times.begin();
-        return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(content, time));
+        return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(layer, content, time));
     }
     std::vector<FrameTime> ordered(times.begin(), times.end());
     std::vector<pag::Keyframe<pag::TextDocumentHandle> *> keyframes;
@@ -541,8 +858,8 @@ pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const Te
         auto *keyframe = new pag::Keyframe<pag::TextDocumentHandle>();
         keyframe->startTime = ordered[index];
         keyframe->endTime = ordered[index + 1];
-        keyframe->startValue = makeTextDocument(content, ordered[index]);
-        keyframe->endValue = makeTextDocument(content, ordered[index + 1]);
+        keyframe->startValue = makeTextDocument(layer, content, ordered[index]);
+        keyframe->endValue = makeTextDocument(layer, content, ordered[index + 1]);
         keyframe->interpolationType = pag::KeyframeInterpolationType::Hold;
         keyframes.push_back(keyframe);
     }
@@ -603,8 +920,11 @@ Expected<pag::ImageLayer *, PagExportError> PagFileBuilder::buildImageLayer(cons
         return Unexpected(filled.error());
     }
     pagLayer->imageBytes = imageBytes.value();
+    // Keep scaleMode for runtime image replacement; design-time container is baked into transform.
     pagLayer->imageFillRule = new pag::ImageFillRule();
     pagLayer->imageFillRule->scaleMode = MapScaleMode(content.scaleMode);
+    applyImageContainerFit(pagLayer, layer, content, imageBytes.value()->width,
+                           imageBytes.value()->height);
     return pagLayer;
 }
 

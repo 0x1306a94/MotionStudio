@@ -10,6 +10,7 @@
 #include "MotionStudio/export/PagExporter.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/ShapeElement.h"
 #include "MotionStudio/model/TextContent.h"
@@ -52,11 +53,20 @@ class PagFileBuilder {
                                                 const Layer &layer);
     bool needsBitmapFallback(const Layer &layer) const;
     void collectDescendants(EntityId rootLayerId, std::unordered_set<uint64_t> *out) const;
+    void skipLayerWithWarning(const Layer &layer, const char *code, const char *message,
+                              std::unordered_set<uint64_t> *skippedDescendants);
+    pag::ShapeLayer *buildCompositionBackdrop(const Composition &composition);
+    pag::VectorComposition *wrapCompositionWithCornerClip(pag::VectorComposition *inner,
+                                                          const Composition &composition);
+    void applyImageContainerFit(pag::ImageLayer *pagLayer, const Layer &layer,
+                                const ImageContent &content, int intrinsicWidth,
+                                int intrinsicHeight);
     Expected<pag::ImageBytes *, PagExportError> imageBytesForAsset(EntityId assetId,
                                                                    EntityId layerId);
-    pag::Property<pag::TextDocumentHandle> *buildSourceText(const TextContent &content,
-                                                            EntityId layerId);
-    pag::TextDocumentHandle makeTextDocument(const TextContent &content, FrameTime time) const;
+    pag::Property<pag::TextDocumentHandle> *buildSourceText(const Layer &layer,
+                                                            const TextContent &content);
+    pag::TextDocumentHandle makeTextDocument(const Layer &layer, const TextContent &content,
+                                             FrameTime time);
     pag::Transform2D *buildTransform(const Transform &transform, EntityId layerId);
     pag::BlendMode mapBlendMode(BlendMode mode, EntityId layerId, bool *ok);
     const Composition *findComposition(EntityId id) const;
@@ -73,6 +83,8 @@ class PagFileBuilder {
     std::unordered_map<uint64_t, pag::ImageBytes *> imageBytesByAsset_;
     std::vector<pag::ImageBytes *> imageBytesList_;
     std::vector<pag::Composition *> bitmapCompositions_;
+    // Inner comps created when wrapping corner-radius clip; owned until VerifyAndMake.
+    std::vector<pag::Composition *> nestedCompositions_;
     const Composition *currentHostComposition_ = nullptr;
     pag::ID nextLayerId_ = 1;
     pag::ID nextCompositionId_ = 1;

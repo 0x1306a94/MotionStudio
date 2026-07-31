@@ -346,13 +346,13 @@ innerTime = (outer - inPoint) × timeStretch + startTime
 | --- | --- |
 | `name` | `layer->name` |
 | `inPoint` / `outPoint` | `startTime` + `duration`（注意 exclusive/inclusive 边界，与 AE exporter 一致化） |
-| `visible` | `isActive` |
+| `visible` | `isActive`（**例外**：被用作 Track Matte 源的层必须 `isActive = false`，见 §5.1） |
 | `transform`（anchor/position/scale/rotation/opacity + KF） | `Transform2D` + `Property` / `AnimatableProperty` |
 | `blendMode` | `BlendMode` 同名子集；无对应则 warning + 近似为 Normal **或** 触发该层 Fallback（优先：无对应则 Fallback，保视觉） |
 | `masks[]` | `MaskData`：path / mode / opacity / inverted / feather / expansion |
-| `trackMatteType` + `trackMatteLayerId` | `trackMatteType` + `trackMatteLayer`（导出顺序需满足 PAG 对 matte 层位置约定，对齐 AE exporter） |
-| `styles`（Fill/Stroke） | Shape 内容中的 Fill/Stroke 元素（非 AE DropShadow 类 LayerStyle） |
-| `followPath.enabled == true` | **不可直接映射** → §3.6 Fallback |
+| `trackMatteType` + `trackMatteLayerId` | `trackMatteType` + `trackMatteLayer`（源层须紧邻目标之上且 `isActive=false`，见 §5.1） |
+| `styles`（Fill/Stroke） | Shape → shape contents；**Text → `TextDocument` 的 fill/stroke 字段**（非 ShapeElement） |
+| `followPath.enabled == true` | 优先 BitmapFallback；不可用则**跳过该层** + warning（整份导出不因单层 `MappingFailed` 中断，见 §5.1） |
 | `locked` | 忽略（PAG 无编辑锁） |
 
 **缓动**：MS 贝塞尔缓动 → PAG keyframe bezier；空间贝塞尔（position path）若 PAG 支持则映射，否则采样为多关键帧并 warning（code: `SpatialEasingApproximated`）。
@@ -374,9 +374,11 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 ### 3.4 Text / Image
 
-**Text**：`text` / `fontFamily` / `fontStyle` / `fontSize` / `size` / `align` / `boxTextMode` → `TextDocument` 对应字段；无法表达的（如 shrink-to-fit 细节）→ warning，能保则保矢量，只有严重偏离时才 Fallback。
+**Text**：`text` / `fontFamily` / `fontStyle` / `fontSize` / `size` / `align` / `boxTextMode` → `TextDocument`；**必须**从 `Layer.styles` 取首个 Fill → `applyFill`/`fillColor`、首个 Stroke → `applyStroke`/`strokeColor`/`strokeWidth`（`strokeOverFill = true`，对齐 MS 先填后描）。漏映射时 PAG 默认 `fillColor=Black`，预览会像「只剩描边」。多 Fill/Stroke → 取第一个 + warning。`boxTextMode` shrink-to-fit 细节 → warning。
 
-**Image**：读 `Asset.path`（相对 `projectRoot`）→ 编码为 `ImageBytes`（PNG/JPEG 原样或重编码，实现选侵入小者）；`scaleMode` → `ImageFillRule::scaleMode`（与 `PAGScaleMode` / MS `ImageScaleMode` 对齐，已有 LetterBox 等）。
+**Image**：读 `Asset.path`（相对 `projectRoot`）→ 编码为 `ImageBytes`（**源像素尺寸**，对齐 AE）；`ImageContent.size` + `scaleMode` 按 `ComputeImageDestinationRect` **烘焙进** `transform.scale` / `anchor`（AE 无独立容器，改大小走 Transform）。`ImageFillRule::scaleMode` 保留给运行时换图。Zoom/None 溢出容器时加矩形 Mask。`size` 关键帧首版按 inPoint 静帧烘焙并 warning。
+
+**合成背景 / 圆角**：始终在图层栈最底插入 `CompositionBackground` Shape（铺 `backgroundColor`）——多数 PAG 预览只画图层、不铺 `Composition.backgroundColor` 字段。`cornerRadius > 0` 时 backdrop 用圆角矩形，并外包一层带圆角 Mask 的 PreCompose 做整体裁剪。
 
 默认可替换：导出后若未标记不可替换，依赖 `Codec::Encode` 默认把全部 text/image 标为 editable（与 libpag codec 行为一致）；若某层 Fallback 掉则自然不在 editable 列表。
 
@@ -385,7 +387,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 - MS 用 `parentId` 树；PAG 为扁平 `layers[]` + `parent` 指针
 - `LayerType::Group` → `pag::NullLayer`，保留 Transform / timing / masks / trackMatte
 - 子层 `parent` 指向该 NullLayer
-- 图层顺序：与宿主 `Composition` 渲染序一致（MS index 0 = 最底 → PAG 同序）
+- 图层顺序见 §5.1（MS 底→顶构建，再反转为 PAG File 顶→底；背景层在数组末尾）
 - Group **自身**带 FollowPath 或不可映射 blend 等 → **整棵子树** 一并 Fallback（§3.6）
 
 ### 3.6 BitmapFallback（整层 / 最小子树）
@@ -406,7 +408,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
    - 子树降级时：只保留一个 PreComposeLayer，原子层不再单独导出
 4. 追加 `PagExportWarning`（如 `UnsupportedFollowPath`）
 
-**`allowBitmapFallback == false`**：不调用 FrameSource，直接 `MappingFailed`。
+**`allowBitmapFallback == false`**：不调用 FrameSource；该层按 soft-fail 跳过（§5.1），不整份中断。
 
 **首版不交付**生产 `BitmapFrameSource` 实现；测试用 Fake 源验证「警告 + Bitmap 子合成挂接 + Encode/Load」。
 
@@ -416,14 +418,19 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 | code | 含义 |
 | --- | --- |
-| `UnsupportedFollowPath` | 层启用 FollowPath，已 Bitmap 降级 |
+| `UnsupportedFollowPath` | FollowPath 层已跳过或 Bitmap 降级 |
 | `UnsupportedBlendMode` | 混合模式无映射，已降级或近似 |
 | `UnsupportedStrokePosition` | 描边位置无映射，已近似 |
 | `SpatialEasingApproximated` | 空间缓动被采样近似 |
 | `TextFeatureApproximated` | 文本特性部分丢失但仍矢量 |
-| `ImageAssetMissing` | 图片资源缺失（失败或占位，实现选定一种并单测锁定） |
+| `TextStyleApproximated` | 多 Fill/Stroke 折叠为 TextDocument 单组 |
+| `ImageAssetMissing` | 图片资源缺失，层已跳过 |
+| `ImageSizeAnimationBakedAsStatic` | 容器尺寸关键帧按 inPoint 静帧烘焙 |
 | `BitmapFallback` | 通用降级（可带更具体 code 同时存在） |
+| `BitmapFallbackUnavailable` | 允许降级但无 FrameSource，层已跳过 |
 | `GroupSubtreeRasterized` | Group 子树整体光栅化 |
+| `CompositionCornerRadiusApproximated` | 圆角用 backdrop + clip Precomp 近似 |
+| `LayerSkipped` / `SkippedParent` / `SkippedTrackMatte` | 软失败跳层或断链 |
 
 ---
 
@@ -445,7 +452,38 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 - `exporter/src/export/ExportComposition.cpp`
 - `exporter/src/export/ExportLayer.cpp`
 - `exporter/src/export/data/Transform2D.*`、`Shape.*`、`Mask.*`
-- `src/codec/Codec.cpp`（`Encode`）
+- `src/codec/Codec.cpp`（`Encode` / `InstallReferences`）
+- `src/rendering/renderers/CompositionRenderer.cpp`（图层绘制序）
+- `src/rendering/renderers/TrackMatteRenderer.cpp`
+
+### 5.1 实现坑位（踩坑备忘）
+
+以下与「看起来导出了但预览不对」强相关，改 `PagFileBuilder` 时对照：
+
+1. **图层顺序（PAG File ≠ PAGLayers API）**  
+   - MS：`layers[0]` = 最底，末项最上。  
+   - PAG **File** 内 `VectorComposition::layers`：`CompositionRenderer` **从尾画到头**，故 **index 0 = 最顶**（注释：*The index order of Layers in File is different from PAGLayers*）。  
+   - 导出：按 MS 底→顶构建（便于 Group fallback 先收集子孙），再 `reverse` 成 PAG 顶→底；`CompositionBackground` **push 在末尾**（真正最底）。  
+   - 错误地把全幅背景插在 index 0 → 盖住全部内容。
+
+2. **Track Matte**  
+   - Decode 时 `InstallReferences` 把有 matte 的层的源**强制绑成** `layers[index - 1]`（只认邻接，不认任意指针）。导出后须把 matte 源排在目标层正上方。  
+   - AE exporter：`trackMatteLayer->isActive = false`。PAG 渲染跳过 `!isActive` 层，仅经 `trackMatteLayer` 采样。若源层仍 `isActive=true`，会当普通层画出（例如白色 silhouette 盖住蓝色 Luma 结果）。对齐 MS `usedAsMatteOnly`。
+
+3. **合成背景色**  
+   - `Composition.backgroundColor` 会进文件，但很多预览器**不铺该字段**、只画图层。  
+   - 必须始终垫底层 `CompositionBackground` Shape；圆角时再加 Precomp + 圆角 Mask 整体裁剪。
+
+4. **Image 容器尺寸**  
+   - AE：`ImageBytes` = footage 源尺寸，视觉大小靠 Transform.Scale。  
+   - MS：另有 `ImageContent.size` + `scaleMode`。只导出源尺寸会偏小/偏大 → 用 `ComputeImageDestinationRect` 烘焙进 scale/anchor。
+
+5. **Text Fill/Stroke**  
+   - 样式在 `Layer.styles`，不在 `TextContent`。必须写入 `TextDocument`；否则默认黑填充、`applyStroke=false`。
+
+6. **单层 MappingFailed = soft-fail**  
+   - 跳过该层 + warning，继续导出；父层/matte 源被跳过则清链接 + warning。  
+   - 硬失败仍限：InvalidComposition / InvalidOptions / EncodeFailed / WriteFailed。
 
 ---
 
@@ -455,14 +493,16 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | --- | --- |
 | Shape Rect/Ellipse/Path + Transform KF | Load 成功；ShapeLayer；关键帧数量符合 |
 | Fill + Stroke + Trim | shape contents 含对应元素 |
-| Text 静态/字号 KF | TextLayer；editableTexts 非空或 codec 默认全可编辑 |
-| Image + LetterBox | ImageLayer + ImageBytes；尺寸合理 |
+| Text + Fill/Stroke styles | TextDocument `applyFill`/`fillColor`/`applyStroke`/`strokeWidth` 正确 |
+| Image 容器 ≠ 源尺寸 + LetterBox | `ImageBytes` 仍为源尺寸；transform.scale 含容器 fit |
 | Mask Add/Sub/Intersect | masks 非空且 mode 正确 |
-| TrackMatte Alpha | trackMatte 指针/类型正确 |
+| TrackMatte | 类型/邻接正确；**matte 源 `isActive == false`** |
 | Precomp 嵌套 | PreComposeLayer 指向子 VectorComposition；时长关系正确 |
-| Group 父子 | NullLayer + child.parent |
-| FollowPath + Fake BitmapFrameSource | warning `UnsupportedFollowPath`；存在 BitmapComposition；Load 成功 |
-| `allowBitmapFallback=false` + FollowPath | `MappingFailed`，无文件写出 |
+| Group 父子 | NullLayer + child.parent；PAG 顶→底序 |
+| 空合成 / 任意合成 | 含 `CompositionBackground`；`backgroundColor` 字段与色块一致 |
+| 圆角合成 | 外包 Precomp + mask；inner 末层为圆角 backdrop |
+| FollowPath + Fake BitmapFrameSource | warning；存在 BitmapComposition；Load 成功 |
+| FollowPath 且无 fallback | **整份仍成功**；问题层跳过 + warning |
 | Encode round-trip | `Encode` → `Load` → 再 `Encode` 长度/根合成类型稳定（允许非 byte-identical） |
 
 全部在 ASan 构建下跑；不引入 AE SDK。
