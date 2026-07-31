@@ -27,6 +27,10 @@ add_files_by_extension(SERIALIZATION_SOURCES ".h;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/serialization
 )
 
+add_files_by_extension(EXPORT_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/export
+)
+
 add_files_by_extension(PUBLIC_HEADERS ".h;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/MotionStudio
 )
@@ -39,6 +43,7 @@ list(APPEND CORE_SOURCES
     ${ANIMATION_SOURCES}
     ${UNDO_SOURCES}
     ${SERIALIZATION_SOURCES}
+    ${EXPORT_SOURCES}
 )
 add_library(core STATIC ${PUBLIC_HEADERS} ${CORE_SOURCES})
 set_target_properties(core PROPERTIES OUTPUT_NAME motionstudio_core)

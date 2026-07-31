@@ -29,6 +29,10 @@ add_files_by_extension(UNDO_TESTS_SOURCES ".h;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/undo
 )
 
+add_files_by_extension(EXPORT_TESTS_SOURCES ".h;.cpp"
+    ${CMAKE_CURRENT_SOURCE_DIR}/export
+)
+
 list(APPEND TESTS_SOURCES
     ${COMMON_TESTS_SOURCES}
     ${CORE_TESTS_SOURCES}
@@ -37,6 +41,7 @@ list(APPEND TESTS_SOURCES
     ${RENDER_TESTS_SOURCES}
     ${ANIMATION_TESTS_SOURCES}
     ${UNDO_TESTS_SOURCES}
+    ${EXPORT_TESTS_SOURCES}
 )
 add_executable(core_tests ${TESTS_SOURCES})
 add_source_group(TESTS_SOURCES ${CMAKE_CURRENT_LIST_DIR} "Sources")
