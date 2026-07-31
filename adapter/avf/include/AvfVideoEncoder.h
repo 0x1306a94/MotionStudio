@@ -19,6 +19,7 @@ class AvfVideoEncoder : public VideoEncoder {
     Expected<void, std::string> end() override;
     void abort() override;
     void *platformPixelBufferPool() const override;
+    Expected<void, std::string> waitUntilReadyForMoreFrames() override;
 
   private:
     struct Impl;

@@ -3,6 +3,7 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
 
 #include <algorithm>
 
@@ -171,23 +172,24 @@ CVPixelBufferPoolRef MakeExportPixelBufferPool(int width, int height) {
     return pool;
 }
 
+// Backpressure belongs in VideoEncoder::waitUntilReadyForMoreFrames() before render.
+// Do not use AllocationThreshold here: writer may hold the only buffers while we are
+// blocked before appendFrame, which deadlocks the export loop.
 CVPixelBufferRef AcquirePooledPixelBuffer(CVPixelBufferPoolRef pool) {
     if (pool == nullptr) {
         return nullptr;
     }
-    NSDictionary *auxAttributes = @{
-        (id)kCVPixelBufferPoolAllocationThresholdKey: @(kExportPixelBufferPoolSize),
-    };
-    for (;;) {
+    const CFTimeInterval deadline = CACurrentMediaTime() + 60.0;
+    while (CACurrentMediaTime() < deadline) {
         CVPixelBufferRef buffer = nullptr;
-        const CVReturn status = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(
-            kCFAllocatorDefault, pool, (__bridge CFDictionaryRef)auxAttributes, &buffer);
+        const CVReturn status =
+            CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer);
         if (status == kCVReturnSuccess && buffer != nullptr) {
             return buffer;
         }
-        // Threshold hit: writer still holds in-flight buffers; backpressure until one returns.
         [NSThread sleepForTimeInterval:0.001];
     }
+    return nullptr;
 }
 
 }  // namespace

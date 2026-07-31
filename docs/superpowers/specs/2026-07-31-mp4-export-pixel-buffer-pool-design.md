@@ -23,8 +23,8 @@ Instruments：`VM: IOSurface` Total Bytes 暴涨。FrameSource 自建池 + adapt
 
 - `VideoExporter`：先 `encoder.begin()`，再 `setPlatformPixelBufferPool(encoder.platformPixelBufferPool())`，再 `prepare`
 - `AvfVideoEncoder`：暴露 `adaptor.pixelBufferPool`；`shouldOptimizeForNetworkUse = YES`
-- `TgfxVideoFrameSource`：优先用共享池；无共享池时（单测）仍自建 3 槽池
-- `renderFrame`：`AllocationThreshold = 3`；触顶 sleep 1ms 背压
+- `TgfxVideoFrameSource`：优先用共享池；无共享池时（单测）仍自建池
+- 背压：`VideoExporter` 每帧先 `encoder.waitUntilReadyForMoreFrames()`，再 `renderFrame`（避免在 append 前用 AllocationThreshold 死锁）
 - `finish`：仅释放自建池
 
 峰值目标：约 `3 × W×H×4`（像素）+ GPU/编码工作集。

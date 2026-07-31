@@ -26,6 +26,11 @@ class VideoEncoder {
     virtual void *platformPixelBufferPool() const {
         return nullptr;
     }
+
+    // Backpressure before rendering the next frame (e.g. AVAssetWriterInput ready).
+    virtual Expected<void, std::string> waitUntilReadyForMoreFrames() {
+        return Expected<void, std::string>();
+    }
 };
 
 }  // namespace motion

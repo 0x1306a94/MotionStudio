@@ -97,6 +97,14 @@ Expected<void, std::string> VideoExporter::Export(
             frames.finish();
             return Unexpected<std::string>("cancelled");
         }
+        // Drain the encoder before taking another pooled pixel buffer; otherwise
+        // AllocationThreshold / pool exhaustion can deadlock before appendFrame.
+        auto ready = encoder.waitUntilReadyForMoreFrames();
+        if (!ready.hasValue()) {
+            encoder.abort();
+            frames.finish();
+            return Unexpected<std::string>(ready.error());
+        }
         auto frame = frames.renderFrame(time);
         if (!frame.hasValue()) {
             encoder.abort();

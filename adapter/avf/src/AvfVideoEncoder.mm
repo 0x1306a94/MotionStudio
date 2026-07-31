@@ -21,8 +21,8 @@ NSString *ProfileLevel(H264Profile profile) {
     return AVVideoProfileLevelH264HighAutoLevel;
 }
 
-bool WaitReady(AVAssetWriterInput *input, NSError **error) {
-    const CFTimeInterval deadline = CACurrentMediaTime() + 5.0;
+bool WaitReady(AVAssetWriterInput *input, NSError **error, CFTimeInterval timeoutSeconds = 60.0) {
+    const CFTimeInterval deadline = CACurrentMediaTime() + timeoutSeconds;
     while (!input.readyForMoreMediaData) {
         if (CACurrentMediaTime() > deadline) {
             if (error != nil) {
@@ -195,6 +195,17 @@ Expected<void, std::string> AvfVideoEncoder::begin(const VideoExportOptions &opt
 
 void *AvfVideoEncoder::platformPixelBufferPool() const {
     return impl_->pixelBufferPool;
+}
+
+Expected<void, std::string> AvfVideoEncoder::waitUntilReadyForMoreFrames() {
+    if (impl_->input == nil) {
+        return Unexpected<std::string>("encoder not started");
+    }
+    NSError *error = nil;
+    if (!WaitReady(impl_->input, &error)) {
+        return Unexpected<std::string>(NsErrorMessage(error, "writer input not ready"));
+    }
+    return Expected<void, std::string>();
 }
 
 Expected<void, std::string> AvfVideoEncoder::appendFrame(const VideoFrame &frame,
