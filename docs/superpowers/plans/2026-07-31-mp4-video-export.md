@@ -275,7 +275,7 @@ git commit --only \
 - Consumes: Task 1 头文件；`Document::entityIndex().findComposition`；`Composition::{duration,width,height,frameRate}`；`TimeRange`；`FrameRate::toSeconds`
 - Produces: 可用的 `VideoExporter::Export`（行为见 spec 伪代码）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/export/VideoExporterTest.cpp`（完整文件）：
 
@@ -453,7 +453,7 @@ TEST(VideoExporterTest, AttachAudioDefaultFails) {
 
 注意：默认码率公式 `round(width * height * fps * 0.1)` 再 clamp；1920×1080×30×0.1 = 6220800。实现必须与此一致，否则改测试与实现到同一公式。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target core_tests
