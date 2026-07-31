@@ -82,42 +82,44 @@ extension EditorViewController {
         progressVC.onCancel = { [weak session] in
             session?.requestCancel()
         }
-        present(progressVC, animated: true)
 
         let core = document.core
         let cancelState = session.cancelState
         let outputPath = outputURL.path(percentEncoded: false)
         UIMenuSystem.main.setNeedsRevalidate()
 
-        Task.detached(priority: .userInitiated) {
-            do {
-                try core.exportVideo(compositionID: compositionID,
-                                     outputPath: outputPath,
-                                     resolved: resolved,
-                                     progress: { completed, total in
-                                         if cancelState.isCancelled {
-                                             return false
-                                         }
-                                         Task { @MainActor in
-                                             progressVC.update(completed: completed, total: total)
-                                         }
-                                         return true
-                                     },
-                                     cancelState: cancelState)
-                await MainActor.run {
-                    self.finishVideoExportSuccess(outputURL: outputURL, progressVC: progressVC)
-                }
-            } catch VideoExportError.cancelled {
-                await MainActor.run {
-                    self.finishVideoExportCancelled(progressVC: progressVC)
-                }
-            } catch let VideoExportError.failed(message) {
-                await MainActor.run {
-                    self.finishVideoExportFailed(message: message, progressVC: progressVC)
-                }
-            } catch {
-                await MainActor.run {
-                    self.finishVideoExportFailed(message: error.localizedDescription, progressVC: progressVC)
+        present(progressVC, animated: true) { [weak self] in
+            guard let self else { return }
+            Task.detached(priority: .userInitiated) {
+                do {
+                    try core.exportVideo(compositionID: compositionID,
+                                         outputPath: outputPath,
+                                         resolved: resolved,
+                                         progress: { completed, total in
+                                             if cancelState.isCancelled {
+                                                 return false
+                                             }
+                                             Task { @MainActor in
+                                                 progressVC.update(completed: completed, total: total)
+                                             }
+                                             return true
+                                         },
+                                         cancelState: cancelState)
+                    await MainActor.run {
+                        self.finishVideoExportSuccess(outputURL: outputURL, progressVC: progressVC)
+                    }
+                } catch VideoExportError.cancelled {
+                    await MainActor.run {
+                        self.finishVideoExportCancelled(progressVC: progressVC)
+                    }
+                } catch let VideoExportError.failed(message) {
+                    await MainActor.run {
+                        self.finishVideoExportFailed(message: message, progressVC: progressVC)
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.finishVideoExportFailed(message: error.localizedDescription, progressVC: progressVC)
+                    }
                 }
             }
         }
