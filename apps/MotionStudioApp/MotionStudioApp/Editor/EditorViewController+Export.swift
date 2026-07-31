@@ -95,7 +95,7 @@ extension EditorViewController {
                                      outputPath: outputPath,
                                      resolved: resolved,
                                      progress: { completed, total in
-                                         if cancelState.flag != 0 {
+                                         if cancelState.isCancelled {
                                              return false
                                          }
                                          Task { @MainActor in

@@ -7,8 +7,31 @@
 
 import Foundation
 
+/// Heap-backed cancel flag so C `cancelFlag` and Swift readers/writers do not
+/// share a `withUnsafePointer(to: &storedProperty)` exclusivity region.
 final nonisolated class VideoExportCancelState: @unchecked Sendable {
-    nonisolated(unsafe) var flag: Int32 = 0
+    private let storage = UnsafeMutablePointer<Int32>.allocate(capacity: 1)
+
+    init() {
+        storage.initialize(to: 0)
+    }
+
+    deinit {
+        storage.deinitialize(count: 1)
+        storage.deallocate()
+    }
+
+    var isCancelled: Bool {
+        storage.pointee != 0
+    }
+
+    var flagPointer: UnsafePointer<Int32> {
+        UnsafePointer(storage)
+    }
+
+    func requestCancel() {
+        storage.pointee = 1
+    }
 }
 
 @MainActor
@@ -34,7 +57,7 @@ final class VideoExportSession {
     }
 
     func requestCancel() {
-        cancelState.flag = 1
+        cancelState.requestCancel()
     }
 
     func cleanup() {

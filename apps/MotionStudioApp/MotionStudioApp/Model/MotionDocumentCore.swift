@@ -169,21 +169,19 @@ final class MotionDocumentCore {
             options.profile = Int32(resolved.profile)
 
             var error: UnsafeMutablePointer<CChar>?
-            let ok = withUnsafePointer(to: &cancelState.flag) { flagPointer in
-                ms_video_export(
-                    handle,
-                    compositionID,
-                    &options,
-                    { ctx, completed, total in
-                        guard let ctx else { return true }
-                        let box = Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue()
-                        return box.progress?(completed, total) ?? true
-                    },
-                    Unmanaged.passUnretained(box).toOpaque(),
-                    UnsafeRawPointer(flagPointer).assumingMemoryBound(to: Int32.self),
-                    &error,
-                )
-            }
+            let ok = ms_video_export(
+                handle,
+                compositionID,
+                &options,
+                { ctx, completed, total in
+                    guard let ctx else { return true }
+                    let box = Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue()
+                    return box.progress?(completed, total) ?? true
+                },
+                Unmanaged.passUnretained(box).toOpaque(),
+                UnsafeRawPointer(cancelState.flagPointer).assumingMemoryBound(to: Int32.self),
+                &error,
+            )
             if ok {
                 return
             }
