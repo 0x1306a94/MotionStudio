@@ -1,6 +1,7 @@
 #include "TgfxVideoFrameSource.h"
 
 #import <CoreVideo/CoreVideo.h>
+#import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 
 #include <algorithm>
@@ -145,19 +146,48 @@ class CVPixelBufferCanvasAdapter : public TgfxCanvasAdapter {
     bool lastAcquireOk_ = false;
 };
 
-CVPixelBufferRef MakeExportPixelBuffer(int width, int height) {
-    NSDictionary *attributes = @{
+constexpr size_t kExportPixelBufferPoolSize = 3;
+
+CVPixelBufferPoolRef MakeExportPixelBufferPool(int width, int height) {
+    NSDictionary *pixelAttributes = @{
+        (id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+        (id)kCVPixelBufferWidthKey: @(width),
+        (id)kCVPixelBufferHeightKey: @(height),
         (id)kCVPixelBufferIOSurfacePropertiesKey: @{},
         (id)kCVPixelBufferMetalCompatibilityKey: @YES,
     };
-    CVPixelBufferRef buffer = nullptr;
-    const CVReturn status = CVPixelBufferCreate(
-        kCFAllocatorDefault, static_cast<size_t>(width), static_cast<size_t>(height),
-        kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef)attributes, &buffer);
+    // Prefer keeping a few recycled buffers warm; hard cap is enforced on acquire
+    // via kCVPixelBufferPoolAllocationThresholdKey (MaximumBufferCount was removed).
+    NSDictionary *poolAttributes = @{
+        (id)kCVPixelBufferPoolMinimumBufferCountKey: @(kExportPixelBufferPoolSize),
+    };
+    CVPixelBufferPoolRef pool = nullptr;
+    const CVReturn status =
+        CVPixelBufferPoolCreate(kCFAllocatorDefault, (__bridge CFDictionaryRef)poolAttributes,
+                                (__bridge CFDictionaryRef)pixelAttributes, &pool);
     if (status != kCVReturnSuccess) {
         return nullptr;
     }
-    return buffer;
+    return pool;
+}
+
+CVPixelBufferRef AcquirePooledPixelBuffer(CVPixelBufferPoolRef pool) {
+    if (pool == nullptr) {
+        return nullptr;
+    }
+    NSDictionary *auxAttributes = @{
+        (id)kCVPixelBufferPoolAllocationThresholdKey: @(kExportPixelBufferPoolSize),
+    };
+    for (;;) {
+        CVPixelBufferRef buffer = nullptr;
+        const CVReturn status = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(
+            kCFAllocatorDefault, pool, (__bridge CFDictionaryRef)auxAttributes, &buffer);
+        if (status == kCVReturnSuccess && buffer != nullptr) {
+            return buffer;
+        }
+        // Threshold hit: writer still holds in-flight buffers; backpressure until one returns.
+        [NSThread sleepForTimeInterval:0.001];
+    }
 }
 
 }  // namespace
@@ -167,7 +197,7 @@ struct TgfxVideoFrameSource::Impl {
     EntityId compositionId;
     VideoExportOptions options;
     std::unique_ptr<CVPixelBufferCanvasAdapter> adapter;
-    CVPixelBufferRef pixelBuffer = nullptr;
+    CVPixelBufferPoolRef pixelBufferPool = nullptr;
 };
 
 TgfxVideoFrameSource::TgfxVideoFrameSource()
@@ -186,20 +216,21 @@ Expected<void, std::string> TgfxVideoFrameSource::prepare(const Document &docume
     if (!adapter->Initialize()) {
         return Unexpected<std::string>("Metal unavailable for video frame source");
     }
-    CVPixelBufferRef buffer = MakeExportPixelBuffer(options.width, options.height);
-    if (buffer == nullptr) {
-        return Unexpected<std::string>("failed to create CVPixelBuffer");
+    CVPixelBufferPoolRef pool = MakeExportPixelBufferPool(options.width, options.height);
+    if (pool == nullptr) {
+        return Unexpected<std::string>("failed to create CVPixelBufferPool");
     }
     impl_->document = &document;
     impl_->compositionId = compositionId;
     impl_->options = options;
     impl_->adapter = std::move(adapter);
-    impl_->pixelBuffer = buffer;
+    impl_->pixelBufferPool = pool;
     return Expected<void, std::string>();
 }
 
 Expected<VideoFrame, std::string> TgfxVideoFrameSource::renderFrame(FrameTime time) {
-    if (impl_->document == nullptr || impl_->adapter == nullptr || impl_->pixelBuffer == nullptr) {
+    if (impl_->document == nullptr || impl_->adapter == nullptr ||
+        impl_->pixelBufferPool == nullptr) {
         return Unexpected<std::string>("frame source not prepared");
     }
 
@@ -208,11 +239,17 @@ Expected<VideoFrame, std::string> TgfxVideoFrameSource::renderFrame(FrameTime ti
         return Unexpected<std::string>(state.error());
     }
 
+    CVPixelBufferRef buffer = AcquirePooledPixelBuffer(impl_->pixelBufferPool);
+    if (buffer == nullptr) {
+        return Unexpected<std::string>("failed to acquire pooled CVPixelBuffer");
+    }
+
     Color background = state->backgroundColor;
     background.a = 1.0f;
-    impl_->adapter->SetPixelBuffer(impl_->pixelBuffer);
+    impl_->adapter->SetPixelBuffer(buffer);
     impl_->adapter->beginFrame(impl_->options.width, impl_->options.height, background, 0.0f);
     if (!impl_->adapter->lastAcquireSucceeded()) {
+        CVPixelBufferRelease(buffer);
         return Unexpected<std::string>("failed to acquire CVPixelBuffer render target");
     }
 
@@ -235,18 +272,18 @@ Expected<VideoFrame, std::string> TgfxVideoFrameSource::renderFrame(FrameTime ti
     frame.width = impl_->options.width;
     frame.height = impl_->options.height;
     frame.storage = VideoFrameStorage::PlatformShared;
-    frame.platformHandle = impl_->pixelBuffer;
+    frame.platformHandle = buffer;
     frame.retainHandle = RetainCVPixelBuffer;
     frame.releaseHandle = ReleaseCVPixelBuffer;
-    RetainCVPixelBuffer(frame.platformHandle);
+    // CreatePixelBuffer already returned +1; VideoFrame owns that retain via releaseHandle.
     return frame;
 }
 
 void TgfxVideoFrameSource::finish() {
     impl_->adapter.reset();
-    if (impl_->pixelBuffer != nullptr) {
-        CVPixelBufferRelease(impl_->pixelBuffer);
-        impl_->pixelBuffer = nullptr;
+    if (impl_->pixelBufferPool != nullptr) {
+        CVPixelBufferPoolRelease(impl_->pixelBufferPool);
+        impl_->pixelBufferPool = nullptr;
     }
     impl_->document = nullptr;
 }

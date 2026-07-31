@@ -140,6 +140,7 @@ Expected<void, std::string> AvfVideoEncoder::begin(const VideoExportOptions &opt
     if (writer == nil) {
         return Unexpected<std::string>(NsErrorMessage(error, "failed to create AVAssetWriter"));
     }
+    writer.shouldOptimizeForNetworkUse = YES;
 
     NSDictionary *compression = @{
         AVVideoAverageBitRateKey: @(options.bitrateBps),
