@@ -31,9 +31,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                          action: #selector(EditorViewController.saveDocumentAs),
                                          input: "s",
                                          modifierFlags: [.command, .shift])
-        let exportMP4Command = UICommand(title: "Export MP4...",
-                                         image: nil,
-                                         action: #selector(EditorViewController.exportMP4))
+        // Not ⌘E: that conflicts with system Edit → Use Selection for Find.
+        let exportMP4Command = UIKeyCommand(title: "Export MP4...",
+                                            image: nil,
+                                            action: #selector(EditorViewController.exportMP4),
+                                            input: "e",
+                                            modifierFlags: [.command, .alternate])
         let saveMenu = UIMenu(title: "",
                               options: .displayInline,
                               children: [saveCommand, saveAsCommand, exportMP4Command])

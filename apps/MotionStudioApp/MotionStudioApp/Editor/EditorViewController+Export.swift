@@ -2,7 +2,7 @@
 //  EditorViewController+Export.swift
 //  MotionStudioApp
 //
-//  File → Export MP4… flow: settings → progress → Files picker.
+//  File → Export MP4… flow: settings → progress → share (iPad) / Files picker (Catalyst).
 //
 
 import UIKit
@@ -11,6 +11,11 @@ import UIKit
 extension EditorViewController {
     @objc func exportMP4() {
         guard videoExportSession == nil else { return }
+
+        // Pause live preview for the export flow; do not resume afterward.
+        if editorState.isPlaying {
+            editorState.isPlaying = false
+        }
 
         let core = document.core
         let compositionID = core.firstCompositionID
@@ -73,6 +78,7 @@ extension EditorViewController {
             outputURL = try session.prepareOutputURL(projectName: projectName)
         } catch {
             videoExportSession = nil
+            updateExportButtonState()
             presentExportAlert(title: "Export Failed", message: error.localizedDescription)
             return
         }
@@ -86,6 +92,7 @@ extension EditorViewController {
         let core = document.core
         let cancelState = session.cancelState
         let outputPath = outputURL.path(percentEncoded: false)
+        updateExportButtonState()
         UIMenuSystem.main.setNeedsRevalidate()
 
         present(progressVC, animated: true) { [weak self] in
@@ -128,13 +135,37 @@ extension EditorViewController {
     private func finishVideoExportSuccess(outputURL: URL, progressVC _: UIViewController) {
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
-            documentPickerPurpose = .exportMP4
-            let picker = UIDocumentPickerViewController(forExporting: [outputURL], asCopy: true)
-            picker.delegate = self
-            picker.shouldShowFileExtensions = true
-            present(picker, animated: true)
+            #if targetEnvironment(macCatalyst)
+                documentPickerPurpose = .exportMP4
+                let picker = UIDocumentPickerViewController(forExporting: [outputURL], asCopy: true)
+                picker.delegate = self
+                picker.shouldShowFileExtensions = true
+                present(picker, animated: true)
+            #else
+                presentExportShareSheet(for: outputURL)
+            #endif
         }
     }
+
+    #if !targetEnvironment(macCatalyst)
+        private func presentExportShareSheet(for outputURL: URL) {
+            let activity = UIActivityViewController(activityItems: [outputURL], applicationActivities: nil)
+            activity.completionWithItemsHandler = { [weak self] _, _, _, _ in
+                self?.cleanupVideoExportSession()
+            }
+            if let popover = activity.popoverPresentationController {
+                if exportButton.window != nil {
+                    popover.sourceView = exportButton
+                    popover.sourceRect = exportButton.bounds
+                } else {
+                    popover.sourceView = view
+                    popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+                    popover.permittedArrowDirections = []
+                }
+            }
+            present(activity, animated: true)
+        }
+    #endif
 
     private func finishVideoExportCancelled(progressVC _: UIViewController) {
         dismiss(animated: true) { [weak self] in
@@ -153,7 +184,17 @@ extension EditorViewController {
         videoExportSession?.cleanup()
         videoExportSession = nil
         documentPickerPurpose = .saveAs
+        updateExportButtonState()
         UIMenuSystem.main.setNeedsRevalidate()
+    }
+
+    func updateExportButtonState() {
+        #if !targetEnvironment(macCatalyst)
+            let enabled = videoExportSession == nil
+            exportButton.isEnabled = enabled
+            // Match a normal toolbar control (not the muted secondaryLabel used by idle Save).
+            exportButton.tintColor = enabled ? .label : .tertiaryLabel
+        #endif
     }
 
     private func presentExportAlert(title: String, message: String) {

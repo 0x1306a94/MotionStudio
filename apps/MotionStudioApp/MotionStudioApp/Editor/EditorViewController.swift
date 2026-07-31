@@ -56,6 +56,7 @@ final class EditorViewController: UIViewController {
     let canvasViewport = UIView()
     let topToolbar = UIVisualEffectView(effect: nil)
     let saveButton = UIButton(type: .system)
+    let exportButton = UIButton(type: .system)
     let undoButton = UIButton(type: .system)
     let redoButton = UIButton(type: .system)
     let documentStatusView = UIView()
@@ -154,6 +155,7 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: UIKeyCommand.inputDelete, modifierFlags: [], action: #selector(UIResponderStandardEditActions.delete(_:))),
             UIKeyCommand(input: "s", modifierFlags: [.command], action: #selector(saveCurrentDocument)),
             UIKeyCommand(input: "s", modifierFlags: [.command, .shift], action: #selector(saveDocumentAs)),
+            UIKeyCommand(input: "e", modifierFlags: [.command, .alternate], action: #selector(exportMP4)),
             UIKeyCommand(input: "r", modifierFlags: [.command, .shift], action: #selector(addRectangleLayer)),
             UIKeyCommand(input: "e", modifierFlags: [.command, .shift], action: #selector(addEllipseLayer)),
             UIKeyCommand(input: "i", modifierFlags: [.command, .shift], action: #selector(addImageLayer)),

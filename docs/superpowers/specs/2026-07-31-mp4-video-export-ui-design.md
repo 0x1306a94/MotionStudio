@@ -9,14 +9,14 @@
 
 在编辑器 App 中提供最小可用的 MP4 导出 UI：
 
-1. File 菜单 **Export MP4…**
+1. File 菜单 **Export MP4…**（⌥⌘E；⌘E 与系统 Find 冲突）；iPad 顶栏导出按钮
 2. 设置 sheet：质量三档（分辨率=合成原始；时间=整段）
 3. 后台导出 + 模态进度 / 取消
-4. 成功后用 `UIDocumentPicker(forExporting:)` 保存到用户位置（对齐现有 Save As）
+4. 成功后：iPad 用 Share sheet；Catalyst 用 `UIDocumentPicker(forExporting:)`
 
 ## 非目标
 
-- 工具栏导出按钮
+- Mac Catalyst 工具栏导出按钮（Catalyst 用 File 菜单 + ⌥⌘E）
 - 自定义分辨率 / 起止帧 / bitrate / profile 细项 UI
 - 导出后自动用系统播放器打开
 - 音频、多合成选择（用 `firstCompositionID`）
@@ -109,12 +109,12 @@ nonisolated func exportVideo(compositionID: UInt64,
 
 ---
 
-## §5 临时文件与 picker
+## §5 临时文件与分享 / picker
 
 - 目录：`FileManager.default.temporaryDirectory / "MotionStudioExport-<UUID>" / "<ProjectName>.mp4"`
 - 项目名：与 Save As 相同（draft → `"Untitled"`）
-- picker：`UIDocumentPickerViewController(forExporting: [url], asCopy: true)`，`shouldShowFileExtensions = true`
-- delegate：done / cancel 都删除临时目录（对齐 `removeSaveAsTemporaryDocument`）
+- **iPad**：成功后 `UIActivityViewController`（相册 / Files / 其它 App）；`completionWithItemsHandler` 后再删临时目录；需 `NSPhotoLibraryAddUsageDescription`
+- **Mac Catalyst**：`UIDocumentPickerViewController(forExporting:)`；done / cancel 都删临时目录
 
 ---
 
@@ -126,8 +126,9 @@ nonisolated func exportVideo(compositionID: UInt64,
 | 奇数合成尺寸 | UI evenFloor；不弹错 |
 | 导出失败 | alert，文案来自 bridge |
 | 用户取消 | 无失败 alert |
-| picker 取消 | 仅删临时文件 |
-| 重复点 Export MP4 | 已有 session 进行中则忽略或菜单 disabled |
+| Share / picker 取消或完成 | 仅删临时文件 |
+| 重复点 Export MP4 | 已有 session 进行中则忽略或菜单 / 按钮 disabled |
+| 导出时正在实时预览 | 进入 Export 时暂停播放；结束后不自动恢复 |
 
 ---
 
@@ -137,6 +138,6 @@ nonisolated func exportVideo(compositionID: UInt64,
 |---|---|
 | UI 深度 | 设置（质量）+ 进度 + Files 导出 |
 | 分辨率 / 时间 | 仅合成原始 / 整段 |
-| 入口 | File 菜单 only |
-| 存盘顺序 | 先渲临时文件再 forExporting picker（方案 1） |
+| 入口 | File → Export MP4…（⌥⌘E）；iPad 顶栏另有导出按钮 |
+| 存盘顺序 | 先渲临时文件；iPad Share sheet / Catalyst forExporting picker |
 | 进度 UI | 模态 sheet + Cancel |

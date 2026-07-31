@@ -76,6 +76,10 @@ extension EditorViewController {
                                action: #selector(toggleInspectorPanel))
 
         #if !targetEnvironment(macCatalyst)
+            configureToolbarButton(exportButton,
+                                   systemName: "square.and.arrow.up",
+                                   accessibilityLabel: "Export MP4",
+                                   action: #selector(exportMP4))
             configureToolbarButton(undoButton,
                                    systemName: "arrow.uturn.left",
                                    accessibilityLabel: "Undo",
@@ -88,6 +92,7 @@ extension EditorViewController {
 
         #if !targetEnvironment(macCatalyst)
             contentStack.addArrangedSubview(saveButton)
+            contentStack.addArrangedSubview(exportButton)
         #endif
         contentStack.addArrangedSubview(projectToggleButton)
         #if !targetEnvironment(macCatalyst)
@@ -96,6 +101,7 @@ extension EditorViewController {
         #endif
         contentStack.addArrangedSubview(UIView())
         contentStack.addArrangedSubview(inspectorToggleButton)
+        updateExportButtonState()
 
         configureDocumentStatusView()
         topToolbar.contentView.addSubview(documentStatusView)
