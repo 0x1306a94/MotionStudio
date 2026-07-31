@@ -31,9 +31,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                          action: #selector(EditorViewController.saveDocumentAs),
                                          input: "s",
                                          modifierFlags: [.command, .shift])
+        let exportMP4Command = UICommand(title: "Export MP4...",
+                                         image: nil,
+                                         action: #selector(EditorViewController.exportMP4))
         let saveMenu = UIMenu(title: "",
                               options: .displayInline,
-                              children: [saveCommand, saveAsCommand])
+                              children: [saveCommand, saveAsCommand, exportMP4Command])
         builder.insertSibling(saveMenu, beforeMenu: .close)
 
         let closeCommand = UIKeyCommand(title: "Close",

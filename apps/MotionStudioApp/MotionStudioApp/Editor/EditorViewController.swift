@@ -87,6 +87,13 @@ final class EditorViewController: UIViewController {
     var isProjectPanelVisible = true
     var isInspectorPanelVisible = true
     var saveAsTemporaryDirectoryURL: URL?
+    var videoExportSession: VideoExportSession?
+    var documentPickerPurpose: DocumentPickerPurpose = .saveAs
+
+    enum DocumentPickerPurpose {
+        case saveAs
+        case exportMP4
+    }
 
     init(document: MotionProjectDocument) {
         self.document = document
@@ -163,9 +170,11 @@ final class EditorViewController: UIViewController {
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
         switch action {
         case #selector(saveCurrentDocument):
-            hasUnsavedChanges
+            videoExportSession == nil && hasUnsavedChanges
         case #selector(saveDocumentAs),
-             #selector(requestCloseWindow),
+             #selector(exportMP4):
+            videoExportSession == nil
+        case #selector(requestCloseWindow),
              #selector(addRectangleLayer),
              #selector(addEllipseLayer),
              #selector(addImageLayer),

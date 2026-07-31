@@ -46,6 +46,7 @@ extension EditorViewController {
 
     @objc func saveDocumentAs() {
         do {
+            documentPickerPurpose = .saveAs
             let temporaryDocumentURL = try makeSaveAsTemporaryDocument()
             let picker = UIDocumentPickerViewController(forExporting: [temporaryDocumentURL], asCopy: true)
             picker.delegate = self
@@ -129,10 +130,20 @@ extension EditorViewController {
 
 extension EditorViewController: UIDocumentPickerDelegate {
     func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt _: [URL]) {
-        removeSaveAsTemporaryDocument()
+        switch documentPickerPurpose {
+        case .saveAs:
+            removeSaveAsTemporaryDocument()
+        case .exportMP4:
+            cleanupVideoExportSession()
+        }
     }
 
     func documentPickerWasCancelled(_: UIDocumentPickerViewController) {
-        removeSaveAsTemporaryDocument()
+        switch documentPickerPurpose {
+        case .saveAs:
+            removeSaveAsTemporaryDocument()
+        case .exportMP4:
+            cleanupVideoExportSession()
+        }
     }
 }
