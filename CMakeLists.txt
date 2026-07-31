@@ -41,6 +41,7 @@ add_subdirectory(benchmarks)
 
 if (APPLE)
     add_subdirectory(adapter/tgfx)
+    add_subdirectory(adapter/avf)
 endif()
 
 # C ABI bridge for platform UI shells; must come after adapter/tgfx on Apple

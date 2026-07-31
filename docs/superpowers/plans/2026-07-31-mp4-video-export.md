@@ -626,7 +626,7 @@ git commit --only src/export/VideoExporter.cpp tests/export/VideoExporterTest.cp
 - Consumes: `VideoEncoder`、`VideoExportOptions`、`VideoFrame`
 - Produces: `motion::AvfVideoEncoder`（`static std::unique_ptr<AvfVideoEncoder> Make()` 或默认构造）
 
-- [ ] **Step 1: CMake 库骨架**
+- [x] **Step 1: CMake 库骨架**
 
 `adapter/avf/CMakeLists.txt`：静态库 `avf_adapter` → `OUTPUT_NAME motionstudio_avf_adapter`，`PUBLIC` 链 `core`，link frameworks：`AVFoundation`、`CoreMedia`、`CoreVideo`、`Foundation`。测试可执行文件 `avf_adapter_test` + `gtest_discover_tests`。
 
@@ -639,7 +639,7 @@ if (APPLE)
 endif()
 ```
 
-- [ ] **Step 2: 写失败测试（CPU 实心帧写出 MP4）**
+- [x] **Step 2: 写失败测试（CPU 实心帧写出 MP4）**
 
 ```objc
 // adapter/avf/tests/AvfVideoEncoderTest.mm
@@ -719,7 +719,7 @@ TEST(AvfVideoEncoderTest, AbortRemovesPartialFile) {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认失败/无法链接**
+- [x] **Step 3: 跑测试确认失败/无法链接**
 
 ```bash
 cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON
@@ -728,7 +728,7 @@ cmake --build build --target avf_adapter_test
 
 Expected: 找不到 `AvfVideoEncoder` 或测试 FAIL。
 
-- [ ] **Step 4: 实现 `AvfVideoEncoder`**
+- [x] **Step 4: 实现 `AvfVideoEncoder`**
 
 头文件要点：
 
@@ -765,7 +765,7 @@ class AvfVideoEncoder : public VideoEncoder {
 4. `abort`：`cancelWriting`，`std::filesystem::remove(outputPath)`。
 5. 等待 `isReadyForMoreMediaData`（短 spin / 小 sleep），避免丢帧。
 
-- [ ] **Step 5: 测试通过**
+- [x] **Step 5: 测试通过**
 
 ```bash
 cmake --build build --target avf_adapter_test
@@ -776,7 +776,7 @@ find build -name avf_adapter_test -type f
 
 Expected: PASS。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only adapter/avf CMakeLists.txt \
