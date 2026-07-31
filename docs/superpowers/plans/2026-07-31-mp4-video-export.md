@@ -905,7 +905,7 @@ git commit --only adapter/tgfx/include/TgfxVideoFrameSource.h \
 **Interfaces:**
 - Consumes: `VideoExporter`、`TgfxVideoFrameSource`、`AvfVideoEncoder`
 
-- [ ] **Step 1: 集成测试**
+- [x] **Step 1: 集成测试**
 
 ```cpp
 TEST(VideoExportIntegrationTest, ExportsShortClip) {
@@ -918,7 +918,7 @@ TEST(VideoExportIntegrationTest, ExportsShortClip) {
 
 CMake：`avf_adapter_test` `target_link_libraries(... motionstudio_tgfx_adapter)`，include tgfx 头路径。
 
-- [ ] **Step 2: 构建并运行**
+- [x] **Step 2: 构建并运行**
 
 ```bash
 cmake --build build --target avf_adapter_test
@@ -927,7 +927,7 @@ cmake --build build --target avf_adapter_test
 
 Expected: PASS 或 Metal skip。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit --only adapter/avf/tests/VideoExportIntegrationTest.mm adapter/avf/CMakeLists.txt \
