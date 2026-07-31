@@ -13,8 +13,6 @@ class TgfxVideoFrameSource : public VideoFrameSource {
     TgfxVideoFrameSource();
     ~TgfxVideoFrameSource() override;
 
-    void setPlatformPixelBufferPool(void *pool) override;
-
     // Returns nullptr-constructed usability: prepare fails when Metal is unavailable.
     Expected<void, std::string> prepare(const Document &document, EntityId compositionId,
                                         const VideoExportOptions &options) override;

@@ -21,12 +21,6 @@ class VideoEncoder {
     virtual Expected<void, std::string> end() = 0;
     virtual void abort() = 0;
 
-    // Optional platform pixel-buffer pool (e.g. AVAssetWriterInputPixelBufferAdaptor).
-    // Valid after successful begin(); nullptr when unsupported.
-    virtual void *platformPixelBufferPool() const {
-        return nullptr;
-    }
-
     // Backpressure before rendering the next frame (e.g. AVAssetWriterInput ready).
     virtual Expected<void, std::string> waitUntilReadyForMoreFrames() {
         return Expected<void, std::string>();

@@ -16,11 +16,6 @@ class VideoFrameSource {
   public:
     virtual ~VideoFrameSource() = default;
 
-    // Optional shared pool from VideoEncoder::platformPixelBufferPool(). Call before prepare().
-    virtual void setPlatformPixelBufferPool(void *pool) {
-        (void)pool;
-    }
-
     virtual Expected<void, std::string> prepare(const Document &document, EntityId compositionId,
                                                 const VideoExportOptions &options) = 0;
     virtual Expected<VideoFrame, std::string> renderFrame(FrameTime time) = 0;

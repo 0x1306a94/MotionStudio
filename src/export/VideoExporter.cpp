@@ -49,11 +49,9 @@ Expected<VideoExportOptions, std::string> Resolve(const Document &document, Enti
         return Unexpected<std::string>("invalid export range");
     }
 
-    const double fps =
-        static_cast<double>(resolved.frameRate.num) / static_cast<double>(resolved.frameRate.den);
+    const double fps = static_cast<double>(resolved.frameRate.num) / static_cast<double>(resolved.frameRate.den);
     if (resolved.bitrateBps <= 0) {
-        const double raw =
-            static_cast<double>(resolved.width) * static_cast<double>(resolved.height) * fps * 0.1;
+        const double raw = static_cast<double>(resolved.width) * static_cast<double>(resolved.height) * fps * 0.1;
         resolved.bitrateBps = static_cast<int>(std::clamp(raw, 1000000.0, 50000000.0));
     }
     if (resolved.keyframeInterval <= 0) {
@@ -73,14 +71,11 @@ Expected<void, std::string> VideoExporter::Export(
         return Unexpected<std::string>(resolved.error());
     }
 
-    // Begin encoder first so Apple adapters can share AVAssetWriter's pixel buffer pool
-    // with the frame source (avoids a second unbounded adaptor-side IOSurface pool).
     auto begun = encoder.begin(*resolved);
     if (!begun.hasValue()) {
         return Unexpected<std::string>(begun.error());
     }
 
-    frames.setPlatformPixelBufferPool(encoder.platformPixelBufferPool());
     auto prepared = frames.prepare(document, compositionId, *resolved);
     if (!prepared.hasValue()) {
         encoder.abort();

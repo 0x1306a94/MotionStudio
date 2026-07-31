@@ -90,7 +90,7 @@ extension EditorViewController {
 
         present(progressVC, animated: true) { [weak self] in
             guard let self else { return }
-            Task.detached(priority: .userInitiated) {
+            Task.detached(priority: .utility) {
                 do {
                     try core.exportVideo(compositionID: compositionID,
                                          outputPath: outputPath,

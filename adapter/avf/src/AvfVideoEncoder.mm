@@ -26,13 +26,12 @@ bool WaitReady(AVAssetWriterInput *input, NSError **error, CFTimeInterval timeou
     while (!input.readyForMoreMediaData) {
         if (CACurrentMediaTime() > deadline) {
             if (error != nil) {
-                *error = [NSError errorWithDomain:@"motion.AvfVideoEncoder"
-                                             code:1
-                                         userInfo:@{NSLocalizedDescriptionKey: @"writer input timed out"}];
+                *error = [NSError errorWithDomain:@"motion.AvfVideoEncoder" code:1 userInfo:@{NSLocalizedDescriptionKey: @"writer input timed out"}];
             }
             return false;
         }
-        [NSThread sleepForTimeInterval:0.001];
+        // AVAssetWriter encoding may need the run loop to make progress on this thread.
+        [NSThread sleepForTimeInterval:0.1];
     }
     return true;
 }
@@ -43,17 +42,10 @@ CVPixelBufferRef CreateBgraBuffer(int width, int height, NSError **error) {
         (id)kCVPixelBufferMetalCompatibilityKey: @YES,
     };
     CVPixelBufferRef buffer = nullptr;
-    const CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width),
-                                                static_cast<size_t>(height),
-                                                kCVPixelFormatType_32BGRA,
-                                                (__bridge CFDictionaryRef)attributes, &buffer);
+    const CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width), static_cast<size_t>(height), kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef)attributes, &buffer);
     if (status != kCVReturnSuccess || buffer == nullptr) {
         if (error != nil) {
-            *error = [NSError errorWithDomain:@"motion.AvfVideoEncoder"
-                                         code:status
-                                     userInfo:@{
-                                         NSLocalizedDescriptionKey: @"CVPixelBufferCreate failed"
-                                     }];
+            *error = [NSError errorWithDomain:@"motion.AvfVideoEncoder" code:status userInfo:@{NSLocalizedDescriptionKey: @"CVPixelBufferCreate failed"}];
         }
         return nullptr;
     }
@@ -63,9 +55,7 @@ CVPixelBufferRef CreateBgraBuffer(int width, int height, NSError **error) {
 bool CopyRgbaToBgra(const VideoFrame &frame, CVPixelBufferRef buffer, NSError **error) {
     if (CVPixelBufferLockBaseAddress(buffer, 0) != kCVReturnSuccess) {
         if (error != nil) {
-            *error = [NSError errorWithDomain:@"motion.AvfVideoEncoder"
-                                         code:2
-                                     userInfo:@{NSLocalizedDescriptionKey: @"lock pixel buffer failed"}];
+            *error = [NSError errorWithDomain:@"motion.AvfVideoEncoder" code:2 userInfo:@{NSLocalizedDescriptionKey: @"lock pixel buffer failed"}];
         }
         return false;
     }
@@ -109,7 +99,6 @@ struct AvfVideoEncoder::Impl {
     AVAssetWriter *writer = nil;
     AVAssetWriterInput *input = nil;
     AVAssetWriterInputPixelBufferAdaptor *adaptor = nil;
-    CVPixelBufferPoolRef pixelBufferPool = nullptr;
     bool sessionStarted = false;
     bool finished = false;
 };
@@ -132,16 +121,15 @@ Expected<void, std::string> AvfVideoEncoder::begin(const VideoExportOptions &opt
     std::error_code ec;
     std::filesystem::remove(options.outputPath, ec);
 
-    NSURL *url =
-        [NSURL fileURLWithPath:[NSString stringWithUTF8String:options.outputPath.c_str()]];
+    NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:options.outputPath.c_str()]];
     NSError *error = nil;
-    AVAssetWriter *writer = [[AVAssetWriter alloc] initWithURL:url
-                                                      fileType:AVFileTypeMPEG4
-                                                         error:&error];
+    AVAssetWriter *writer = [[AVAssetWriter alloc] initWithURL:url fileType:AVFileTypeMPEG4 error:&error];
     if (writer == nil) {
         return Unexpected<std::string>(NsErrorMessage(error, "failed to create AVAssetWriter"));
     }
-    writer.shouldOptimizeForNetworkUse = YES;
+    // Keep false for export memory: optimizing for network rewrites the file and can
+    // retain a large intermediate working set on long clips.
+    writer.shouldOptimizeForNetworkUse = NO;
 
     NSDictionary *compression = @{
         AVVideoAverageBitRateKey: @(options.bitrateBps),
@@ -155,46 +143,30 @@ Expected<void, std::string> AvfVideoEncoder::begin(const VideoExportOptions &opt
         AVVideoCompressionPropertiesKey: compression,
     };
 
-    AVAssetWriterInput *input = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo
-                                                               outputSettings:settings];
-    input.expectsMediaDataInRealTime = NO;
+    AVAssetWriterInput *input = [[AVAssetWriterInput alloc] initWithMediaType:AVMediaTypeVideo outputSettings:settings];
+    // YES so readyForMoreMediaData actually backpressures. With NO it often stays YES
+    // and AVAssetWriter retains an unbounded queue of frame copies.
+    input.expectsMediaDataInRealTime = YES;
     if (![writer canAddInput:input]) {
         return Unexpected<std::string>("cannot add video input to AVAssetWriter");
     }
     [writer addInput:input];
 
-    NSDictionary *sourceAttrs = @{
-        (id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
-        (id)kCVPixelBufferWidthKey: @(options.width),
-        (id)kCVPixelBufferHeightKey: @(options.height),
-        (id)kCVPixelBufferIOSurfacePropertiesKey: @{},
-        (id)kCVPixelBufferMetalCompatibilityKey: @YES,
-    };
-    AVAssetWriterInputPixelBufferAdaptor *adaptor =
-        [[AVAssetWriterInputPixelBufferAdaptor alloc] initWithAssetWriterInput:input
-                                                   sourcePixelBufferAttributes:sourceAttrs];
+    // nil source attributes: do not create an adaptor-owned CVPixelBufferPool.
+    // FrameSource owns the Metal-compatible pool; sharing adaptor.pixelBufferPool
+    // has crashed inside CVPixelBufferPoolCreatePixelBuffer mid-export.
+    AVAssetWriterInputPixelBufferAdaptor *adaptor = [[AVAssetWriterInputPixelBufferAdaptor alloc] initWithAssetWriterInput:input sourcePixelBufferAttributes:nil];
 
     if (![writer startWriting]) {
         return Unexpected<std::string>(NsErrorMessage(writer.error, "startWriting failed"));
     }
     [writer startSessionAtSourceTime:kCMTimeZero];
 
-    CVPixelBufferPoolRef pool = adaptor.pixelBufferPool;
-    if (pool == nullptr) {
-        [writer cancelWriting];
-        return Unexpected<std::string>("AVAssetWriter pixel buffer pool unavailable");
-    }
-
     impl_->writer = writer;
     impl_->input = input;
     impl_->adaptor = adaptor;
-    impl_->pixelBufferPool = pool;
     impl_->sessionStarted = true;
     return Expected<void, std::string>();
-}
-
-void *AvfVideoEncoder::platformPixelBufferPool() const {
-    return impl_->pixelBufferPool;
 }
 
 Expected<void, std::string> AvfVideoEncoder::waitUntilReadyForMoreFrames() {
@@ -249,8 +221,7 @@ Expected<void, std::string> AvfVideoEncoder::appendFrame(const VideoFrame &frame
     }
 
     const int32_t timescale = static_cast<int32_t>(impl_->options.frameRate.num);
-    const int64_t value =
-        presentationIndex * static_cast<int64_t>(impl_->options.frameRate.den);
+    const int64_t value = presentationIndex * static_cast<int64_t>(impl_->options.frameRate.den);
     const CMTime pts = CMTimeMake(value, timescale);
     const BOOL ok = [impl_->adaptor appendPixelBuffer:buffer withPresentationTime:pts];
     if (owned) {
@@ -286,7 +257,6 @@ Expected<void, std::string> AvfVideoEncoder::end() {
     impl_->writer = nil;
     impl_->input = nil;
     impl_->adaptor = nil;
-    impl_->pixelBufferPool = nullptr;
     if (!finishedOk) {
         std::error_code ec;
         std::filesystem::remove(impl_->options.outputPath, ec);
@@ -302,7 +272,6 @@ void AvfVideoEncoder::abort() {
     impl_->writer = nil;
     impl_->input = nil;
     impl_->adaptor = nil;
-    impl_->pixelBufferPool = nullptr;
     impl_->sessionStarted = false;
     impl_->finished = false;
     if (!impl_->options.outputPath.empty()) {
