@@ -462,7 +462,7 @@ cmake --build build --target core_tests
 
 Expected: `ExportsDefaultRange...` 失败（`"not implemented"`）或链接后断言失败。
 
-- [ ] **Step 3: 实现 `VideoExporter::Export`**
+- [x] **Step 3: 实现 `VideoExporter::Export`**
 
 在 `VideoExporter.cpp` 中实现 resolve + 循环。关键逻辑：
 
@@ -595,7 +595,7 @@ Expected<void, std::string> VideoExporter::Export(
 
 取消语义：progress 在 **append 之前**调用，`completedFrames` 为已完成数（即将渲染的是下一帧）。与测试 `completedFrames < 2` 时已 render/append 2 帧一致。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target core_tests
@@ -604,7 +604,7 @@ cmake --build build --target core_tests
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/VideoExporter.cpp tests/export/VideoExporterTest.cpp \
