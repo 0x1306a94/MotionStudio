@@ -73,15 +73,18 @@ Expected<void, std::string> VideoExporter::Export(
         return Unexpected<std::string>(resolved.error());
     }
 
-    auto prepared = frames.prepare(document, compositionId, *resolved);
-    if (!prepared.hasValue()) {
-        return Unexpected<std::string>(prepared.error());
-    }
-
+    // Begin encoder first so Apple adapters can share AVAssetWriter's pixel buffer pool
+    // with the frame source (avoids a second unbounded adaptor-side IOSurface pool).
     auto begun = encoder.begin(*resolved);
     if (!begun.hasValue()) {
-        frames.finish();
         return Unexpected<std::string>(begun.error());
+    }
+
+    frames.setPlatformPixelBufferPool(encoder.platformPixelBufferPool());
+    auto prepared = frames.prepare(document, compositionId, *resolved);
+    if (!prepared.hasValue()) {
+        encoder.abort();
+        return Unexpected<std::string>(prepared.error());
     }
 
     const FrameTime start = resolved->range.start;

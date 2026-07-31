@@ -18,6 +18,7 @@ class AvfVideoEncoder : public VideoEncoder {
                                             FrameTime presentationIndex) override;
     Expected<void, std::string> end() override;
     void abort() override;
+    void *platformPixelBufferPool() const override;
 
   private:
     struct Impl;

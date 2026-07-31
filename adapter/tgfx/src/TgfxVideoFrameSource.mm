@@ -198,6 +198,8 @@ struct TgfxVideoFrameSource::Impl {
     VideoExportOptions options;
     std::unique_ptr<CVPixelBufferCanvasAdapter> adapter;
     CVPixelBufferPoolRef pixelBufferPool = nullptr;
+    CVPixelBufferPoolRef sharedPixelBufferPool = nullptr;
+    bool ownsPixelBufferPool = false;
 };
 
 TgfxVideoFrameSource::TgfxVideoFrameSource()
@@ -208,23 +210,39 @@ TgfxVideoFrameSource::~TgfxVideoFrameSource() {
     finish();
 }
 
+void TgfxVideoFrameSource::setPlatformPixelBufferPool(void *pool) {
+    impl_->sharedPixelBufferPool = static_cast<CVPixelBufferPoolRef>(pool);
+}
+
 Expected<void, std::string> TgfxVideoFrameSource::prepare(const Document &document,
                                                           EntityId compositionId,
                                                           const VideoExportOptions &options) {
+    // Preserve shared pool across finish(); VideoExporter sets it before prepare().
+    CVPixelBufferPoolRef sharedPool = impl_->sharedPixelBufferPool;
     finish();
+    impl_->sharedPixelBufferPool = sharedPool;
+
     auto adapter = std::make_unique<CVPixelBufferCanvasAdapter>();
     if (!adapter->Initialize()) {
         return Unexpected<std::string>("Metal unavailable for video frame source");
     }
-    CVPixelBufferPoolRef pool = MakeExportPixelBufferPool(options.width, options.height);
+
+    CVPixelBufferPoolRef pool = sharedPool;
+    bool ownsPool = false;
     if (pool == nullptr) {
-        return Unexpected<std::string>("failed to create CVPixelBufferPool");
+        pool = MakeExportPixelBufferPool(options.width, options.height);
+        ownsPool = true;
+        if (pool == nullptr) {
+            return Unexpected<std::string>("failed to create CVPixelBufferPool");
+        }
     }
+
     impl_->document = &document;
     impl_->compositionId = compositionId;
     impl_->options = options;
     impl_->adapter = std::move(adapter);
     impl_->pixelBufferPool = pool;
+    impl_->ownsPixelBufferPool = ownsPool;
     return Expected<void, std::string>();
 }
 
@@ -281,10 +299,12 @@ Expected<VideoFrame, std::string> TgfxVideoFrameSource::renderFrame(FrameTime ti
 
 void TgfxVideoFrameSource::finish() {
     impl_->adapter.reset();
-    if (impl_->pixelBufferPool != nullptr) {
+    if (impl_->ownsPixelBufferPool && impl_->pixelBufferPool != nullptr) {
         CVPixelBufferPoolRelease(impl_->pixelBufferPool);
-        impl_->pixelBufferPool = nullptr;
     }
+    impl_->pixelBufferPool = nullptr;
+    impl_->ownsPixelBufferPool = false;
+    impl_->sharedPixelBufferPool = nullptr;
     impl_->document = nullptr;
 }
 

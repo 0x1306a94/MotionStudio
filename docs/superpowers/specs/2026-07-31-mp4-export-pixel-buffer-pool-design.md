@@ -6,37 +6,30 @@
 
 ## 目标
 
-1. 限制导出时 in-flight `CVPixelBuffer` 数量，避免内存涨到 1G+  
+1. 限制导出时 in-flight `CVPixelBuffer` / IOSurface，避免内存涨到 1G+  
 2. 保留零拷贝（Metal → `CVPixelBuffer` → `AVAssetWriter`）  
 3. `AVAssetWriter.shouldOptimizeForNetworkUse = YES`（默认开启）
 
 ## 非目标
 
-- 改 Core `VideoFrame` / `VideoExporter` API  
 - 渲染与编码多线程 pipeline  
 - 可配置池大小 / network optimize 开关（首版写死）
 
 ## 方案
 
-### FrameSource：`CVPixelBufferPool`，in-flight 上限 = 3
+### 共用 `AVAssetWriterInputPixelBufferAdaptor.pixelBufferPool`
 
-- 去掉「整段导出共用一块 buffer」  
-- 建池：`MinimumBufferCount = 3`  
-- `renderFrame`：`CVPixelBufferPoolCreatePixelBufferWithAuxAttributes` + `AllocationThreshold = 3`；触顶则 sleep 1ms 重试（writer 释放后归还池）  
-- `VideoFrame` 持有 pool create 的 +1 retain，`releaseHandle = CFRelease`  
-- `finish` 销毁 pool  
+Instruments：`VM: IOSurface` Total Bytes 暴涨。FrameSource 自建池 + adaptor `sourcePixelBufferAttributes` 会让 adaptor 再拷/再占 IOSurface。
 
-峰值约 `3 × W×H×4`（像素）+ GPU/编码器工作集。
+- `VideoExporter`：先 `encoder.begin()`，再 `setPlatformPixelBufferPool(encoder.platformPixelBufferPool())`，再 `prepare`
+- `AvfVideoEncoder`：暴露 `adaptor.pixelBufferPool`；`shouldOptimizeForNetworkUse = YES`
+- `TgfxVideoFrameSource`：优先用共享池；无共享池时（单测）仍自建 3 槽池
+- `renderFrame`：`AllocationThreshold = 3`；触顶 sleep 1ms 背压
+- `finish`：仅释放自建池
 
-### Encoder
-
-`begin()` 中、`startWriting` 前：
-
-```objc
-writer.shouldOptimizeForNetworkUse = YES;
-```
+峰值目标：约 `3 × W×H×4`（像素）+ GPU/编码工作集。
 
 ## 测试
 
-- 现有 AVF / integration / frame-source 测试仍通过  
+- 现有 AVF / integration / frame-source / VideoExporter 测试仍通过  
 - 手工：较长合成导出时内存不再随帧数线性冲到 1G+

@@ -109,6 +109,7 @@ struct AvfVideoEncoder::Impl {
     AVAssetWriter *writer = nil;
     AVAssetWriterInput *input = nil;
     AVAssetWriterInputPixelBufferAdaptor *adaptor = nil;
+    CVPixelBufferPoolRef pixelBufferPool = nullptr;
     bool sessionStarted = false;
     bool finished = false;
 };
@@ -178,11 +179,22 @@ Expected<void, std::string> AvfVideoEncoder::begin(const VideoExportOptions &opt
     }
     [writer startSessionAtSourceTime:kCMTimeZero];
 
+    CVPixelBufferPoolRef pool = adaptor.pixelBufferPool;
+    if (pool == nullptr) {
+        [writer cancelWriting];
+        return Unexpected<std::string>("AVAssetWriter pixel buffer pool unavailable");
+    }
+
     impl_->writer = writer;
     impl_->input = input;
     impl_->adaptor = adaptor;
+    impl_->pixelBufferPool = pool;
     impl_->sessionStarted = true;
     return Expected<void, std::string>();
+}
+
+void *AvfVideoEncoder::platformPixelBufferPool() const {
+    return impl_->pixelBufferPool;
 }
 
 Expected<void, std::string> AvfVideoEncoder::appendFrame(const VideoFrame &frame,
@@ -263,6 +275,7 @@ Expected<void, std::string> AvfVideoEncoder::end() {
     impl_->writer = nil;
     impl_->input = nil;
     impl_->adaptor = nil;
+    impl_->pixelBufferPool = nullptr;
     if (!finishedOk) {
         std::error_code ec;
         std::filesystem::remove(impl_->options.outputPath, ec);
@@ -278,6 +291,7 @@ void AvfVideoEncoder::abort() {
     impl_->writer = nil;
     impl_->input = nil;
     impl_->adaptor = nil;
+    impl_->pixelBufferPool = nullptr;
     impl_->sessionStarted = false;
     impl_->finished = false;
     if (!impl_->options.outputPath.empty()) {
