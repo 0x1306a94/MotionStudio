@@ -9,6 +9,7 @@
 #include "MotionStudio/export/VideoExportOptions.h"
 #include "MotionStudio/export/VideoExporter.h"
 #include "MotionStudio/model/Composition.h"
+#include "MotionStudio/model/Document.h"
 #include "TgfxVideoFrameSource.h"
 #include "common/DocumentLock.h"
 
