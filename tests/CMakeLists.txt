@@ -32,6 +32,8 @@ add_files_by_extension(UNDO_TESTS_SOURCES ".h;.cpp"
 add_files_by_extension(EXPORT_TESTS_SOURCES ".h;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/export
 )
+# PAG export tests live in the pag_export_tests binary (Apple / pag_codec).
+list(FILTER EXPORT_TESTS_SOURCES EXCLUDE REGEX "/export/pag/")
 
 list(APPEND TESTS_SOURCES
     ${COMMON_TESTS_SOURCES}

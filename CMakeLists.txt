@@ -52,6 +52,8 @@ if (APPLE)
     add_subdirectory(adapter/avf)
     # libpag base+codec only (no rendering/GL); not via upstream libpag CMake.
     add_subdirectory(adapter/pag_codec)
+    # Document → .pag (PRIVATE pag_codec); after pag_codec.
+    add_subdirectory(src/export/pag)
 
     # C ABI bridge for platform UI shells; must come after adapter/tgfx on Apple
     # (the canvas API links the tgfx adapter).

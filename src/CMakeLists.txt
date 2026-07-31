@@ -30,6 +30,8 @@ add_files_by_extension(SERIALIZATION_SOURCES ".h;.cpp"
 add_files_by_extension(EXPORT_SOURCES ".h;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/export
 )
+# PAG export is a separate Apple library (links pag_codec); keep it out of core.
+list(FILTER EXPORT_SOURCES EXCLUDE REGEX "/export/pag/")
 
 add_files_by_extension(PUBLIC_HEADERS ".h;.cpp"
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/MotionStudio
