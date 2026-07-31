@@ -10,6 +10,11 @@ import Foundation
 import MotionStudioBridging
 import Observation
 
+enum VideoExportError: Error {
+    case cancelled
+    case failed(String)
+}
+
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
 ///
@@ -134,6 +139,60 @@ final class MotionDocumentCore {
         let den = ms_composition_frame_rate_den(handle, compositionID)
         guard den > 0 else { return 30 }
         return Double(num) / Double(den)
+    }
+
+    /// Runs on the calling thread. `progress` may be invoked off the main actor.
+    nonisolated func exportVideo(compositionID: UInt64,
+                                 outputPath: String,
+                                 resolved: VideoExportResolvedSettings,
+                                 progress: (@Sendable (Int64, Int64) -> Bool)?,
+                                 cancelState: VideoExportCancelState) throws
+    {
+        final class ProgressBox: @unchecked Sendable {
+            let progress: (@Sendable (Int64, Int64) -> Bool)?
+            init(_ progress: (@Sendable (Int64, Int64) -> Bool)?) {
+                self.progress = progress
+            }
+        }
+        let box = ProgressBox(progress)
+        try outputPath.withCString { path in
+            var options = MSVideoExportOptions()
+            options.outputPath = path
+            options.startFrame = 0
+            options.endFrame = resolved.durationFrames
+            options.width = Int32(resolved.width)
+            options.height = Int32(resolved.height)
+            options.frameRateNum = Int32(resolved.frameRateNum)
+            options.frameRateDen = Int32(resolved.frameRateDen)
+            options.bitrateBps = Int32(resolved.bitrateBps)
+            options.keyframeInterval = 0
+            options.profile = Int32(resolved.profile)
+
+            var error: UnsafeMutablePointer<CChar>?
+            let ok = withUnsafePointer(to: &cancelState.flag) { flagPointer in
+                ms_video_export(
+                    handle,
+                    compositionID,
+                    &options,
+                    { ctx, completed, total in
+                        guard let ctx else { return true }
+                        let box = Unmanaged<ProgressBox>.fromOpaque(ctx).takeUnretainedValue()
+                        return box.progress?(completed, total) ?? true
+                    },
+                    Unmanaged.passUnretained(box).toOpaque(),
+                    UnsafeRawPointer(flagPointer).assumingMemoryBound(to: Int32.self),
+                    &error,
+                )
+            }
+            if ok {
+                return
+            }
+            let message = Self.takeString(error) ?? "export failed"
+            if message == "cancelled" {
+                throw VideoExportError.cancelled
+            }
+            throw VideoExportError.failed(message)
+        }
     }
 
     func backgroundColor(compositionID: UInt64) -> MotionColor {

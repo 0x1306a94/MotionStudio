@@ -179,7 +179,7 @@ git commit -m "Add video export options builder and unit tests."
   - `enum VideoExportError: Error { case cancelled; case failed(String) }`
   - `nonisolated func exportVideo(compositionID:options:progress:isCancelled:) throws`
 
-- [ ] **Step 1: 在 `MotionDocumentCore` 增加导出 API**
+- [x] **Step 1: 在 `MotionDocumentCore` 增加导出 API**
 
 在文件顶部（或同文件内）增加：
 
@@ -249,11 +249,11 @@ nonisolated func exportVideo(
 
 若 `cancelFlag` 参数类型与导入的 `UnsafePointer<Int32>?` / `UnsafeMutablePointer` 不匹配，改成与 `ms_video_export` 声明一致的一种，并在 Session 里用 class 持有 `var flag: Int32` 以保证地址稳定。
 
-- [ ] **Step 2: 编译 App / 跑现有 tests**
+- [x] **Step 2: 编译 App / 跑现有 tests**
 
 优先 Xcode MCP Build。Expected: 成功。
 
-- [ ] **Step 3: 更新 plan 并提交**
+- [x] **Step 3: 更新 plan 并提交**
 
 ```bash
 git commit -m "Expose nonisolated MP4 export on MotionDocumentCore."
@@ -271,7 +271,7 @@ git commit -m "Expose nonisolated MP4 export on MotionDocumentCore."
 - Settings: `var quality: VideoExportQuality`；`var onExport: ((VideoExportQuality) -> Void)?`；`var onCancel: (() -> Void)?`；init 传入 summary 字符串（尺寸/时长）
 - Progress: `func update(completed:total:)`；`var onCancel: (() -> Void)?`；`isModalInPresentation = true`
 
-- [ ] **Step 1: 实现 Settings VC**
+- [x] **Step 1: 实现 Settings VC**
 
 UIKit：`UINavigationController` 包一层，title `"Export MP4"`，右栏 Cancel，主内容：
 
@@ -283,7 +283,7 @@ Export 时若 `durationFrames == 0`：alert `"Composition has no frames to expor
 
 用 `.formSheet` / `.pageSheet` present。
 
-- [ ] **Step 2: 实现 Progress VC**
+- [x] **Step 2: 实现 Progress VC**
 
 - `UIProgressView`
 - `UILabel`：`"42 / 150"`
@@ -291,7 +291,7 @@ Export 时若 `durationFrames == 0`：alert `"Composition has no frames to expor
 - `isModalInPresentation = true`
 - Cancel → `onCancel?()`
 
-- [ ] **Step 3: 更新 plan 并提交**（UI 可先提交骨架，人工点看布局）
+- [x] **Step 3: 更新 plan 并提交**（UI 可先提交骨架，人工点看布局）
 
 ```bash
 git commit -m "Add video export settings and progress view controllers."
@@ -313,7 +313,7 @@ git commit -m "Add video export settings and progress view controllers."
 - `@objc func exportMP4()`
 - `canPerformAction`：导出中禁用 Export / Save 可选
 
-- [ ] **Step 1: Session**
+- [x] **Step 1: Session**
 
 ```swift
 @MainActor
@@ -332,7 +332,7 @@ final class VideoExportSession {
 
 用 `final class CancelState: @unchecked Sendable { var flag: Int32 = 0 }`，Cancel 按钮写 `flag = 1`，`ms_video_export` 传 `UnsafePointer(&state.flag)` 需固定地址——用 class 存储即可。
 
-- [ ] **Step 2: `exportMP4` 编排**
+- [x] **Step 2: `exportMP4` 编排**
 
 ```swift
 @objc func exportMP4() {
@@ -391,7 +391,7 @@ Success：dismiss progress → `UIDocumentPickerViewController(forExporting:[url
 Cancelled：dismiss + cleanup，无 alert。  
 Failed：dismiss + alert + cleanup。
 
-- [ ] **Step 3: AppDelegate 菜单**
+- [x] **Step 3: AppDelegate 菜单**
 
 在 Save As 后插入：
 
@@ -402,7 +402,7 @@ let exportMP4 = UICommand(title: "Export MP4...",
 // 放进 saveMenu children 或独立 inline menu after save
 ```
 
-- [ ] **Step 4: picker delegate 不冲突**
+- [x] **Step 4: picker delegate 不冲突**
 
 Save As 与 Export 共用 `EditorViewController: UIDocumentPickerDelegate` 时，用枚举区分：
 
