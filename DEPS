@@ -6,9 +6,9 @@
   "repos": {
     "common": [
       {
-        "url": "${GITHUB_BASE_URL}/libpag/tgfx.git",
-        "commit": "64c8597101809078bc71499c13fe850553fbfa1e",
-        "dir": "third_party/tgfx"
+        "url": "${GITHUB_BASE_URL}/Tencent/libpag.git",
+        "commit": "05aebeb2ea694e4df839861a197501b98cb927ac",
+        "dir": "third_party/libpag"
       },
       {
         "url": "${GITHUB_BASE_URL}/google/googletest.git",
@@ -37,16 +37,16 @@
         "dir": "third_party"
       },
       {
-        "command": "python3 tgfx/third_party/shaderc/utils/git-sync-deps",
+        "command": "python3 libpag/third_party/tgfx/third_party/shaderc/utils/git-sync-deps",
         "dir": "third_party"
       },
       {
-        "command": "sh -c 'git reset --hard HEAD && git apply ../../../../patches/vendor_tools-maccatalyst-arm64.patch'",
-        "dir": "third_party/tgfx/third_party/vendor_tools"
+        "command": "sh -c 'git reset --hard HEAD && git apply ../../../../../../patches/libpag-tgfx-vendor_tools-maccatalyst-arm64.patch'",
+        "dir": "third_party/libpag/third_party/tgfx/third_party/vendor_tools"
       },
       {
-        "command": "sh -c 'git reset --hard HEAD && git apply ../../patches/tgfx-maccatalyst-arm64.patch'",
-        "dir": "third_party/tgfx"
+        "command": "sh -c 'git reset --hard HEAD && git apply ../../../../patches/libpag-tgfx-maccatalyst-arm64.patch'",
+        "dir": "third_party/libpag/third_party/tgfx"
       }
     ]
   }

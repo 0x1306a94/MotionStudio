@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 76975b3..b3d4646 100644
+index 01d6207..58e58c6 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -154,18 +154,19 @@ message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
+@@ -166,18 +166,19 @@ message("TGFX_ENABLE_STENCIL_COVER_PATH: ${TGFX_ENABLE_STENCIL_COVER_PATH}")
  if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
      if (DEPLOYMENT_TARGET)
          set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
@@ -28,7 +28,7 @@ index 76975b3..b3d4646 100644
      endif ()
  endif ()
  
-@@ -409,7 +410,7 @@ if (TGFX_USE_QT)
+@@ -453,7 +454,7 @@ if (TGFX_USE_QT)
  
      file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
      list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
@@ -37,7 +37,7 @@ index 76975b3..b3d4646 100644
          file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTexture.mm)
          list(APPEND TGFX_FILES ${CGL_PLATFORM_FILES})
          list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
-@@ -519,6 +520,8 @@ elseif (OHOS)
+@@ -566,6 +567,8 @@ elseif (OHOS)
          list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
      endif ()
  elseif (IOS)
@@ -47,7 +47,7 @@ index 76975b3..b3d4646 100644
      find_library(UIKit_LIBS UIKit REQUIRED)
      list(APPEND TGFX_SHARED_LIBS ${UIKit_LIBS})
 diff --git a/vendor.json b/vendor.json
-index b7e738d..18bc8bf 100644
+index b4ca64a..59fb25d 100644
 --- a/vendor.json
 +++ b/vendor.json
 @@ -85,6 +85,7 @@
@@ -68,7 +68,7 @@ index b7e738d..18bc8bf 100644
          ]
        }
      },
-@@ -291,6 +293,24 @@
+@@ -292,6 +294,24 @@
          ]
        }
      },
@@ -93,7 +93,7 @@ index b7e738d..18bc8bf 100644
      {
        "name": "SPIRV-Cross",
        "cmake": {
-@@ -326,6 +346,24 @@
+@@ -328,6 +348,24 @@
          ]
        }
      },

@@ -40,10 +40,22 @@ add_subdirectory(tests)
 add_subdirectory(benchmarks)
 
 if (APPLE)
+    # Single tgfx pin: vendored under libpag. Consumed by adapter/tgfx prebuild,
+    # adapter/pag_codec, bridge, and avf via these TGFX_* / LIBPAG_DIR vars.
+    set(LIBPAG_DIR "${PROJECT_SOURCE_DIR}/third_party/libpag")
+    set(TGFX_SOURCE_DIR "${LIBPAG_DIR}/third_party/tgfx")
+    set(TGFX_INCLUDE_DIR "${TGFX_SOURCE_DIR}/include")
+    set(TGFX_OUT_DIR "${CMAKE_BINARY_DIR}/tgfx_prebuilt")
+    set(TGFX_CMAKE_ARGS "-DTGFX_USE_METAL=ON -DTGFX_USE_OPENGL=OFF -DTGFX_USE_PNG_DECODE=ON -DTGFX_USE_PNG_ENCODE=ON -DTGFX_USE_JPEG_DECODE=ON -DTGFX_USE_JPEG_ENCODE=ON -DTGFX_USE_WEBP_DECODE=ON -DTGFX_USE_WEBP_ENCODE=ON")
+
     add_subdirectory(adapter/tgfx)
     add_subdirectory(adapter/avf)
+    # libpag base+codec only (no rendering/GL); not via upstream libpag CMake.
+    add_subdirectory(adapter/pag_codec)
+
+    # C ABI bridge for platform UI shells; must come after adapter/tgfx on Apple
+    # (the canvas API links the tgfx adapter).
+    add_subdirectory(bridge)
 endif()
 
-# C ABI bridge for platform UI shells; must come after adapter/tgfx on Apple
-# (the canvas API links the tgfx adapter).
-add_subdirectory(bridge)
+

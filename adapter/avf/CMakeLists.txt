@@ -53,7 +53,5 @@ target_include_directories(avf_adapter_test
                            PRIVATE
                            "${CMAKE_CURRENT_SOURCE_DIR}/include"
                            "${PROJECT_SOURCE_DIR}/adapter/tgfx/include"
-                           "${PROJECT_SOURCE_DIR}/third_party/tgfx/include")
-motionstudio_add_tgfx_prebuild(avf_adapter_test)
-motionstudio_link_prebuilt_tgfx(avf_adapter_test)
+                           "${TGFX_INCLUDE_DIR}")
 gtest_discover_tests(avf_adapter_test)

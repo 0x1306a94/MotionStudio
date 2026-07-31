@@ -99,7 +99,7 @@ motionstudio/
 └── docs/                           # 本目录
 ```
 
-应用构建依赖 `gen_xcode/Products/$(CONFIGURATION)` 下的静态库（core / bridge / tgfx 适配器）与 `gen_xcode/tgfx_prebuilt/` 下的 tgfx 预编译库，搜索路径与链接标志在 `Base.xcconfig` 中按 SDK 配置。
+应用构建依赖 `gen_xcode/Products/$(CONFIGURATION)` 下的静态库（core / bridge / tgfx 适配器）与 `gen_xcode/tgfx_prebuilt/` 下的 tgfx 预编译库（源码来自 `third_party/libpag/third_party/tgfx`）；PAG 导出链 `adapter/pag_codec`（只编译 libpag 的 base+codec）。搜索路径与链接标志在 `Base.xcconfig` 中按 SDK 配置。
 
 ## 桥接层设计
 
@@ -160,15 +160,35 @@ void      ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document,
 
 ## 第三方依赖
 
-统一由 [depctl](https://github.com/0x1306a94/depctl) 管理：在根目录 `DEPS` 文件中声明依赖（仓库 URL + 固定 commit），depctl 浅克隆同步到 `third_party/`（不入库），CMake 以 `add_subdirectory` 消费。
+统一由 [depctl](https://github.com/0x1306a94/depctl) 管理：在根目录 `DEPS` 文件中声明依赖（仓库 URL + 固定 commit），depctl 浅克隆同步到 `third_party/`（不入库）。
 
-| 库 | 用途 | DEPS 声明 |
-|---|---|---|
-| [GoogleTest](https://github.com/google/googletest) | Core 层单元测试 | `third_party/googletest` |
-| [nlohmann/json](https://github.com/nlohmann/json) | JSON 序列化/解析 | `third_party/json` |
-| [tgfx](https://github.com/libpag/tgfx) | 2D 渲染引擎（Metal 后端） | `third_party/tgfx` |
+| 库 | 用途 | 工作区路径 | 如何进构建 |
+|---|---|---|---|
+| [GoogleTest](https://github.com/google/googletest) | 单元测试 | `third_party/googletest` | `add_subdirectory` |
+| [nlohmann/json](https://github.com/nlohmann/json) | JSON 序列化 | `third_party/json` | `add_subdirectory` |
+| [libpag](https://github.com/Tencent/libpag) | PAG 编解码源码 + 内嵌 tgfx | `third_party/libpag` | **不**整库 `add_subdirectory`；见下 |
+| [tgfx](https://github.com/libpag/tgfx) | 2D 渲染（Metal） | `third_party/libpag/third_party/tgfx` | MS 预编译 `tgfx.a`（`cmake/BuildTgfx.cmake`） |
 
 Core 库本身仅依赖 nlohmann/json（私有链接，不经公共头暴露）。
+
+### Apple：tgfx + pag_codec（为何分叉构建）
+
+预览需要 **Metal** tgfx；上游整库 libpag 偏 **GL/平台渲染**，且 **Mac Catalyst 无 OpenGLES**。导出只需要 `Codec::Encode` / `File::Load`，不必链 libpag 播放器。因此：
+
+1. **一份源码**：DEPS 只 pin `libpag`；tgfx 随其 `third_party/tgfx`；**无**独立 `third_party/tgfx`。
+2. **Metal 预编译**：根 CMake 设 `TGFX_*` / `LIBPAG_DIR` → `adapter/tgfx` 用 `BuildTgfx.cmake` 产出  
+   `tgfx_prebuilt/<Config>/<mac|ios|catalyst>/<arch>/tgfx.a`，adapter / bridge / App 链接该库。
+3. **编解码裁剪**：`adapter/pag_codec` 只编译 libpag 的 `src/base` + `src/codec`，加 `PlatformStub`（不拉 NativePlatform / 视频解码），并链**同一份**预编译 tgfx。
+4. **Catalyst patch**：`patches/libpag-tgfx-maccatalyst-arm64.patch` 与 `libpag-tgfx-vendor_tools-maccatalyst-arm64.patch`（由 `DEPS` actions apply）。
+
+```
+DEPS → third_party/libpag (+ …/tgfx)
+         │
+         ├─ BuildTgfx (Metal) ──► tgfx.a ──► tgfx_adapter / App / bridge / pag_codec
+         └─ adapter/pag_codec (base+codec) ──► 后续 pag_export PRIVATE 链接
+```
+
+细节、否决方案与验收清单：[PAG Export 设计 §0](superpowers/specs/2026-07-31-pag-export-design.md)。
 
 同步命令：
 
@@ -201,4 +221,5 @@ xcodebuild -project apps/gen_xcode/MotionStudio.xcodeproj -target bridge \
 - 数据模型与 undo/redo：[data-model.md](data-model.md)
 - 时间轴与曲线求值：[timeline-evaluation.md](timeline-evaluation.md)
 - 渲染抽象与导出：[rendering.md](rendering.md)
+- PAG 导出与依赖收敛：[superpowers/specs/2026-07-31-pag-export-design.md](superpowers/specs/2026-07-31-pag-export-design.md)
 - 开发计划：[development-plan.md](development-plan.md)

@@ -1,11 +1,15 @@
 # tgfx-based render adapter (Metal backend), Apple platforms only.
 # tgfx is prebuilt per Destination via build_tgfx (not add_subdirectory).
+# TGFX_SOURCE_DIR / TGFX_INCLUDE_DIR are set by the root CMakeLists.txt.
 
-set(TGFX_SOURCE_DIR "${PROJECT_SOURCE_DIR}/third_party/tgfx")
-set(TGFX_OUT_DIR "${CMAKE_BINARY_DIR}/tgfx_prebuilt")
-set(TGFX_INCLUDE_DIR "${TGFX_SOURCE_DIR}/include")
+if(NOT TGFX_SOURCE_DIR OR NOT TGFX_INCLUDE_DIR OR NOT TGFX_OUT_DIR)
+  message(FATAL_ERROR
+          "adapter/tgfx requires TGFX_SOURCE_DIR, TGFX_INCLUDE_DIR, and TGFX_OUT_DIR from root CMakeLists")
+endif()
 
-set(TGFX_CMAKE_ARGS "-DTGFX_USE_METAL=ON -DTGFX_USE_OPENGL=OFF -DTGFX_USE_PNG_DECODE=ON -DTGFX_USE_PNG_ENCODE=ON -DTGFX_USE_JPEG_DECODE=ON -DTGFX_USE_JPEG_ENCODE=ON -DTGFX_USE_WEBP_DECODE=ON -DTGFX_USE_WEBP_ENCODE=ON")
+if(NOT TGFX_CMAKE_ARGS)
+  message(FATAL_ERROR "adapter/tgfx requires TGFX_CMAKE_ARGS from root CMakeLists")
+endif()
 
 # Defaults so Ninja/CI configure works; Xcode gen scripts can still override explicitly.
 if(NOT MOTIONSTUDIO_MACOSX_DEPLOYMENT_TARGET)
@@ -23,14 +27,6 @@ else()
   set(TGFX_SINGLE_CONFIG "Release")
 endif()
 
-set(_tgfx_prebuild_cmd
-    "${CMAKE_COMMAND}"
-    "-DTGFX_SOURCE_DIR=${TGFX_SOURCE_DIR}"
-    "-DTGFX_OUT_DIR=${TGFX_OUT_DIR}"
-    "-DTGFX_CMAKE_ARGS=${TGFX_CMAKE_ARGS}"
-    "-DTGFX_MACOSX_DEPLOYMENT_TARGET=${MOTIONSTUDIO_MACOSX_DEPLOYMENT_TARGET}"
-    "-DTGFX_IPHONEOS_DEPLOYMENT_TARGET=${MOTIONSTUDIO_IPHONEOS_DEPLOYMENT_TARGET}")
-
 if(CMAKE_GENERATOR MATCHES "Xcode")
   set(TGFX_PREBUILT_MAC_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/mac/arm64")
   set(TGFX_PREBUILT_CATALYST_DIR "${TGFX_OUT_DIR}/$(CONFIGURATION)/catalyst/arm64")
@@ -44,9 +40,17 @@ if(CMAKE_GENERATOR MATCHES "Xcode")
   set(TGFX_PREBUILT_IOS_DIR "${TGFX_PREBUILT_IOS_DIR}" PARENT_SCOPE)
   set(TGFX_PREBUILT_IOSSIM_DIR "${TGFX_PREBUILT_IOSSIM_DIR}" PARENT_SCOPE)
 
+  # Build the cmake -P argv inside the function so callers outside this directory
+  # (e.g. adapter/pag_codec) still get a complete command. Directory-local lists
+  # like _tgfx_prebuild_cmd are invisible when the function runs from elsewhere.
   function(motionstudio_add_tgfx_prebuild target_name)
     add_custom_command(TARGET ${target_name} PRE_BUILD
-        COMMAND ${_tgfx_prebuild_cmd}
+        COMMAND "${CMAKE_COMMAND}"
+                "-DTGFX_SOURCE_DIR=${TGFX_SOURCE_DIR}"
+                "-DTGFX_OUT_DIR=${TGFX_OUT_DIR}"
+                "-DTGFX_CMAKE_ARGS=${TGFX_CMAKE_ARGS}"
+                "-DTGFX_MACOSX_DEPLOYMENT_TARGET=${MOTIONSTUDIO_MACOSX_DEPLOYMENT_TARGET}"
+                "-DTGFX_IPHONEOS_DEPLOYMENT_TARGET=${MOTIONSTUDIO_IPHONEOS_DEPLOYMENT_TARGET}"
                 "-DCMAKE_BUILD_TYPE=$<CONFIG>"
                 -P "${PROJECT_SOURCE_DIR}/cmake/BuildTgfx.cmake"
         COMMENT "Prebuild tgfx for current PLATFORM_NAME / $<CONFIG>"
@@ -69,6 +73,8 @@ else()
   set(TGFX_PREBUILT_MAC_DIR "${TGFX_OUT_DIR}/${TGFX_SINGLE_CONFIG}/mac/arm64")
   set(TGFX_PREBUILT_MAC_LIB "${TGFX_PREBUILT_MAC_DIR}/tgfx.a")
   set(TGFX_PREBUILT_MAC_OUT "${TGFX_OUT_DIR}/${TGFX_SINGLE_CONFIG}/mac")
+  set(TGFX_PREBUILT_MAC_DIR "${TGFX_PREBUILT_MAC_DIR}" PARENT_SCOPE)
+  set(TGFX_PREBUILT_MAC_LIB "${TGFX_PREBUILT_MAC_LIB}" PARENT_SCOPE)
 
   separate_arguments(_tgfx_cmake_args_list NATIVE_COMMAND "${TGFX_CMAKE_ARGS}")
 
@@ -144,6 +150,7 @@ target_link_libraries(tgfx_adapter
                       "-framework CoreVideo"
                       "-framework ImageIO"
                       "-framework CoreGraphics"
+                      "-framework CoreText"
                       iconv)
 
 # Xcode / gen_mac: Mac destination is Catalyst (UIKit). Native mac Cocoa is Ninja-only.

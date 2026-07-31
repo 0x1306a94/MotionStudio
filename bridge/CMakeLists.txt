@@ -35,7 +35,7 @@ target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_include_directories(bridge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../adapter/tgfx/src")
 if (APPLE)
   target_include_directories(bridge PRIVATE
-    "${PROJECT_SOURCE_DIR}/third_party/tgfx/include"
+    "${TGFX_INCLUDE_DIR}"
     "${PROJECT_SOURCE_DIR}/adapter/tgfx/include"
     "${PROJECT_SOURCE_DIR}/adapter/avf/include")
 endif()

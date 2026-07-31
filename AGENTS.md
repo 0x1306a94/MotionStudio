@@ -67,7 +67,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -showdestinations
 ```
 
-CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ninja 构建 → ctest。tgfx 预编译库按 `build/tgfx_prebuilt/` 缓存，命中时 Ninja 跳过 tgfx 编译。
+CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ninja 构建 → ctest。tgfx 预编译库（源码为 `third_party/libpag/third_party/tgfx`）按 `build/tgfx_prebuilt/` 缓存；`pag_codec` 由 `adapter/pag_codec` 编译 libpag base+codec 并链该预编译 tgfx。
 
 ## 架构
 
