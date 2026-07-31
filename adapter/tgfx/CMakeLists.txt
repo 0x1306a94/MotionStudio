@@ -158,7 +158,7 @@ motionstudio_add_tgfx_prebuild(tgfx_adapter)
 motionstudio_link_prebuilt_tgfx(tgfx_adapter)
 
 include(GoogleTest)
-add_files_by_extension(TGFX_ADAPTER_TEST_SOURCES ".h;.cpp"
+add_files_by_extension(TGFX_ADAPTER_TEST_SOURCES ".h;.cpp;.mm"
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
 )
 

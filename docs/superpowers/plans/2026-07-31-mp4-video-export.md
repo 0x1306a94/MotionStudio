@@ -800,7 +800,7 @@ git commit --only adapter/avf CMakeLists.txt \
 - Consumes: `VideoFrameSource`；`SceneEvaluator::Evaluate`；`BuildCommands`；`PlayCommands`；`TgfxCanvasAdapter` 模式
 - Produces: `motion::TgfxVideoFrameSource`；`renderFrame` 返回 `PlatformShared`（`CVPixelBufferRef` + CF retain/release 函数指针）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(TgfxVideoFrameSourceTest, RendersPlatformSharedIgnoringCornerRadius) {
@@ -843,7 +843,7 @@ TEST(TgfxVideoFrameSourceTest, RendersPlatformSharedIgnoringCornerRadius) {
 
 四角采样断言写进测试：若仍应用圆角，角上常为透明/黑；强制 `cornerRadius=0` 后应为不透明绿。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -852,7 +852,7 @@ cmake --build build --target tgfx_adapter_test
 
 Expected: 编译失败（类不存在）。
 
-- [ ] **Step 3: 实现零拷贝帧源**
+- [x] **Step 3: 实现零拷贝帧源**
 
 推荐结构（侵入小于改 `TgfxRenderAdapter`）：
 
@@ -875,7 +875,7 @@ Expected: 编译失败（类不存在）。
 
 缩放矩阵：`Mat3::Scale(Vec2{exportW / viewportW, exportH / viewportH})`。
 
-- [ ] **Step 4: 测试通过**
+- [x] **Step 4: 测试通过**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -884,7 +884,7 @@ cmake --build build --target tgfx_adapter_test
 
 Expected: PASS（Metal 不可用则 `GTEST_SKIP`，与现有 adapter 测试一致）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/include/TgfxVideoFrameSource.h \
