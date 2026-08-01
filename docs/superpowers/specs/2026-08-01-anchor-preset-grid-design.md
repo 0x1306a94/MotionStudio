@@ -1,7 +1,7 @@
 # Transform 属性面板 — 九点锚点快捷设置
 
 日期：2026-08-01  
-状态：已确认（待实现计划）
+状态：已确认；实现计划见 `docs/superpowers/plans/2026-08-01-anchor-preset-grid.md`
 
 ## 目标
 
