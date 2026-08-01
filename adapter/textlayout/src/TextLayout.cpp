@@ -111,15 +111,21 @@ std::string TrimLeadingWhitespace(const std::string &text) {
 TextLayoutResult LayoutAtFontSize(const TextLayoutInput &input, float fontSize) {
     TextLayoutResult result;
     result.appliedFontSize = fontSize;
-    if (input.metrics == nullptr || input.boxWidth <= 0.0f) {
-        result.measuredSize = Vec2{std::max(0.0f, input.boxWidth), 0.0f};
+    if (input.metrics == nullptr) {
+        result.measuredSize = Vec2{0.0f, 0.0f};
+        return result;
+    }
+    // Soft-wrap layout needs a positive box width; point text ignores boxWidth.
+    if (input.softWrap && input.boxWidth <= 0.0f) {
+        result.measuredSize = Vec2{0.0f, 0.0f};
         return result;
     }
 
     const GlyphMetrics &glyphMetrics = *input.metrics;
     const FontMetrics metrics = glyphMetrics.metrics(fontSize);
     const float lineHeight = LineHeightOf(metrics);
-    const float boxWidth = input.boxWidth;
+    // Provisional align width; point text realigns after measuring max line width.
+    const float alignWidth = input.softWrap ? input.boxWidth : 0.0f;
 
     std::string current;
     float currentWidth = 0.0f;
@@ -130,7 +136,7 @@ TextLayoutResult LayoutAtFontSize(const TextLayoutInput &input, float fontSize) 
     size_t offset = 0;
     while (offset < input.text.size()) {
         if (input.text[offset] == '\n') {
-            PushLine(result, current, currentWidth, input.align, boxWidth, metrics);
+            PushLine(result, current, currentWidth, input.align, alignWidth, metrics);
             current.clear();
             currentWidth = 0.0f;
             lastWhitespaceStart = std::string::npos;
@@ -147,14 +153,14 @@ TextLayoutResult LayoutAtFontSize(const TextLayoutInput &input, float fontSize) 
         }
         const float advance = glyphMetrics.advance(unichar, fontSize);
 
-        if (!current.empty() && currentWidth + advance > boxWidth) {
+        if (input.softWrap && !current.empty() && currentWidth + advance > input.boxWidth) {
             if (lastWhitespaceStart != std::string::npos) {
                 std::string head = current.substr(0, lastWhitespaceStart);
-                PushLine(result, head, widthBeforeLastWhitespace, input.align, boxWidth, metrics);
+                PushLine(result, head, widthBeforeLastWhitespace, input.align, alignWidth, metrics);
                 current = TrimLeadingWhitespace(current.substr(lastWhitespaceStart));
                 currentWidth = MeasureWidth(current, glyphMetrics, fontSize);
             } else {
-                PushLine(result, current, currentWidth, input.align, boxWidth, metrics);
+                PushLine(result, current, currentWidth, input.align, alignWidth, metrics);
                 current.clear();
                 currentWidth = 0.0f;
             }
@@ -178,11 +184,22 @@ TextLayoutResult LayoutAtFontSize(const TextLayoutInput &input, float fontSize) 
         currentWidth += advance;
     }
 
-    PushLine(result, current, currentWidth, input.align, boxWidth, metrics);
+    PushLine(result, current, currentWidth, input.align, alignWidth, metrics);
 
     const float contentHeight =
         result.lines.empty() ? lineHeight : static_cast<float>(result.lines.size()) * lineHeight;
-    result.measuredSize = Vec2{boxWidth, contentHeight};
+    if (!input.softWrap) {
+        float maxLineWidth = 0.0f;
+        for (const TextLine &line : result.lines) {
+            maxLineWidth = std::max(maxLineWidth, line.width);
+        }
+        for (TextLine &line : result.lines) {
+            line.x = AlignX(input.align, maxLineWidth, line.width);
+        }
+        result.measuredSize = Vec2{maxLineWidth, contentHeight};
+    } else {
+        result.measuredSize = Vec2{input.boxWidth, contentHeight};
+    }
     return result;
 }
 
@@ -204,11 +221,12 @@ TextLayoutResult LayoutText(const TextLayoutInput &input) {
     if (input.metrics == nullptr) {
         TextLayoutResult empty;
         empty.appliedFontSize = input.fontSize;
-        empty.measuredSize = Vec2{std::max(0.0f, input.boxWidth), 0.0f};
+        empty.measuredSize = Vec2{0.0f, 0.0f};
         return empty;
     }
 
-    if (!input.shrinkToFit) {
+    // Point text never shrinks; shrink only applies to soft-wrapped box text.
+    if (!input.softWrap || !input.shrinkToFit) {
         return LayoutAtFontSize(input, input.fontSize);
     }
 

@@ -124,3 +124,31 @@ TEST(TextLayoutTest, WithoutShrinkKeepsFontSize) {
     TextLayoutResult result = LayoutText(input);
     EXPECT_FLOAT_EQ(result.appliedFontSize, 40.0f);
 }
+
+TEST(TextLayoutTest, PointTextNoSoftWrapMeasuresContent) {
+    FakeGlyphMetrics metrics;
+    TextLayoutInput input = MakeInput("abcdef", 30.0f, 20.0f);  // 30 would soft-wrap
+    input.metrics = &metrics;
+    input.softWrap = false;
+    input.align = Align::Left;
+
+    TextLayoutResult result = LayoutText(input);
+    ASSERT_EQ(result.lines.size(), 1u);
+    EXPECT_EQ(result.lines[0].text, "abcdef");
+    EXPECT_FLOAT_EQ(result.measuredSize.x, 60.0f);  // 6 * 10
+    EXPECT_FLOAT_EQ(result.measuredSize.y, 20.0f);
+}
+
+TEST(TextLayoutTest, PointTextHardBreakAndCenter) {
+    FakeGlyphMetrics metrics;
+    TextLayoutInput input = MakeInput("aa\nbbbb", 10.0f, 20.0f);
+    input.metrics = &metrics;
+    input.softWrap = false;
+    input.align = Align::Center;
+
+    TextLayoutResult result = LayoutText(input);
+    ASSERT_EQ(result.lines.size(), 2u);
+    EXPECT_FLOAT_EQ(result.measuredSize.x, 40.0f);  // longer line "bbbb"
+    EXPECT_FLOAT_EQ(result.lines[0].x, 10.0f);      // (40-20)/2
+    EXPECT_FLOAT_EQ(result.lines[1].x, 0.0f);
+}

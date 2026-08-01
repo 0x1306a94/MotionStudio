@@ -37,6 +37,8 @@
 
 ### Task 1: textlayout — `softWrap` + 点文本 `measuredSize`
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `adapter/textlayout/include/MotionStudio/textlayout/TextLayout.h`
 - Modify: `adapter/textlayout/src/TextLayout.cpp`
@@ -45,7 +47,7 @@
 **Interfaces:**
 - Produces: `TextLayoutInput::softWrap`（默认 `true`）；`softWrap==false` 时不按宽断行，`measuredSize = {maxLineWidth, contentHeight}`，对齐参考宽 = `maxLineWidth`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(TextLayoutTest, PointTextNoSoftWrapMeasuresContent) {
@@ -77,7 +79,7 @@ TEST(TextLayoutTest, PointTextHardBreakAndCenter) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 ```bash
 cmake --build build --target textlayout_tests 2>/dev/null || cmake --build build --target tgfx_adapter_test
@@ -87,7 +89,7 @@ ctest --test-dir build -R TextLayoutTest --output-on-failure
 
 Expected: 编译失败（无 `softWrap`）或断言失败。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 在 `TextLayout.h` 增加：
 
@@ -103,7 +105,7 @@ bool softWrap = true;  // false = point text: only '\\n', measuredSize is conten
 
 `LayoutText`：`shrinkToFit` 仅在 `softWrap==true` 时有意义；若 `!softWrap` 强制走非 shrink。
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 ```bash
 ctest --test-dir build -R TextLayoutTest --output-on-failure
@@ -111,7 +113,7 @@ ctest --test-dir build -R TextLayoutTest --output-on-failure
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add adapter/textlayout/

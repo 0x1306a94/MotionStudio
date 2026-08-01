@@ -19,6 +19,8 @@ struct TextLayoutInput {
     float boxWidth = 0;
     float boxHeight = 0;       // fixed layout box height
     bool shrinkToFit = false;  // true = binary-search font shrink into box
+    // false = point text: hard breaks only; measuredSize is content bounds.
+    bool softWrap = true;
     float fontSize = 48;
     Align align = Align::Left;
     const GlyphMetrics *metrics = nullptr;
@@ -37,8 +39,9 @@ struct TextLayoutResult {
     std::vector<TextLine> lines;
 };
 
-// Lays out boxed text: hard breaks on '\\n', soft wrap by width; when
-// shrinkToFit is true, binary-search font size to fit boxHeight.
+// Lays out text: hard breaks on '\\n'; soft wrap by width when softWrap;
+// when softWrap and shrinkToFit, binary-search font size to fit boxHeight.
+// When softWrap is false, measuredSize is content width/height (not boxWidth).
 TextLayoutResult LayoutText(const TextLayoutInput &input);
 
 }  // namespace motion::textlayout
