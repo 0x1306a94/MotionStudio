@@ -214,9 +214,9 @@ class TextContent : public LayerContent {
     Animatable<std::string> text{std::string{"Text"}};
     std::string fontFamily{"PingFang SC"};         // 系统字体族名
     std::string fontStyle{};                       // 族内 style 名（如 Bold）；空 = 默认/Regular
-    Animatable<float> fontSize{48};                // 字号上限（boxTextMode 时可缩字）
-    Animatable<Vec2> size{Vec2{400, 120}};         // 固定排版框；hit/选中也用此尺寸
-    bool boxTextMode = false;                      // true：换行 + 缩字号；false：换行 + clip
+    float fontSize = 48;                           // 静态；框模式下为字号上限（可 shrink）
+    Vec2 size{400, 120};                           // 静态；仅框文本排版/选中用；点文本忽略
+    bool boxTextMode = false;                      // false：点文本；true：PAG 框文本（换行+shrink）
     TextAlign align = TextAlign::Left;             // Left / Center / Right
 };
 class PrecompContent : public LayerContent {
@@ -228,11 +228,11 @@ class PrecompContent : public LayerContent {
 
 新建空 Image 层：未绑定 asset、`size` 静态 `200×200`、`anchorPoint = (100,100)`、`position` = 合成中心。Inspector 可「重置为源尺寸」。选中框手柄一律改 `image.size`（可补偿 position/anchor）；`transform.scale` 仅属性面板可改。
 
-新建 Text 层：文案 `"Text"`，`size = 400×120`，`boxTextMode = false`，`align = Left`，`fontFamily = "PingFang SC"`，`fontStyle` 空，`anchorPoint = (200,60)`，`position` = 合成中心，并附带黑色 Fill。填充/描边按 `Layer.styles` 顺序全部参与绘制（各自 blend）；Stroke 的 Position / Trim 对文本无效。
+新建 Text 层：文案 `"Text"`，默认**点文本**（`boxTextMode = false`），`size = 400×120`（占位，点文本排版忽略），`align = Left`，`fontFamily = "PingFang SC"`，`fontStyle` 空，`anchorPoint` = 当前字形包围盒中心，`position` = 合成中心，并附带黑色 Fill。填充/描边按 `Layer.styles` 顺序全部参与绘制（各自 blend）；Stroke 的 Position / Trim 对文本无效。
 
-Inspector 拖改 `content.size` 时：`anchor' = (ax·w1/w0, ay·h1/h0)`（分母为 0 则该轴保持），**`transform.position` 不变**。画布选中框对角/对边固定拖拽会同时补偿 position。Hit/选中框始终等于 `content.size`（无虚拟测高）。
+点文本：选中/hit bounds 为字形测量；无角/边 resize 手柄。框文本：bounds = `size`；Inspector/手柄可改 `size`（`anchor' = (ax·w1/w0, ay·h1/h0)`，position 可补偿）。点→框时用当前字形测量写入 `size`。
 
-PropertyPath：`content.text`、`content.fontSize`、`content.size`；非 Animatable 字段（`fontFamily`/`fontStyle`/`boxTextMode`/`align`）经专用 undo 命令与 bridge API。
+PropertyPath：仅 `content.text` 可动画。`fontSize` / `size` / `fontFamily` / `fontStyle` / `boxTextMode` / `align` 经专用 undo 命令与 bridge API。
 
 ### 3.5 Shape 模型
 

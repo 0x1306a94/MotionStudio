@@ -530,8 +530,8 @@ EOF
 - Modify: `docs/data-model.md`（若描述 Animatable fontSize/size）
 - Modify: `docs/superpowers/specs/2026-08-01-point-vs-box-text-design.md`（状态已确认；可链到本 plan）
 
-- [ ] **Step 1: 同步文档与 spec 链接**
-- [ ] **Step 2: Commit**
+- [x] **Step 1: 同步文档与 spec 链接**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/

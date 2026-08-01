@@ -1,7 +1,8 @@
 # 点文本 / PAG 框文本 — 设计说明
 
 日期：2026-08-01  
-状态：已确认  
+状态：已确认；实现计划见 `docs/superpowers/plans/2026-08-01-point-vs-box-text.md`  
+
 
 相关：取代 `2026-07-30-figma-style-resize-box-text-design.md` 中文本语义（`boxTextMode` = clip/shrink）；PAG 导出见 `2026-07-31-pag-export-design.md`（实现时同步修订）
 
@@ -57,6 +58,7 @@ class TextContent : public LayerContent {
 - `boxTextMode = false`
 - `fontSize = 48`（或现有默认）
 - `size` 可先写占位（如 400×120），点文本排版忽略它；选中 bounds 用字形测量
+- `anchorPoint` = 当前默认文案字形包围盒中心（非整块 400×120）
 
 ---
 
