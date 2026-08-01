@@ -325,6 +325,8 @@ EOF
 
 ### Task 5: Bridge — 点文本 live `containerSize` 覆写
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `bridge/src/common/motionstudio_bridge_composition.cpp`（hit / bounds / selection_handles）
 - Modify: `bridge/src/common/motionstudio_bridge_canvas.cpp`（及 `.mm` 若求值在此）
@@ -334,7 +336,7 @@ EOF
 - 对每个 `textItem && !boxTextMode`：用 item 字段测字，设 `containerSize = measured`（≥1）
 - 框文本：保持模型 `size`
 
-- [ ] **Step 1: 实现 helper 并在三处 Evaluate 成功后调用**
+- [x] **Step 1: 实现 helper 并在三处 Evaluate 成功后调用**
 
 ```cpp
 void ResolvePointTextContainerSizes(motion::SceneState &state) {
@@ -347,11 +349,11 @@ void ResolvePointTextContainerSizes(motion::SceneState &state) {
 }
 ```
 
-- [ ] **Step 2: 手动/测试验证**（若有 TextLayerEvalTest 只覆盖 Core，可加 bridge 测或 tgfx 测）
+- [x] **Step 2: 手动/测试验证**（若有 TextLayerEvalTest 只覆盖 Core，可加 bridge 测或 tgfx 测）
 
 点文本长串：handles 宽 ≈ 内容宽，而非 400。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add bridge/

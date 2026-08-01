@@ -20,6 +20,7 @@
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/SceneState.h"
 #include "MotionStudio/undo/Command.h"
 
 #include "MSDocument.h"
@@ -59,5 +60,8 @@ motion::Easing MakeEasing(int easingType, float inX, float inY, float outX, floa
 
 uint64_t AddShapeLayer(MSDocument *handle, uint64_t compositionId, bool ellipse);
 uint64_t AddPathLayer(MSDocument *handle, uint64_t compositionId);
+
+// For point-text layers, overwrite textItem.containerSize with glyph content bounds.
+void ResolvePointTextContainerSizes(motion::SceneState &state);
 
 }  // namespace bridge

@@ -365,6 +365,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
             return;
         }
         motion::SceneState &state = result.value();
+        bridge::ResolvePointTextContainerSizes(state);
         profile.layerCount = state.layers.size();
         viewportWidth = state.viewportWidth;
         viewportHeight = state.viewportHeight;

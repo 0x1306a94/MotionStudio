@@ -115,6 +115,7 @@ uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositio
         return 0;
     }
     motion::SceneState &state = result.value();
+    ResolvePointTextContainerSizes(state);
     for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
         const Layer *layer = doc->entityIndex().findLayer(it->id);
         if (layer != nullptr && !layer->locked && motion::HitTestLayer(*it, Vec2{x, y}, tolerance)) {
@@ -136,6 +137,7 @@ bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, u
         return false;
     }
     motion::SceneState &state = result.value();
+    ResolvePointTextContainerSizes(state);
     for (const motion::EvaluatedLayer &layer : state.layers) {
         if (layer.id.value != layerId) {
             continue;
@@ -179,6 +181,7 @@ bool ms_composition_selection_handles(MSDocument *document, uint64_t composition
         return false;
     }
     motion::SceneState &state = result.value();
+    ResolvePointTextContainerSizes(state);
     std::vector<EntityId> selected;
     selected.reserve(count);
     for (size_t index = 0; index < count; ++index) {
