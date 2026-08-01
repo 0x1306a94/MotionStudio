@@ -164,6 +164,45 @@ bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, u
     return false;
 }
 
+bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
+                           float *minX, float *minY, float *maxX, float *maxY) {
+    DocumentLock guard(document);
+    Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return false;
+    }
+    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    if (!result.hasValue()) {
+        return false;
+    }
+    motion::SceneState &state = result.value();
+    ResolvePointTextContainerSizes(state);
+    for (const motion::EvaluatedLayer &layer : state.layers) {
+        if (layer.id.value != layerId) {
+            continue;
+        }
+        Vec2 minPoint;
+        Vec2 maxPoint;
+        if (!motion::BoundsOfLayerLocal(layer, minPoint, maxPoint)) {
+            return false;
+        }
+        if (minX != nullptr) {
+            *minX = minPoint.x;
+        }
+        if (minY != nullptr) {
+            *minY = minPoint.y;
+        }
+        if (maxX != nullptr) {
+            *maxX = maxPoint.x;
+        }
+        if (maxY != nullptr) {
+            *maxY = maxPoint.y;
+        }
+        return true;
+    }
+    return false;
+}
+
 bool ms_composition_selection_handles(MSDocument *document, uint64_t compositionId, double frameTime,
                                       const uint64_t *layerIds, size_t count, uint64_t primaryLayerId,
                                       MSSelectionHandles *out) {

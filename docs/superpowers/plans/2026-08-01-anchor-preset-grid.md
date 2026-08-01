@@ -37,6 +37,8 @@
 
 ### Task 1: Bridge `ms_layer_local_bounds` + tests
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（紧挨 `ms_composition_layer_bounds` 声明之后）
 - Modify: `bridge/src/common/motionstudio_bridge_composition.cpp`
@@ -47,9 +49,9 @@
 - Consumes: `SceneEvaluator::EvaluatePreview`、`ResolvePointTextContainerSizes`、`BoundsOfLayerLocal`
 - Produces: `bool ms_layer_local_bounds(MSDocument*, uint64_t compositionId, uint64_t layerId, double frameTime, float* minX, float* minY, float* maxX, float* maxY)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
-在 `BridgeTest.cpp` 追加（可放在 `TextLayerAddSetStringFontAndUndo` 附近）：
+在 `BridgeTest.cpp` 追加（已用 `BridgeCommandTest` suite）：
 
 ```cpp
 TEST(BridgeCompositionTest, LayerLocalBoundsMatchesSelectionHandlesAndPointText) {
@@ -100,18 +102,16 @@ TEST(BridgeCompositionTest, LayerLocalBoundsMatchesSelectionHandlesAndPointText)
 }
 ```
 
-若工程里尚无 `BridgeCompositionTest` suite 名，用现有 suite 前缀（如 `BridgeCommandTest`）亦可，保持文件风格一致即可。
-
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cmake --build build --target bridge_test
-./build/bridge/tests/bridge_test --gtest_filter='*LayerLocalBounds*'
+./build/bridge/bridge_test --gtest_filter='*LayerLocalBounds*'
 ```
 
 Expected: 链接/编译失败（符号不存在）或测试未注册。
 
-- [ ] **Step 3: Declare + implement API**
+- [x] **Step 3: Declare + implement API**
 
 在 `motionstudio_bridge.h` 于 `ms_composition_layer_bounds` 后插入：
 
@@ -168,16 +168,16 @@ bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_
 
 确认已 `#include "MotionStudio/render/HitTest.h"`（若文件尚未 include）。
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 cmake --build build --target bridge_test
-./build/bridge/tests/bridge_test --gtest_filter='*LayerLocalBounds*'
+./build/bridge/bridge_test --gtest_filter='*LayerLocalBounds*'
 ```
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add bridge/include/motionstudio_bridge.h \

@@ -270,6 +270,12 @@ uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositio
 bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
                                  float *minX, float *minY, float *maxX, float *maxY);
 
+// Layer-local AABB (same source as selection handles localMin/localMax).
+// Runs EvaluatePreview → ResolvePointTextContainerSizes → BoundsOfLayerLocal.
+// Returns false when the layer is missing or has no local bounds.
+bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
+                           float *minX, float *minY, float *maxX, float *maxY);
+
 // Selection chrome geometry in scene space for free-transform hit-testing.
 // corners / edgeMids are TL,TR,BR,BL and top,right,bottom,left respectively.
 // primaryLayerId selects the anchor owner (AE primary). Returns false when

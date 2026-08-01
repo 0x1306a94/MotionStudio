@@ -1010,6 +1010,56 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, LayerLocalBoundsMatchesSelectionHandlesAndPointText) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+
+    // Rect shape: local bounds must match selection_handles localMin/Max.
+    const uint64_t rectId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_NE(rectId, 0u);
+    float minX = 0;
+    float minY = 0;
+    float maxX = 0;
+    float maxY = 0;
+    ASSERT_TRUE(ms_layer_local_bounds(document, compositionId, rectId, 0.0, &minX, &minY, &maxX, &maxY));
+    MSSelectionHandles handles = {};
+    const uint64_t ids[] = {rectId};
+    ASSERT_TRUE(ms_composition_selection_handles(document, compositionId, 0.0, ids, 1, rectId, &handles));
+    EXPECT_FLOAT_EQ(minX, handles.localMinX);
+    EXPECT_FLOAT_EQ(minY, handles.localMinY);
+    EXPECT_FLOAT_EQ(maxX, handles.localMaxX);
+    EXPECT_FLOAT_EQ(maxY, handles.localMaxY);
+    EXPECT_GT(maxX - minX, 0.0f);
+    EXPECT_GT(maxY - minY, 0.0f);
+
+    // Point text: local size is measured glyphs, not placeholder 400×120.
+    const uint64_t textId = ms_command_add_text_layer(document, compositionId);
+    ASSERT_NE(textId, 0u);
+    EXPECT_FALSE(ms_layer_text_box_text_mode(document, textId));
+    ASSERT_TRUE(ms_layer_local_bounds(document, compositionId, textId, 0.0, &minX, &minY, &maxX, &maxY));
+    EXPECT_FLOAT_EQ(minX, 0.0f);
+    EXPECT_FLOAT_EQ(minY, 0.0f);
+    EXPECT_GT(maxX, 0.0f);
+    EXPECT_GT(maxY, 0.0f);
+    EXPECT_LT(maxX, 400.0f);
+    EXPECT_LT(maxY, 120.0f);
+
+    // Box text: local bounds follow content.size after mode switch.
+    ASSERT_TRUE(ms_command_set_text_box_text_mode(document, textId, true, 0));
+    ASSERT_TRUE(ms_command_set_text_size(document, textId, 300.0f, 100.0f));
+    ASSERT_TRUE(ms_layer_local_bounds(document, compositionId, textId, 0.0, &minX, &minY, &maxX, &maxY));
+    EXPECT_FLOAT_EQ(minX, 0.0f);
+    EXPECT_FLOAT_EQ(minY, 0.0f);
+    EXPECT_FLOAT_EQ(maxX, 300.0f);
+    EXPECT_FLOAT_EQ(maxY, 100.0f);
+
+    // Missing layer → false.
+    EXPECT_FALSE(ms_layer_local_bounds(document, compositionId, 0, 0.0, &minX, &minY, &maxX, &maxY));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, ResizeLayerGeometryScalesPathMaskAndRect) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
