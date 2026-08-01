@@ -182,3 +182,15 @@ target_include_directories(tgfx_adapter_test
 motionstudio_add_tgfx_prebuild(tgfx_adapter_test)
 motionstudio_link_prebuilt_tgfx(tgfx_adapter_test)
 gtest_discover_tests(tgfx_adapter_test)
+
+# Browse-only: surface vendored tgfx sources in the Xcode navigator without compiling.
+# tgfx itself is still produced by build_tgfx / motionstudio_add_tgfx_prebuild.
+if(CMAKE_GENERATOR MATCHES "Xcode")
+  add_files_by_extension(TGFX_BROWSE_SOURCES ".h;.hpp;.c;.cc;.cpp;.m;.mm"
+      ${TGFX_SOURCE_DIR}/src)
+  add_files_by_extension(TGFX_BROWSE_HEADERS ".h;.hpp"
+      ${TGFX_SOURCE_DIR}/include)
+  add_custom_target(tgfx_sources SOURCES ${TGFX_BROWSE_SOURCES} ${TGFX_BROWSE_HEADERS})
+  add_source_group(TGFX_BROWSE_SOURCES ${TGFX_SOURCE_DIR}/src "Sources")
+  add_source_group(TGFX_BROWSE_HEADERS ${TGFX_SOURCE_DIR}/include "Public Headers")
+endif()
