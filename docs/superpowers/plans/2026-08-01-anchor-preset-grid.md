@@ -190,6 +190,8 @@ git commit -m "Add bridge API for layer-local content bounds."
 
 ### Task 2: Swift `AnchorPreset` + unit tests
 
+**Status:** ✅ Done
+
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPreset.swift`
 - Create: `apps/MotionStudioApp/MotionStudioAppTests/AnchorPresetTests.swift`
@@ -203,7 +205,7 @@ git commit -m "Add bridge API for layer-local content bounds."
     - `static func matchingCorner(anchor:rect:tolerance:) -> AnchorPresetCorner?`
     - `static func compensatedPosition(oldAnchor:newAnchor:position:scale:rotationDegrees:) -> CGVector`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `AnchorPresetTests.swift`：
 
@@ -256,7 +258,7 @@ struct AnchorPresetTests {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 优先 Xcode MCP `BuildProject` / 跑 `MotionStudioAppTests`；不可用则：
 
@@ -268,7 +270,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp \
 
 Expected: 编译失败（`AnchorPreset` 未定义）。
 
-- [ ] **Step 3: Implement `AnchorPreset.swift`**
+- [x] **Step 3: Implement `AnchorPreset.swift`**
 
 ```swift
 import CoreGraphics
@@ -334,11 +336,11 @@ enum AnchorPreset {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 同 Step 2 命令。Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPreset.swift \
