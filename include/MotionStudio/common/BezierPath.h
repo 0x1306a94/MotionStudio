@@ -28,6 +28,10 @@ struct BezierPath {
     // True if the last vertex connects back to the first, forming a closed loop.
     bool closed = false;
 
+    // True when the path collapses to a point (width and height both zero),
+    // including empty paths. Hairlines (zero on only one axis) return false.
+    bool isZero() const;
+
     bool operator==(const BezierPath &other) const;
     bool operator!=(const BezierPath &other) const;
 };

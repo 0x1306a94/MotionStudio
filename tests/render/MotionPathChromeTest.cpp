@@ -141,3 +141,27 @@ TEST(MotionPathChromeTest, BuildCommandsEmitsStrokeAndHandles) {
     }
     EXPECT_TRUE(sawStroke);
 }
+
+TEST(MotionPathChromeTest, BuildCommandsSkipsCollapsedPathStroke) {
+    Scene scene;
+    scene.layer->transform.position.addKeyframe(MakePositionKeyframe(0, {40, 50}));
+    scene.layer->transform.position.addKeyframe(MakePositionKeyframe(10, {40, 50}));
+
+    MotionPathChrome chrome;
+    ASSERT_TRUE(BuildMotionPathChrome(scene.document, scene.layer->id, PreviewTime{0}, -1, chrome));
+    auto commands = BuildMotionPathCommands(chrome, 1.5f, 7.0f);
+    // Path overlay wraps stroke in Save/ConcatTransform; collapsed paths skip it.
+    // Keyframe marker fills/strokes remain.
+    bool sawPathTransform = false;
+    bool sawHandleFill = false;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::ConcatTransform) {
+            sawPathTransform = true;
+        }
+        if (command.type == DrawCommandType::DrawPath) {
+            sawHandleFill = true;
+        }
+    }
+    EXPECT_FALSE(sawPathTransform);
+    EXPECT_TRUE(sawHandleFill);
+}

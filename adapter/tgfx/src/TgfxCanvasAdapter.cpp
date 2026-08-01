@@ -202,7 +202,11 @@ void TgfxCanvasAdapter::setBlendMode(BlendMode mode) {
 
 void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &paint) {
     tgfx::Canvas *canvas = drawingCanvas();
-    if (canvas == nullptr || !pathCache_) {
+    if (canvas == nullptr || !pathCache_ || geometry.isZero()) {
+        return;
+    }
+    const tgfx::Path path = pathCache_->Resolve(geometry, paint.fillRule);
+    if (path.isEmpty()) {
         return;
     }
     tgfx::Paint tgfxPaint;
@@ -212,13 +216,13 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
     color.a *= opacity_;
     tgfxPaint.setColor(ToTgfxColor(color));
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-    canvas->drawPath(pathCache_->Resolve(geometry, paint.fillRule), tgfxPaint);
+    canvas->drawPath(path, tgfxPaint);
 }
 
 void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &paint,
                                    const StrokeOptions &options) {
     tgfx::Canvas *canvas = drawingCanvas();
-    if (canvas == nullptr || !pathCache_) {
+    if (canvas == nullptr || !pathCache_ || geometry.isZero()) {
         return;
     }
     const tgfx::Path fullPath = pathCache_->Resolve(geometry, paint.fillRule);
@@ -233,6 +237,11 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
         strokeGeometry = pathCache_->ResolveTrimmed(geometry, paint.fillRule, trimWindow, fullPath);
     }
     if (strokeGeometry.isEmpty()) {
+        return;
+    }
+    // Trim can collapse a non-zero source to a point; hairlines must still draw.
+    const tgfx::Rect bounds = strokeGeometry.getBounds();
+    if (bounds.width() <= 0.0f && bounds.height() <= 0.0f) {
         return;
     }
 

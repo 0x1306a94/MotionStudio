@@ -52,6 +52,25 @@ TEST(PathOverlayTest, BuildCommandsSkipsSingleVertexPath) {
     EXPECT_TRUE(BuildPathOverlayCommands({item}, 1.5f).empty());
 }
 
+TEST(PathOverlayTest, BuildCommandsSkipsCollapsedMultiVertexPath) {
+    PathOverlayItem item;
+    item.path.vertices.push_back({{40, 50}, {}, {}});
+    item.path.vertices.push_back({{40, 50}, {}, {}});
+    item.color = Color{0.35f, 0.75f, 1.0f, 1};
+    EXPECT_TRUE(BuildPathOverlayCommands({item}, 1.5f).empty());
+}
+
+TEST(PathOverlayTest, BuildCommandsKeepsHairlinePath) {
+    PathOverlayItem item;
+    item.path.vertices.push_back({{0, 10}, {}, {}});
+    item.path.vertices.push_back({{20, 10}, {}, {}});
+    item.color = Color{1, 0.85f, 0.2f, 1};
+
+    auto commands = BuildPathOverlayCommands({item}, 1.5f);
+    ASSERT_EQ(commands.size(), 4u);
+    EXPECT_EQ(commands[2].type, DrawCommandType::StrokePath);
+}
+
 TEST(PathOverlayTest, BuildCommandsEmitsStrokeInLocalTransform) {
     PathOverlayItem item;
     item.worldTransform = Mat3::Translate(Vec2{10, 20});

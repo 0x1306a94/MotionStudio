@@ -27,6 +27,10 @@ struct ShapeGeometry {
 
     // Meaningful when kind == Rect. Values > 0 produce a rounded rectangle.
     float cornerRadius = 0;
+
+    // True when geometry collapses to a point (width and height both zero).
+    // Path uses BezierPath::isZero; Rect/Ellipse use size. Hairlines return false.
+    bool isZero() const;
 };
 
 // Builds a Path geometry from an authoring BezierPath.

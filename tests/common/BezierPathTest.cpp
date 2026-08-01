@@ -27,3 +27,27 @@ TEST(BezierPathTest, EqualityComparesVerticesAndClosedFlag) {
     pathB.closed = false;
     EXPECT_NE(pathA, pathB);
 }
+
+TEST(BezierPathTest, IsZeroForEmptyCollapsedAndHairline) {
+    BezierPath empty;
+    EXPECT_TRUE(empty.isZero());
+
+    BezierPath single;
+    single.vertices.push_back({{4, 5}, {}, {}});
+    EXPECT_TRUE(single.isZero());
+
+    BezierPath collapsed;
+    collapsed.vertices.push_back({{40, 50}, {}, {}});
+    collapsed.vertices.push_back({{40, 50}, {}, {}});
+    EXPECT_TRUE(collapsed.isZero());
+
+    BezierPath hairline;
+    hairline.vertices.push_back({{0, 10}, {}, {}});
+    hairline.vertices.push_back({{20, 10}, {}, {}});
+    EXPECT_FALSE(hairline.isZero());
+
+    BezierPath curvedFromPoint;
+    curvedFromPoint.vertices.push_back({{0, 0}, {}, {10, 0}});
+    curvedFromPoint.vertices.push_back({{0, 0}, {-10, 0}, {}});
+    EXPECT_FALSE(curvedFromPoint.isZero());
+}

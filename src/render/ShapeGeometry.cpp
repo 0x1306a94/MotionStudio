@@ -81,6 +81,19 @@ ShapeGeometry MakeEllipseGeometry(Vec2 center, Vec2 size) {
     return geometry;
 }
 
+bool ShapeGeometry::isZero() const {
+    switch (kind) {
+        case ShapeGeometryKind::Path: {
+            return path.isZero();
+        }
+        case ShapeGeometryKind::Rect:
+        case ShapeGeometryKind::Ellipse: {
+            return size.x <= 0.0f && size.y <= 0.0f;
+        }
+    }
+    return true;
+}
+
 bool ShapeGeometryIsClosed(const ShapeGeometry &geometry) {
     switch (geometry.kind) {
         case ShapeGeometryKind::Path: {

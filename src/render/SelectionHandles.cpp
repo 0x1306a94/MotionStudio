@@ -279,15 +279,17 @@ DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
     }
 
     const float anchorRadius = safeHandle * 0.55f;
-    AppendFill(commands, MakeEllipseGeometry(handles.anchor, {anchorRadius * 2, anchorRadius * 2}),
-               kAnchorFillColor);
-    AppendStroke(commands, MakeEllipseGeometry(handles.anchor, {anchorRadius * 2, anchorRadius * 2}),
-                 safeStroke);
+    AppendFill(commands, MakeEllipseGeometry(handles.anchor, {anchorRadius * 2, anchorRadius * 2}), kAnchorFillColor);
+    AppendStroke(commands, MakeEllipseGeometry(handles.anchor, {anchorRadius * 2, anchorRadius * 2}), safeStroke);
     const float cross = anchorRadius * 1.6f;
-    Vec2 horizontal[2] = {{handles.anchor.x - cross, handles.anchor.y},
-                          {handles.anchor.x + cross, handles.anchor.y}};
-    Vec2 vertical[2] = {{handles.anchor.x, handles.anchor.y - cross},
-                        {handles.anchor.x, handles.anchor.y + cross}};
+    Vec2 horizontal[2] = {
+        {handles.anchor.x - cross, handles.anchor.y},
+        {handles.anchor.x + cross, handles.anchor.y},
+    };
+    Vec2 vertical[2] = {
+        {handles.anchor.x, handles.anchor.y - cross},
+        {handles.anchor.x, handles.anchor.y + cross},
+    };
     BezierPath hPath;
     hPath.vertices.push_back({horizontal[0], {}, {}});
     hPath.vertices.push_back({horizontal[1], {}, {}});
