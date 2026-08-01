@@ -16,6 +16,8 @@ struct MSCanvas {
     std::vector<motion::EntityId> selectedLayerIds;
     // When false, selection chrome omits the anchor crosshair (App container mode).
     bool showSelectionAnchor = true;
+    // When false, selection chrome omits corner/edge resize knobs (point text).
+    bool showSelectionScaleHandles = true;
     bool hasPathEditTarget = false;
     motion::PathEditTarget pathEditTarget;
     int pathEditSelectedVertex = -1;

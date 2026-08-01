@@ -20,11 +20,13 @@ DrawCommandList BuildCommands(const SceneState &state);
 // invalid, the last id in selectedLayerIds is used.
 // strokeWidth / handleSize: chrome sizes in scene units.
 // showAnchor: false omits the anchor crosshair.
+// showScaleHandles: false omits corner/edge resize knobs (box outline remains).
 DrawCommandList BuildSelectionOutlineCommands(const SceneState &state,
                                               const std::vector<EntityId> &selectedLayerIds,
                                               EntityId primaryLayerId,
                                               float strokeWidth,
                                               float handleSize,
-                                              bool showAnchor = true);
+                                              bool showAnchor = true,
+                                              bool showScaleHandles = true);
 
 }  // namespace motion

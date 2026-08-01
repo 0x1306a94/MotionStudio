@@ -49,12 +49,6 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: ImageProperty.size.path).isEmpty {
         paths.append(ImageProperty.size.path)
     }
-    if !core.keyframes(entityID: layerID, path: TextProperty.size.path).isEmpty {
-        paths.append(TextProperty.size.path)
-    }
-    if !core.keyframes(entityID: layerID, path: TextProperty.fontSize.path).isEmpty {
-        paths.append(TextProperty.fontSize.path)
-    }
     for property in FollowPathProperty.allCases
         where !core.keyframes(entityID: layerID, path: property.path).isEmpty
     {
@@ -183,6 +177,8 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
         }
 
         for property in TextProperty.allCases where animatedPaths.contains(property.path) {
+            // fontSize / size are static; only content.text can be animated.
+            guard property == .text else { continue }
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: property.path,

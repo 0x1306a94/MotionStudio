@@ -981,6 +981,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return .NONE
         }
         let radius = Self.handleHitPoints
+        let allowScaleHandles = selectionAllowsScaleHandles()
         func isNear(_ scenePoint: CGPoint) -> Bool {
             let point = transform.viewPoint(fromScenePoint: scenePoint)
             let dx = point.x - viewPoint.x
@@ -990,13 +991,15 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         if isNear(handles.anchor) {
             return .ANCHOR
         }
-        let cornerHits: [MS_SELECTION_HANDLE] = [.SCALE_CORNER0, .SCALE_CORNER1, .SCALE_CORNER2, .SCALE_CORNER3]
-        for index in 0 ..< 4 where isNear(handles.corners[index]) {
-            return cornerHits[index]
-        }
-        let edgeHits: [MS_SELECTION_HANDLE] = [.SCALE_EDGE0, .SCALE_EDGE1, .SCALE_EDGE2, .SCALE_EDGE3]
-        for index in 0 ..< 4 where isNear(handles.edgeMids[index]) {
-            return edgeHits[index]
+        if allowScaleHandles {
+            let cornerHits: [MS_SELECTION_HANDLE] = [.SCALE_CORNER0, .SCALE_CORNER1, .SCALE_CORNER2, .SCALE_CORNER3]
+            for index in 0 ..< 4 where isNear(handles.corners[index]) {
+                return cornerHits[index]
+            }
+            let edgeHits: [MS_SELECTION_HANDLE] = [.SCALE_EDGE0, .SCALE_EDGE1, .SCALE_EDGE2, .SCALE_EDGE3]
+            for index in 0 ..< 4 where isNear(handles.edgeMids[index]) {
+                return edgeHits[index]
+            }
         }
 
         let centerView = transform.viewPoint(fromScenePoint: handles.center)
@@ -1044,10 +1047,23 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
         ms_canvas_set_selection_show_anchor(canvas, true)
+        ms_canvas_set_selection_show_scale_handles(canvas, selectionAllowsScaleHandles())
         document.core.setMotionPathSelection(canvas: canvas,
                                              layerID: editorState.motionPathLayerID,
                                              selectedKeyframe: editorState.motionPathSelectedKeyframe)
         updatePathEditChrome()
+    }
+
+    /// Point text has no content-size resize; keep move/rotate/anchor only.
+    private func selectionAllowsScaleHandles() -> Bool {
+        let layerIDs = editorState.selectedLayerIDs
+        guard layerIDs.count == 1, let layerID = layerIDs.first else {
+            return true
+        }
+        if document.core.layerType(layerID) == .TEXT {
+            return document.core.textBoxTextMode(layerID: layerID)
+        }
+        return true
     }
 
     private func updatePathEditChrome() {

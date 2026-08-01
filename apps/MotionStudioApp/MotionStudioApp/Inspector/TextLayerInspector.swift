@@ -9,8 +9,6 @@ import MotionStudioBridging
 import SwiftUI
 import UIKit
 
-let textSizePath = TextProperty.size.path
-let textFontSizePath = TextProperty.fontSize.path
 let textStringPath = TextProperty.text.path
 
 struct TextLayerInspector: View {
@@ -35,8 +33,8 @@ struct TextLayerInspector: View {
 
     var body: some View {
         let _ = core.revision
-        let size = core.evaluateVec2(entityID: layerID, path: textSizePath, frame: playheadFrame)
-        let fontSize = core.evaluateFloat(entityID: layerID, path: textFontSizePath, frame: playheadFrame)
+        let size = core.textSize(layerID: layerID)
+        let fontSize = core.textFontSize(layerID: layerID)
         let boxTextMode = core.textBoxTextMode(layerID: layerID)
         let align = core.textAlign(layerID: layerID)
         let fontFamily = core.textFontFamily(layerID: layerID)
@@ -78,33 +76,30 @@ struct TextLayerInspector: View {
 
         NumberPropertyRow(label: "Font Size",
                           value: fontSize,
-                          hasKeyframeAtPlayhead: hasFontSizeKeyframe(),
-                          isEditable: isEditable)
+                          hasKeyframeAtPlayhead: false,
+                          isEditable: isEditable,
+                          showsKeyframeButton: false)
         { newValue in
             setFontSize(value: max(1, newValue))
-        } onToggleKeyframe: { _ in
-            toggleFontSizeKeyframe()
-        }
+        } onToggleKeyframe: { _ in }
 
         NumberPropertyRow(label: "Width",
                           value: Float(size.dx),
-                          hasKeyframeAtPlayhead: hasSizeKeyframe(),
-                          isEditable: isEditable)
+                          hasKeyframeAtPlayhead: false,
+                          isEditable: isEditable && boxTextMode,
+                          showsKeyframeButton: false)
         { newValue in
             setSize(value: CGVector(dx: CGFloat(max(1, newValue)), dy: size.dy))
-        } onToggleKeyframe: { _ in
-            toggleSizeKeyframe()
-        }
+        } onToggleKeyframe: { _ in }
 
         NumberPropertyRow(label: "Height",
                           value: Float(size.dy),
-                          hasKeyframeAtPlayhead: hasSizeKeyframe(),
-                          isEditable: isEditable)
+                          hasKeyframeAtPlayhead: false,
+                          isEditable: isEditable && boxTextMode,
+                          showsKeyframeButton: false)
         { newValue in
             setSize(value: CGVector(dx: size.dx, dy: CGFloat(max(1, newValue))))
-        } onToggleKeyframe: { _ in
-            toggleSizeKeyframe()
-        }
+        } onToggleKeyframe: { _ in }
 
         Toggle("框文本模式", isOn: Binding(
             get: { boxTextMode },
@@ -246,81 +241,17 @@ struct TextLayerInspector: View {
         }
     }
 
-    private func hasSizeKeyframe() -> Bool {
-        core.keyframes(entityID: layerID, path: textSizePath).contains { $0.frame == playheadFrame }
-    }
-
-    private func hasFontSizeKeyframe() -> Bool {
-        core.keyframes(entityID: layerID, path: textFontSizePath).contains { $0.frame == playheadFrame }
-    }
-
     private func setSize(value: CGVector) {
-        guard isEditable else { return }
+        guard isEditable, core.textBoxTextMode(layerID: layerID) else { return }
         perform("Set Text Size") {
-            if hasSizeKeyframe() {
-                let oldSize = core.evaluateVec2(entityID: layerID, path: textSizePath, frame: playheadFrame)
-                let oldAnchor = core.evaluateVec2(entityID: layerID,
-                                                  path: TransformProperty.anchorPoint.path,
-                                                  frame: playheadFrame)
-                let ratioX = oldSize.dx > 1e-6 ? value.dx / oldSize.dx : 1
-                let ratioY = oldSize.dy > 1e-6 ? value.dy / oldSize.dy : 1
-                let newAnchor = CGVector(dx: oldAnchor.dx * ratioX, dy: oldAnchor.dy * ratioY)
-                core.beginDrag()
-                core.addKeyframeVec2(entityID: layerID, path: textSizePath,
-                                     frame: playheadFrame, value: value)
-                if core.isAnimated(entityID: layerID, path: TransformProperty.anchorPoint.path) {
-                    core.addKeyframeVec2(entityID: layerID, path: TransformProperty.anchorPoint.path,
-                                         frame: playheadFrame, value: newAnchor)
-                } else {
-                    core.setStaticVec2(entityID: layerID, path: TransformProperty.anchorPoint.path,
-                                       value: newAnchor)
-                }
-                core.endDrag()
-            } else {
-                core.setTextBoxSize(layerID: layerID, size: value, frame: playheadFrame)
-            }
+            core.setTextBoxSize(layerID: layerID, size: value, frame: playheadFrame)
         }
     }
 
     private func setFontSize(value: Float) {
         guard isEditable else { return }
         perform("Set Font Size") {
-            if hasFontSizeKeyframe() {
-                core.addKeyframeFloat(entityID: layerID, path: textFontSizePath,
-                                      frame: playheadFrame, value: value)
-            } else {
-                core.setStaticFloat(entityID: layerID, path: textFontSizePath, value: value)
-            }
-        }
-    }
-
-    private func toggleSizeKeyframe() {
-        guard isEditable else { return }
-        if hasSizeKeyframe() {
-            perform("Delete Keyframe") {
-                core.removeKeyframe(entityID: layerID, path: textSizePath, frame: playheadFrame)
-            }
-        } else {
-            let value = core.evaluateVec2(entityID: layerID, path: textSizePath, frame: playheadFrame)
-            perform("Add Keyframe") {
-                core.addKeyframeVec2(entityID: layerID, path: textSizePath,
-                                     frame: playheadFrame, value: value)
-            }
-        }
-    }
-
-    private func toggleFontSizeKeyframe() {
-        guard isEditable else { return }
-        if hasFontSizeKeyframe() {
-            perform("Delete Keyframe") {
-                core.removeKeyframe(entityID: layerID, path: textFontSizePath, frame: playheadFrame)
-            }
-        } else {
-            let value = core.evaluateFloat(entityID: layerID, path: textFontSizePath, frame: playheadFrame)
-            perform("Add Keyframe") {
-                core.addKeyframeFloat(entityID: layerID, path: textFontSizePath,
-                                      frame: playheadFrame, value: value)
-            }
+            core.setTextFontSize(layerID: layerID, fontSize: value)
         }
     }
 }

@@ -159,6 +159,13 @@ void ms_canvas_set_selection_show_anchor(MSCanvas *canvas, bool showAnchor) {
     canvas->showSelectionAnchor = showAnchor;
 }
 
+void ms_canvas_set_selection_show_scale_handles(MSCanvas *canvas, bool showScaleHandles) {
+    if (canvas == nullptr) {
+        return;
+    }
+    canvas->showSelectionScaleHandles = showScaleHandles;
+}
+
 void ms_canvas_set_path_edit_target(MSCanvas *canvas, MS_PATH_EDIT kind, uint64_t layerId, int maskIndex, int selectedVertex) {
     if (canvas == nullptr) {
         return;
@@ -405,9 +412,9 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
             if (!canvas->hasPathEditTarget) {
                 const motion::EntityId primaryLayerId = canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
-                selectionCommands = motion::BuildSelectionOutlineCommands(state, canvas->selectedLayerIds,
-                                                                          primaryLayerId, outlineWidth, handleSize,
-                                                                          canvas->showSelectionAnchor);
+                selectionCommands = motion::BuildSelectionOutlineCommands(
+                    state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
+                    canvas->showSelectionAnchor, canvas->showSelectionScaleHandles);
             }
         }
         const auto buildEnd = ProfileClock::now();

@@ -761,13 +761,13 @@ final class MotionDocumentCore {
 
     /// Updates text box size and scales the anchor proportionally; position stays fixed.
     func setTextBoxSize(layerID: UInt64, size: CGVector, frame: Int64) {
-        let oldSize = evaluateVec2(entityID: layerID, path: TextProperty.size.path, frame: frame)
+        let oldSize = textSize(layerID: layerID)
         let oldAnchor = evaluateVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame)
         let ratioX = oldSize.dx > 1e-6 ? size.dx / oldSize.dx : 1
         let ratioY = oldSize.dy > 1e-6 ? size.dy / oldSize.dy : 1
         let newAnchor = CGVector(dx: oldAnchor.dx * ratioX, dy: oldAnchor.dy * ratioY)
         beginDrag()
-        writeVec2(entityID: layerID, path: TextProperty.size.path, frame: frame, value: size)
+        setTextSize(layerID: layerID, size: size)
         writeVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame, value: newAnchor)
         endDrag()
     }

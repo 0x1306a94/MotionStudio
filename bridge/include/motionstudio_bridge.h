@@ -661,6 +661,7 @@ void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, s
 // When showAnchor is false, subsequent draws omit the selection anchor crosshair
 // (used for image container-resize mode). Default is true. Ignored when canvas is null.
 void ms_canvas_set_selection_show_anchor(MSCanvas *canvas, bool showAnchor);
+void ms_canvas_set_selection_show_scale_handles(MSCanvas *canvas, bool showScaleHandles);
 
 // Sets the user view transform applied on top of the fit-to-drawable
 // transform, effective for every subsequent draw call.

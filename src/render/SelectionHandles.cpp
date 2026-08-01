@@ -258,7 +258,8 @@ SelectionHandleKind HitTestSelectionHandle(const SelectionHandles &handles,
 DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
                                              float strokeWidth,
                                              float handleSize,
-                                             bool showAnchor) {
+                                             bool showAnchor,
+                                             bool showScaleHandles) {
     DrawCommandList commands;
     if (!handles.valid) {
         return commands;
@@ -267,11 +268,13 @@ DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
     const float safeHandle = std::max(handleSize, safeStroke);
     AppendStroke(commands, ClosedPolyline(handles.corners, 4), safeStroke);
 
-    for (int index = 0; index < 4; ++index) {
-        AppendFill(commands, AxisAlignedSquare(handles.corners[index], safeHandle), kHandleFillColor);
-        AppendStroke(commands, AxisAlignedSquare(handles.corners[index], safeHandle), safeStroke);
-        AppendFill(commands, AxisAlignedSquare(handles.edgeMids[index], safeHandle), kHandleFillColor);
-        AppendStroke(commands, AxisAlignedSquare(handles.edgeMids[index], safeHandle), safeStroke);
+    if (showScaleHandles) {
+        for (int index = 0; index < 4; ++index) {
+            AppendFill(commands, AxisAlignedSquare(handles.corners[index], safeHandle), kHandleFillColor);
+            AppendStroke(commands, AxisAlignedSquare(handles.corners[index], safeHandle), safeStroke);
+            AppendFill(commands, AxisAlignedSquare(handles.edgeMids[index], safeHandle), kHandleFillColor);
+            AppendStroke(commands, AxisAlignedSquare(handles.edgeMids[index], safeHandle), safeStroke);
+        }
     }
 
     if (!showAnchor) {

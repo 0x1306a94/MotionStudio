@@ -103,7 +103,7 @@ struct FreeTransformDrag {
         layerIDs.map { layerID in
             let contentSizePath: String? = if core.hasProperty(entityID: layerID, path: ImageProperty.size.path) {
                 ImageProperty.size.path
-            } else if core.hasProperty(entityID: layerID, path: TextProperty.size.path) {
+            } else if core.layerType(layerID) == .TEXT, core.textBoxTextMode(layerID: layerID) {
                 TextProperty.size.path
             } else {
                 nil
@@ -146,9 +146,15 @@ struct FreeTransformDrag {
                 scale: core.evaluateVec2(entityID: layerID, path: TransformProperty.scale.path, frame: frame),
                 rotation: core.evaluateFloat(entityID: layerID, path: TransformProperty.rotation.path, frame: frame),
                 anchor: core.evaluateVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame),
-                contentSize: contentSizePath.map {
-                    core.evaluateVec2(entityID: layerID, path: $0, frame: frame)
-                } ?? .zero,
+                contentSize: {
+                    if contentSizePath == TextProperty.size.path {
+                        return core.textSize(layerID: layerID)
+                    }
+                    if let contentSizePath {
+                        return core.evaluateVec2(entityID: layerID, path: contentSizePath, frame: frame)
+                    }
+                    return .zero
+                }(),
                 contentSizePath: contentSizePath,
                 shapePath: shapePath,
                 shapePosition: shapePosition,
@@ -158,9 +164,12 @@ struct FreeTransformDrag {
                 scaleAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.scale.path),
                 rotationAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.rotation.path),
                 anchorAnimated: core.isAnimated(entityID: layerID, path: TransformProperty.anchorPoint.path),
-                contentSizeAnimated: contentSizePath.map {
-                    core.isAnimated(entityID: layerID, path: $0)
-                } ?? false,
+                contentSizeAnimated: {
+                    guard let contentSizePath, contentSizePath != TextProperty.size.path else {
+                        return false
+                    }
+                    return core.isAnimated(entityID: layerID, path: contentSizePath)
+                }(),
                 shapePathAnimated: shapePathAnimated,
                 shapePositionAnimated: shapePositionAnimated,
                 shapeSizeAnimated: shapeSizeAnimated,
@@ -631,6 +640,10 @@ struct FreeTransformDrag {
                            value: CGVector,
                            animated: Bool)
     {
+        if path == TextProperty.size.path {
+            core.setTextSize(layerID: layerID, size: value)
+            return
+        }
         if animated {
             core.addKeyframeVec2(entityID: layerID, path: path, frame: frame, value: value)
         } else {
