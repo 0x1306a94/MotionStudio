@@ -352,6 +352,8 @@ git commit -m "Add AnchorPreset math for nine-point anchor shortcuts."
 
 ### Task 3: `AnchorPresetFrame` 示意线框 UI
 
+**Status:** ⏳ Implemented — awaiting manual UI verification before commit
+
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPresetFrame.swift`
 
@@ -359,7 +361,7 @@ git commit -m "Add AnchorPreset math for nine-point anchor shortcuts."
 - Consumes: `AnchorPresetCorner`
 - Produces: `struct AnchorPresetFrame: View` — `selected: AnchorPresetCorner?`、`isEnabled: Bool`、`onSelect: (AnchorPresetCorner) -> Void`
 
-- [ ] **Step 1: Implement wireframe control**
+- [x] **Step 1: Implement wireframe control**
 
 固定约 44×44（或 48×48）示意矩形；九个点按相对位置布局；点可视半径 ~3pt，按钮命中 ~22×22；选中用 `Color.accentColor` 实心，未选中描边空心；`disabled(!isEnabled)`。
 
@@ -429,7 +431,7 @@ extension AnchorPresetCorner: Hashable {}
 
 若 `CaseIterable` 已满足 `ForEach` 的 `Identifiable` 需求，可用 `id: \.self`（需 `Hashable`）。按项目现有 SwiftUI 风格微调间距/颜色，勿引入新设计系统。
 
-- [ ] **Step 2: Build app target to verify compile**
+- [x] **Step 2: Build app target to verify compile**
 
 优先 Xcode MCP `BuildProject`；回退：
 
@@ -442,7 +444,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp \
 
 Expected: BUILD SUCCEEDED。
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit**（等手动验证通过后再提交）
 
 ```bash
 git add apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPresetFrame.swift
@@ -452,6 +454,8 @@ git commit -m "Add wireframe nine-point anchor preset control."
 ---
 
 ### Task 4: Wire Inspector + `layerLocalBounds`
+
+**Status:** ⏳ Implemented — awaiting manual UI verification before commit
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`（`layerBounds` 附近）
@@ -463,7 +467,7 @@ git commit -m "Add wireframe nine-point anchor preset control."
 - Consumes: `ms_layer_local_bounds`、`AnchorPreset`、`AnchorPresetFrame`
 - Produces: `MotionDocumentCore.layerLocalBounds(compositionID:layerID:frameTime:) -> CGRect?`；`TransformInspector(compositionID:)`
 
-- [ ] **Step 1: Add Core wrapper**
+- [x] **Step 1: Add Core wrapper**
 
 在 `MotionDocumentCore` 的 `layerBounds` 旁：
 
@@ -487,7 +491,7 @@ func layerLocalBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double)
 
 先 `apps/gen_mac`（或等价）确保 bridging header / 静态库含新符号，再编 App。
 
-- [ ] **Step 2: Update `InspectorView` → pass `compositionID`**
+- [x] **Step 2: Update `InspectorView` → pass `compositionID`**
 
 ```swift
 TransformInspector(core: core,
@@ -499,7 +503,7 @@ TransformInspector(core: core,
 
 （与 `FollowPathInspector` 一致。）
 
-- [ ] **Step 3: Wire `TransformInspector`**
+- [x] **Step 3: Wire `TransformInspector`**
 
 在 `TransformInspector` 增加 `compositionID: UInt64`。在 Anchor X/Y **之前**：
 
@@ -556,9 +560,9 @@ private func applyAnchorPreset(_ corner: AnchorPresetCorner, localBounds: CGRect
 
 注意：现有 `setVec2Property` 会再包一层 `perform(...)`，会导致两个 undo 单元。实现时抽出私有 `writeVec2`（复制 `setVec2Property` 的 keyframe/static 分支、**不含** `perform`），在一个 `perform("Set Anchor")` 里连续调用；或 `beginDrag`/`endDrag` 合并——优先**单次 `perform` + 无嵌套 perform 的 write**，与「一个 undo 单元」一致。
 
-`frameTime` 必须与画布 selection handles 使用同一时间基。查看 `CanvasViewController.evaluationFrame` / `PlayheadClock`：若 canvas 传 `Double(frame)` 给 bridge，Inspector 同样用 `Double(playheadFrame)`；若用秒，两边对齐。
+`frameTime` 使用 `Double(playheadFrame)`（与 canvas `evaluationTime` 同为帧号 Double）。
 
-- [ ] **Step 4: Build + smoke**
+- [x] **Step 4: Build + smoke**
 
 ```bash
 # 重建 bridge/core 产物后编 App
@@ -566,9 +570,13 @@ apps/gen_mac   # 若符号未进 Products
 # 然后 Xcode MCP BuildProject 或 xcodebuild（同 Task 3）
 ```
 
-手动：单选矩形 → 点四角/中心，画面不跳、Anchor/Position 数值变化、对应点高亮；点文本高亮基于测量框；锁定图层控件禁用。
+手动验证清单（请用户执行）：
+1. 单选矩形 → 点四角/中心，画面不跳、Anchor/Position 变化、对应点高亮
+2. 点文本 → 九点相对字形测量框
+3. 锁定图层 → 控件禁用
+4. Undo 一次回退 anchor+position
 
-- [ ] **Step 5: Update spec status + commit**
+- [ ] **Step 5: Update spec status + commit**（等手动验证通过后再提交）
 
 Spec 状态改为：`已确认；实现计划见 docs/superpowers/plans/2026-08-01-anchor-preset-grid.md`
 
