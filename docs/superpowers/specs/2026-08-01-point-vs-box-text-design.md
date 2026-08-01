@@ -1,7 +1,8 @@
 # 点文本 / PAG 框文本 — 设计说明
 
 日期：2026-08-01  
-状态：待审阅  
+状态：已确认  
+
 相关：取代 `2026-07-30-figma-style-resize-box-text-design.md` 中文本语义（`boxTextMode` = clip/shrink）；PAG 导出见 `2026-07-31-pag-export-design.md`（实现时同步修订）
 
 ## 目标
