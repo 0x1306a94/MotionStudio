@@ -61,7 +61,7 @@ struct EvaluatedTextItem {
     std::string text;
     float fontSize;
     Vec2 containerSize;
-    bool boxTextMode;  // true：换行 + 缩字号；false：换行 + clip
+    bool boxTextMode;  // true：框文本（换行 + 缩字号）；false：点文本（仅 \\n，无 clip）
     TextAlign align;
     std::string fontFamily;
     std::string fontStyle;
@@ -157,7 +157,7 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 ### 3.3 已实现后端：tgfx（Metal）
 
-`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。文本绘制走 `TgfxGlyphMetrics` + `adapter/textlayout`（固定框换行；`boxTextMode` 开则缩字号，关则仅 clip），再按行 `TextBlob` 依 `styles` 顺序填充与描边（各 style 自带 blend）；始终 clip 到容器。字体解析：`Typeface::MakeFromName(fontFamily, fontStyle)` → PingFang SC → Helvetica。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
+`adapter/tgfx/TgfxRenderAdapter`（`motionstudio_tgfx_adapter` 静态库，仅 Apple 平台）基于 tgfx 2D 渲染引擎的 Metal 后端实现该接口：渲染到离屏纹理，`ReadPixels` 回读 RGBA8 像素，用于快照测试与序列帧导出。文本绘制走 `TgfxGlyphMetrics` + `adapter/textlayout`：`boxTextMode` 开则按框换行并缩字号，关则点文本（仅 `\n`、不 soft wrap）；两端均不做 canvas `clipRect`。再按行 `TextBlob` 依 `styles` 顺序填充与描边（各 style 自带 blend）。字体解析：`Typeface::MakeFromName(fontFamily, fontStyle)` → PingFang SC → Helvetica。Core 层不依赖 tgfx，后续增加其他后端（CoreGraphics/OpenGL）不影响现有代码。
 
 ## 4. 上屏适配器（应用层预览）
 

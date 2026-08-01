@@ -466,7 +466,10 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
                                  const std::string &fontStyle,
                                  const std::vector<TextDrawStyle> &styles) {
     tgfx::Canvas *canvas = drawingCanvas();
-    if (canvas == nullptr || containerSize.x <= 0.0f || containerSize.y <= 0.0f || styles.empty()) {
+    if (canvas == nullptr || styles.empty()) {
+        return;
+    }
+    if (boxTextMode && (containerSize.x <= 0.0f || containerSize.y <= 0.0f)) {
         return;
     }
     std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontFamily, fontStyle);
@@ -477,9 +480,16 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
     TgfxGlyphMetrics glyphMetrics(typeface);
     textlayout::TextLayoutInput input;
     input.text = text;
-    input.boxWidth = containerSize.x;
-    input.boxHeight = containerSize.y;
+    input.softWrap = boxTextMode;
     input.shrinkToFit = boxTextMode;
+    if (boxTextMode) {
+        input.boxWidth = containerSize.x;
+        input.boxHeight = containerSize.y;
+    } else {
+        // Unused when softWrap is false; keep positive for layout guards.
+        input.boxWidth = 1.0f;
+        input.boxHeight = 1.0f;
+    }
     input.fontSize = fontSize > 0.0f ? fontSize : 1.0f;
     switch (align) {
         case TextAlign::Left: {
@@ -497,9 +507,6 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
     }
     input.metrics = &glyphMetrics;
     const textlayout::TextLayoutResult layout = textlayout::LayoutText(input);
-
-    tgfx::AutoCanvasRestore restore(canvas);
-    canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
 
     const tgfx::Font font(typeface, layout.appliedFontSize);
     for (const TextDrawStyle &style : styles) {

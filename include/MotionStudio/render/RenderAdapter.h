@@ -96,12 +96,12 @@ class RenderAdapter {
     virtual void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
                            ImageScaleMode mode) = 0;
 
-    // Draws boxed text in the layer-local container [0,0]–containerSize.
+    // Draws text in layer-local space (origin top-left of content bounds / box).
     // text: UTF-8 string (may be empty).
     // fontSize: model size cap (shrink applies when boxTextMode is true).
-    // containerSize: fixed text box size.
-    // boxTextMode: true = wrap + shrink to fit; false = wrap + clip overflow.
-    // align: horizontal alignment within the box.
+    // containerSize: box size when boxTextMode; ignored for point-text layout.
+    // boxTextMode: true = wrap + shrink to fit box; false = point text (\\n only, no clip).
+    // align: horizontal alignment.
     // fontFamily: system font family name.
     // fontStyle: system style name within the family; empty = default/Regular.
     // styles: fill/stroke passes in order; empty draws a black fill.

@@ -368,6 +368,8 @@ EOF
 
 ### Task 6: tgfx `drawText` — 去 clip + 点/框布局
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxCanvasAdapter.cpp`
 - Modify: `include/MotionStudio/render/RenderAdapter.h`（注释）
@@ -393,14 +395,14 @@ if (!boxTextMode) {
 if (boxTextMode && (containerSize.x <= 0.0f || containerSize.y <= 0.0f)) return;
 ```
 
-- [ ] **Step 1: 改实现 + 注释**
-- [ ] **Step 2: 跑**
+- [x] **Step 1: 改实现 + 注释**
+- [x] **Step 2: 跑**
 
 ```bash
 ctest --test-dir build -R 'TgfxRenderAdapterTest|TextLayoutTest' --output-on-failure
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add adapter/tgfx/ include/MotionStudio/render/RenderAdapter.h docs/rendering.md
