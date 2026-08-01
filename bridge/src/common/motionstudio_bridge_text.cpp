@@ -21,10 +21,7 @@
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
 #include "MSDocument.h"
-
-#if defined(__APPLE__)
 #include "MeasurePointTextSize.h"
-#endif
 
 using namespace bridge;
 
@@ -62,7 +59,12 @@ uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId)
     layer->name = "Text " + std::to_string(composition->layers.size() + 1);
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
-    layer->transform.anchorPoint.setStaticValue(Vec2{200.0f, 60.0f});
+    // Point text default: anchor at center of measured glyph bounds (not the placeholder size).
+    const TextContent *defaults = static_cast<const TextContent *>(layer->content.get());
+    const Vec2 measured =
+        MeasurePointTextSize(defaults->text.staticValue(), defaults->fontSize, defaults->align,
+                             defaults->fontFamily, defaults->fontStyle);
+    layer->transform.anchorPoint.setStaticValue(Vec2{measured.x * 0.5f, measured.y * 0.5f});
     layer->transform.position.setStaticValue(
         Vec2{composition->width * 0.5f, composition->height * 0.5f});
     auto fill = std::make_unique<FillStyle>();
@@ -99,14 +101,9 @@ bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, b
 
     std::optional<Vec2> sizeWhenEnabling;
     if (boxTextMode && !content->boxTextMode) {
-#if defined(__APPLE__)
         const std::string text = content->text.evaluate(frame);
         sizeWhenEnabling = MeasurePointTextSize(text, content->fontSize, content->align,
                                                 content->fontFamily, content->fontStyle);
-#else
-        (void)frame;
-        sizeWhenEnabling = content->size;
-#endif
     }
 
     Execute(document, std::make_unique<motion::SetTextBoxTextModeCommand>(EntityId{layerId}, boxTextMode, sizeWhenEnabling));

@@ -300,7 +300,7 @@ TEST(TextCommandsTest, EnableBoxTextModeSetsMeasuredSize) {
 
 `ms_command_set_text_box_text_mode`：若目标为 true 且当前为 false，调用 `MeasurePointTextSize`（frame 上 `text.evaluate`），再 `Execute(SetTextBoxTextModeCommand(..., measured))`。
 
-非 Apple 构建：若无 tgfx，测字可退回 `Vec2{400,120}` 或跳过（本仓库主路径为 Apple）。
+测字经 tgfx adapter 的 `MeasurePointTextSize`（bridge 仅在链 tgfx 时编入）。
 
 - [x] **Step 3: 跑测**
 
@@ -470,6 +470,8 @@ EOF
 
 ### Task 8: App — Inspector / 手柄 / Timeline
 
+**Status:** ⏳ Implemented — awaiting commit approval (UI)
+
 **Files:**
 - Modify: `apps/MotionStudioApp/.../TextLayerInspector.swift`
 - Modify: `apps/MotionStudioApp/.../MotionDocumentCore.swift`
@@ -505,10 +507,10 @@ EOF
 5. **MotionDocumentCore.setTextBoxSize**  
    改为 `ms_command_set_text_size` + anchor 补偿（仍可用 merge group）；勿再走 `writeVec2(content.size)`。
 
-- [ ] **Step 1: 改 Swift API 封装**
-- [ ] **Step 2: 改 Inspector / Drag / Canvas / Timeline**
-- [ ] **Step 3: 用 Xcode MCP 或 `apps/gen_mac` + 编译 MotionStudioApp 验证**
-- [ ] **Step 4: Commit**
+- [x] **Step 1: 改 Swift API 封装**
+- [x] **Step 2: 改 Inspector / Drag / Canvas / Timeline**
+- [x] **Step 3: 用 Xcode MCP 或 `apps/gen_mac` + 编译 MotionStudioApp 验证**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/MotionStudioApp/

@@ -4,9 +4,7 @@
 #include <string>
 #include <vector>
 
-#if defined(__APPLE__)
 #include "MeasurePointTextSize.h"
-#endif
 
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -287,7 +285,6 @@ uint64_t AddPathLayer(MSDocument *handle, uint64_t compositionId) {
 }
 
 void ResolvePointTextContainerSizes(motion::SceneState &state) {
-#if defined(__APPLE__)
     for (motion::EvaluatedLayer &layer : state.layers) {
         if (!layer.textItem.has_value() || layer.textItem->boxTextMode) {
             continue;
@@ -296,9 +293,6 @@ void ResolvePointTextContainerSizes(motion::SceneState &state) {
         item.containerSize = MeasurePointTextSize(item.text, item.fontSize, item.align, item.fontFamily,
                                                   item.fontStyle);
     }
-#else
-    (void)state;
-#endif
 }
 
 }  // namespace bridge

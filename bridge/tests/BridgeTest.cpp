@@ -946,8 +946,11 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     float anchorX = 0.0f;
     float anchorY = 0.0f;
     ms_property_static_vec2(document, layerId, "transform.anchorPoint", &anchorX, &anchorY);
-    EXPECT_FLOAT_EQ(anchorX, 200.0f);
-    EXPECT_FLOAT_EQ(anchorY, 60.0f);
+    // Point text: anchor is half of measured glyph bounds (not placeholder 400×120 center).
+    EXPECT_GT(anchorX, 0.0f);
+    EXPECT_GT(anchorY, 0.0f);
+    EXPECT_LT(anchorX, 200.0f);
+    EXPECT_LT(anchorY, 60.0f);
 
     ms_command_set_static_string(document, layerId, "content.text", "Hello\nWorld");
     {
