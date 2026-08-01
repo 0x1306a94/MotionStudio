@@ -352,7 +352,7 @@ git commit -m "Add AnchorPreset math for nine-point anchor shortcuts."
 
 ### Task 3: `AnchorPresetFrame` 示意线框 UI
 
-**Status:** ⏳ Implemented — awaiting manual UI verification before commit
+**Status:** ✅ Done
 
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPresetFrame.swift`
@@ -444,18 +444,13 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp \
 
 Expected: BUILD SUCCEEDED。
 
-- [ ] **Step 3: Commit**（等手动验证通过后再提交）
-
-```bash
-git add apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPresetFrame.swift
-git commit -m "Add wireframe nine-point anchor preset control."
-```
+- [x] **Step 3: Commit**（与 Task 4 一并提交）
 
 ---
 
 ### Task 4: Wire Inspector + `layerLocalBounds`
 
-**Status:** ⏳ Implemented — awaiting manual UI verification before commit
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`（`layerBounds` 附近）
@@ -558,7 +553,7 @@ private func applyAnchorPreset(_ corner: AnchorPresetCorner, localBounds: CGRect
 }
 ```
 
-注意：现有 `setVec2Property` 会再包一层 `perform(...)`，会导致两个 undo 单元。实现时抽出私有 `writeVec2`（复制 `setVec2Property` 的 keyframe/static 分支、**不含** `perform`），在一个 `perform("Set Anchor")` 里连续调用；或 `beginDrag`/`endDrag` 合并——优先**单次 `perform` + 无嵌套 perform 的 write**，与「一个 undo 单元」一致。
+注意：现有 `setVec2Property` 会再包一层 `perform(...)`，会导致两个 undo 单元。实现时抽出私有 `writeVec2`（复制 `setVec2Property` 的 keyframe/static 分支、**不含** `perform`），在一个 `perform("Set Anchor")` 里用 `beginMergeGroup`/`endMergeGroup` 包住两次 write。
 
 `frameTime` 使用 `Double(playheadFrame)`（与 canvas `evaluationTime` 同为帧号 Double）。
 
@@ -574,17 +569,16 @@ apps/gen_mac   # 若符号未进 Products
 1. 单选矩形 → 点四角/中心，画面不跳、Anchor/Position 变化、对应点高亮
 2. 点文本 → 九点相对字形测量框
 3. 锁定图层 → 控件禁用
-4. Undo 一次回退 anchor+position
+4. Undo 一次回退 anchor+position（`beginMergeGroup`/`endMergeGroup` 合并两条 Core 命令）
 
-- [ ] **Step 5: Update spec status + commit**（等手动验证通过后再提交）
-
-Spec 状态改为：`已确认；实现计划见 docs/superpowers/plans/2026-08-01-anchor-preset-grid.md`
+- [x] **Step 5: Commit**（含 rename `beginDrag`→`beginMergeGroup`）
 
 ```bash
-git add apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift \
+git add apps/MotionStudioApp/MotionStudioApp/Inspector/AnchorPresetFrame.swift \
   apps/MotionStudioApp/MotionStudioApp/Inspector/TransformInspector.swift \
   apps/MotionStudioApp/MotionStudioApp/Inspector/InspectorView.swift \
-  docs/superpowers/specs/2026-08-01-anchor-preset-grid-design.md
+  apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift \
+  # + all beginMergeGroup call-site renames
 git commit -m "Wire nine-point anchor presets into the transform inspector."
 ```
 

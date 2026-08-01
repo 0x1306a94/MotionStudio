@@ -118,7 +118,7 @@ struct MasksInspector: View {
             guard isEditable else { return }
             perform("Set Mask \(label)") {
                 writeFloat(path: path, value: newValue)
-                core.endDrag()
+                core.endMergeGroup()
             }
         } onToggleKeyframe: { value in
             guard isEditable else { return }

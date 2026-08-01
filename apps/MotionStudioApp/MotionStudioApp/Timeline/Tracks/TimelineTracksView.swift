@@ -563,9 +563,9 @@ private final class TimelineTrackRowView: UIView {
                         }
                     },
                     onCommit: { self.registerEdit("Set Easing") },
-                    onDragBegan: { self.document.core.beginDrag() },
+                    onDragBegan: { self.document.core.beginMergeGroup() },
                     onDragEnded: {
-                        self.document.core.endDrag()
+                        self.document.core.endMergeGroup()
                         self.registerEdit("Set Easing")
                     },
                 ))
@@ -762,7 +762,7 @@ private final class TimelineTrackRowView: UIView {
         dragCurrentFrames = [dragKey(path: path, origin: frame): frame]
         didDrag = false
         dragEditName = "Move Keyframe"
-        document.core.beginDrag()
+        document.core.beginMergeGroup()
     }
 
     private func updateKeyframeDrag(path _: String, originFrame _: Int64, pointerFrame: Int64,
@@ -797,7 +797,7 @@ private final class TimelineTrackRowView: UIView {
         }
         didDrag = false
         dragEditName = editName
-        document.core.beginDrag()
+        document.core.beginMergeGroup()
     }
 
     private func applyMoves(_ moves: [KeyframeMove]) {
@@ -832,7 +832,7 @@ private final class TimelineTrackRowView: UIView {
         didDrag = false
         dragEditName = nil
         onTimeRangeDraggingChanged?(false)
-        document.core.endDrag()
+        document.core.endMergeGroup()
         if moved, let editName {
             registerEdit(editName)
         }
@@ -895,9 +895,9 @@ private final class TimelineTrackRowView: UIView {
             },
             onDelete: nil,
             onCommit: { self.registerEdit("Set Easing") },
-            onDragBegan: { self.document.core.beginDrag() },
+            onDragBegan: { self.document.core.beginMergeGroup() },
             onDragEnded: {
-                self.document.core.endDrag()
+                self.document.core.endMergeGroup()
                 self.registerEdit("Set Easing")
             },
         ))

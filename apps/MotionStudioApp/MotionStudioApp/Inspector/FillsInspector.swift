@@ -101,7 +101,7 @@ struct FillsInspector: View {
                 } else {
                     core.setStaticColor(entityID: layerID, path: path, value: value)
                 }
-                core.endDrag()
+                core.endMergeGroup()
             }
         }
     }

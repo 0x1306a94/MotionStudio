@@ -125,7 +125,7 @@ struct FollowPathInspector: View {
                 } else {
                     core.setStaticFloat(entityID: layerID, path: path, value: newValue)
                 }
-                core.endDrag()
+                core.endMergeGroup()
             }
         } onToggleKeyframe: { value in
             guard isEditable else { return }

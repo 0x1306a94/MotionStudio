@@ -63,7 +63,7 @@ struct MotionPathInspector: View {
                                      startSpatial: startSpatial, endSpatial: endSpatial)
                     },
                     onDragEnded: {
-                        endDragIfNeeded()
+                        endMergeGroupIfNeeded()
                     },
                 )
                 HStack {
@@ -124,7 +124,7 @@ struct MotionPathInspector: View {
     {
         guard isEditable else { return }
         if !isDragging {
-            core.beginDrag()
+            core.beginMergeGroup()
             isDragging = true
         }
         let outTangent = CGVector(dx: c1.x - p0.dx, dy: c1.y - p0.dy)
@@ -139,10 +139,10 @@ struct MotionPathInspector: View {
                                 hasOut: endSpatial.hasOut, outTangent: endSpatial.outTangent)
     }
 
-    private func endDragIfNeeded() {
+    private func endMergeGroupIfNeeded() {
         guard isDragging else { return }
         isDragging = false
-        core.endDrag()
+        core.endMergeGroup()
         perform("Set Spatial Tangents") {}
     }
 }

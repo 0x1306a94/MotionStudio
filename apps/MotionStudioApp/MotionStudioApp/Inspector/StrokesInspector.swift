@@ -127,7 +127,7 @@ struct StrokesInspector: View {
                 } else {
                     core.setStaticFloat(entityID: layerID, path: path, value: newValue)
                 }
-                core.endDrag()
+                core.endMergeGroup()
             }
         } onToggleKeyframe: { value in
             guard isEditable else { return }
@@ -157,7 +157,7 @@ struct StrokesInspector: View {
                 } else {
                     core.setStaticColor(entityID: layerID, path: path, value: value)
                 }
-                core.endDrag()
+                core.endMergeGroup()
             }
         }
     }

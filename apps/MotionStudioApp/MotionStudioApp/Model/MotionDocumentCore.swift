@@ -104,13 +104,13 @@ final class MotionDocumentCore {
         }
     }
 
-    /// Opens a drag transaction so mixed property edits become one undo unit.
-    func beginDrag() {
+    /// Opens a merge window so mixed property edits become one undo unit.
+    func beginMergeGroup() {
         ms_document_begin_merge_group(handle)
     }
 
-    /// Closes the core's merge window (call on drag end).
-    func endDrag() {
+    /// Closes the core's merge window.
+    func endMergeGroup() {
         ms_document_end_merge_group(handle)
     }
 
@@ -280,6 +280,22 @@ final class MotionDocumentCore {
         var maxY: Float = 0
         guard ms_composition_layer_bounds(handle, compositionID, layerID, frameTime,
                                           &minX, &minY, &maxX, &maxY)
+        else {
+            return nil
+        }
+        return CGRect(x: CGFloat(minX),
+                      y: CGFloat(minY),
+                      width: CGFloat(maxX - minX),
+                      height: CGFloat(maxY - minY))
+    }
+
+    func layerLocalBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double) -> CGRect? {
+        var minX: Float = 0
+        var minY: Float = 0
+        var maxX: Float = 0
+        var maxY: Float = 0
+        guard ms_layer_local_bounds(handle, compositionID, layerID, frameTime,
+                                    &minX, &minY, &maxX, &maxY)
         else {
             return nil
         }
@@ -655,7 +671,7 @@ final class MotionDocumentCore {
         let previousAssetID = imageAssetID(layerID: layerID)
         let firstBind = previousAssetID == 0 && assetID != 0
         if firstBind {
-            beginDrag()
+            beginMergeGroup()
         }
         let ok = ms_layer_set_image_asset(handle, layerID, assetID)
         if ok {
@@ -665,7 +681,7 @@ final class MotionDocumentCore {
             }
         }
         if firstBind {
-            endDrag()
+            endMergeGroup()
         }
         return ok
     }
@@ -766,10 +782,10 @@ final class MotionDocumentCore {
         let ratioX = oldSize.dx > 1e-6 ? size.dx / oldSize.dx : 1
         let ratioY = oldSize.dy > 1e-6 ? size.dy / oldSize.dy : 1
         let newAnchor = CGVector(dx: oldAnchor.dx * ratioX, dy: oldAnchor.dy * ratioY)
-        beginDrag()
+        beginMergeGroup()
         setTextSize(layerID: layerID, size: size)
         writeVec2(entityID: layerID, path: TransformProperty.anchorPoint.path, frame: frame, value: newAnchor)
-        endDrag()
+        endMergeGroup()
     }
 
     func layerBlendMode(layerID: UInt64) -> MS_BLEND {
@@ -785,9 +801,9 @@ final class MotionDocumentCore {
     /// anchor on the new size, and compensates `position` so the container center
     /// stays fixed in scene space.
     func resetImageSizeToIntrinsic(layerID: UInt64, frame: Int64) {
-        beginDrag()
+        beginMergeGroup()
         applyResetImageSizeToIntrinsic(layerID: layerID, frame: frame)
-        endDrag()
+        endMergeGroup()
     }
 
     /// Caller must own the merge group when combining with other edits.

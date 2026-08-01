@@ -7,6 +7,7 @@ import SwiftUI
 
 struct TransformInspector: View {
     let core: MotionDocumentCore
+    let compositionID: UInt64
     let layerID: UInt64
     @Environment(PlayheadClock.self) private var clock
     let isEditable: Bool
@@ -33,6 +34,17 @@ struct TransformInspector: View {
         let scale = core.evaluateVec2(entityID: layerID,
                                       path: TransformProperty.scale.path,
                                       frame: playheadFrame)
+
+        if let localBounds = core.layerLocalBounds(compositionID: compositionID,
+                                                   layerID: layerID,
+                                                   frameTime: Double(playheadFrame)),
+            localBounds.width > 0, localBounds.height > 0
+        {
+            let selectedCorner = AnchorPreset.matchingCorner(anchor: anchor, rect: localBounds)
+            AnchorPresetFrame(selected: selectedCorner, isEnabled: isEditable) { corner in
+                applyAnchorPreset(corner, localBounds: localBounds)
+            }
+        }
 
         NumberPropertyRow(label: TransformField.anchorX.label,
                           value: Float(anchor.dx),
@@ -123,6 +135,50 @@ struct TransformInspector: View {
         core.keyframes(entityID: layerID, path: property.path).contains { $0.frame == playheadFrame }
     }
 
+    private func applyAnchorPreset(_ corner: AnchorPresetCorner, localBounds: CGRect) {
+        guard isEditable else { return }
+        let oldAnchor = core.evaluateVec2(entityID: layerID,
+                                          path: TransformProperty.anchorPoint.path,
+                                          frame: playheadFrame)
+        if let match = AnchorPreset.matchingCorner(anchor: oldAnchor, rect: localBounds),
+           match == corner
+        {
+            return
+        }
+        let newAnchor = AnchorPreset.point(corner: corner, in: localBounds)
+        let oldPosition = core.evaluateVec2(entityID: layerID,
+                                            path: TransformProperty.position.path,
+                                            frame: playheadFrame)
+        let scale = core.evaluateVec2(entityID: layerID,
+                                      path: TransformProperty.scale.path,
+                                      frame: playheadFrame)
+        let rotation = core.evaluateFloat(entityID: layerID,
+                                          path: TransformProperty.rotation.path,
+                                          frame: playheadFrame)
+        let newPosition = AnchorPreset.compensatedPosition(oldAnchor: oldAnchor,
+                                                           newAnchor: newAnchor,
+                                                           position: oldPosition,
+                                                           scale: scale,
+                                                           rotationDegrees: rotation)
+        perform("Set Anchor") {
+            // Merge anchor + position into one core undo unit (perform registers a
+            // single UI inverse that calls performUndo once).
+            core.beginMergeGroup()
+            writeVec2(.anchorPoint, value: newAnchor)
+            writeVec2(.position, value: newPosition)
+            core.endMergeGroup()
+        }
+    }
+
+    private func writeVec2(_ property: TransformProperty, value: CGVector) {
+        if hasKeyframe(property) {
+            core.addKeyframeVec2(entityID: layerID, path: property.path,
+                                 frame: playheadFrame, value: value)
+        } else {
+            core.setStaticVec2(entityID: layerID, path: property.path, value: value)
+        }
+    }
+
     private func setFloatProperty(_ property: TransformProperty, value: Float) {
         performSet(property) {
             if hasKeyframe(property) {
@@ -136,12 +192,7 @@ struct TransformInspector: View {
 
     private func setVec2Property(_ property: TransformProperty, value: CGVector) {
         performSet(property) {
-            if hasKeyframe(property) {
-                core.addKeyframeVec2(entityID: layerID, path: property.path,
-                                     frame: playheadFrame, value: value)
-            } else {
-                core.setStaticVec2(entityID: layerID, path: property.path, value: value)
-            }
+            writeVec2(property, value: value)
         }
     }
 

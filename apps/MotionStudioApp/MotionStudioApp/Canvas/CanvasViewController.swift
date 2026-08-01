@@ -724,7 +724,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return
         }
         let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
-        document.core.beginDrag()
+        document.core.beginMergeGroup()
         freeTransformDrag = FreeTransformDrag(kind: .move,
                                               layerStarts: starts,
                                               startScenePoint: scenePoint,
@@ -840,7 +840,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard motionPathDrag != nil else {
             return
         }
-        document.core.endDrag()
+        document.core.endMergeGroup()
         guard motionPathDragDidMove else {
             return
         }
@@ -889,7 +889,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let localRel = starts.first.flatMap {
             FreeTransformDrag.localPivotRelative(for: kind, handles: handles, start: $0, alternate: alternate)
         }
-        document.core.beginDrag()
+        document.core.beginMergeGroup()
         freeTransformDrag = FreeTransformDrag(kind: kind,
                                               layerStarts: starts,
                                               startScenePoint: scenePoint,
@@ -941,7 +941,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard let freeTransformDrag else {
             return
         }
-        document.core.endDrag()
+        document.core.endMergeGroup()
         guard freeTransformDidMove else {
             return
         }
@@ -1253,7 +1253,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return
         }
         if !penDragDidMove {
-            document.core.beginDrag()
+            document.core.beginMergeGroup()
         }
         let linked = !alternate
         switch penDrag.kind {
@@ -1283,7 +1283,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         defer {
             penDrag = nil
             penDragDidMove = false
-            document.core.endDrag()
+            document.core.endMergeGroup()
         }
         guard penDragDidMove else {
             return
@@ -1296,15 +1296,15 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         if editorState.pathEditTarget != nil {
             return false
         }
-        document.core.beginDrag()
+        document.core.beginMergeGroup()
         let layerID = document.core.addPathLayer(compositionID: compositionID)
         guard layerID != 0 else {
-            document.core.endDrag()
+            document.core.endMergeGroup()
             return false
         }
         document.core.pathEditAppendVertex(layerID: layerID, kind: .SHAPE, maskIndex: 0,
                                            frame: evaluationFrame, scenePoint: scenePoint)
-        document.core.endDrag()
+        document.core.endMergeGroup()
         editorState.selectedLayerID = layerID
         editorState.pathEditTarget = .shape(layerID: layerID, selectedVertex: 0)
         registerEdit("Add Path")

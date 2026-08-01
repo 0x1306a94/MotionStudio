@@ -65,6 +65,7 @@ struct InspectorView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         TransformInspector(core: core,
+                                           compositionID: core.firstCompositionID,
                                            layerID: layerID,
                                            isEditable: isEditable,
                                            perform: perform)

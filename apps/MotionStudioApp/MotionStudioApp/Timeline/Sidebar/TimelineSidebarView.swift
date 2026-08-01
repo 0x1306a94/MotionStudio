@@ -307,7 +307,7 @@ private extension TimelineSidebarView {
             return
         }
         if didBeginCoreLayerDrag {
-            document.core.endDrag()
+            document.core.endMergeGroup()
             didBeginCoreLayerDrag = false
         }
         if context.lastDesired != context.startOrder {
@@ -358,7 +358,7 @@ extension TimelineSidebarView: UITableViewDragDelegate, UITableViewDropDelegate 
 
     func tableView(_: UITableView, dragSessionWillBegin session: UIDragSession) {
         layerDragContext = session.localContext as? LayerDragSessionContext
-        document.core.beginDrag()
+        document.core.beginMergeGroup()
         didBeginCoreLayerDrag = true
     }
 

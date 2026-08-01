@@ -77,7 +77,7 @@ struct CompositionInspector: View {
         perform("Set Background") {
             core.setCompositionBackgroundColor(compositionID: compositionID,
                                                value: color.clampedChannels())
-            core.endDrag()
+            core.endMergeGroup()
         }
     }
 

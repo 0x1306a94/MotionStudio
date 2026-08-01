@@ -65,10 +65,10 @@ struct TextLayerInspector: View {
                 }
                 .onChange(of: textFocused) { _, focused in
                     if focused {
-                        core.beginDrag()
+                        core.beginMergeGroup()
                     } else {
                         commitText()
-                        core.endDrag()
+                        core.endMergeGroup()
                     }
                 }
         }
