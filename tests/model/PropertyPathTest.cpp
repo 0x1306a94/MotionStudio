@@ -165,11 +165,8 @@ TEST(ResolveAnimatableTest, ResolvesTextContent) {
         document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
     auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
 
-    AnimatableBase *resolved =
-        ResolveAnimatable(document, {textLayer->id, "content.fontSize"});
-    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&textContent->fontSize));
-    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.size"}),
-              static_cast<AnimatableBase *>(&textContent->size));
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.fontSize"}), nullptr);
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.size"}), nullptr);
     EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.text"}),
               static_cast<AnimatableBase *>(&textContent->text));
 }

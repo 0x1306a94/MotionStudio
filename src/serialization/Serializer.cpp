@@ -476,6 +476,41 @@ json ValueToJson(const std::string &value) {
     return value;
 }
 
+json StaticFloatToJson(float value) {
+    return json{{"static", value}};
+}
+
+json StaticVec2ToJson(Vec2 value) {
+    return json{{"static", Vec2ToJson(value)}};
+}
+
+// Reads {"static": N}, bare number, or falls back when only legacy keyframes exist.
+Expected<float, std::string> StaticFloatFromJson(const json &node, float fallback) {
+    if (node.is_number()) {
+        return static_cast<float>(node.get<double>());
+    }
+    if (!node.is_object()) {
+        return Unexpected(std::string("Static float must be a number or object"));
+    }
+    if (const json *staticNode = FindChild(node, "static")) {
+        return AsFloat(*staticNode);
+    }
+    return fallback;
+}
+
+Expected<Vec2, std::string> StaticVec2FromJson(const json &node, Vec2 fallback) {
+    if (node.is_array()) {
+        return Vec2FromJson(node);
+    }
+    if (!node.is_object()) {
+        return Unexpected(std::string("Static Vec2 must be an array or object"));
+    }
+    if (const json *staticNode = FindChild(node, "static")) {
+        return Vec2FromJson(*staticNode);
+    }
+    return fallback;
+}
+
 template <typename T>
 json AnimatableToJson(const Animatable<T> &animatable) {
     if (!animatable.isAnimated()) {
@@ -990,8 +1025,8 @@ json ContentToJson(const LayerContent &content) {
             node["text"] = AnimatableToJson(text.text);
             node["fontFamily"] = text.fontFamily;
             node["fontStyle"] = text.fontStyle;
-            node["fontSize"] = AnimatableToJson(text.fontSize);
-            node["size"] = AnimatableToJson(text.size);
+            node["fontSize"] = StaticFloatToJson(text.fontSize);
+            node["size"] = StaticVec2ToJson(text.size);
             node["boxTextMode"] = text.boxTextMode;
             node["align"] = dto::ToString(text.align);
             break;
@@ -1094,15 +1129,18 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
             if (!fontSizeNode) {
                 return Unexpected(fontSizeNode.error());
             }
-            result = AnimatableFromJson(**fontSizeNode, content->fontSize);
-            if (!result) {
-                return Unexpected(result.error());
+            Expected<float, std::string> fontSize =
+                StaticFloatFromJson(**fontSizeNode, content->fontSize);
+            if (!fontSize) {
+                return Unexpected(fontSize.error());
             }
+            content->fontSize = *fontSize;
             if (const json *sizeNode = FindChild(node, "size")) {
-                result = AnimatableFromJson(*sizeNode, content->size);
-                if (!result) {
-                    return Unexpected(result.error());
+                Expected<Vec2, std::string> size = StaticVec2FromJson(*sizeNode, content->size);
+                if (!size) {
+                    return Unexpected(size.error());
                 }
+                content->size = *size;
             }
             if (const json *boxTextModeNode = FindChild(node, "boxTextMode")) {
                 Expected<bool, std::string> boxTextMode = AsBool(*boxTextModeNode);

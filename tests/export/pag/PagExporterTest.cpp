@@ -370,8 +370,8 @@ TEST(PagExporterTest, TextLayerExports) {
     auto *content = static_cast<TextContent *>(layer->content.get());
     content->text.setStaticValue("Hello PAG");
     content->fontFamily = "PingFang SC";
-    content->fontSize.setStaticValue(36.0f);
-    content->size.setStaticValue(Vec2{400.0f, 120.0f});
+    content->fontSize = 36.0f;
+    content->size = Vec2{400.0f, 120.0f};
     content->boxTextMode = false;
     auto fill = std::make_unique<FillStyle>();
     fill->color.setStaticValue(Color{0.0f, 210.0f / 255.0f, 186.0f / 255.0f, 1.0f});
@@ -473,7 +473,7 @@ TEST(PagExporterTest, ImageLayerExports) {
     layer->transform.scale.setStaticValue(Vec2{1, 1});
     auto *content = static_cast<ImageContent *>(layer->content.get());
     content->assetId = asset.id;
-    content->size.setStaticValue(Vec2{100, 100});
+    content->size = Vec2{100, 100};
     content->scaleMode = ImageScaleMode::LetterBox;
     document.addLayer(composition->id, std::move(layer));
 

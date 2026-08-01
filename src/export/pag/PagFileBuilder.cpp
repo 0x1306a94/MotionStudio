@@ -152,15 +152,8 @@ void Warn(std::vector<PagExportWarning> *warnings, EntityId entityId, const char
     warnings->push_back(std::move(warning));
 }
 
-void CollectKeyframeTimes(const Animatable<std::string> &text, const Animatable<float> &fontSize,
-                          const Animatable<Vec2> &size, std::set<FrameTime> *times) {
+void CollectTextKeyframeTimes(const Animatable<std::string> &text, std::set<FrameTime> *times) {
     for (const auto &keyframe : text.keyframes()) {
-        times->insert(keyframe.time);
-    }
-    for (const auto &keyframe : fontSize.keyframes()) {
-        times->insert(keyframe.time);
-    }
-    for (const auto &keyframe : size.keyframes()) {
         times->insert(keyframe.time);
     }
 }
@@ -787,7 +780,7 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
     document->text = content.text.evaluate(time);
     document->fontFamily = content.fontFamily;
     document->fontStyle = content.fontStyle;
-    const float fontSize = content.fontSize.evaluate(time);
+    const float fontSize = content.fontSize;
     document->fontSize = fontSize;
     document->justification = MapAlign(content.align);
 
@@ -796,7 +789,7 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
     // Without font metrics at export time, approximate first baseline as ~ascent from box top
     // so PAG does not treat firstBaseLine==0 as vertically-centered box text.
     constexpr float kAscentFactor = 0.8f;
-    const Vec2 box = content.size.evaluate(time);
+    const Vec2 box = content.size;
     if (box.x > 0.0f && box.y > 0.0f) {
         document->boxText = true;
         document->boxTextPos = pag::Point::Zero();
@@ -857,11 +850,11 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
 
 pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const Layer &layer,
                                                                         const TextContent &content) {
-    if (!content.text.isAnimated() && !content.fontSize.isAnimated() && !content.size.isAnimated()) {
+    if (!content.text.isAnimated()) {
         return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(layer, content, 0));
     }
     std::set<FrameTime> times;
-    CollectKeyframeTimes(content.text, content.fontSize, content.size, &times);
+    CollectTextKeyframeTimes(content.text, &times);
     if (times.size() < 2) {
         const FrameTime time = times.empty() ? 0 : *times.begin();
         return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(layer, content, time));

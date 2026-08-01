@@ -943,11 +943,6 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
         text.value = ms_property_static_string(document, layerId, "content.text");
         EXPECT_EQ(text.str(), "Text");
     }
-    float sizeX = 0.0f;
-    float sizeY = 0.0f;
-    ms_property_static_vec2(document, layerId, "content.size", &sizeX, &sizeY);
-    EXPECT_FLOAT_EQ(sizeX, 400.0f);
-    EXPECT_FLOAT_EQ(sizeY, 120.0f);
     float anchorX = 0.0f;
     float anchorY = 0.0f;
     ms_property_static_vec2(document, layerId, "transform.anchorPoint", &anchorX, &anchorY);
@@ -960,10 +955,6 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
         text.value = ms_property_static_string(document, layerId, "content.text");
         EXPECT_EQ(text.str(), "Hello\nWorld");
     }
-    ms_command_set_static_vec2(document, layerId, "content.size", 300.0f, 100.0f);
-    ms_property_static_vec2(document, layerId, "content.size", &sizeX, &sizeY);
-    EXPECT_FLOAT_EQ(sizeX, 300.0f);
-    EXPECT_FLOAT_EQ(sizeY, 100.0f);
 
     ASSERT_TRUE(ms_command_set_text_box_text_mode(document, layerId, true));
     EXPECT_TRUE(ms_layer_text_box_text_mode(document, layerId));

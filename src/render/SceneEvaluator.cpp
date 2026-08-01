@@ -229,8 +229,8 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
         EvaluatedTextItem textItem;
         textItem.text = textContent.text.evaluatePreview(time);
-        textItem.fontSize = textContent.fontSize.evaluatePreview(time);
-        textItem.containerSize = textContent.size.evaluatePreview(time);
+        textItem.fontSize = textContent.fontSize;
+        textItem.containerSize = textContent.size;
         textItem.boxTextMode = textContent.boxTextMode;
         textItem.align = textContent.align;
         textItem.fontFamily = textContent.fontFamily;

@@ -246,12 +246,6 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             if (segments[1].name == "text") {
                 return &textContent->text;
             }
-            if (segments[1].name == "fontSize") {
-                return &textContent->fontSize;
-            }
-            if (segments[1].name == "size") {
-                return &textContent->size;
-            }
             return nullptr;
         }
         if (first.name == "image" && segments.size() == 2 &&

@@ -9,7 +9,7 @@
 
 namespace motion {
 
-// Layer content for editable boxed text with animatable string and size.
+// Layer content for editable text (point text or PAG-style box text).
 class TextContent : public LayerContent {
   public:
     TextContent();
@@ -21,10 +21,10 @@ class TextContent : public LayerContent {
     // System style name within the family (e.g. "Bold"); empty = default/Regular.
     std::string fontStyle{};
     // Font size cap; shrink applies only when boxTextMode is true.
-    Animatable<float> fontSize{48.0f};
-    // Fixed layout box; selection / hit bounds use this size.
-    Animatable<Vec2> size{Vec2{400, 120}};
-    // true: wrap + shrink font to fit box; false: wrap + clip overflow.
+    float fontSize = 48.0f;
+    // Layout box for box text; point text ignores this for layout/selection.
+    Vec2 size{400, 120};
+    // true: PAG box text (wrap + shrink); false: point text.
     bool boxTextMode = false;
     TextAlign align = TextAlign::Left;
 };

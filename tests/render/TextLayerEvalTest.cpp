@@ -36,8 +36,8 @@ TEST(TextLayerEvalTest, EvaluatesDefaultsAndStyles) {
     layer->outPoint = 120;
     auto *text = static_cast<TextContent *>(layer->content.get());
     text->text.setStaticValue("Hello");
-    text->fontSize.setStaticValue(32.0f);
-    text->size.setStaticValue(Vec2{200, 80});
+    text->fontSize = 32.0f;
+    text->size = Vec2{200, 80};
     text->align = TextAlign::Center;
     text->fontFamily = "Helvetica";
 

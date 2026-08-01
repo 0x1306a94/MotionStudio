@@ -128,6 +128,8 @@ EOF
 
 ### Task 2: 模型 — 静态 `fontSize` / `size`
 
+**Status:** ✅ Done（序列化一并完成，见 Task 3）
+
 **Files:**
 - Modify: `include/MotionStudio/model/TextContent.h`
 - Modify: `src/model/PropertyPath.cpp`、`include/MotionStudio/model/PropertyPath.h`
@@ -137,7 +139,7 @@ EOF
 **Interfaces:**
 - Produces: `float fontSize = 48.0f;`、`Vec2 size{400, 120};`；`ResolveAnimatable` **不再**解析 `content.fontSize` / `content.size`
 
-- [ ] **Step 1: 改失败测试**
+- [x] **Step 1: 改失败测试**
 
 ```cpp
 TEST(TextContentTest, DefaultsMatchSpec) {
@@ -157,7 +159,7 @@ TEST(PropertyPathTest, TextFontSizeAndSizeNotAnimatable) {
 }
 ```
 
-- [ ] **Step 2: 改模型与 PropertyPath**
+- [x] **Step 2: 改模型与 PropertyPath**
 
 ```cpp
 // TextContent.h
@@ -169,15 +171,15 @@ bool boxTextMode = false;
 
 删除 `PropertyPath.cpp` 中 `fontSize`/`size` 分支；更新头注释。
 
-- [ ] **Step 3: 修编译断裂点（同任务内）**
+- [x] **Step 3: 修编译断裂点（同任务内）**
 
 至少：
 - `src/render/SceneEvaluator.cpp`：`textItem.fontSize = textContent.fontSize;`、`containerSize = textContent.size;`
 - `src/export/pag/PagFileBuilder.cpp`：去掉 `fontSize`/`size` 的 `isAnimated` / `evaluate` / `CollectKeyframeTimes`
 - `tests/**` 中 `setStaticValue` → 直接赋值
-- Bridge 测试里对 `content.size` 的 `ms_command_set_static_vec2` 暂保留会失败 → Task 4 换 API（本任务可先 `#if 0` 或改测到 Task 4；优先修 core 能编过）
+- Bridge 测试里对 `content.size` 的 `ms_command_set_static_vec2` 已去掉，Task 4 换专用 API
 
-- [ ] **Step 4: 跑测**
+- [x] **Step 4: 跑测**
 
 ```bash
 cmake --build build
@@ -186,7 +188,7 @@ ctest --test-dir build -R 'TextContentTest|PropertyPathTest|TextLayerEvalTest' -
 
 Expected: 所列 PASS；bridge/PAG 相关若仍红，在 Task 4/7 清。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add include/MotionStudio/model/ src/model/ src/render/SceneEvaluator.cpp tests/model/ tests/render/
@@ -201,6 +203,8 @@ EOF
 
 ### Task 3: 序列化静态 `fontSize` / `size`
 
+**Status:** ✅ Done（与 Task 2 同提交，因模型变更必须同步）
+
 **Files:**
 - Modify: `src/serialization/Serializer.cpp`
 - Modify: `tests/serialization/SerializerTest.cpp`
@@ -209,11 +213,11 @@ EOF
 - Write: `node["fontSize"] = {{"static", fontSize}}`；`node["size"] = {{"static", Vec2ToJson(size)}}`（与现有 static Animatable 外形一致）
 - Read: 只接受 `static` 或裸 number/object；**忽略** `keyframes`（若仅有 keyframes 则用默认值或第一个值——选：**有 static 用 static；否则默认 `48` / `{400,120}`**，不报错）
 
-- [ ] **Step 1: 更新 round-trip 断言**
+- [x] **Step 1: 更新 round-trip 断言**
 
 确认 `SerializerTest` 文本用例：round-trip 后 `fontSize`/`size` 相等且 JSON 无 `keyframes`。
 
-- [ ] **Step 2: 实现读写辅助**（文件内 anonymous namespace）
+- [x] **Step 2: 实现读写辅助**（文件内 anonymous namespace）
 
 ```cpp
 json StaticFloatToJson(float value) { return json{{"static", value}}; }
@@ -223,7 +227,7 @@ Expected<float, std::string> StaticFloatFromJson(const json &node, float fallbac
 Expected<Vec2, std::string> StaticVec2FromJson(const json &node, Vec2 fallback);
 ```
 
-- [ ] **Step 3: 跑测**
+- [x] **Step 3: 跑测**
 
 ```bash
 ctest --test-dir build -R SerializerTest --output-on-failure
@@ -231,7 +235,7 @@ ctest --test-dir build -R SerializerTest --output-on-failure
 
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/serialization/Serializer.cpp tests/serialization/SerializerTest.cpp
