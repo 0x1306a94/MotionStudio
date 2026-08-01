@@ -787,12 +787,27 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
     document->text = content.text.evaluate(time);
     document->fontFamily = content.fontFamily;
     document->fontStyle = content.fontStyle;
-    document->fontSize = content.fontSize.evaluate(time);
+    const float fontSize = content.fontSize.evaluate(time);
+    document->fontSize = fontSize;
     document->justification = MapAlign(content.align);
-    document->boxText = true;
+
+    // Align with AE paragraph (box) text: MS `size` is the layout box (wrap / clip).
+    // `boxTextMode` only means shrink-to-fit and is not a PAG field (warned separately).
+    // Without font metrics at export time, approximate first baseline as ~ascent from box top
+    // so PAG does not treat firstBaseLine==0 as vertically-centered box text.
+    constexpr float kAscentFactor = 0.8f;
     const Vec2 box = content.size.evaluate(time);
-    document->boxTextPos = pag::Point::Zero();
-    document->boxTextSize = pag::Point::Make(box.x, box.y);
+    if (box.x > 0.0f && box.y > 0.0f) {
+        document->boxText = true;
+        document->boxTextPos = pag::Point::Zero();
+        document->boxTextSize = pag::Point::Make(box.x, box.y);
+        document->firstBaseLine = document->boxTextPos.y + fontSize * kAscentFactor;
+    } else {
+        document->boxText = false;
+        document->boxTextPos = pag::Point::Zero();
+        document->boxTextSize = pag::Point::Zero();
+        document->firstBaseLine = 0.0f;
+    }
 
     // PAG TextDocument supports one fill + one stroke; MS draws styles in order (fill then stroke).
     document->applyFill = false;

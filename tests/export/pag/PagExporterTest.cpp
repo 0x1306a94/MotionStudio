@@ -371,6 +371,8 @@ TEST(PagExporterTest, TextLayerExports) {
     content->text.setStaticValue("Hello PAG");
     content->fontFamily = "PingFang SC";
     content->fontSize.setStaticValue(36.0f);
+    content->size.setStaticValue(Vec2{400.0f, 120.0f});
+    content->boxTextMode = false;
     auto fill = std::make_unique<FillStyle>();
     fill->color.setStaticValue(Color{0.0f, 210.0f / 255.0f, 186.0f / 255.0f, 1.0f});
     layer->styles.push_back(std::move(fill));
@@ -389,18 +391,49 @@ TEST(PagExporterTest, TextLayerExports) {
     ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Text);
     auto *textLayer = static_cast<pag::TextLayer *>(vector->layers[0]);
     ASSERT_NE(textLayer->sourceText, nullptr);
-    EXPECT_EQ(textLayer->sourceText->value->text, "Hello PAG");
-    EXPECT_FLOAT_EQ(textLayer->sourceText->value->fontSize, 36.0f);
-    EXPECT_TRUE(textLayer->sourceText->value->applyFill);
-    EXPECT_EQ(textLayer->sourceText->value->fillColor.red, 0);
-    EXPECT_EQ(textLayer->sourceText->value->fillColor.green, 210);
-    EXPECT_EQ(textLayer->sourceText->value->fillColor.blue, 186);
-    EXPECT_TRUE(textLayer->sourceText->value->applyStroke);
-    EXPECT_EQ(textLayer->sourceText->value->strokeColor.red, 0);
-    EXPECT_EQ(textLayer->sourceText->value->strokeColor.green, 0);
-    EXPECT_EQ(textLayer->sourceText->value->strokeColor.blue, 0);
-    EXPECT_FLOAT_EQ(textLayer->sourceText->value->strokeWidth, 2.0f);
-    EXPECT_TRUE(textLayer->sourceText->value->strokeOverFill);
+    const auto &textDocument = *textLayer->sourceText->value;
+    EXPECT_EQ(textDocument.text, "Hello PAG");
+    EXPECT_FLOAT_EQ(textDocument.fontSize, 36.0f);
+    // MS size maps to AE paragraph (box) text even when boxTextMode is false.
+    EXPECT_TRUE(textDocument.boxText);
+    EXPECT_FLOAT_EQ(textDocument.boxTextPos.x, 0.0f);
+    EXPECT_FLOAT_EQ(textDocument.boxTextPos.y, 0.0f);
+    EXPECT_FLOAT_EQ(textDocument.boxTextSize.x, 400.0f);
+    EXPECT_FLOAT_EQ(textDocument.boxTextSize.y, 120.0f);
+    EXPECT_FLOAT_EQ(textDocument.firstBaseLine, 36.0f * 0.8f);
+    EXPECT_TRUE(textDocument.applyFill);
+    EXPECT_EQ(textDocument.fillColor.red, 0);
+    EXPECT_EQ(textDocument.fillColor.green, 210);
+    EXPECT_EQ(textDocument.fillColor.blue, 186);
+    EXPECT_TRUE(textDocument.applyStroke);
+    EXPECT_EQ(textDocument.strokeColor.red, 0);
+    EXPECT_EQ(textDocument.strokeColor.green, 0);
+    EXPECT_EQ(textDocument.strokeColor.blue, 0);
+    EXPECT_FLOAT_EQ(textDocument.strokeWidth, 2.0f);
+    EXPECT_TRUE(textDocument.strokeOverFill);
+}
+
+TEST(PagExporterTest, TextBoxTextModeEmitsShrinkWarning) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Text);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto *content = static_cast<TextContent *>(layer->content.get());
+    content->text.setStaticValue("Shrink");
+    content->boxTextMode = true;
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    bool found = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "TextFeatureApproximated") {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
 }
 
 TEST(PagExporterTest, ImageLayerExports) {
