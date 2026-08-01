@@ -699,8 +699,31 @@ final class MotionDocumentCore {
         changed()
     }
 
-    func setTextBoxTextMode(layerID: UInt64, boxTextMode: Bool) {
-        _ = ms_command_set_text_box_text_mode(handle, layerID, boxTextMode)
+    func setTextBoxTextMode(layerID: UInt64, boxTextMode: Bool, frame: Int64 = 0) {
+        _ = ms_command_set_text_box_text_mode(handle, layerID, boxTextMode, frame)
+        changed()
+    }
+
+    func textFontSize(layerID: UInt64) -> Float {
+        ms_layer_text_font_size(handle, layerID)
+    }
+
+    func setTextFontSize(layerID: UInt64, fontSize: Float) {
+        _ = ms_command_set_text_font_size(handle, layerID, fontSize)
+        changed()
+    }
+
+    func textSize(layerID: UInt64) -> CGVector {
+        var width: Float = 0
+        var height: Float = 0
+        guard ms_layer_text_size(handle, layerID, &width, &height) else {
+            return .zero
+        }
+        return CGVector(dx: CGFloat(width), dy: CGFloat(height))
+    }
+
+    func setTextSize(layerID: UInt64, size: CGVector) {
+        _ = ms_command_set_text_size(handle, layerID, Float(size.dx), Float(size.dy))
         changed()
     }
 

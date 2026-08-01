@@ -250,6 +250,8 @@ EOF
 
 ### Task 4: Undo + Bridge — 静态属性与切模式测字
 
+**Status:** ✅ Done
+
 **Files:**
 - Create: `include/MotionStudio/undo/SetTextFontSizeCommand.h`、`src/undo/SetTextFontSizeCommand.cpp`
 - Create: `include/MotionStudio/undo/SetTextSizeCommand.h`、`src/undo/SetTextSizeCommand.cpp`
@@ -282,7 +284,7 @@ Vec2 MeasurePointTextSize(const std::string &text, float fontSize, TextAlign ali
 }
 ```
 
-- [ ] **Step 1: 写 undo 测试**
+- [x] **Step 1: 写 undo 测试**
 
 ```cpp
 TEST(TextCommandsTest, EnableBoxTextModeSetsMeasuredSize) {
@@ -294,13 +296,13 @@ TEST(TextCommandsTest, EnableBoxTextModeSetsMeasuredSize) {
 }
 ```
 
-- [ ] **Step 2: 实现命令与 bridge**
+- [x] **Step 2: 实现命令与 bridge**
 
 `ms_command_set_text_box_text_mode`：若目标为 true 且当前为 false，调用 `MeasurePointTextSize`（frame 上 `text.evaluate`），再 `Execute(SetTextBoxTextModeCommand(..., measured))`。
 
 非 Apple 构建：若无 tgfx，测字可退回 `Vec2{400,120}` 或跳过（本仓库主路径为 Apple）。
 
-- [ ] **Step 3: 跑测**
+- [x] **Step 3: 跑测**
 
 ```bash
 ctest --test-dir build -R 'TextCommandsTest|BridgeTest' --output-on-failure
@@ -308,7 +310,7 @@ ctest --test-dir build -R 'TextCommandsTest|BridgeTest' --output-on-failure
 
 Expected: PASS（Bridge 测切模式后 size 变化：可用固定 Fake 或只断言 `size` 被改成 ≥1）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add include/MotionStudio/undo/ src/undo/ bridge/ tests/undo/ tests/bridge/

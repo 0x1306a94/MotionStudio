@@ -956,8 +956,25 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
         EXPECT_EQ(text.str(), "Hello\nWorld");
     }
 
-    ASSERT_TRUE(ms_command_set_text_box_text_mode(document, layerId, true));
+    EXPECT_FLOAT_EQ(ms_layer_text_font_size(document, layerId), 48.0f);
+    float sizeX = 0.0f;
+    float sizeY = 0.0f;
+    ASSERT_TRUE(ms_layer_text_size(document, layerId, &sizeX, &sizeY));
+    EXPECT_FLOAT_EQ(sizeX, 400.0f);
+    EXPECT_FLOAT_EQ(sizeY, 120.0f);
+
+    ASSERT_TRUE(ms_command_set_text_font_size(document, layerId, 36.0f));
+    EXPECT_FLOAT_EQ(ms_layer_text_font_size(document, layerId), 36.0f);
+    ASSERT_TRUE(ms_command_set_text_size(document, layerId, 300.0f, 100.0f));
+    ASSERT_TRUE(ms_layer_text_size(document, layerId, &sizeX, &sizeY));
+    EXPECT_FLOAT_EQ(sizeX, 300.0f);
+    EXPECT_FLOAT_EQ(sizeY, 100.0f);
+
+    ASSERT_TRUE(ms_command_set_text_box_text_mode(document, layerId, true, 0));
     EXPECT_TRUE(ms_layer_text_box_text_mode(document, layerId));
+    ASSERT_TRUE(ms_layer_text_size(document, layerId, &sizeX, &sizeY));
+    EXPECT_GE(sizeX, 1.0f);
+    EXPECT_GE(sizeY, 1.0f);
     ASSERT_TRUE(ms_command_set_text_align(document, layerId, MS_TEXT_ALIGN_CENTER));
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_CENTER);
     ASSERT_TRUE(ms_command_set_text_font(document, layerId, "Helvetica", "Bold"));
@@ -981,8 +998,11 @@ TEST(BridgeCommandTest, TextLayerAddSetStringFontAndUndo) {
     }
     ASSERT_TRUE(ms_document_undo(document));  // align
     EXPECT_EQ(ms_layer_text_align(document, layerId), MS_TEXT_ALIGN_LEFT);
-    ASSERT_TRUE(ms_document_undo(document));  // boxTextMode
+    ASSERT_TRUE(ms_document_undo(document));  // boxTextMode (+ measured size)
     EXPECT_FALSE(ms_layer_text_box_text_mode(document, layerId));
+    ASSERT_TRUE(ms_layer_text_size(document, layerId, &sizeX, &sizeY));
+    EXPECT_FLOAT_EQ(sizeX, 300.0f);
+    EXPECT_FLOAT_EQ(sizeY, 100.0f);
 
     ms_document_destroy(document);
 }

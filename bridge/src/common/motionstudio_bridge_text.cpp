@@ -1,7 +1,9 @@
 #include "motionstudio_bridge.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "MotionStudio/model/Composition.h"
@@ -13,10 +15,16 @@
 #include "MotionStudio/undo/SetTextAlignCommand.h"
 #include "MotionStudio/undo/SetTextBoxTextModeCommand.h"
 #include "MotionStudio/undo/SetTextFontCommand.h"
+#include "MotionStudio/undo/SetTextFontSizeCommand.h"
+#include "MotionStudio/undo/SetTextSizeCommand.h"
 
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
 #include "MSDocument.h"
+
+#if defined(__APPLE__)
+#include "MeasurePointTextSize.h"
+#endif
 
 using namespace bridge;
 
@@ -78,7 +86,34 @@ bool ms_command_set_text_font(MSDocument *document, uint64_t layerId, const char
     return true;
 }
 
-bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, bool boxTextMode) {
+bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, bool boxTextMode,
+                                       int64_t frame) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return false;
+    }
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    if (content == nullptr) {
+        return false;
+    }
+
+    std::optional<Vec2> sizeWhenEnabling;
+    if (boxTextMode && !content->boxTextMode) {
+#if defined(__APPLE__)
+        const std::string text = content->text.evaluate(frame);
+        sizeWhenEnabling = MeasurePointTextSize(text, content->fontSize, content->align,
+                                                content->fontFamily, content->fontStyle);
+#else
+        (void)frame;
+        sizeWhenEnabling = content->size;
+#endif
+    }
+
+    Execute(document, std::make_unique<motion::SetTextBoxTextModeCommand>(EntityId{layerId}, boxTextMode, sizeWhenEnabling));
+    return true;
+}
+
+bool ms_command_set_text_font_size(MSDocument *document, uint64_t layerId, float fontSize) {
     DocumentLock lock(document);
     if (document == nullptr) {
         return false;
@@ -86,7 +121,19 @@ bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, b
     if (TextContentOf(FindLayer(document, layerId)) == nullptr) {
         return false;
     }
-    Execute(document, std::make_unique<motion::SetTextBoxTextModeCommand>(EntityId{layerId}, boxTextMode));
+    Execute(document, std::make_unique<motion::SetTextFontSizeCommand>(EntityId{layerId}, fontSize));
+    return true;
+}
+
+bool ms_command_set_text_size(MSDocument *document, uint64_t layerId, float width, float height) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return false;
+    }
+    if (TextContentOf(FindLayer(document, layerId)) == nullptr) {
+        return false;
+    }
+    Execute(document, std::make_unique<motion::SetTextSizeCommand>(EntityId{layerId}, Vec2{std::max(1.0f, width), std::max(1.0f, height)}));
     return true;
 }
 
@@ -109,6 +156,27 @@ bool ms_layer_text_box_text_mode(MSDocument *document, uint64_t layerId) {
     DocumentLock lock(document);
     TextContent *content = TextContentOf(FindLayer(document, layerId));
     return content != nullptr ? content->boxTextMode : false;
+}
+
+float ms_layer_text_font_size(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content != nullptr ? content->fontSize : 0.0f;
+}
+
+bool ms_layer_text_size(MSDocument *document, uint64_t layerId, float *width, float *height) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    if (content == nullptr) {
+        return false;
+    }
+    if (width != nullptr) {
+        *width = content->size.x;
+    }
+    if (height != nullptr) {
+        *height = content->size.y;
+    }
+    return true;
 }
 
 MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId) {

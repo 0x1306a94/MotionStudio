@@ -38,6 +38,8 @@ enum class CommandKind {
     SetTextBoxTextMode,
     SetTextAlign,
     SetTextFont,
+    SetTextFontSize,
+    SetTextSize,
     Composite,
 };
 

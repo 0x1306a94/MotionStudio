@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
@@ -10,6 +11,8 @@
 #include "MotionStudio/undo/SetTextAlignCommand.h"
 #include "MotionStudio/undo/SetTextBoxTextModeCommand.h"
 #include "MotionStudio/undo/SetTextFontCommand.h"
+#include "MotionStudio/undo/SetTextFontSizeCommand.h"
+#include "MotionStudio/undo/SetTextSizeCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
 using motion::Composition;
@@ -20,9 +23,12 @@ using motion::LayerType;
 using motion::SetTextAlignCommand;
 using motion::SetTextBoxTextModeCommand;
 using motion::SetTextFontCommand;
+using motion::SetTextFontSizeCommand;
+using motion::SetTextSizeCommand;
 using motion::TextAlign;
 using motion::TextContent;
 using motion::UndoManager;
+using motion::Vec2;
 
 namespace {
 
@@ -55,4 +61,42 @@ TEST(TextCommandsTest, BoxTextModeAlignFontUndo) {
     EXPECT_EQ(content->align, TextAlign::Left);
     undo.undo(document);
     EXPECT_FALSE(content->boxTextMode);
+}
+
+TEST(TextCommandsTest, EnableBoxTextModeSetsMeasuredSize) {
+    Document document;
+    TextContent *content = AddTextLayer(document);
+    const EntityId layerId = document.compositions[0]->layers[0]->id;
+    content->fontSize = 20.0f;
+    content->size = Vec2{400, 120};
+    UndoManager undo;
+
+    undo.execute(document, std::make_unique<SetTextBoxTextModeCommand>(layerId, true, Vec2{40, 24}));
+    EXPECT_TRUE(content->boxTextMode);
+    EXPECT_FLOAT_EQ(content->size.x, 40.0f);
+    EXPECT_FLOAT_EQ(content->size.y, 24.0f);
+
+    undo.undo(document);
+    EXPECT_FALSE(content->boxTextMode);
+    EXPECT_FLOAT_EQ(content->size.x, 400.0f);
+    EXPECT_FLOAT_EQ(content->size.y, 120.0f);
+}
+
+TEST(TextCommandsTest, FontSizeAndSizeUndo) {
+    Document document;
+    TextContent *content = AddTextLayer(document);
+    const EntityId layerId = document.compositions[0]->layers[0]->id;
+    UndoManager undo;
+
+    undo.execute(document, std::make_unique<SetTextFontSizeCommand>(layerId, 72.0f));
+    EXPECT_FLOAT_EQ(content->fontSize, 72.0f);
+    undo.execute(document, std::make_unique<SetTextSizeCommand>(layerId, Vec2{200, 80}));
+    EXPECT_FLOAT_EQ(content->size.x, 200.0f);
+    EXPECT_FLOAT_EQ(content->size.y, 80.0f);
+
+    undo.undo(document);
+    EXPECT_FLOAT_EQ(content->size.x, 400.0f);
+    EXPECT_FLOAT_EQ(content->size.y, 120.0f);
+    undo.undo(document);
+    EXPECT_FLOAT_EQ(content->fontSize, 48.0f);
 }

@@ -111,7 +111,7 @@ struct TextLayerInspector: View {
             set: { newValue in
                 guard isEditable else { return }
                 perform("Set Text Box Text Mode") {
-                    core.setTextBoxTextMode(layerID: layerID, boxTextMode: newValue)
+                    core.setTextBoxTextMode(layerID: layerID, boxTextMode: newValue, frame: playheadFrame)
                 }
             },
         ))

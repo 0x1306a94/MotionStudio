@@ -9,12 +9,10 @@
 
 namespace motion {
 
-// Sets TextContent::boxTextMode. When enabling box text, optional sizeWhenEnabling
-// writes content.size in the same undo unit (point → box measure).
-class SetTextBoxTextModeCommand : public Command {
+// Sets TextContent::size (static layout box).
+class SetTextSizeCommand : public Command {
   public:
-    SetTextBoxTextModeCommand(EntityId layerId, bool boxTextMode,
-                              std::optional<Vec2> sizeWhenEnabling = std::nullopt);
+    SetTextSizeCommand(EntityId layerId, Vec2 size);
 
     void execute(Document &document) override;
     void undo(Document &document) override;
@@ -24,9 +22,7 @@ class SetTextBoxTextModeCommand : public Command {
 
   private:
     EntityId layerId_;
-    bool boxTextMode_ = false;
-    std::optional<Vec2> sizeWhenEnabling_;
-    std::optional<bool> oldBoxTextMode_;
+    Vec2 size_{400, 120};
     std::optional<Vec2> oldSize_;
 };
 

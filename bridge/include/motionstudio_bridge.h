@@ -519,9 +519,15 @@ uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId)
 // family / style: system CT family and style names (style may be empty for default).
 bool ms_command_set_text_font(MSDocument *document, uint64_t layerId, const char *family,
                               const char *style);
-bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, bool boxTextMode);
+// frame: playhead used to evaluate text when enabling box mode (measure → size).
+bool ms_command_set_text_box_text_mode(MSDocument *document, uint64_t layerId, bool boxTextMode,
+                                       int64_t frame);
+bool ms_command_set_text_font_size(MSDocument *document, uint64_t layerId, float fontSize);
+bool ms_command_set_text_size(MSDocument *document, uint64_t layerId, float width, float height);
 bool ms_command_set_text_align(MSDocument *document, uint64_t layerId, MS_TEXT_ALIGN align);
 bool ms_layer_text_box_text_mode(MSDocument *document, uint64_t layerId);
+float ms_layer_text_font_size(MSDocument *document, uint64_t layerId);
+bool ms_layer_text_size(MSDocument *document, uint64_t layerId, float *width, float *height);
 MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId);
 char *ms_layer_text_font_family(MSDocument *document, uint64_t layerId);  // ms_string_free
 char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId);   // ms_string_free
