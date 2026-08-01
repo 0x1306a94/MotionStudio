@@ -376,12 +376,11 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 **Text**：`text` / `fontFamily` / `fontStyle` / `fontSize` / `size` / `align` → `TextDocument`；**必须**从 `Layer.styles` 取首个 Fill → `applyFill`/`fillColor`、首个 Stroke → `applyStroke`/`strokeColor`/`strokeWidth`（`strokeOverFill = true`，对齐 MS 先填后描）。漏映射时 PAG 默认 `fillColor=Black`，预览会像「只剩描边」。多 Fill/Stroke → 取第一个 + warning。
 
-排版框对齐 **AE 段落文本（Paragraph / Box Text）**，而非 AE 点文本：
+`boxTextMode` 直映 PAG / AE 点文本 vs 段落（框）文本：
 
-- MS 始终用 `size` 做换行/裁剪容器 → 当 `size.x > 0 && size.y > 0` 时导出 `boxText = true`，并写 `boxTextPos = (0,0)`、`boxTextSize = size`。
-- `firstBaseLine`：对齐 MS 顶对齐首行 baseline（≈ ascent）。导出层无字体 metrics 时用启发式 `boxTextPos.y + fontSize * 0.8`；**禁止**留 0（PAG 会按框竖直居中，和预览不一致）。
-- `size` 无效（宽或高 ≤ 0）→ `boxText = false`（point text），`firstBaseLine = 0`。
-- `boxTextMode` 只表示 shrink-to-fit，**不**映射为 `boxText`；无法完整表达时 → `TextFeatureApproximated` warning。
+- `boxTextMode == false`（默认点文本）→ `boxText = false`，`boxTextSize = 0`，`firstBaseLine = 0`。
+- `boxTextMode == true`（框文本：换行 + shrink）→ `boxText = true`，`boxTextPos = (0,0)`，`boxTextSize = size`；`firstBaseLine ≈ boxTextPos.y + fontSize * 0.8`（导出层无字体 metrics 时的启发式；**禁止**对框文本留 0，否则 PAG 会竖直居中）。
+- 不再为 shrink 发 `TextFeatureApproximated`（MS shrink 对齐 PAG 框文本适配）。
 
 **Image**：读 `Asset.path`（相对 `projectRoot`）→ 编码为 `ImageBytes`（**源像素尺寸**，对齐 AE）；`ImageContent.size` + `scaleMode` 按 `ComputeImageDestinationRect` **烘焙进** `transform.scale` / `anchor`（AE 无独立容器，改大小走 Transform）。`ImageFillRule::scaleMode` 保留给运行时换图。Zoom/None 溢出容器时加矩形 Mask。`size` 关键帧首版按 inPoint 静帧烘焙并 warning。
 
@@ -501,8 +500,8 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | Shape Rect/Ellipse/Path + Transform KF | Load 成功；ShapeLayer；关键帧数量符合 |
 | Fill + Stroke + Trim | shape contents 含对应元素 |
 | Text + Fill/Stroke styles | TextDocument `applyFill`/`fillColor`/`applyStroke`/`strokeWidth` 正确 |
-| Text + 有效 `size`（含 `boxTextMode=false`） | `boxText=true`；`boxTextSize=size`；`firstBaseLine ≈ fontSize*0.8`（非 0） |
-| Text + `boxTextMode=true` | 仍为 box text；附带 `TextFeatureApproximated` warning |
+| Text + `boxTextMode=false`（默认） | `boxText=false`；`firstBaseLine=0` |
+| Text + `boxTextMode=true` | `boxText=true`；`boxTextSize=size`；`firstBaseLine ≈ fontSize*0.8`；无 shrink warning |
 | Image 容器 ≠ 源尺寸 + LetterBox | `ImageBytes` 仍为源尺寸；transform.scale 含容器 fit |
 | Mask Add/Sub/Intersect | masks 非空且 mode 正确 |
 | TrackMatte | 类型/邻接正确；**matte 源 `isActive == false`** |

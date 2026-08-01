@@ -417,6 +417,8 @@ EOF
 
 ### Task 7: PAG 导出映射
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp`（`makeTextDocument`、`buildTextLayer`、`buildSourceText`）
 - Modify: `tests/export/pag/PagExporterTest.cpp`
@@ -440,20 +442,20 @@ if (content.boxTextMode) {
 - 删除 `buildTextLayer` 里 `TextFeatureApproximated`（shrink）warning
 - `buildSourceText`：仅当 `content.text.isAnimated()` 时收集 keyframes；`fontSize`/`size` 静态打进每个 document
 
-- [ ] **Step 1: 改测试**
+- [x] **Step 1: 改测试**
 
 ```cpp
 // Point (default): boxText == false
 // Box mode: boxText == true, firstBaseLine != 0, no TextFeatureApproximated for shrink
 ```
 
-- [ ] **Step 2: 实现 + 跑**
+- [x] **Step 2: 实现 + 跑**
 
 ```bash
 ctest --test-dir build -R PagExporterTest --output-on-failure
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/export/pag/ tests/export/pag/ docs/superpowers/specs/2026-07-31-pag-export-design.md

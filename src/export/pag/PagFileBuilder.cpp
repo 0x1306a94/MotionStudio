@@ -765,10 +765,6 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
         delete pagLayer;
         return Unexpected(filled.error());
     }
-    if (content.boxTextMode) {
-        Warn(&warnings_, layer.id, "TextFeatureApproximated",
-             "boxTextMode shrink-to-fit is not fully represented in PAG TextDocument");
-    }
     pagLayer->sourceText = buildSourceText(layer, content);
     return pagLayer;
 }
@@ -784,16 +780,14 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
     document->fontSize = fontSize;
     document->justification = MapAlign(content.align);
 
-    // Align with AE paragraph (box) text: MS `size` is the layout box (wrap / clip).
-    // `boxTextMode` only means shrink-to-fit and is not a PAG field (warned separately).
+    // boxTextMode maps directly to PAG/AE paragraph (box) text.
     // Without font metrics at export time, approximate first baseline as ~ascent from box top
     // so PAG does not treat firstBaseLine==0 as vertically-centered box text.
     constexpr float kAscentFactor = 0.8f;
-    const Vec2 box = content.size;
-    if (box.x > 0.0f && box.y > 0.0f) {
+    if (content.boxTextMode) {
         document->boxText = true;
         document->boxTextPos = pag::Point::Zero();
-        document->boxTextSize = pag::Point::Make(box.x, box.y);
+        document->boxTextSize = pag::Point::Make(content.size.x, content.size.y);
         document->firstBaseLine = document->boxTextPos.y + fontSize * kAscentFactor;
     } else {
         document->boxText = false;

@@ -394,13 +394,11 @@ TEST(PagExporterTest, TextLayerExports) {
     const auto &textDocument = *textLayer->sourceText->value;
     EXPECT_EQ(textDocument.text, "Hello PAG");
     EXPECT_FLOAT_EQ(textDocument.fontSize, 36.0f);
-    // MS size maps to AE paragraph (box) text even when boxTextMode is false.
-    EXPECT_TRUE(textDocument.boxText);
-    EXPECT_FLOAT_EQ(textDocument.boxTextPos.x, 0.0f);
-    EXPECT_FLOAT_EQ(textDocument.boxTextPos.y, 0.0f);
-    EXPECT_FLOAT_EQ(textDocument.boxTextSize.x, 400.0f);
-    EXPECT_FLOAT_EQ(textDocument.boxTextSize.y, 120.0f);
-    EXPECT_FLOAT_EQ(textDocument.firstBaseLine, 36.0f * 0.8f);
+    // Default point text: boxTextMode false → PAG point text.
+    EXPECT_FALSE(textDocument.boxText);
+    EXPECT_FLOAT_EQ(textDocument.boxTextSize.x, 0.0f);
+    EXPECT_FLOAT_EQ(textDocument.boxTextSize.y, 0.0f);
+    EXPECT_FLOAT_EQ(textDocument.firstBaseLine, 0.0f);
     EXPECT_TRUE(textDocument.applyFill);
     EXPECT_EQ(textDocument.fillColor.red, 0);
     EXPECT_EQ(textDocument.fillColor.green, 210);
@@ -413,7 +411,7 @@ TEST(PagExporterTest, TextLayerExports) {
     EXPECT_TRUE(textDocument.strokeOverFill);
 }
 
-TEST(PagExporterTest, TextBoxTextModeEmitsShrinkWarning) {
+TEST(PagExporterTest, TextBoxTextModeExportsBoxText) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
     auto layer = std::make_unique<Layer>(LayerType::Text);
@@ -421,19 +419,26 @@ TEST(PagExporterTest, TextBoxTextModeEmitsShrinkWarning) {
     layer->outPoint = composition->duration;
     auto *content = static_cast<TextContent *>(layer->content.get());
     content->text.setStaticValue("Shrink");
+    content->fontSize = 48.0f;
+    content->size = Vec2{320.0f, 96.0f};
     content->boxTextMode = true;
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
     ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
-    bool found = false;
     for (const auto &warning : result.value().warnings) {
-        if (warning.code == "TextFeatureApproximated") {
-            found = true;
-            break;
-        }
+        EXPECT_NE(warning.code, "TextFeatureApproximated");
     }
-    EXPECT_TRUE(found);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Text);
+    auto *textLayer = static_cast<pag::TextLayer *>(vector->layers[0]);
+    const auto &textDocument = *textLayer->sourceText->value;
+    EXPECT_TRUE(textDocument.boxText);
+    EXPECT_FLOAT_EQ(textDocument.boxTextSize.x, 320.0f);
+    EXPECT_FLOAT_EQ(textDocument.boxTextSize.y, 96.0f);
+    EXPECT_FLOAT_EQ(textDocument.firstBaseLine, 48.0f * 0.8f);
 }
 
 TEST(PagExporterTest, ImageLayerExports) {
