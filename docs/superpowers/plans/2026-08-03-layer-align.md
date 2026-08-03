@@ -191,7 +191,7 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
 
 ### Task 3: `MotionDocumentCore.alignLayers`
 
-**Status:** 🔄 in progress
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`
@@ -202,7 +202,7 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
   - `func mapCompositionDelta(compositionID:layerID:frame:delta:) -> CGVector?`
   - `func alignLayers(compositionID:layerIDs:edge:frame:)`
 
-- [ ] **Step 1: Add methods**
+- [x] **Step 1: Add methods**
 
 ```swift
 func mapCompositionDelta(compositionID: UInt64, layerID: UInt64, frame: Int64,
@@ -256,23 +256,17 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 
 **本方法不调用 merge group**——由 UI 调用方包一层。
 
-- [ ] **Step 2: Build**（Xcode MCP `BuildProject`）Expected: SUCCEEDED。
+- [x] **Step 2: Build**（Xcode MCP `BuildProject` SUCCEEDED）
 
-- [ ] **Step 3: Update this plan** — Task 3 Done。
+- [x] **Step 3: Update this plan** — Task 3 Done。
 
-- [ ] **Step 4: Commit**
-
-```bash
-git commit --only apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift \
-  docs/superpowers/plans/2026-08-03-layer-align.md \
-  -m "Add alignLayers on MotionDocumentCore with parent-space writes."
-```
+- [x] **Step 4: Commit**
 
 ---
 
 ### Task 4: Toolbar UI（Inspector 前）+ 选中显隐
 
-**Status:** ⏳
+**Status:** 🔄 in progress
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController.swift`（按钮属性）

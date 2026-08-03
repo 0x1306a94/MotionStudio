@@ -289,6 +289,61 @@ final class MotionDocumentCore {
                       height: CGFloat(maxY - minY))
     }
 
+    func mapCompositionDelta(compositionID: UInt64, layerID: UInt64, frame: Int64,
+                             delta: CGVector) -> CGVector?
+    {
+        var outX: Float = 0
+        var outY: Float = 0
+        guard ms_layer_map_composition_delta(handle, compositionID, layerID, Double(frame),
+                                             Float(delta.dx), Float(delta.dy), &outX, &outY)
+        else {
+            return nil
+        }
+        return CGVector(dx: CGFloat(outX), dy: CGFloat(outY))
+    }
+
+    /// Aligns layers by translating stored `transform.position`. Caller owns merge group.
+    func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge, frame: Int64) {
+        guard !layerIDs.isEmpty else { return }
+        let target: CGRect
+        if layerIDs.count == 1 {
+            let size = size(compositionID: compositionID)
+            target = CGRect(origin: .zero, size: size)
+        } else {
+            let rects = layerIDs.compactMap {
+                layerBounds(compositionID: compositionID, layerID: $0, frameTime: Double(frame))
+            }
+            guard let union = LayerAlign.unionBounds(rects) else { return }
+            target = union
+        }
+        let path = TransformProperty.position.path
+        for layerID in layerIDs {
+            guard let bounds = layerBounds(compositionID: compositionID, layerID: layerID,
+                                           frameTime: Double(frame))
+            else {
+                continue
+            }
+            let deltaComp = LayerAlign.compositionDelta(edge: edge, bounds: bounds, target: target)
+            if abs(deltaComp.dx) < 1e-6, abs(deltaComp.dy) < 1e-6 {
+                continue
+            }
+            guard let deltaParent = mapCompositionDelta(compositionID: compositionID,
+                                                        layerID: layerID,
+                                                        frame: frame,
+                                                        delta: deltaComp)
+            else {
+                continue
+            }
+            let stored = evaluateVec2(entityID: layerID, path: path, frame: frame)
+            let next = CGVector(dx: stored.dx + deltaParent.dx, dy: stored.dy + deltaParent.dy)
+            if keyframes(entityID: layerID, path: path).contains(where: { $0.frame == frame }) {
+                addKeyframeVec2(entityID: layerID, path: path, frame: frame, value: next)
+            } else {
+                setStaticVec2(entityID: layerID, path: path, value: next)
+            }
+        }
+    }
+
     func layerLocalBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double) -> CGRect? {
         var minX: Float = 0
         var minY: Float = 0
