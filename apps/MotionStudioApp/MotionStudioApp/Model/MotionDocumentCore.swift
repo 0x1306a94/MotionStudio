@@ -305,6 +305,67 @@ final class MotionDocumentCore {
                       height: CGFloat(maxY - minY))
     }
 
+    /// Parent-space offset from local AABB top-left to the anchor.
+    func layoutPositionOffset(compositionID: UInt64, layerID: UInt64, frame: Int64) -> CGVector {
+        let anchor = evaluateVec2(entityID: layerID,
+                                  path: TransformProperty.anchorPoint.path,
+                                  frame: frame)
+        let scale = evaluateVec2(entityID: layerID,
+                                 path: TransformProperty.scale.path,
+                                 frame: frame)
+        let rotation = evaluateFloat(entityID: layerID,
+                                     path: TransformProperty.rotation.path,
+                                     frame: frame)
+        guard let bounds = layerLocalBounds(compositionID: compositionID,
+                                            layerID: layerID,
+                                            frameTime: Double(frame))
+        else {
+            return .zero
+        }
+        return LayoutPosition.offset(anchor: anchor,
+                                     scale: scale,
+                                     rotationDegrees: rotation,
+                                     localBounds: bounds)
+    }
+
+    func evaluateLayoutPosition(compositionID: UInt64, layerID: UInt64, frame: Int64) -> CGVector {
+        let stored = evaluateVec2(entityID: layerID,
+                                  path: TransformProperty.position.path,
+                                  frame: frame)
+        let offset = layoutPositionOffset(compositionID: compositionID,
+                                          layerID: layerID,
+                                          frame: frame)
+        return LayoutPosition.toLayout(stored: stored, offset: offset)
+    }
+
+    /// Writes layout (top-left) position; converts to stored AE position.
+    /// Upserts keyframe when playhead already has one otherwise setStatic.
+    func writeLayoutPosition(compositionID: UInt64, layerID: UInt64, frame: Int64,
+                             value: CGVector)
+    {
+        let offset = layoutPositionOffset(compositionID: compositionID,
+                                          layerID: layerID,
+                                          frame: frame)
+        let stored = LayoutPosition.toStored(layout: value, offset: offset)
+        let path = TransformProperty.position.path
+        if keyframes(entityID: layerID, path: path).contains(where: { $0.frame == frame }) {
+            addKeyframeVec2(entityID: layerID, path: path, frame: frame, value: stored)
+        } else {
+            setStaticVec2(entityID: layerID, path: path, value: stored)
+        }
+    }
+
+    func keyframeLayoutPosition(compositionID: UInt64, layerID: UInt64, index: Int) -> CGVector {
+        let path = TransformProperty.position.path
+        let frames = keyframeFrames(entityID: layerID, path: path)
+        guard index >= 0, index < frames.count else { return .zero }
+        let stored = keyframeVec2(entityID: layerID, path: path, index: index)
+        let offset = layoutPositionOffset(compositionID: compositionID,
+                                          layerID: layerID,
+                                          frame: frames[index])
+        return LayoutPosition.toLayout(stored: stored, offset: offset)
+    }
+
     // MARK: - Layer queries
 
     func layerIDs(compositionID: UInt64) -> [UInt64] {
