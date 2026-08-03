@@ -208,11 +208,16 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
     const uint64_t childId = ms_command_add_rect_layer(document, compositionId);
     ASSERT_NE(parentId, 0u);
     ASSERT_NE(childId, 0u);
-    // Parent rotation 90° CCW at playhead 0 (static).
     ms_command_set_static_float(document, parentId, "transform.rotation", 90.0f);
-    ASSERT_TRUE(ms_command_set_layer_parent(document, childId, parentId)); // 若 API 名不同，改用项目现有 setParent 命令
+    // 无公开 setParent bridge：测试内 DocumentLock + Layer::setParent（与 BridgeInternals 同权）。
+    {
+        DocumentLock guard(document);
+        Layer *child = FindLayer(document, childId);
+        ASSERT_NE(child, nullptr);
+        ASSERT_TRUE(child->setParent(EntityId{parentId}, *Doc(document)));
+    }
     float outX = 0, outY = 0;
-    // Composition delta (10,0) under parent R=90° → parent space ≈ (0,-10)
+    // Composition delta (10,0) under parent R=90° CCW → parent space ≈ (0,-10)
     ASSERT_TRUE(ms_layer_map_composition_delta(document, compositionId, childId, 0.0,
                                                10.0f, 0.0f, &outX, &outY));
     EXPECT_NEAR(outX, 0.0f, 1e-3f);
@@ -221,7 +226,7 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
 }
 ```
 
-**注意：** 实现前先在 bridge 头文件/命令里确认「设置父级」的真实 API 名（如 `ms_command_set_layer_parent` / 现有等价物）；若无公开命令，测试可改为直接通过已有 undo 命令或跳过父级用例、仅测无父级 + 单元测 Mat3（优先找到现有 setParent bridge）。
+**注意：** Bridge 测试可 `#include` 内部头以 `FindLayer`/`Doc`/`DocumentLock`（其它 BridgeTest 已有先例则跟随）；若不便，则父级用例改放到 `tests/` 下 core 单测，Bridge 仅保留无父级恒等。
 
 - [ ] **Step 2: Run test to verify it fails**
 
