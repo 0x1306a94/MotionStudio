@@ -74,6 +74,7 @@ extension EditorViewController {
                                systemName: "sidebar.right",
                                accessibilityLabel: "Toggle Inspector Panel",
                                action: #selector(toggleInspectorPanel))
+        configureAlignToolbar()
 
         #if !targetEnvironment(macCatalyst)
             configureExportToolbarButton()
@@ -97,8 +98,10 @@ extension EditorViewController {
             contentStack.addArrangedSubview(redoButton)
         #endif
         contentStack.addArrangedSubview(UIView())
+        contentStack.addArrangedSubview(alignToolbarStack)
         contentStack.addArrangedSubview(inspectorToggleButton)
         updateExportButtonState()
+        updateAlignToolbarVisibility()
 
         configureDocumentStatusView()
         topToolbar.contentView.addSubview(documentStatusView)
@@ -307,6 +310,47 @@ extension EditorViewController {
         ])
     }
 
+    func configureAlignToolbar() {
+        configureToolbarButton(alignLeftButton,
+                               systemName: "align.horizontal.left",
+                               accessibilityLabel: "Align Left",
+                               action: #selector(alignSelectionLeft))
+        configureToolbarButton(alignHorizontalCenterButton,
+                               systemName: "align.horizontal.center",
+                               accessibilityLabel: "Align Horizontal Centers",
+                               action: #selector(alignSelectionHorizontalCenter))
+        configureToolbarButton(alignRightButton,
+                               systemName: "align.horizontal.right",
+                               accessibilityLabel: "Align Right",
+                               action: #selector(alignSelectionRight))
+        configureToolbarButton(alignTopButton,
+                               systemName: "align.vertical.top",
+                               accessibilityLabel: "Align Top",
+                               action: #selector(alignSelectionTop))
+        configureToolbarButton(alignVerticalCenterButton,
+                               systemName: "align.vertical.center",
+                               accessibilityLabel: "Align Vertical Centers",
+                               action: #selector(alignSelectionVerticalCenter))
+        configureToolbarButton(alignBottomButton,
+                               systemName: "align.vertical.bottom",
+                               accessibilityLabel: "Align Bottom",
+                               action: #selector(alignSelectionBottom))
+
+        alignToolbarStack.translatesAutoresizingMaskIntoConstraints = false
+        alignToolbarStack.axis = .horizontal
+        alignToolbarStack.alignment = .center
+        alignToolbarStack.spacing = 2
+        for button in [alignLeftButton, alignHorizontalCenterButton, alignRightButton,
+                       alignTopButton, alignVerticalCenterButton, alignBottomButton]
+        {
+            alignToolbarStack.addArrangedSubview(button)
+        }
+    }
+
+    func updateAlignToolbarVisibility() {
+        alignToolbarStack.isHidden = editorState.selectedLayerIDs.isEmpty
+    }
+
     func configureExportToolbarButton() {
         exportButton.translatesAutoresizingMaskIntoConstraints = false
         exportButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
@@ -353,6 +397,7 @@ extension EditorViewController {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.updateCreationToolSelection()
+                self?.updateAlignToolbarVisibility()
                 self?.observeCreationToolChanges()
             }
         }

@@ -268,6 +268,45 @@ extension EditorViewController {
         arrangeSelection(.sendToBack, actionName: "Send to Back")
     }
 
+    @objc func alignSelectionLeft() {
+        alignSelection(edge: .left, name: "Align Left")
+    }
+
+    @objc func alignSelectionHorizontalCenter() {
+        alignSelection(edge: .horizontalCenter, name: "Align Horizontal Centers")
+    }
+
+    @objc func alignSelectionRight() {
+        alignSelection(edge: .right, name: "Align Right")
+    }
+
+    @objc func alignSelectionTop() {
+        alignSelection(edge: .top, name: "Align Top")
+    }
+
+    @objc func alignSelectionVerticalCenter() {
+        alignSelection(edge: .verticalCenter, name: "Align Vertical Centers")
+    }
+
+    @objc func alignSelectionBottom() {
+        alignSelection(edge: .bottom, name: "Align Bottom")
+    }
+
+    func alignSelection(edge: LayerAlignEdge, name: String) {
+        let layerIDs = editorState.selectedLayerIDs
+        guard !layerIDs.isEmpty else { return }
+        let compositionID = document.core.firstCompositionID
+        let frame = playheadClock.frame
+        perform(name) {
+            document.core.beginMergeGroup()
+            document.core.alignLayers(compositionID: compositionID,
+                                      layerIDs: layerIDs,
+                                      edge: edge,
+                                      frame: frame)
+            document.core.endMergeGroup()
+        }
+    }
+
     func perform(_ actionName: String, edit: () -> Void) {
         edit()
         registerEdit(actionName)

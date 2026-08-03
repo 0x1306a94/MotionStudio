@@ -266,7 +266,7 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 
 ### Task 4: Toolbar UI（Inspector 前）+ 选中显隐
 
-**Status:** 🔄 in progress
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController.swift`（按钮属性）
@@ -278,88 +278,23 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 - Consumes: `alignLayers`、`editorState.selectedLayerIDs`、`perform`、`beginMergeGroup`/`endMergeGroup`、`PlayheadClock`/当前帧
 - Produces: 6 按钮组；无选中 `isHidden = true`
 
-- [ ] **Step 1: Add six buttons + stack**
+- [x] **Step 1: Add six buttons + stack**
 
-在 `EditorViewController` 增加 6 个 `UIButton`（或一个 `alignStack` 内含 6 按钮）。SF Symbol 建议：
+- [x] **Step 2: Insert before Inspector in `configureTopToolbar`**
 
-| Edge | Symbol | Label |
-|---|---|---|
-| left | `align.horizontal.left` | Align Left |
-| horizontalCenter | `align.horizontal.center` | Align Horizontal Centers |
-| right | `align.horizontal.right` | Align Right |
-| top | `align.vertical.top` | Align Top |
-| verticalCenter | `align.vertical.center` | Align Vertical Centers |
-| bottom | `align.vertical.bottom` | Align Bottom |
+- [x] **Step 3: Actions + merge undo**（`playheadClock.frame`；观察路径调用 `updateAlignToolbarVisibility()`）
 
-（若系统版本缺符号，用项目已有 icon 风格或 `text.align*` 替代，保持 6 键语义。）
+- [x] **Step 4: Build**（Xcode MCP `BuildProject` SUCCEEDED；人机点按见 Task 5）
 
-- [ ] **Step 2: Insert before Inspector in `configureTopToolbar`**
+- [x] **Step 5: Update this plan** — Task 4 Done。
 
-将：
-
-```swift
-contentStack.addArrangedSubview(UIView())
-contentStack.addArrangedSubview(inspectorToggleButton)
-```
-
-改为：
-
-```swift
-contentStack.addArrangedSubview(UIView()) // spacer
-contentStack.addArrangedSubview(alignToolbarStack) // 内含 6 按钮，spacing 小
-contentStack.addArrangedSubview(inspectorToggleButton)
-```
-
-`configureToolbarButton` 复用现有样式。
-
-- [ ] **Step 3: Actions + merge undo**
-
-```swift
-@objc func alignSelectionLeft() { alignSelection(edge: .left, name: "Align Left") }
-// … 其余 5 个同理
-
-func alignSelection(edge: LayerAlignEdge, name: String) {
-    let layerIDs = editorState.selectedLayerIDs
-    guard !layerIDs.isEmpty else { return }
-    let compositionID = document.core.firstCompositionID
-    let frame = /* 当前 playhead Int64，与 Inspector 同源 */
-    perform(name) {
-        document.core.beginMergeGroup()
-        document.core.alignLayers(compositionID: compositionID,
-                                  layerIDs: layerIDs,
-                                  edge: edge,
-                                  frame: frame)
-        document.core.endMergeGroup()
-    }
-}
-
-func updateAlignToolbarVisibility() {
-    alignToolbarStack.isHidden = editorState.selectedLayerIDs.isEmpty
-}
-```
-
-在已有观察 `selectedLayerIDs` 的刷新路径调用 `updateAlignToolbarVisibility()`（见 `EditorViewController+Layout.swift` 约 351 行附近）。
-
-- [ ] **Step 4: Build + 手动点一次对齐**（MCP Build）。Expected: SUCCEEDED。
-
-- [ ] **Step 5: Update this plan** — Task 4 Done。
-
-- [ ] **Step 6: Commit**
-
-```bash
-git commit --only \
-  apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController.swift \
-  apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController+Layout.swift \
-  apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController+Commands.swift \
-  docs/superpowers/plans/2026-08-03-layer-align.md \
-  -m "Add layer align controls before the inspector toolbar button."
-```
+- [x] **Step 6: Commit**
 
 ---
 
 ### Task 5: Spec 状态 + 验收
 
-**Status:** ⏳
+**Status:** 🔄 in progress
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-03-layer-align-design.md`
