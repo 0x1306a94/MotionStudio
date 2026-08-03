@@ -28,9 +28,9 @@ struct TransformInspector: View {
         let anchor = core.evaluateVec2(entityID: layerID,
                                        path: TransformProperty.anchorPoint.path,
                                        frame: playheadFrame)
-        let position = core.evaluateVec2(entityID: layerID,
-                                         path: TransformProperty.position.path,
-                                         frame: playheadFrame)
+        let position = core.evaluateLayoutPosition(compositionID: compositionID,
+                                                   layerID: layerID,
+                                                   frame: playheadFrame)
         let scale = core.evaluateVec2(entityID: layerID,
                                       path: TransformProperty.scale.path,
                                       frame: playheadFrame)
@@ -71,7 +71,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
                           isEditable: positionEditable)
         { newValue in
-            setVec2Property(.position, value: CGVector(dx: CGFloat(newValue), dy: position.dy))
+            setLayoutPosition(CGVector(dx: CGFloat(newValue), dy: position.dy))
         } onToggleKeyframe: { _ in
             toggleVec2Keyframe(.position)
         }
@@ -81,7 +81,7 @@ struct TransformInspector: View {
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
                           isEditable: positionEditable)
         { newValue in
-            setVec2Property(.position, value: CGVector(dx: position.dx, dy: CGFloat(newValue)))
+            setLayoutPosition(CGVector(dx: position.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
             toggleVec2Keyframe(.position)
         }
@@ -193,6 +193,15 @@ struct TransformInspector: View {
     private func setVec2Property(_ property: TransformProperty, value: CGVector) {
         performSet(property) {
             writeVec2(property, value: value)
+        }
+    }
+
+    private func setLayoutPosition(_ value: CGVector) {
+        performSet(.position) {
+            core.writeLayoutPosition(compositionID: compositionID,
+                                     layerID: layerID,
+                                     frame: playheadFrame,
+                                     value: value)
         }
     }
 
