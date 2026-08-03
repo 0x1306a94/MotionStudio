@@ -289,14 +289,45 @@ extension EditorViewController {
         guard !layerIDs.isEmpty else { return }
         let compositionID = document.core.firstCompositionID
         let frame = playheadClock.frame
-        perform("Nudge Position") {
+        // Keep one merge group across rapid key repeats (same idea as Core's
+        // 500ms SetStatic merge window used by Inspector step buttons). Closing
+        // the group on every keypress made each arrow its own Undo step.
+        let continuing = isNudgeMergeActive
+        if !continuing {
             document.core.beginMergeGroup()
-            document.core.nudgeLayersPosition(compositionID: compositionID,
-                                              layerIDs: layerIDs,
-                                              delta: CGVector(dx: dx, dy: dy),
-                                              frame: frame)
-            document.core.endMergeGroup()
+            isNudgeMergeActive = true
         }
+        document.core.nudgeLayersPosition(compositionID: compositionID,
+                                          layerIDs: layerIDs,
+                                          delta: CGVector(dx: dx, dy: dy),
+                                          frame: frame)
+        if continuing {
+            document.markEdited()
+            updateSaveButtonState()
+        } else {
+            registerEdit("Nudge Position")
+        }
+        scheduleNudgeMergeEnd()
+    }
+
+    /// Matches `UndoManager` default merge window (500ms).
+    private static let nudgeMergeIdleInterval: TimeInterval = 0.5
+
+    func scheduleNudgeMergeEnd() {
+        nudgeMergeEndWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.endNudgeMergeIfNeeded()
+        }
+        nudgeMergeEndWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.nudgeMergeIdleInterval, execute: work)
+    }
+
+    func endNudgeMergeIfNeeded() {
+        nudgeMergeEndWorkItem?.cancel()
+        nudgeMergeEndWorkItem = nil
+        guard isNudgeMergeActive else { return }
+        document.core.endMergeGroup()
+        isNudgeMergeActive = false
     }
 
     @objc func alignSelectionLeft() {
@@ -339,6 +370,7 @@ extension EditorViewController {
     }
 
     func perform(_ actionName: String, edit: () -> Void) {
+        endNudgeMergeIfNeeded()
         edit()
         registerEdit(actionName)
     }

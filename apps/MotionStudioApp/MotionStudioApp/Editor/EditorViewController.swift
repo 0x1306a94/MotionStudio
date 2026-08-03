@@ -98,6 +98,9 @@ final class EditorViewController: UIViewController {
     var videoExportSession: VideoExportSession?
     var pagExportSession: PagExportSession?
     var documentPickerPurpose: DocumentPickerPurpose = .saveAs
+    /// Open core merge group for rapid arrow-key nudges (one Undo unit).
+    var isNudgeMergeActive = false
+    var nudgeMergeEndWorkItem: DispatchWorkItem?
 
     enum DocumentPickerPurpose {
         case saveAs

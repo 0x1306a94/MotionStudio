@@ -29,7 +29,7 @@
 | 触发 | 有选中层；文本输入框聚焦时由系统消化方向键（不进 editor） |
 | 映射 | ←：Δx = −1；→：Δx = +1；↑：Δy = −1；↓：Δy = +1（合成空间） |
 | 多选 | 每层施加**相同**合成空间位移 |
-| Undo | `beginMergeGroup` → 写各层 → `endMergeGroup`，再经 `perform("Nudge Position")`（或分向命名）登记；一次 Undo 全部还原 |
+| Undo | 连按方向键共用一个 merge group（空闲 500ms 后 `endMergeGroup`）；UIKit 只登记一次 `Nudge Position`；一次 Undo 回到连按前（与 Inspector 步进按钮的 Core merge 体验一致） |
 | 锁定 / 隐藏 | 忽略：仍参与并移动（同 Layer Align） |
 | 父级 | `ms_layer_map_composition_delta` / `mapCompositionDelta` 后写存储 `transform.position` |
 | 语义 | 只改 Position；不改 Anchor / Size / Scale 等 |
