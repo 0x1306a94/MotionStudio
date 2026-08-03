@@ -268,6 +268,37 @@ extension EditorViewController {
         arrangeSelection(.sendToBack, actionName: "Send to Back")
     }
 
+    @objc func nudgeSelectionLeft() {
+        nudgeSelection(dx: -1, dy: 0)
+    }
+
+    @objc func nudgeSelectionRight() {
+        nudgeSelection(dx: 1, dy: 0)
+    }
+
+    @objc func nudgeSelectionUp() {
+        nudgeSelection(dx: 0, dy: -1)
+    }
+
+    @objc func nudgeSelectionDown() {
+        nudgeSelection(dx: 0, dy: 1)
+    }
+
+    func nudgeSelection(dx: CGFloat, dy: CGFloat) {
+        let layerIDs = editorState.selectedLayerIDs
+        guard !layerIDs.isEmpty else { return }
+        let compositionID = document.core.firstCompositionID
+        let frame = playheadClock.frame
+        perform("Nudge Position") {
+            document.core.beginMergeGroup()
+            document.core.nudgeLayersPosition(compositionID: compositionID,
+                                              layerIDs: layerIDs,
+                                              delta: CGVector(dx: dx, dy: dy),
+                                              frame: frame)
+            document.core.endMergeGroup()
+        }
+    }
+
     @objc func alignSelectionLeft() {
         alignSelection(edge: .left, name: "Align Left")
     }

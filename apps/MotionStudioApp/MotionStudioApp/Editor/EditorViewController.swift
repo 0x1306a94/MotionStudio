@@ -176,6 +176,10 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "[", modifierFlags: [.command], action: #selector(sendLayersBackward)),
             UIKeyCommand(input: "]", modifierFlags: [.command, .alternate], action: #selector(bringLayersToFront)),
             UIKeyCommand(input: "[", modifierFlags: [.command, .alternate], action: #selector(sendLayersToBack)),
+            UIKeyCommand(input: UIKeyCommand.inputLeftArrow, modifierFlags: [], action: #selector(nudgeSelectionLeft)),
+            UIKeyCommand(input: UIKeyCommand.inputRightArrow, modifierFlags: [], action: #selector(nudgeSelectionRight)),
+            UIKeyCommand(input: UIKeyCommand.inputUpArrow, modifierFlags: [], action: #selector(nudgeSelectionUp)),
+            UIKeyCommand(input: UIKeyCommand.inputDownArrow, modifierFlags: [], action: #selector(nudgeSelectionDown)),
         ]
     }
 
@@ -205,6 +209,11 @@ final class EditorViewController: UIViewController {
             canArrangeSelection(.sendBackward)
         case #selector(sendLayersToBack):
             canArrangeSelection(.sendToBack)
+        case #selector(nudgeSelectionLeft),
+             #selector(nudgeSelectionRight),
+             #selector(nudgeSelectionUp),
+             #selector(nudgeSelectionDown):
+            !editorState.selectedLayerIDs.isEmpty
         case #selector(UIResponderStandardEditActions.delete(_:)):
             canDeleteSelection()
         default:
