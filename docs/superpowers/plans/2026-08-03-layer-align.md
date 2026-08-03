@@ -294,13 +294,13 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 
 ### Task 5: Spec 状态 + 验收
 
-**Status:** 🔄 in progress
+**Status:** 🔄 in progress（待人机验收）
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-03-layer-align-design.md`
 - Modify: `docs/superpowers/plans/2026-08-03-layer-align.md`
 
-- [ ] **Step 1: Spec 状态改为** `已实现（待人机验收）`
+- [x] **Step 1: Spec 状态改为** `已实现（待人机验收）`
 
 - [ ] **Step 2: Manual checklist**
 
@@ -310,16 +310,9 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 4. 多选对齐后 **一次 Undo** 全部还原  
 5. 无选中时 Align 组隐藏；有选中出现在 Inspector 左侧  
 
-- [ ] **Step 3: Update this plan** — Task 5 Step1/3 `[x]`；Step2 人机通过后勾选。
+- [x] **Step 3: Update this plan** — Step1/3 已勾；Step2 人机通过后勾选并将 Status 改为 ✅ Done。
 
-- [ ] **Step 4: Commit**
-
-```bash
-git commit --only \
-  docs/superpowers/specs/2026-08-03-layer-align-design.md \
-  docs/superpowers/plans/2026-08-03-layer-align.md \
-  -m "Mark layer align spec implemented pending acceptance."
-```
+- [x] **Step 4: Commit**
 
 ---
 
