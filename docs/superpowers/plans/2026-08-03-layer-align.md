@@ -294,15 +294,15 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 
 ### Task 5: Spec 状态 + 验收
 
-**Status:** 🔄 in progress（待人机验收）
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-03-layer-align-design.md`
 - Modify: `docs/superpowers/plans/2026-08-03-layer-align.md`
 
-- [x] **Step 1: Spec 状态改为** `已实现（待人机验收）`
+- [x] **Step 1: Spec 状态改为** `已实现（待人机验收）` → 验收后改为 `已实现（已验收）`
 
-- [ ] **Step 2: Manual checklist**
+- [x] **Step 2: Manual checklist**（人机确认通过）
 
 1. 单选 → Align Left：视觉左边贴 x=0  
 2. 两层 → Align Horizontal Centers：中线对齐并集  
@@ -310,7 +310,7 @@ func alignLayers(compositionID: UInt64, layerIDs: [UInt64], edge: LayerAlignEdge
 4. 多选对齐后 **一次 Undo** 全部还原  
 5. 无选中时 Align 组隐藏；有选中出现在 Inspector 左侧  
 
-- [x] **Step 3: Update this plan** — Step1/3 已勾；Step2 人机通过后勾选并将 Status 改为 ✅ Done。
+- [x] **Step 3: Update this plan** — Task 5 Done。
 
 - [x] **Step 4: Commit**
 
