@@ -77,6 +77,7 @@ struct InspectorView: View {
                                             perform: perform)
 
                         MotionPathInspector(core: core,
+                                            compositionID: core.firstCompositionID,
                                             layerID: layerID,
                                             selectedKeyframeIndex: editorState.motionPathSelectedKeyframe,
                                             isEditable: isEditable,

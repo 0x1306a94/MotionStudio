@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MotionPathInspector: View {
     let core: MotionDocumentCore
+    let compositionID: UInt64
     let layerID: UInt64
     @Environment(PlayheadClock.self) private var clock
     let selectedKeyframeIndex: Int?
@@ -32,8 +33,12 @@ struct MotionPathInspector: View {
             let segment = resolveSegment(frameCount: frames.count)
             let startIndex = segment.start
             let endIndex = segment.end
-            let p0 = core.keyframeVec2(entityID: layerID, path: path, index: startIndex)
-            let p3 = core.keyframeVec2(entityID: layerID, path: path, index: endIndex)
+            let p0 = core.keyframeLayoutPosition(compositionID: compositionID,
+                                                 layerID: layerID,
+                                                 index: startIndex)
+            let p3 = core.keyframeLayoutPosition(compositionID: compositionID,
+                                                 layerID: layerID,
+                                                 index: endIndex)
             let startSpatial = core.keyframeSpatial(entityID: layerID, path: path, index: startIndex)
             let endSpatial = core.keyframeSpatial(entityID: layerID, path: path, index: endIndex)
             let delta = CGVector(dx: p3.dx - p0.dx, dy: p3.dy - p0.dy)
