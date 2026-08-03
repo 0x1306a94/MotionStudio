@@ -37,7 +37,7 @@
 
 ### Task 1: `LayerAlign` 纯函数 + 测试
 
-**Status:** ⏳
+**Status:** ✅ Done
 
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Editor/LayerAlign.swift`
@@ -51,7 +51,7 @@
   - `static func unionBounds(_ rects: [CGRect]) -> CGRect?`
   - `static func compositionDelta(edge: LayerAlignEdge, bounds: CGRect, target: CGRect) -> CGVector`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```swift
 // LayerAlignTests.swift
@@ -105,72 +105,21 @@ struct LayerAlignTests {
 
 （若 `==` 对 `CGVector`/`CGRect` 浮点不稳，改用分量容差。）
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**（与实现一并落地；MCP 最终 4/4 PASS）
 
-优先 Xcode MCP `RunSomeTests`（`MotionStudioAppTests` / `LayerAlignTests`）；不可用则 xcodebuild `-only-testing:MotionStudioAppTests/LayerAlignTests`。
+- [x] **Step 3: Implement `LayerAlign.swift`**
 
-Expected: 编译失败（类型未定义）。
+- [x] **Step 4: Run tests to verify they pass**（Xcode MCP：4/4 PASS）
 
-- [ ] **Step 3: Implement `LayerAlign.swift`**
+- [x] **Step 5: Update this plan** — Task 1 全部 `[x]`，`Status: ✅ Done`。
 
-```swift
-import CoreGraphics
-import Foundation
-
-enum LayerAlignEdge {
-    case left, horizontalCenter, right
-    case top, verticalCenter, bottom
-}
-
-enum LayerAlign {
-    static func unionBounds(_ rects: [CGRect]) -> CGRect? {
-        guard let first = rects.first else { return nil }
-        return rects.dropFirst().reduce(first) { $0.union($1) }
-    }
-
-    static func compositionDelta(edge: LayerAlignEdge,
-                                 bounds: CGRect,
-                                 target: CGRect) -> CGVector
-    {
-        switch edge {
-        case .left:
-            return CGVector(dx: target.minX - bounds.minX, dy: 0)
-        case .horizontalCenter:
-            return CGVector(dx: target.midX - bounds.midX, dy: 0)
-        case .right:
-            return CGVector(dx: target.maxX - bounds.maxX, dy: 0)
-        case .top:
-            return CGVector(dx: 0, dy: target.minY - bounds.minY)
-        case .verticalCenter:
-            return CGVector(dx: 0, dy: target.midY - bounds.midY)
-        case .bottom:
-            return CGVector(dx: 0, dy: target.maxY - bounds.maxY)
-        }
-    }
-}
-```
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-同 Step 2。Expected: PASS。
-
-- [ ] **Step 5: Update this plan** — Task 1 全部 `[x]`，`Status: ✅ Done`。
-
-- [ ] **Step 6: Commit**
-
-```bash
-git commit --only \
-  apps/MotionStudioApp/MotionStudioApp/Editor/LayerAlign.swift \
-  apps/MotionStudioApp/MotionStudioAppTests/LayerAlignTests.swift \
-  docs/superpowers/plans/2026-08-03-layer-align.md \
-  -m "Add LayerAlign helpers for composition-space edge deltas."
-```
+- [x] **Step 6: Commit**
 
 ---
 
 ### Task 2: Bridge `ms_layer_map_composition_delta` + 测试
 
-**Status:** ⏳
+**Status:** 🔄 in progress
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（`ms_composition_layer_bounds` 附近）
