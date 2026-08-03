@@ -25,6 +25,10 @@ pag::Property<pag::Point> *ConvertPoint(const Animatable<Vec2> &source,
                                         std::vector<PagExportWarning> *warnings, EntityId entityId);
 pag::Property<pag::Color> *ConvertColor(const Animatable<Color> &source,
                                         std::vector<PagExportWarning> *warnings, EntityId entityId);
+// PAG Color has no alpha; maps Color.a → Opacity (for Fill/Stroke element opacity).
+pag::Property<pag::Opacity> *ConvertColorAlpha(const Animatable<Color> &source,
+                                               std::vector<PagExportWarning> *warnings,
+                                               EntityId entityId);
 pag::Property<pag::Opacity> *ConvertOpacity(const Animatable<float> &source,
                                             std::vector<PagExportWarning> *warnings,
                                             EntityId entityId);

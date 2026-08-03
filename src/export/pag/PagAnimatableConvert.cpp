@@ -79,6 +79,13 @@ pag::Keyframe<pag::Opacity> *MakeOpacityKeyframe(const Keyframe<float> &from,
     return keyframe;
 }
 
+pag::Keyframe<pag::Opacity> *MakeColorAlphaKeyframe(const Keyframe<Color> &from,
+                                                    const Keyframe<Color> &) {
+    auto *keyframe = new pag::SingleEaseKeyframe<pag::Opacity>();
+    ApplyBezierHandles(keyframe, from.easing, 1);
+    return keyframe;
+}
+
 pag::Keyframe<pag::Color> *MakeColorKeyframe(const Keyframe<Color> &from, const Keyframe<Color> &) {
     auto *keyframe = new pag::SingleEaseKeyframe<pag::Color>();
     ApplyBezierHandles(keyframe, from.easing, 3);
@@ -200,6 +207,10 @@ pag::Opacity ToPagOpacity(float opacity) {
     return static_cast<pag::Opacity>(std::lround(Clamp01(opacity) * 255.0f));
 }
 
+pag::Opacity ToPagOpacityFromColor(const Color &value) {
+    return ToPagOpacity(value.a);
+}
+
 pag::PathHandle ToPagPath(const BezierPath &path) {
     auto data = std::make_shared<pag::PathData>();
     if (path.vertices.empty()) {
@@ -252,6 +263,11 @@ pag::Property<pag::Point> *ConvertPoint(const Animatable<Vec2> &source,
 pag::Property<pag::Color> *ConvertColor(const Animatable<Color> &source,
                                         std::vector<PagExportWarning> *, EntityId) {
     return ConvertAnimatableRef(source, MakeColorKeyframe, ToPagColor);
+}
+
+pag::Property<pag::Opacity> *ConvertColorAlpha(const Animatable<Color> &source,
+                                               std::vector<PagExportWarning> *, EntityId) {
+    return ConvertAnimatableRef(source, MakeColorAlphaKeyframe, ToPagOpacityFromColor);
 }
 
 pag::Property<pag::Opacity> *ConvertOpacity(const Animatable<float> &source,

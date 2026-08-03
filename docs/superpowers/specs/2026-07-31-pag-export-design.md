@@ -487,7 +487,10 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 5. **Text Fill/Stroke**  
    - 样式在 `Layer.styles`，不在 `TextContent`。必须写入 `TextDocument`；否则默认黑填充、`applyStroke=false`。
 
-6. **单层 MappingFailed = soft-fail**  
+6. **Color alpha → Fill/Stroke opacity**  
+   - PAG `Color` 只有 RGB；MS `#RRGGBBAA` 的 A 必须写到 `FillElement`/`StrokeElement` 的 `opacity`（`ConvertColorAlpha`）。漏映射会变成不透明实色。
+
+7. **单层 MappingFailed = soft-fail**  
    - 跳过该层 + warning，继续导出；父层/matte 源被跳过则清链接 + warning。  
    - 硬失败仍限：InvalidComposition / InvalidOptions / EncodeFailed / WriteFailed。
 

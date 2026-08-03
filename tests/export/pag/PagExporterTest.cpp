@@ -161,6 +161,38 @@ TEST(PagExporterTest, CompositionCornerRadiusAddsBackdrop) {
     EXPECT_TRUE(foundCornerWarning);
 }
 
+TEST(PagExporterTest, FillColorAlphaMapsToOpacity) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 50});
+    ASSERT_FALSE(layer->styles.empty());
+    auto *fill = static_cast<FillStyle *>(layer->styles[0].get());
+    // #E4F5FC1A → alpha 0x1A / 255
+    fill->color.setStaticValue(Color{228.0f / 255.0f, 245.0f / 255.0f, 252.0f / 255.0f, 26.0f / 255.0f});
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_FALSE(shapeLayer->contents.empty());
+    auto *group = static_cast<pag::ShapeGroupElement *>(shapeLayer->contents[0]);
+    pag::FillElement *pagFill = nullptr;
+    for (pag::ShapeElement *element : group->elements) {
+        if (element->type() == pag::ShapeType::Fill) {
+            pagFill = static_cast<pag::FillElement *>(element);
+            break;
+        }
+    }
+    ASSERT_NE(pagFill, nullptr);
+    ASSERT_NE(pagFill->opacity, nullptr);
+    EXPECT_EQ(pagFill->opacity->value, 26);
+    EXPECT_EQ(pagFill->color->value.red, 228);
+    EXPECT_EQ(pagFill->color->value.green, 245);
+    EXPECT_EQ(pagFill->color->value.blue, 252);
+}
+
 TEST(PagExporterTest, ShapeRectStaticTransform) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);

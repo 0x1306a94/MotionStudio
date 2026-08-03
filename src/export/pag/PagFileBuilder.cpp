@@ -516,7 +516,7 @@ pag::ShapeLayer *PagFileBuilder::buildCompositionBackdrop(const Composition &com
     fill->blendMode = pag::BlendMode::Normal;
     fill->fillRule = pag::FillRule::NonZeroWinding;
     fill->color = new pag::Property<pag::Color>(ToPagColor(composition.backgroundColor));
-    fill->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+    fill->opacity = new pag::Property<pag::Opacity>(ToPagOpacity(composition.backgroundColor.a));
 
     group->elements.push_back(rect);
     group->elements.push_back(fill);
@@ -1036,7 +1036,8 @@ Expected<void, PagExportError> PagFileBuilder::appendStyles(
             }
             pagFill->fillRule = MapFillRule(fill.fillRule);
             pagFill->color = ConvertColor(fill.color, &warnings_, layer.id);
-            pagFill->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+            // PAG Color is RGB-only; MS Color.a → FillElement.opacity.
+            pagFill->opacity = ConvertColorAlpha(fill.color, &warnings_, layer.id);
             contents->push_back(pagFill);
             continue;
         }
@@ -1061,7 +1062,7 @@ Expected<void, PagExportError> PagFileBuilder::appendStyles(
                 return Unexpected(PagExportError::MappingFailed);
             }
             pagStroke->color = ConvertColor(stroke.color, &warnings_, layer.id);
-            pagStroke->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+            pagStroke->opacity = ConvertColorAlpha(stroke.color, &warnings_, layer.id);
             pagStroke->strokeWidth = ConvertFloat(stroke.width, &warnings_, layer.id);
             pagStroke->lineCap = MapLineCap(stroke.cap);
             pagStroke->lineJoin = MapLineJoin(stroke.join);
