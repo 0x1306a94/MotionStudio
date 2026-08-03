@@ -368,7 +368,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | `ShapeEllipse` | `Ellipse` |
 | `ShapeTrimPath` / Stroke trim* | `TrimPath` |
 | `FillStyle` | `Fill` |
-| `StrokeStyle` | `Stroke`（width/cap/join/miter；`StrokePosition` 无对应则 Center + warning） |
+| `StrokeStyle` | Shape `Stroke`（width/cap/join/miter）。`Inside`/`Outside` → **平行 ShapeLayer**（outline `ShapePath` + `Fill`；trim 先作用于 stroke 几何再做 Inside/Outside 布尔，对齐 MS）；trim 动画按帧烘焙 Path。`Center`+Trim → 平行层（Path+TrimPaths+Stroke），**禁止**把 TrimPaths 放进主层（会裁掉 Fill）。主层仅 Fill + 无 Trim 的 Center Stroke |
 
 \* 若 trim 仅在 `StrokeStyle` 上：导出为 shape 内容链中的 TrimPath，行为对齐 MS 渲染。
 
@@ -426,7 +426,9 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | --- | --- |
 | `UnsupportedFollowPath` | FollowPath 层已跳过或 Bitmap 降级 |
 | `UnsupportedBlendMode` | 混合模式无映射，已降级或近似 |
-| `UnsupportedStrokePosition` | 描边位置无映射，已近似 |
+| `StrokePositionBaked` | Inside/Outside 已导出为平行 outline ShapeLayer |
+| `StrokePositionBakeFailed` | 轮廓烘焙失败，该描边省略 |
+| `StrokeTrimSeparated` | 带 Trim 的 Center Stroke 已拆到平行层，避免裁切 Fill |
 | `SpatialEasingApproximated` | 空间缓动被采样近似 |
 | `TextFeatureApproximated` | 文本特性部分丢失但仍矢量 |
 | `TextStyleApproximated` | 多 Fill/Stroke 折叠为 TextDocument 单组 |
@@ -507,6 +509,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | --- | --- |
 | Shape Rect/Ellipse/Path + Transform KF | Load 成功；ShapeLayer；关键帧数量符合 |
 | Fill + Stroke + Trim | shape contents 含对应元素 |
+| Fill + Inside/Outside Stroke | 主 ShapeLayer（Path+Fill）+ 两个平行 outline ShapeLayer；有 `StrokePositionBaked` warning |
 | Text + Fill/Stroke styles | TextDocument `applyFill`/`fillColor`/`applyStroke`/`strokeWidth` 正确 |
 | Text + `boxTextMode=false`（默认） | `boxText=false`；`firstBaseLine=0`；`position.y` 含 `+ ascent`（无 resolver 时 `fontSize*0.8`） |
 | Text + resolver | `position.y` 使用 resolver 返回的 ascent |
@@ -558,6 +561,6 @@ App UI / Bridge 另开 spec（类似 `mp4-video-export-ui`）。
 
 ## 开放问题（实现期可定，不阻塞本 spec）
 
-1. `StrokePosition::Inside/Outside` 是近似还是直接 Fallback——默认 **近似 Center + warning**
+1. ~~`StrokePosition::Inside/Outside`~~——**已定**：优先保证预览可见 → 平行 outline ShapeLayer（不用 LayerStyle tag 92）；带 Trim 时按 Center
 2. 缺图 asset：失败 vs 彩色占位——默认 **MappingFailed（该层）**；若 `allowBitmapFallback` 可改为占位 Bitmap
 3. ~~libpag CMake 整库 vs 裁剪~~——**已定**：MS `pag_codec`（base+codec），见 §0

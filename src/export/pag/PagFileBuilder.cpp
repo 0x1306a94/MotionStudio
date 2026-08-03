@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <functional>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "MotionStudio/common/BezierPath.h"
@@ -30,6 +32,7 @@
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "PagAnimatableConvert.h"
 #include "PagBitmapFallback.h"
+#include "PagStrokeOutline.h"
 #include "codec/utils/WebpDecoder.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
@@ -568,6 +571,7 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     }
 
     layerByEntity_.clear();
+    strokeSiblingsByEntity_.clear();
     currentHostComposition_ = &composition;
 
     auto *pagComposition = new pag::VectorComposition();
@@ -590,15 +594,22 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
             continue;
         }
 
-        Expected<pag::Layer *, PagExportError> layerResult =
-            Expected<pag::Layer *, PagExportError>(Unexpected(PagExportError::MappingFailed));
+        Expected<std::vector<pag::Layer *>, PagExportError> layerResult =
+            Expected<std::vector<pag::Layer *>, PagExportError>(
+                Unexpected(PagExportError::MappingFailed));
         if (needsBitmapFallback(*layerPtr)) {
-            layerResult = buildFallbackLayer(*layerPtr, composition);
-            if (layerResult.hasValue() && layerPtr->type() == LayerType::Group) {
-                collectDescendants(layerPtr->id, &skippedDescendants);
+            Expected<pag::Layer *, PagExportError> fallback =
+                buildFallbackLayer(*layerPtr, composition);
+            if (fallback.hasValue()) {
+                if (layerPtr->type() == LayerType::Group) {
+                    collectDescendants(layerPtr->id, &skippedDescendants);
+                }
+                layerResult = std::vector<pag::Layer *>{fallback.value()};
+            } else {
+                layerResult = Unexpected(fallback.error());
             }
         } else {
-            layerResult = buildLayer(*layerPtr);
+            layerResult = buildLayers(*layerPtr);
         }
         if (!layerResult.hasValue()) {
             // Soft-fail MappingFailed (and fallback unavailable): skip layer, keep exporting.
@@ -623,11 +634,35 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
             delete pagComposition;
             return Unexpected(layerResult.error());
         }
-        pag::Layer *pagLayer = layerResult.value();
-        pagLayer->containingComposition = pagComposition;
-        contentLayers.push_back(pagLayer);
-        layerByEntity_[layerPtr->id.value] = pagLayer;
+        std::vector<pag::Layer *> built = std::move(layerResult.value());
+        if (built.empty()) {
+            continue;
+        }
+        for (pag::Layer *pagLayer : built) {
+            pagLayer->containingComposition = pagComposition;
+            contentLayers.push_back(pagLayer);
+        }
+        layerByEntity_[layerPtr->id.value] = built.front();
+        if (built.size() > 1) {
+            strokeSiblingsByEntity_[layerPtr->id.value] =
+                std::vector<pag::Layer *>(built.begin() + 1, built.end());
+        }
     }
+
+    auto applyToEntityLayers = [this](EntityId entityId, auto &&apply) {
+        auto primaryIt = layerByEntity_.find(entityId.value);
+        if (primaryIt == layerByEntity_.end()) {
+            return;
+        }
+        apply(primaryIt->second);
+        auto siblingIt = strokeSiblingsByEntity_.find(entityId.value);
+        if (siblingIt == strokeSiblingsByEntity_.end()) {
+            return;
+        }
+        for (pag::Layer *sibling : siblingIt->second) {
+            apply(sibling);
+        }
+    };
 
     for (const auto &layerPtr : composition.layers) {
         auto childIt = layerByEntity_.find(layerPtr->id.value);
@@ -640,7 +675,10 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
                 Warn(&warnings_, layerPtr->id, "SkippedParent",
                      "Parent layer was skipped; clearing parent link");
             } else {
-                childIt->second->parent = parentIt->second;
+                pag::Layer *parent = parentIt->second;
+                applyToEntityLayers(layerPtr->id, [parent](pag::Layer *pagLayer) {
+                    pagLayer->parent = parent;
+                });
             }
         }
         if (layerPtr->trackMatteType != TrackMatteType::None) {
@@ -655,8 +693,12 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
                      "Track matte source was skipped; clearing track matte");
                 continue;
             }
-            childIt->second->trackMatteType = MapTrackMatte(layerPtr->trackMatteType);
-            childIt->second->trackMatteLayer = matteIt->second;
+            const pag::TrackMatteType matteType = MapTrackMatte(layerPtr->trackMatteType);
+            pag::Layer *matteLayer = matteIt->second;
+            applyToEntityLayers(layerPtr->id, [matteType, matteLayer](pag::Layer *pagLayer) {
+                pagLayer->trackMatteType = matteType;
+                pagLayer->trackMatteLayer = matteLayer;
+            });
         }
     }
 
@@ -722,42 +764,38 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     return pagComposition;
 }
 
-Expected<pag::Layer *, PagExportError> PagFileBuilder::buildLayer(const Layer &layer) {
+Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildLayers(
+    const Layer &layer) {
     switch (layer.type()) {
-        case LayerType::Shape: {
-            Expected<pag::ShapeLayer *, PagExportError> shape = buildShapeLayer(layer);
-            if (!shape.hasValue()) {
-                return Unexpected(shape.error());
-            }
-            return shape.value();
-        }
+        case LayerType::Shape:
+            return buildShapeLayers(layer);
         case LayerType::Group: {
             Expected<pag::NullLayer *, PagExportError> nullLayer = buildNullLayer(layer);
             if (!nullLayer.hasValue()) {
                 return Unexpected(nullLayer.error());
             }
-            return nullLayer.value();
+            return std::vector<pag::Layer *>{nullLayer.value()};
         }
         case LayerType::Text: {
             Expected<pag::TextLayer *, PagExportError> text = buildTextLayer(layer);
             if (!text.hasValue()) {
                 return Unexpected(text.error());
             }
-            return text.value();
+            return std::vector<pag::Layer *>{text.value()};
         }
         case LayerType::Image: {
             Expected<pag::ImageLayer *, PagExportError> image = buildImageLayer(layer);
             if (!image.hasValue()) {
                 return Unexpected(image.error());
             }
-            return image.value();
+            return std::vector<pag::Layer *>{image.value()};
         }
         case LayerType::Precomp: {
             Expected<pag::PreComposeLayer *, PagExportError> precomp = buildPrecompLayer(layer);
             if (!precomp.hasValue()) {
                 return Unexpected(precomp.error());
             }
-            return precomp.value();
+            return std::vector<pag::Layer *>{precomp.value()};
         }
     }
     return Unexpected(PagExportError::MappingFailed);
@@ -974,7 +1012,8 @@ Expected<pag::PreComposeLayer *, PagExportError> PagFileBuilder::buildPrecompLay
     return pagLayer;
 }
 
-Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildShapeLayer(const Layer &layer) {
+Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLayers(
+    const Layer &layer) {
     const auto &content = static_cast<const ShapeContent &>(*layer.content);
     if (content.geometry == nullptr) {
         return Unexpected(PagExportError::MappingFailed);
@@ -1006,7 +1045,7 @@ Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildShapeLayer(cons
     }
     group->elements.push_back(geometry.value());
 
-    Expected<void, PagExportError> styles = appendStyles(&group->elements, layer);
+    Expected<void, PagExportError> styles = appendMainStyles(&group->elements, layer);
     if (!styles.hasValue()) {
         delete group;
         delete pagLayer;
@@ -1014,6 +1053,158 @@ Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildShapeLayer(cons
     }
 
     pagLayer->contents.push_back(group);
+
+    std::vector<pag::Layer *> layers;
+    layers.push_back(pagLayer);
+
+    for (const auto &stylePtr : layer.styles) {
+        if (stylePtr->type() != LayerStyleType::Stroke) {
+            continue;
+        }
+        const auto &stroke = *static_cast<const StrokeStyle *>(stylePtr.get());
+        Expected<pag::ShapeLayer *, PagExportError> sibling =
+            Expected<pag::ShapeLayer *, PagExportError>(nullptr);
+        if (stroke.position == StrokePosition::Center) {
+            if (TrimIsDefault(stroke)) {
+                continue;  // stays on the main layer
+            }
+            sibling = buildCenterTrimStrokeLayer(layer, *content.geometry, stroke);
+        } else {
+            sibling = buildPositionedStrokeLayer(layer, *content.geometry, stroke);
+        }
+        if (!sibling.hasValue()) {
+            for (pag::Layer *owned : layers) {
+                delete owned;
+            }
+            return Unexpected(sibling.error());
+        }
+        if (sibling.value() == nullptr) {
+            continue;
+        }
+        layers.push_back(sibling.value());
+    }
+    return layers;
+}
+
+Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildPositionedStrokeLayer(
+    const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke) {
+    std::set<FrameTime> timeSet;
+    CollectStrokeOutlineBakeTimes(geometry, stroke, layer.inPoint, &timeSet);
+    // Animated trim needs per-frame outlines; KF-only Hold cannot spin trimOffset smoothly.
+    if (stroke.trimStart.isAnimated() || stroke.trimEnd.isAnimated() ||
+        stroke.trimOffset.isAnimated()) {
+        for (FrameTime time = layer.inPoint; time < layer.outPoint; ++time) {
+            timeSet.insert(time);
+        }
+    }
+    std::vector<FrameTime> times(timeSet.begin(), timeSet.end());
+    pag::Property<pag::PathHandle> *pathProperty =
+        MakeStrokeOutlinePathProperty(geometry, stroke, times);
+    if (pathProperty == nullptr) {
+        Warn(&warnings_, layer.id, "StrokePositionBakeFailed",
+             "Failed to bake positioned stroke outline; stroke omitted");
+        return nullptr;
+    }
+
+    auto *pagLayer = new pag::ShapeLayer();
+    Expected<void, PagExportError> filled = fillCommonLayer(pagLayer, layer);
+    if (!filled.hasValue()) {
+        delete pathProperty;
+        delete pagLayer;
+        return Unexpected(filled.error());
+    }
+    const char *positionLabel =
+        stroke.position == StrokePosition::Inside ? "Inside" : "Outside";
+    pagLayer->name = layer.name + " / Stroke " + positionLabel;
+
+    auto *group = new pag::ShapeGroupElement();
+    group->transform = new pag::ShapeTransform();
+    group->transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    group->transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    group->transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    group->transform->skew = new pag::Property<float>(0);
+    group->transform->skewAxis = new pag::Property<float>(0);
+    group->transform->rotation = new pag::Property<float>(0);
+    group->transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+
+    auto *pathElement = new pag::ShapePathElement();
+    pathElement->shapePath = pathProperty;
+    group->elements.push_back(pathElement);
+
+    auto *fill = new pag::FillElement();
+    bool blendOk = true;
+    fill->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
+    if (!blendOk) {
+        delete group;
+        delete pagLayer;
+        return Unexpected(PagExportError::MappingFailed);
+    }
+    fill->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
+    fill->fillRule = pag::FillRule::NonZeroWinding;
+    fill->color = ConvertColor(stroke.color, &warnings_, layer.id);
+    fill->opacity = ConvertColorAlpha(stroke.color, &warnings_, layer.id);
+    group->elements.push_back(fill);
+
+    pagLayer->contents.push_back(group);
+    Warn(&warnings_, layer.id, "StrokePositionBaked",
+         "Inside/Outside stroke exported as parallel outline ShapeLayer");
+    return pagLayer;
+}
+
+Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildCenterTrimStrokeLayer(
+    const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke) {
+    auto *pagLayer = new pag::ShapeLayer();
+    Expected<void, PagExportError> filled = fillCommonLayer(pagLayer, layer);
+    if (!filled.hasValue()) {
+        delete pagLayer;
+        return Unexpected(filled.error());
+    }
+    pagLayer->name = layer.name + " / Stroke";
+
+    auto *group = new pag::ShapeGroupElement();
+    group->transform = new pag::ShapeTransform();
+    group->transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    group->transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    group->transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    group->transform->skew = new pag::Property<float>(0);
+    group->transform->skewAxis = new pag::Property<float>(0);
+    group->transform->rotation = new pag::Property<float>(0);
+    group->transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+
+    Expected<pag::ShapeElement *, PagExportError> pathElement = buildGeometry(geometry, layer.id);
+    if (!pathElement.hasValue()) {
+        delete group;
+        delete pagLayer;
+        return Unexpected(pathElement.error());
+    }
+    group->elements.push_back(pathElement.value());
+
+    auto *trim = new pag::TrimPathsElement();
+    trim->start = ConvertPercent(stroke.trimStart, &warnings_, layer.id);
+    trim->end = ConvertPercent(stroke.trimEnd, &warnings_, layer.id);
+    trim->offset = ConvertFloat(stroke.trimOffset, &warnings_, layer.id);
+    group->elements.push_back(trim);
+
+    auto *pagStroke = new pag::StrokeElement();
+    bool blendOk = true;
+    pagStroke->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
+    if (!blendOk) {
+        delete group;
+        delete pagLayer;
+        return Unexpected(PagExportError::MappingFailed);
+    }
+    pagStroke->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
+    pagStroke->color = ConvertColor(stroke.color, &warnings_, layer.id);
+    pagStroke->opacity = ConvertColorAlpha(stroke.color, &warnings_, layer.id);
+    pagStroke->strokeWidth = ConvertFloat(stroke.width, &warnings_, layer.id);
+    pagStroke->lineCap = MapLineCap(stroke.cap);
+    pagStroke->lineJoin = MapLineJoin(stroke.join);
+    pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
+    group->elements.push_back(pagStroke);
+
+    pagLayer->contents.push_back(group);
+    Warn(&warnings_, layer.id, "StrokeTrimSeparated",
+         "Trimmed Center stroke exported on a parallel ShapeLayer so Fill stays untrimmed");
     return pagLayer;
 }
 
@@ -1047,55 +1238,64 @@ Expected<pag::ShapeElement *, PagExportError> PagFileBuilder::buildGeometry(
     return Unexpected(PagExportError::MappingFailed);
 }
 
-Expected<void, PagExportError> PagFileBuilder::appendStyles(
+Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
     std::vector<pag::ShapeElement *> *contents, const Layer &layer) {
+    auto appendFill = [&](const FillStyle &fill) -> Expected<void, PagExportError> {
+        auto *pagFill = new pag::FillElement();
+        bool blendOk = true;
+        pagFill->blendMode = mapBlendMode(fill.blendMode, layer.id, &blendOk);
+        if (!blendOk) {
+            delete pagFill;
+            return Unexpected(PagExportError::MappingFailed);
+        }
+        pagFill->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
+        pagFill->fillRule = MapFillRule(fill.fillRule);
+        pagFill->color = ConvertColor(fill.color, &warnings_, layer.id);
+        pagFill->opacity = ConvertColorAlpha(fill.color, &warnings_, layer.id);
+        contents->push_back(pagFill);
+        return Expected<void, PagExportError>();
+    };
+
+    auto appendCenterStroke = [&](const StrokeStyle &stroke) -> Expected<void, PagExportError> {
+        auto *pagStroke = new pag::StrokeElement();
+        bool blendOk = true;
+        pagStroke->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
+        if (!blendOk) {
+            delete pagStroke;
+            return Unexpected(PagExportError::MappingFailed);
+        }
+        pagStroke->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
+        pagStroke->color = ConvertColor(stroke.color, &warnings_, layer.id);
+        pagStroke->opacity = ConvertColorAlpha(stroke.color, &warnings_, layer.id);
+        pagStroke->strokeWidth = ConvertFloat(stroke.width, &warnings_, layer.id);
+        pagStroke->lineCap = MapLineCap(stroke.cap);
+        pagStroke->lineJoin = MapLineJoin(stroke.join);
+        pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
+        contents->push_back(pagStroke);
+        return Expected<void, PagExportError>();
+    };
+
     for (const auto &stylePtr : layer.styles) {
         if (stylePtr->type() == LayerStyleType::Fill) {
-            const auto &fill = static_cast<const FillStyle &>(*stylePtr);
-            auto *pagFill = new pag::FillElement();
-            bool blendOk = true;
-            pagFill->blendMode = mapBlendMode(fill.blendMode, layer.id, &blendOk);
-            if (!blendOk) {
-                delete pagFill;
-                return Unexpected(PagExportError::MappingFailed);
+            Expected<void, PagExportError> appended =
+                appendFill(*static_cast<const FillStyle *>(stylePtr.get()));
+            if (!appended.hasValue()) {
+                return Unexpected(appended.error());
             }
-            pagFill->fillRule = MapFillRule(fill.fillRule);
-            pagFill->color = ConvertColor(fill.color, &warnings_, layer.id);
-            // PAG Color is RGB-only; MS Color.a → FillElement.opacity.
-            pagFill->opacity = ConvertColorAlpha(fill.color, &warnings_, layer.id);
-            contents->push_back(pagFill);
             continue;
         }
-        if (stylePtr->type() == LayerStyleType::Stroke) {
-            const auto &stroke = static_cast<const StrokeStyle &>(*stylePtr);
-            if (stroke.position != StrokePosition::Center) {
-                Warn(&warnings_, layer.id, "UnsupportedStrokePosition",
-                     "Stroke position approximated as Center");
-            }
-            if (!TrimIsDefault(stroke)) {
-                auto *trim = new pag::TrimPathsElement();
-                trim->start = ConvertPercent(stroke.trimStart, &warnings_, layer.id);
-                trim->end = ConvertPercent(stroke.trimEnd, &warnings_, layer.id);
-                trim->offset = ConvertFloat(stroke.trimOffset, &warnings_, layer.id);
-                contents->push_back(trim);
-            }
-            auto *pagStroke = new pag::StrokeElement();
-            bool blendOk = true;
-            pagStroke->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
-            if (!blendOk) {
-                delete pagStroke;
-                return Unexpected(PagExportError::MappingFailed);
-            }
-            pagStroke->color = ConvertColor(stroke.color, &warnings_, layer.id);
-            pagStroke->opacity = ConvertColorAlpha(stroke.color, &warnings_, layer.id);
-            pagStroke->strokeWidth = ConvertFloat(stroke.width, &warnings_, layer.id);
-            pagStroke->lineCap = MapLineCap(stroke.cap);
-            pagStroke->lineJoin = MapLineJoin(stroke.join);
-            pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
-            contents->push_back(pagStroke);
+        if (stylePtr->type() != LayerStyleType::Stroke) {
+            return Unexpected(PagExportError::MappingFailed);
+        }
+        const auto &stroke = *static_cast<const StrokeStyle *>(stylePtr.get());
+        // Inside/Outside and any trimmed stroke are parallel layers (TrimPaths would clip Fill).
+        if (stroke.position != StrokePosition::Center || !TrimIsDefault(stroke)) {
             continue;
         }
-        return Unexpected(PagExportError::MappingFailed);
+        Expected<void, PagExportError> appended = appendCenterStroke(stroke);
+        if (!appended.hasValue()) {
+            return Unexpected(appended.error());
+        }
     }
     return Expected<void, PagExportError>();
 }

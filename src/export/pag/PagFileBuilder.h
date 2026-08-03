@@ -12,6 +12,7 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeElement.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/Transform.h"
@@ -37,10 +38,16 @@ class PagFileBuilder {
     Expected<void, PagExportError> collectCompositionOrder(EntityId compositionId);
     Expected<pag::VectorComposition *, PagExportError> buildComposition(
         const Composition &composition);
-    Expected<pag::Layer *, PagExportError> buildLayer(const Layer &layer);
+    // Primary layer first; Shape Inside/Outside strokes append parallel sibling layers.
+    Expected<std::vector<pag::Layer *>, PagExportError> buildLayers(const Layer &layer);
     Expected<pag::Layer *, PagExportError> buildFallbackLayer(const Layer &layer,
                                                               const Composition &hostComposition);
-    Expected<pag::ShapeLayer *, PagExportError> buildShapeLayer(const Layer &layer);
+    Expected<std::vector<pag::Layer *>, PagExportError> buildShapeLayers(const Layer &layer);
+    Expected<pag::ShapeLayer *, PagExportError> buildPositionedStrokeLayer(
+        const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke);
+    // Center stroke with Trim — own layer so TrimPaths cannot clip the main Fill.
+    Expected<pag::ShapeLayer *, PagExportError> buildCenterTrimStrokeLayer(
+        const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke);
     Expected<pag::NullLayer *, PagExportError> buildNullLayer(const Layer &layer);
     Expected<pag::TextLayer *, PagExportError> buildTextLayer(const Layer &layer);
     Expected<pag::ImageLayer *, PagExportError> buildImageLayer(const Layer &layer);
@@ -49,8 +56,9 @@ class PagFileBuilder {
     Expected<void, PagExportError> appendMasks(pag::Layer *pagLayer, const Layer &layer);
     Expected<pag::ShapeElement *, PagExportError> buildGeometry(const ShapeElement &element,
                                                                 EntityId layerId);
-    Expected<void, PagExportError> appendStyles(std::vector<pag::ShapeElement *> *contents,
-                                                const Layer &layer);
+    // Fill + Center strokes on the main shape layer (Inside/Outside become sibling layers).
+    Expected<void, PagExportError> appendMainStyles(std::vector<pag::ShapeElement *> *contents,
+                                                    const Layer &layer);
     bool needsBitmapFallback(const Layer &layer) const;
     void collectDescendants(EntityId rootLayerId, std::unordered_set<uint64_t> *out) const;
     void skipLayerWithWarning(const Layer &layer, const char *code, const char *message,
@@ -80,6 +88,8 @@ class PagFileBuilder {
     std::unordered_set<uint64_t> visitedCompositions_;
     std::unordered_map<uint64_t, pag::Composition *> compositionByEntity_;
     std::unordered_map<uint64_t, pag::Layer *> layerByEntity_;
+    // Parallel stroke outline layers for an MS shape entity (share parent / track matte).
+    std::unordered_map<uint64_t, std::vector<pag::Layer *>> strokeSiblingsByEntity_;
     std::unordered_map<uint64_t, pag::ImageBytes *> imageBytesByAsset_;
     std::vector<pag::ImageBytes *> imageBytesList_;
     std::vector<pag::Composition *> bitmapCompositions_;

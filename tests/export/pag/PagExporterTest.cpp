@@ -23,6 +23,7 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "pag/file.h"
@@ -54,6 +55,7 @@ using motion::ShapeContent;
 using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
+using motion::StrokePosition;
 using motion::StrokeStyle;
 using motion::TextContent;
 using motion::TrackMatteType;
@@ -692,6 +694,168 @@ TEST(PagExporterTest, ShapePath) {
     auto result = PagExporter::Export(document, {});
     ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
     ASSERT_NE(DecodeBytes(result.value().bytes), nullptr);
+}
+
+TEST(PagExporterTest, InsideOutsideStrokeBakedAsParallelLayers) {
+    // Shape Stroke has no position; bake Outside/Inside to parallel ShapeLayers
+    // (outline Path + Fill) so viewers draw them and stroke animation can keyframe the path.
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "PathDualStroke";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto path = std::make_unique<ShapePath>();
+    BezierPath geometry;
+    geometry.closed = true;
+    geometry.vertices.push_back({{-50, -50}, {}, {}});
+    geometry.vertices.push_back({{50, -50}, {}, {}});
+    geometry.vertices.push_back({{50, 50}, {}, {}});
+    geometry.vertices.push_back({{-50, 50}, {}, {}});
+    path->path.setStaticValue(geometry);
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.2f, 0.6f, 0.4f, 1.0f});
+    layer->styles.push_back(std::move(fill));
+
+    auto inside = std::make_unique<StrokeStyle>();
+    inside->color.setStaticValue(Color{1, 1, 1, 1});
+    inside->width.setStaticValue(9.0f);
+    inside->position = StrokePosition::Inside;
+    layer->styles.push_back(std::move(inside));
+
+    auto outside = std::make_unique<StrokeStyle>();
+    outside->color.setStaticValue(Color{0, 0, 0, 1});
+    outside->width.setStaticValue(9.0f);
+    outside->position = StrokePosition::Outside;
+    layer->styles.push_back(std::move(outside));
+
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    int bakedCount = 0;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "StrokePositionBaked") {
+            ++bakedCount;
+        }
+        EXPECT_NE(warning.code, "UnsupportedStrokePosition");
+        EXPECT_NE(warning.code, "StrokePositionBakeFailed");
+        EXPECT_NE(warning.code, "StrokePositionApproximated");
+    }
+    EXPECT_EQ(bakedCount, 2);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    // PAG order: index 0 = topmost. After reverse: Outside, Inside, Main, …, backdrop.
+    ASSERT_GE(vector->layers.size(), 4u);
+    auto *outsideLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    auto *insideLayer = static_cast<pag::ShapeLayer *>(vector->layers[1]);
+    auto *mainLayer = static_cast<pag::ShapeLayer *>(vector->layers[2]);
+    EXPECT_EQ(outsideLayer->name, "PathDualStroke / Stroke Outside");
+    EXPECT_EQ(insideLayer->name, "PathDualStroke / Stroke Inside");
+    EXPECT_EQ(mainLayer->name, "PathDualStroke");
+    EXPECT_TRUE(mainLayer->layerStyles.empty());
+
+    ASSERT_EQ(mainLayer->contents.size(), 1u);
+    auto *mainGroup = static_cast<pag::ShapeGroupElement *>(mainLayer->contents[0]);
+    ASSERT_EQ(mainGroup->elements.size(), 2u);
+    EXPECT_EQ(mainGroup->elements[0]->type(), pag::ShapeType::ShapePath);
+    EXPECT_EQ(mainGroup->elements[1]->type(), pag::ShapeType::Fill);
+
+    auto expectOutlineLayer = [](pag::ShapeLayer *shapeLayer, uint8_t red, uint8_t green,
+                                 uint8_t blue) {
+        ASSERT_EQ(shapeLayer->contents.size(), 1u);
+        auto *group = static_cast<pag::ShapeGroupElement *>(shapeLayer->contents[0]);
+        ASSERT_EQ(group->elements.size(), 2u);
+        EXPECT_EQ(group->elements[0]->type(), pag::ShapeType::ShapePath);
+        ASSERT_EQ(group->elements[1]->type(), pag::ShapeType::Fill);
+        auto *fillElement = static_cast<pag::FillElement *>(group->elements[1]);
+        EXPECT_EQ(fillElement->color->value.red, red);
+        EXPECT_EQ(fillElement->color->value.green, green);
+        EXPECT_EQ(fillElement->color->value.blue, blue);
+    };
+    expectOutlineLayer(insideLayer, 255, 255, 255);
+    expectOutlineLayer(outsideLayer, 0, 0, 0);
+}
+
+TEST(PagExporterTest, PositionedStrokeTrimDoesNotClipMainFill) {
+    // TrimPaths on the main group would clip Fill; trimmed Outside must be a sibling layer.
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "PathTrimOutside";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto path = std::make_unique<ShapePath>();
+    BezierPath geometry;
+    geometry.closed = true;
+    geometry.vertices.push_back({{-50, -50}, {}, {}});
+    geometry.vertices.push_back({{50, -50}, {}, {}});
+    geometry.vertices.push_back({{50, 50}, {}, {}});
+    geometry.vertices.push_back({{-50, 50}, {}, {}});
+    path->path.setStaticValue(geometry);
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.2f, 0.6f, 0.4f, 1.0f});
+    layer->styles.push_back(std::move(fill));
+
+    auto outside = std::make_unique<StrokeStyle>();
+    outside->color.setStaticValue(Color{0, 0, 0, 1});
+    outside->width.setStaticValue(9.0f);
+    outside->position = StrokePosition::Outside;
+    outside->trimStart.setStaticValue(0.05f);
+    outside->trimEnd.setStaticValue(0.35f);
+    Keyframe<float> offset0;
+    offset0.time = 0;
+    offset0.value = 0.0f;
+    Keyframe<float> offset1;
+    offset1.time = 149;
+    offset1.value = 3600.0f;
+    outside->trimOffset.addKeyframe(offset0);
+    outside->trimOffset.addKeyframe(offset1);
+    layer->styles.push_back(std::move(outside));
+
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_GE(vector->layers.size(), 3u);
+
+    pag::ShapeLayer *mainLayer = nullptr;
+    pag::ShapeLayer *strokeLayer = nullptr;
+    for (pag::Layer *pagLayer : vector->layers) {
+        if (pagLayer->name == "PathTrimOutside") {
+            mainLayer = static_cast<pag::ShapeLayer *>(pagLayer);
+        } else if (pagLayer->name == "PathTrimOutside / Stroke Outside") {
+            strokeLayer = static_cast<pag::ShapeLayer *>(pagLayer);
+        }
+    }
+    ASSERT_NE(mainLayer, nullptr);
+    ASSERT_NE(strokeLayer, nullptr);
+
+    auto *mainGroup = static_cast<pag::ShapeGroupElement *>(mainLayer->contents[0]);
+    for (pag::ShapeElement *element : mainGroup->elements) {
+        EXPECT_NE(element->type(), pag::ShapeType::TrimPaths);
+        EXPECT_NE(element->type(), pag::ShapeType::Stroke);
+    }
+    ASSERT_EQ(mainGroup->elements.size(), 2u);
+    EXPECT_EQ(mainGroup->elements[0]->type(), pag::ShapeType::ShapePath);
+    EXPECT_EQ(mainGroup->elements[1]->type(), pag::ShapeType::Fill);
+
+    auto *strokeGroup = static_cast<pag::ShapeGroupElement *>(strokeLayer->contents[0]);
+    ASSERT_EQ(strokeGroup->elements.size(), 2u);
+    EXPECT_EQ(strokeGroup->elements[0]->type(), pag::ShapeType::ShapePath);
+    EXPECT_EQ(strokeGroup->elements[1]->type(), pag::ShapeType::Fill);
+    auto *pathElement = static_cast<pag::ShapePathElement *>(strokeGroup->elements[0]);
+    ASSERT_TRUE(pathElement->shapePath->animatable());
 }
 
 TEST(PagExporterTest, EllipseAndStroke) {
