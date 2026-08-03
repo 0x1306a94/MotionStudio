@@ -4,7 +4,7 @@
 
 **Goal:** 让所有向用户展示/编辑的 `transform.position` 数字表示局部 AABB 左上角在父空间中的位置，底层仍存 AE 式锚点位置。
 
-**Architecture:** Swift 纯函数 `LayoutPosition` 负责 `offset = R·S·(bounds.min − anchor)` 与 stored↔layout 换算；`MotionDocumentCore` 提供 `evaluateLayoutPosition` / `writeLayoutPosition` 门面（读 `layerLocalBounds` + transform 属性）；Inspector / Motion Path 数值入口改走门面。FreeTransform 等内部写回保持存储坐标。
+**Architecture:** Swift 纯函数 `LayoutPosition` 负责 `offset = R·S·(anchor − bounds.min)` 与 stored↔layout 换算；`MotionDocumentCore` 提供 `evaluateLayoutPosition` / `writeLayoutPosition` 门面（读 `layerLocalBounds` + transform 属性）；Inspector / Motion Path 数值入口改走门面。FreeTransform 等内部写回保持存储坐标。
 
 **Tech Stack:** SwiftUI、`MotionDocumentCore`、Swift Testing、现有 `ms_layer_local_bounds`。
 
@@ -15,7 +15,7 @@
 - 不改 Core `Transform`、文件格式、序列化、Lottie/PAG 导出。
 - 不改 `ShapeProperty.position`；不改 FreeTransform / 锚点补偿 / recenter 的存储坐标写回。
 - 左上角 = `localBounds.min`；无 bounds 或空 rect → `offset = 0`。
-- 旋转缩放公式与 `AnchorPreset.compensatedPosition` 一致：先 scale 分量乘，再按度转弧度旋转。
+- UI offset = `R·S·(anchor − bounds.min)`；`layout = stored − offset`。旋转缩放与 `AnchorPreset.compensatedPosition` 同序：先 scale 再旋转。
 - 新 Swift 文件放 `apps/MotionStudioApp/MotionStudioApp/Inspector/`（folder 引用，无需改 pbxproj）；测试放 `MotionStudioAppTests/`。
 - 提交：每任务结束后 commit（不推送）；commit 信息英语一句、句号结尾、无其它标点。
 
@@ -34,6 +34,8 @@
 
 ### Task 1: `LayoutPosition` 纯函数 + 单元测试
 
+**Status:** ✅ Done（commit `b5e171b`；实现时修正 offset 符号为 `R·S·(anchor − min)`）
+
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/LayoutPosition.swift`
 - Create: `apps/MotionStudioApp/MotionStudioAppTests/LayoutPositionTests.swift`
@@ -47,90 +49,11 @@
   - `static func toLayout(stored: CGVector, offset: CGVector) -> CGVector`
   - `static func toStored(layout: CGVector, offset: CGVector) -> CGVector`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
-```swift
-//
-//  LayoutPositionTests.swift
-//  MotionStudioAppTests
-//
+（测试代码见 `LayoutPositionTests.swift`；实现时将 offset 定为 `R·S·(anchor − min)`，用例期望已随之修正。）
 
-import CoreGraphics
-import Foundation
-@testable import MotionStudio
-import Testing
-
-@MainActor
-struct LayoutPositionTests {
-    @Test
-    func `image center anchor maps layout to top left`() {
-        let bounds = CGRect(x: 0, y: 0, width: 200, height: 200)
-        let offset = LayoutPosition.offset(anchor: CGVector(dx: 100, dy: 100),
-                                           scale: CGVector(dx: 1, dy: 1),
-                                           rotationDegrees: 0,
-                                           localBounds: bounds)
-        #expect(abs(offset.dx - 100) < 1e-4)
-        #expect(abs(offset.dy - 100) < 1e-4)
-        let layout = LayoutPosition.toLayout(stored: CGVector(dx: 200, dy: 200), offset: offset)
-        #expect(abs(layout.dx - 100) < 1e-4)
-        #expect(abs(layout.dy - 100) < 1e-4)
-    }
-
-    @Test
-    func `recentered shape min corner offset`() {
-        let bounds = CGRect(x: -50, y: -40, width: 100, height: 80)
-        let offset = LayoutPosition.offset(anchor: CGVector(dx: 0, dy: 0),
-                                           scale: CGVector(dx: 1, dy: 1),
-                                           rotationDegrees: 0,
-                                           localBounds: bounds)
-        #expect(abs(offset.dx - (-50)) < 1e-4)
-        #expect(abs(offset.dy - (-40)) < 1e-4)
-        let layout = LayoutPosition.toLayout(stored: CGVector(dx: 300, dy: 300), offset: offset)
-        #expect(abs(layout.dx - 350) < 1e-4)
-        #expect(abs(layout.dy - 340) < 1e-4)
-    }
-
-    @Test
-    func `write layout zero stores position at offset`() {
-        let offset = CGVector(dx: 100, dy: 50)
-        let stored = LayoutPosition.toStored(layout: .zero, offset: offset)
-        #expect(abs(stored.dx - 100) < 1e-4)
-        #expect(abs(stored.dy - 50) < 1e-4)
-        let roundTrip = LayoutPosition.toLayout(stored: stored, offset: offset)
-        #expect(abs(roundTrip.dx) < 1e-4)
-        #expect(abs(roundTrip.dy) < 1e-4)
-    }
-
-    @Test
-    func `rotation and scale transform min minus anchor`() {
-        // bounds.min=(0,0), anchor=(10,0), scale=(2,1), rot=90° CCW
-        // delta=(-10,0) → scaled=(-20,0) → rotated=(0,-20)
-        let bounds = CGRect(x: 0, y: 0, width: 40, height: 20)
-        let offset = LayoutPosition.offset(anchor: CGVector(dx: 10, dy: 0),
-                                           scale: CGVector(dx: 2, dy: 1),
-                                           rotationDegrees: 90,
-                                           localBounds: bounds)
-        #expect(abs(offset.dx - 0) < 1e-4)
-        #expect(abs(offset.dy - (-20)) < 1e-4)
-    }
-
-    @Test
-    func `empty bounds yield zero offset`() {
-        let offset = LayoutPosition.offset(anchor: CGVector(dx: 100, dy: 100),
-                                           scale: CGVector(dx: 1, dy: 1),
-                                           rotationDegrees: 0,
-                                           localBounds: .null)
-        #expect(offset == .zero)
-        let empty = LayoutPosition.offset(anchor: CGVector(dx: 100, dy: 100),
-                                          scale: CGVector(dx: 1, dy: 1),
-                                          rotationDegrees: 0,
-                                          localBounds: CGRect(x: 0, y: 0, width: 0, height: 10))
-        #expect(empty == .zero)
-    }
-}
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 优先 Xcode MCP；不可用则：
 
@@ -142,7 +65,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp \
 
 Expected: 编译失败（`LayoutPosition` 未定义）。
 
-- [ ] **Step 3: Implement `LayoutPosition.swift`**
+- [x] **Step 3: Implement `LayoutPosition.swift`**
 
 ```swift
 //
@@ -188,11 +111,11 @@ enum LayoutPosition {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
-同 Step 2 命令。Expected: PASS。
+同 Step 2 命令 / Xcode MCP `RunSomeTests`。Expected: PASS（已验证 5/5）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/MotionStudioApp/MotionStudioApp/Inspector/LayoutPosition.swift \
@@ -203,6 +126,8 @@ git commit -m "Add LayoutPosition helpers for top-left UI coordinates."
 ---
 
 ### Task 2: `MotionDocumentCore` layout 门面
+
+**Status:** ✅ Done（commit `0c2270b`）
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`（在 `layerLocalBounds` 附近或 Transform 读写区新增）
@@ -215,7 +140,7 @@ git commit -m "Add LayoutPosition helpers for top-left UI coordinates."
   - `func writeLayoutPosition(compositionID: UInt64, layerID: UInt64, frame: Int64, value: CGVector)`
   - `func keyframeLayoutPosition(compositionID: UInt64, layerID: UInt64, index: Int) -> CGVector`
 
-- [ ] **Step 1: Add facade methods**
+- [x] **Step 1: Add facade methods**
 
 在 `MotionDocumentCore` 中 `layerLocalBounds` 之后插入：
 
@@ -284,7 +209,7 @@ func keyframeLayoutPosition(compositionID: UInt64, layerID: UInt64, index: Int) 
 
 确保 `TransformProperty` 在该文件已可见（已有其它用法）。
 
-- [ ] **Step 2: Build to verify compile**
+- [x] **Step 2: Build to verify compile**
 
 优先 Xcode MCP `BuildProject`；不可用则：
 
@@ -295,9 +220,9 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp \
   ARCHS=arm64 build
 ```
 
-Expected: BUILD SUCCEEDED。
+Expected: BUILD SUCCEEDED（已用 MCP 验证）。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift
@@ -308,6 +233,8 @@ git commit -m "Expose layout position read and write on MotionDocumentCore."
 
 ### Task 3: `TransformInspector` 接入 layout position
 
+**Status:** ✅ Done（commit `db76f78`）
+
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/TransformInspector.swift`
 
@@ -315,7 +242,7 @@ git commit -m "Expose layout position read and write on MotionDocumentCore."
 - Consumes: `evaluateLayoutPosition`、`writeLayoutPosition`
 - Produces: Position X/Y 行显示/编辑 layout 坐标；锚点预设与其它属性仍写存储坐标
 
-- [ ] **Step 1: Switch position rows to layout facade**
+- [x] **Step 1: Switch position rows to layout facade**
 
 将 body 内：
 
@@ -379,11 +306,11 @@ private func setLayoutPosition(_ value: CGVector) {
 let value = core.evaluateVec2(entityID: layerID, path: property.path, frame: playheadFrame)
 ```
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
-同 Task 2 Step 2。Expected: BUILD SUCCEEDED。
+同 Task 2 Step 2。Expected: BUILD SUCCEEDED（已用 MCP 验证）。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/MotionStudioApp/MotionStudioApp/Inspector/TransformInspector.swift
@@ -394,6 +321,8 @@ git commit -m "Show and edit Transform position as layout top-left."
 
 ### Task 4: `MotionPathInspector` 关键帧点按 layout 显示
 
+**Status:** ✅ Done（commit `28ded84`）
+
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/MotionPathInspector.swift`
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/InspectorView.swift`
@@ -402,7 +331,7 @@ git commit -m "Show and edit Transform position as layout top-left."
 - Consumes: `keyframeLayoutPosition(compositionID:layerID:index:)`
 - Produces: CubicBezierPad 的 `p0/p3`（及由其推出的 `c1/c2`）在 layout 空间；切线相对位移不变（段内 offset 恒定时精确）
 
-- [ ] **Step 1: Pass `compositionID` into `MotionPathInspector`**
+- [x] **Step 1: Pass `compositionID` into `MotionPathInspector`**
 
 `MotionPathInspector` 增加：
 
@@ -425,7 +354,7 @@ MotionPathInspector(core: core,
                     })
 ```
 
-- [ ] **Step 2: Convert keyframe endpoints to layout**
+- [x] **Step 2: Convert keyframe endpoints to layout**
 
 将：
 
@@ -447,11 +376,11 @@ let p3 = core.keyframeLayoutPosition(compositionID: compositionID,
 
 `writeSegment` 仍用传入的 `p0/p3` 与 `c1/c2` 算相对切线并 `setSpatialTangents`——**不要**把切线再加 offset（相对量）。段内 offset 变化时的近似限制见 spec，此处不额外处理。
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
-同 Task 2 Step 2。Expected: BUILD SUCCEEDED。
+同 Task 2 Step 2。Expected: BUILD SUCCEEDED（已用 MCP 验证）。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/MotionStudioApp/MotionStudioApp/Inspector/MotionPathInspector.swift \
@@ -463,6 +392,8 @@ git commit -m "Display motion path keyframe points in layout coordinates."
 
 ### Task 5: Spec 状态 + 验收核对
 
+**Status:** ⏳ Spec 已更新（commit `2996e09`）；人机验收待确认
+
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-03-layout-position-ui-design.md`
 
@@ -470,7 +401,7 @@ git commit -m "Display motion path keyframe points in layout coordinates."
 - Consumes: Tasks 1–4 已完成行为
 - Produces: spec 状态更新
 
-- [ ] **Step 1: Update spec status**
+- [x] **Step 1: Update spec status**
 
 将文首状态改为：
 
@@ -487,7 +418,7 @@ git commit -m "Display motion path keyframe points in layout coordinates."
 3. 画布拖拽图层 → Inspector Position 与视觉左上角一致
 4. （可选）带 position 关键帧时打开 Motion Path pad，端点与 Inspector 数字一致
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-03-layout-position-ui-design.md
