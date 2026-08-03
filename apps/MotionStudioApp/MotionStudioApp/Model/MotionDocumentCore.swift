@@ -344,6 +344,34 @@ final class MotionDocumentCore {
         }
     }
 
+    /// Translates selected layers by a composition-space delta. Caller owns merge group.
+    func nudgeLayersPosition(compositionID: UInt64,
+                             layerIDs: [UInt64],
+                             delta: CGVector,
+                             frame: Int64)
+    {
+        guard !layerIDs.isEmpty else { return }
+        if abs(delta.dx) < 1e-6, abs(delta.dy) < 1e-6 { return }
+        let path = TransformProperty.position.path
+        for layerID in layerIDs {
+            guard let deltaParent = mapCompositionDelta(compositionID: compositionID,
+                                                        layerID: layerID,
+                                                        frame: frame,
+                                                        delta: delta)
+            else {
+                continue
+            }
+            let stored = evaluateVec2(entityID: layerID, path: path, frame: frame)
+            let next = CGVector(dx: stored.dx + deltaParent.dx,
+                                dy: stored.dy + deltaParent.dy)
+            if keyframes(entityID: layerID, path: path).contains(where: { $0.frame == frame }) {
+                addKeyframeVec2(entityID: layerID, path: path, frame: frame, value: next)
+            } else {
+                setStaticVec2(entityID: layerID, path: path, value: next)
+            }
+        }
+    }
+
     func layerLocalBounds(compositionID: UInt64, layerID: UInt64, frameTime: Double) -> CGRect? {
         var minX: Float = 0
         var minY: Float = 0
