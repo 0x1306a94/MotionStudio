@@ -378,8 +378,8 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 `boxTextMode` 直映 PAG / AE 点文本 vs 段落（框）文本：
 
-- `boxTextMode == false`（默认点文本）→ `boxText = false`，`boxTextSize = 0`，`firstBaseLine = 0`。
-- `boxTextMode == true`（框文本：换行 + shrink）→ `boxText = true`，`boxTextPos = (0,0)`，`boxTextSize = size`；`firstBaseLine ≈ boxTextPos.y + fontSize * 0.8`（导出层无字体 metrics 时的启发式；**禁止**对框文本留 0，否则 PAG 会竖直居中）。
+- `boxTextMode == false`（默认点文本）→ `boxText = false`，`boxTextSize = 0`，`firstBaseLine = 0`；并把 `transform.position.y` **加上** 真实 `ascent`（`PagExportOptions::textAscentResolver`；未提供时回退 `fontSize * 0.8`。MS 原点在文字顶边，PAG/AE 原点在首行 baseline，见 §5.1）。
+- `boxTextMode == true`（框文本：换行 + shrink）→ `boxText = true`，`boxTextPos = (0,0)`，`boxTextSize = size`；`firstBaseLine ≈ boxTextPos.y + ascent`（同上；**禁止**对框文本留 0，否则 PAG 会竖直居中）。框文本不改 position。
 - 不再为 shrink 发 `TextFeatureApproximated`（MS shrink 对齐 PAG 框文本适配）。
 
 **Image**：读 `Asset.path`（相对 `projectRoot`）→ 编码为 `ImageBytes`（**源像素尺寸**，对齐 AE）；`ImageContent.size` + `scaleMode` 按 `ComputeImageDestinationRect` **烘焙进** `transform.scale` / `anchor`（AE 无独立容器，改大小走 Transform）。`ImageFillRule::scaleMode` 保留给运行时换图。Zoom/None 溢出容器时加矩形 Mask。`size` 关键帧首版按 inPoint 静帧烘焙并 warning。
@@ -487,10 +487,15 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 5. **Text Fill/Stroke**  
    - 样式在 `Layer.styles`，不在 `TextContent`。必须写入 `TextDocument`；否则默认黑填充、`applyStroke=false`。
 
-6. **Color alpha → Fill/Stroke opacity**  
+6. **点文本竖直位置（baseline）**  
+   - MS：层原点在文字**顶边**，首行 baseline ≈ 字体 `ascent`（PingFang SC ≈ `1.06 * fontSize`，不是 `0.8`）。  
+   - PAG/AE：点文本层原点在**首行 baseline**（`firstBaseLine=0` 时字形画在 local y=0）。  
+   - 只拷贝 position → 文字整体偏上约一个 ascent。导出时 `position.y += ascent`；bridge 用 tgfx `FontMetrics.ascent`（与 MS TextLayout 同源），无 resolver 时回退 `fontSize * 0.8`。
+
+7. **Color alpha → Fill/Stroke opacity**  
    - PAG `Color` 只有 RGB；MS `#RRGGBBAA` 的 A 必须写到 `FillElement`/`StrokeElement` 的 `opacity`（`ConvertColorAlpha`）。漏映射会变成不透明实色。
 
-7. **单层 MappingFailed = soft-fail**  
+8. **单层 MappingFailed = soft-fail**  
    - 跳过该层 + warning，继续导出；父层/matte 源被跳过则清链接 + warning。  
    - 硬失败仍限：InvalidComposition / InvalidOptions / EncodeFailed / WriteFailed。
 
@@ -503,8 +508,9 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | Shape Rect/Ellipse/Path + Transform KF | Load 成功；ShapeLayer；关键帧数量符合 |
 | Fill + Stroke + Trim | shape contents 含对应元素 |
 | Text + Fill/Stroke styles | TextDocument `applyFill`/`fillColor`/`applyStroke`/`strokeWidth` 正确 |
-| Text + `boxTextMode=false`（默认） | `boxText=false`；`firstBaseLine=0` |
-| Text + `boxTextMode=true` | `boxText=true`；`boxTextSize=size`；`firstBaseLine ≈ fontSize*0.8`；无 shrink warning |
+| Text + `boxTextMode=false`（默认） | `boxText=false`；`firstBaseLine=0`；`position.y` 含 `+ ascent`（无 resolver 时 `fontSize*0.8`） |
+| Text + resolver | `position.y` 使用 resolver 返回的 ascent |
+| Text + `boxTextMode=true` | `boxText=true`；`boxTextSize=size`；`firstBaseLine ≈ ascent`；无 shrink warning |
 | Image 容器 ≠ 源尺寸 + LetterBox | `ImageBytes` 仍为源尺寸；transform.scale 含容器 fit |
 | Mask Add/Sub/Intersect | masks 非空且 mode 正确 |
 | TrackMatte | 类型/邻接正确；**matte 源 `isActive == false`** |

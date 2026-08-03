@@ -2,12 +2,16 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/export/PagExporter.h"
 #include "MotionStudio/model/Document.h"
+#include "TgfxGlyphMetrics.h"
+#include "TgfxTextTypeface.h"
 #include "common/DocumentLock.h"
+#include "tgfx/core/Typeface.h"
 
 namespace {
 
@@ -64,6 +68,17 @@ bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExpo
     exportOptions.compositionId = motion::EntityId{compositionId};
     exportOptions.allowBitmapFallback = options->allowBitmapFallback;
     exportOptions.bitmapScale = options->bitmapScale > 0.0f ? options->bitmapScale : 1.0f;
+    // Match MS TextLayout baseline (tgfx FontMetrics.ascent) instead of fontSize*0.8.
+    exportOptions.textAscentResolver = [](const std::string &fontFamily,
+                                          const std::string &fontStyle, float fontSize) -> float {
+        std::shared_ptr<tgfx::Typeface> typeface =
+            motion::ResolveTextTypeface(fontFamily, fontStyle);
+        if (typeface == nullptr || fontSize <= 0.0f) {
+            return 0.0f;
+        }
+        const motion::TgfxGlyphMetrics glyphMetrics(typeface);
+        return glyphMetrics.metrics(fontSize).ascent;
+    };
 
     const auto result =
         motion::PagExporter::Export(*document->document, exportOptions, nullptr);

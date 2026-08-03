@@ -39,6 +39,22 @@ namespace motion {
 namespace pag_export {
 namespace {
 
+// MS lays out point text from the box top (first baseline ≈ ascent).
+// PAG/AE point text places the layer origin on the first baseline.
+// Fallback when PagExportOptions::textAscentResolver is unset / returns <= 0.
+constexpr float kTextAscentFactor = 0.8f;
+
+float ResolveTextAscent(const PagExportOptions &options, const std::string &fontFamily,
+                        const std::string &fontStyle, float fontSize) {
+    if (options.textAscentResolver) {
+        const float ascent = options.textAscentResolver(fontFamily, fontStyle, fontSize);
+        if (ascent > 0.0f) {
+            return ascent;
+        }
+    }
+    return fontSize * kTextAscentFactor;
+}
+
 bool TrimIsDefault(const StrokeStyle &stroke) {
     if (stroke.trimStart.isAnimated() || stroke.trimEnd.isAnimated() ||
         stroke.trimOffset.isAnimated()) {
@@ -765,6 +781,15 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
         delete pagLayer;
         return Unexpected(filled.error());
     }
+    // Point text: MS position is the content top; PAG position is the first baseline.
+    if (!content.boxTextMode && pagLayer->transform != nullptr &&
+        pagLayer->transform->position != nullptr) {
+        const float ascent = ResolveTextAscent(options_, content.fontFamily, content.fontStyle,
+                                               content.fontSize);
+        MapPointProperty(pagLayer->transform->position, [ascent](pag::Point point) {
+            return pag::Point::Make(point.x, point.y + ascent);
+        });
+    }
     pagLayer->sourceText = buildSourceText(layer, content);
     return pagLayer;
 }
@@ -781,14 +806,14 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
     document->justification = MapAlign(content.align);
 
     // boxTextMode maps directly to PAG/AE paragraph (box) text.
-    // Without font metrics at export time, approximate first baseline as ~ascent from box top
-    // so PAG does not treat firstBaseLine==0 as vertically-centered box text.
-    constexpr float kAscentFactor = 0.8f;
+    // firstBaseLine must be non-zero for box text or PAG vertically centers the block.
     if (content.boxTextMode) {
         document->boxText = true;
         document->boxTextPos = pag::Point::Zero();
         document->boxTextSize = pag::Point::Make(content.size.x, content.size.y);
-        document->firstBaseLine = document->boxTextPos.y + fontSize * kAscentFactor;
+        document->firstBaseLine =
+            document->boxTextPos.y +
+            ResolveTextAscent(options_, content.fontFamily, content.fontStyle, fontSize);
     } else {
         document->boxText = false;
         document->boxTextPos = pag::Point::Zero();
