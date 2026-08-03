@@ -192,6 +192,28 @@ Mat3 Layer::worldTransform(FrameTime t, const Document& doc) const {
 
 > ⚠️ **防环**：`setParent()` 必须沿父链检测环路并拒绝会形成环的操作。
 
+#### Position：数据层 vs UI 层
+
+| 层 | 含义 | 落点 |
+|---|---|---|
+| **数据层（存储 / Bridge / 导出）** | AE 语义：`position` = **锚点**在父空间中的位置 | `Transform.position`、序列化、Lottie/PAG、FreeTransform 等内部写回 |
+| **UI 层（Inspector / 关键帧数值）** | 布局语义：数字 = 局部 AABB **左上角**（`localBounds.min`）在父空间中的位置 | App：`LayoutPosition` + `MotionDocumentCore.evaluateLayoutPosition` / `writeLayoutPosition` |
+
+换算（不改存储模型；`anchor` / `scale` / `rotation` / `localBounds` 取当前帧）：
+
+```
+offset = R · S · (anchor − bounds.min)
+layoutPosition  = storedPosition − offset   // 显示
+storedPosition  = layoutPosition + offset    // 写入
+```
+
+约束：
+
+- `anchorPoint` 仍是**局部坐标**（未做左上角换算）。新建 Rect/Ellipse 几何居中于局部原点时，锚点默认 `(0,0)`（中心）属正常；Image 等「内容从 (0,0) 起算」的层，中心锚点约为 `(w/2, h/2)`。
+- `ShapeProperty.position`（形状内部偏移）与 `transform.position` 无关，不走上述 UI 换算。
+- 无 `localBounds` 或空 rect 时 `offset = 0`，UI 退回显示存储 `position`。
+- 画布运动路径描线、几何拖拽补偿继续使用**存储坐标**。
+
 ### 3.4 LayerContent（多态）
 
 ```cpp

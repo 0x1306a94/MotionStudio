@@ -99,10 +99,19 @@ CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ni
 - **属性双态**：`Animatable<T>` 要么静态值，要么关键帧序列。
 - **undo/redo = Command 模式**：支持合并（拖拽收敛为一个 undo 单元，`ms_document_end_merge_group` 关闭窗口）与组合；历史不持久化。
 - **Lottie 导出是渲染管线的例外**：直接从模型转换以保留关键帧结构，而非消费 `DrawCommand`。
+- **`transform.position` 双语义**：数据层存 AE 锚点位置；App UI 展示/编辑为局部 AABB 左上角布局坐标（换算只在 App，不改 Core）。详见 [`docs/data-model.md`](docs/data-model.md)「Position：数据层 vs UI 层」。
 
 ## 项目规范
 
-`.claude/rules/` 下的规范（自动加载，必须遵守）：`coding-style.md`（命名/禁异常与 dynamic_cast/注释约定等）、`git-workflow.md`（分支命名、commit 信息、pre-commit 格式化、自动提交规则）、`testing.md`（GoogleTest 约定：不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()` 断言、death test、round-trip 与 undo 一致性等专项模式）、`codegraph.md`（CodeGraph MCP 工具的使用规范）、`bridge-swift-enums.md`（`CF_CLOSED_ENUM` 导入 Swift 与 SwiftUI `CaseIterable`/`Identifiable` 扩展约定）。
+`.claude/rules/` 下的规范（自动加载，必须遵守）：`coding-style.md`（命名/禁异常与 dynamic_cast/注释约定等）、`git-workflow.md`（分支命名、commit 信息、pre-commit 格式化、自动提交规则、按 plan 实现时的状态同步）、`testing.md`（GoogleTest 约定：不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()` 断言、death test、round-trip 与 undo 一致性等专项模式）、`codegraph.md`（CodeGraph MCP 工具的使用规范）、`bridge-swift-enums.md`（`CF_CLOSED_ENUM` 导入 Swift 与 SwiftUI `CaseIterable`/`Identifiable` 扩展约定）。
+
+### 按 plan 实现
+
+执行 `docs/superpowers/plans/`（或同类）实现计划时：
+
+1. **每完成一个 Step（或整个 Task）必须立刻同步更新 plan 文件**：对应 checkbox 改为 `[x]`；Task 级标注 `**Status:** ✅ Done`（或进行中/阻塞原因）。
+2. **禁止**攒到全部做完再统一勾选；漏更新视为该步未完成。
+3. plan 状态变更随该步相关 commit 一并提交（或紧随其后单独 commit），勿只改代码不改 plan。
 
 <!-- CODEGRAPH_START -->
 CodeGraph 使用规范见 `.claude/rules/codegraph.md`。

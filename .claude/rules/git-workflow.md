@@ -35,6 +35,14 @@ alwaysApply: true
 - 允许在 master 分支直接提交
 - 提交范围由用户决定或按 commit skill 流程处理工作区中的**所有变更**，不区分是否为本次会话引起
 
+### 按 plan 实现时的状态同步
+
+执行 `docs/superpowers/plans/`（或用户指定的同类实现计划）时：
+
+1. **每完成一个 Step（或整个 Task）必须立刻**在 plan 文件中把对应 `- [ ]` 改为 `- [x]`，并更新该 Task 的 `**Status:**`（如 `✅ Done` / 进行中 / 阻塞原因）
+2. **禁止**全部做完再一次性勾选；未同步更新 plan 视为该步未完成
+3. plan 状态变更与该步代码变更一并 commit，或紧随其后单独 commit
+
 ## Worktree
 
 创建 worktree 新分支时必须加 `--no-track`，避免继承源分支的 tracking 关系。创建完成后，将主仓库的 `tests/` 基线数据、`third_party/` 依赖拷贝到新 worktree 目录下（`tests/out/`、`tests/baseline/` 可能尚不存在，不存在则跳过）：
