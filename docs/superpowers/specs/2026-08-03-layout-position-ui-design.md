@@ -1,7 +1,7 @@
 # Layout Position UI（左上角 Position）— 设计说明
 
 日期：2026-08-03  
-状态：已确认，待实现计划  
+状态：已实现（待人机验收）  
 
 ## 目标
 
@@ -24,7 +24,7 @@ local = T(position) · R(rotation) · S(scale) · T(-anchorPoint)
 | 左上角定义 | 局部 AABB `localBounds.min`（非局部原点硬编码） |
 | 补偿 | 按实际 `anchor` / `scale` / `rotation` + bounds，不写死 `size * 0.5` |
 | 实现路径 | Swift 纯函数 + `MotionDocumentCore` 门面（方案 1） |
-| 旋转 / 缩放 | `offset = R·S·(bounds.min − anchor)` |
+| 旋转 / 缩放 | `offset = R·S·(anchor − bounds.min)` |
 
 ## 非目标
 
@@ -42,11 +42,11 @@ local = T(position) · R(rotation) · S(scale) · T(-anchorPoint)
 parent(p) = position + R · S · (p − anchor)
 ```
 
-取 `p = localBounds.min`：
+取 `p = localBounds.min`。定义 UI offset 为锚点相对左上角的父空间向量：
 
 ```
-offset(frame) = rotate(scale(bounds.min − anchor))
-layoutPosition  = storedPosition − offset   // UI 显示
+offset(frame) = rotate(scale(anchor − bounds.min))
+layoutPosition  = storedPosition − offset   // UI 显示（= parent(bounds.min)）
 storedPosition  = layoutPosition + offset   // UI 写入
 ```
 
