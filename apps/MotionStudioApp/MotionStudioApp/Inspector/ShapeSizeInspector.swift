@@ -30,7 +30,8 @@ struct ShapeSizeInspector: View {
         NumberPropertyRow(label: ShapeSizeField.width.label,
                           value: Float(size.dx),
                           hasKeyframeAtPlayhead: hasKeyframe(),
-                          isEditable: isEditable)
+                          isEditable: isEditable,
+                          showsStepButtons: true)
         { newValue in
             setSize(value: CGVector(dx: CGFloat(newValue), dy: size.dy))
         } onToggleKeyframe: { _ in
@@ -40,7 +41,8 @@ struct ShapeSizeInspector: View {
         NumberPropertyRow(label: ShapeSizeField.height.label,
                           value: Float(size.dy),
                           hasKeyframeAtPlayhead: hasKeyframe(),
-                          isEditable: isEditable)
+                          isEditable: isEditable,
+                          showsStepButtons: true)
         { newValue in
             setSize(value: CGVector(dx: size.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in

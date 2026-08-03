@@ -118,43 +118,13 @@ private func nudge(_ direction: Float) {
 - Consumes: `showsStepButtons`
 - Produces: Anchor/Position/Width/Height 行开启；其它行保持默认
 
-- [ ] **Step 1: Wire `showsStepButtons: true`**
+- [x] **Step 1: Wire `showsStepButtons: true`**（Anchor/Position + Width/Height）
 
-对以下调用在 `isEditable:`（或 `positionEditable`）参数后、trailing closure 前增加 `showsStepButtons: true`：
+- [x] **Step 2: Build**（SUCCEEDED）
 
-- `TransformInspector`：`anchorX`、`anchorY`、`positionX`、`positionY`
-- `ShapeSizeInspector`：`width`、`height`
+- [x] **Step 3: Update this plan** — Task 2 Done。
 
-示例：
-
-```swift
-NumberPropertyRow(label: TransformField.positionX.label,
-                  value: Float(position.dx),
-                  hasKeyframeAtPlayhead: hasKeyframe(.position),
-                  isEditable: positionEditable,
-                  showsStepButtons: true)
-{ newValue in
-    setLayoutPosition(CGVector(dx: CGFloat(newValue), dy: position.dy))
-} onToggleKeyframe: { _ in
-    toggleVec2Keyframe(.position)
-}
-```
-
-**不要**给 Scale / Rotation / Opacity / Radius 加。
-
-- [ ] **Step 2: Build**。Expected: SUCCEEDED。
-
-- [ ] **Step 3: Update this plan** — Task 2 Done。
-
-- [ ] **Step 4: Commit**
-
-```bash
-git commit --only \
-  apps/MotionStudioApp/MotionStudioApp/Inspector/TransformInspector.swift \
-  apps/MotionStudioApp/MotionStudioApp/Inspector/ShapeSizeInspector.swift \
-  docs/superpowers/plans/2026-08-03-number-step-buttons.md \
-  -m "Enable step buttons on transform and shape size fields."
-```
+- [x] **Step 4: Commit**
 
 ---
 

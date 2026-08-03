@@ -49,7 +49,8 @@ struct TransformInspector: View {
         NumberPropertyRow(label: TransformField.anchorX.label,
                           value: Float(anchor.dx),
                           hasKeyframeAtPlayhead: hasKeyframe(.anchorPoint),
-                          isEditable: isEditable)
+                          isEditable: isEditable,
+                          showsStepButtons: true)
         { newValue in
             setVec2Property(.anchorPoint, value: CGVector(dx: CGFloat(newValue), dy: anchor.dy))
         } onToggleKeyframe: { _ in
@@ -59,7 +60,8 @@ struct TransformInspector: View {
         NumberPropertyRow(label: TransformField.anchorY.label,
                           value: Float(anchor.dy),
                           hasKeyframeAtPlayhead: hasKeyframe(.anchorPoint),
-                          isEditable: isEditable)
+                          isEditable: isEditable,
+                          showsStepButtons: true)
         { newValue in
             setVec2Property(.anchorPoint, value: CGVector(dx: anchor.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
@@ -69,7 +71,8 @@ struct TransformInspector: View {
         NumberPropertyRow(label: TransformField.positionX.label,
                           value: Float(position.dx),
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
-                          isEditable: positionEditable)
+                          isEditable: positionEditable,
+                          showsStepButtons: true)
         { newValue in
             setLayoutPosition(CGVector(dx: CGFloat(newValue), dy: position.dy))
         } onToggleKeyframe: { _ in
@@ -79,7 +82,8 @@ struct TransformInspector: View {
         NumberPropertyRow(label: TransformField.positionY.label,
                           value: Float(position.dy),
                           hasKeyframeAtPlayhead: hasKeyframe(.position),
-                          isEditable: positionEditable)
+                          isEditable: positionEditable,
+                          showsStepButtons: true)
         { newValue in
             setLayoutPosition(CGVector(dx: position.dx, dy: CGFloat(newValue)))
         } onToggleKeyframe: { _ in
