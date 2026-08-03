@@ -157,7 +157,18 @@ final class EditorViewController: UIViewController {
     }
 
     override var keyCommands: [UIKeyCommand]? {
-        [
+        // Arrow nudges must outrank focus-system navigation; otherwise Catalyst/iPadOS
+        // moves keyboard focus into the first Inspector text field.
+        let nudgeCommands = [
+            UIKeyCommand(input: UIKeyCommand.inputLeftArrow, modifierFlags: [], action: #selector(nudgeSelectionLeft)),
+            UIKeyCommand(input: UIKeyCommand.inputRightArrow, modifierFlags: [], action: #selector(nudgeSelectionRight)),
+            UIKeyCommand(input: UIKeyCommand.inputUpArrow, modifierFlags: [], action: #selector(nudgeSelectionUp)),
+            UIKeyCommand(input: UIKeyCommand.inputDownArrow, modifierFlags: [], action: #selector(nudgeSelectionDown)),
+        ]
+        for command in nudgeCommands {
+            command.wantsPriorityOverSystemBehavior = true
+        }
+        return [
             UIKeyCommand(input: " ", modifierFlags: [], action: #selector(togglePlayback)),
             UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(exitPenTool)),
             UIKeyCommand(input: "\u{8}", modifierFlags: [], action: #selector(UIResponderStandardEditActions.delete(_:))),
@@ -176,11 +187,7 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "[", modifierFlags: [.command], action: #selector(sendLayersBackward)),
             UIKeyCommand(input: "]", modifierFlags: [.command, .alternate], action: #selector(bringLayersToFront)),
             UIKeyCommand(input: "[", modifierFlags: [.command, .alternate], action: #selector(sendLayersToBack)),
-            UIKeyCommand(input: UIKeyCommand.inputLeftArrow, modifierFlags: [], action: #selector(nudgeSelectionLeft)),
-            UIKeyCommand(input: UIKeyCommand.inputRightArrow, modifierFlags: [], action: #selector(nudgeSelectionRight)),
-            UIKeyCommand(input: UIKeyCommand.inputUpArrow, modifierFlags: [], action: #selector(nudgeSelectionUp)),
-            UIKeyCommand(input: UIKeyCommand.inputDownArrow, modifierFlags: [], action: #selector(nudgeSelectionDown)),
-        ]
+        ] + nudgeCommands
     }
 
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
@@ -213,11 +220,30 @@ final class EditorViewController: UIViewController {
              #selector(nudgeSelectionRight),
              #selector(nudgeSelectionUp),
              #selector(nudgeSelectionDown):
-            !editorState.selectedLayerIDs.isEmpty
+            // When a text field has focus, decline so arrows stay with the field.
+            !editorState.selectedLayerIDs.isEmpty && !isEditingTextInput
         case #selector(UIResponderStandardEditActions.delete(_:)):
             canDeleteSelection()
         default:
             super.canPerformAction(action, withSender: sender)
         }
+    }
+
+    /// True when a UIKit text input (incl. SwiftUI `TextField` host) is first responder.
+    var isEditingTextInput: Bool {
+        guard let root = view.window ?? view else { return false }
+        return root.motionStudio_containsEditingTextInput
+    }
+}
+
+private extension UIView {
+    var motionStudio_containsEditingTextInput: Bool {
+        if isFirstResponder, self is UITextField || self is UITextView {
+            return true
+        }
+        for subview in subviews where subview.motionStudio_containsEditingTextInput {
+            return true
+        }
+        return false
     }
 }
