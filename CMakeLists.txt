@@ -43,6 +43,8 @@ if (APPLE)
     # Single tgfx pin: vendored under libpag. Consumed by adapter/tgfx prebuild,
     # adapter/pag_codec, bridge, and avf via these TGFX_* / LIBPAG_DIR vars.
     set(LIBPAG_DIR "${PROJECT_SOURCE_DIR}/third_party/libpag")
+    set(PAG_INCLUDE_DIR "${LIBPAG_DIR}/include")
+    set(PAG_SOURCE_DIR "${LIBPAG_DIR}/src")
     set(TGFX_SOURCE_DIR "${LIBPAG_DIR}/third_party/tgfx")
     set(TGFX_INCLUDE_DIR "${TGFX_SOURCE_DIR}/include")
     set(TGFX_OUT_DIR "${CMAKE_BINARY_DIR}/tgfx_prebuilt")

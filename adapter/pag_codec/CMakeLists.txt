@@ -81,3 +81,14 @@ target_link_libraries(pag_codec_test PRIVATE pag_codec GTest::gtest_main)
 motionstudio_add_tgfx_prebuild(pag_codec_test)
 motionstudio_link_prebuilt_tgfx(pag_codec_test)
 gtest_discover_tests(pag_codec_test)
+
+# Browse-only: surface vendored pag sources in the Xcode navigator without compiling.
+if(CMAKE_GENERATOR MATCHES "Xcode")
+  add_files_by_extension(PAG_BROWSE_SOURCES ".h;.hpp;.c;.cc;.cpp;.m;.mm"
+      ${PAG_SOURCE_DIR})
+  add_files_by_extension(PAG_BROWSE_HEADERS ".h;.hpp"
+      ${PAG_INCLUDE_DIR})
+  add_custom_target(pag_sources SOURCES ${PAG_BROWSE_SOURCES} ${PAG_BROWSE_HEADERS})
+  add_source_group(PAG_BROWSE_SOURCES ${PAG_SOURCE_DIR} "Sources")
+  add_source_group(PAG_BROWSE_HEADERS ${PAG_INCLUDE_DIR} "Public Headers")
+endif()
