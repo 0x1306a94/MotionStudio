@@ -14,6 +14,8 @@ struct NumberPropertyRow: View {
     let hasKeyframeAtPlayhead: Bool
     let isEditable: Bool
     var showsKeyframeButton = true
+    var showsStepButtons = false
+    var step: Float = 1
     let onCommit: (Float) -> Void
     let onToggleKeyframe: (Float) -> Void
 
@@ -52,6 +54,32 @@ struct NumberPropertyRow: View {
                         commitDraftOnFocusLoss()
                     }
                 }
+            if showsStepButtons {
+                VStack(spacing: 0) {
+                    Button {
+                        nudge(1)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isEditable)
+                    .accessibilityLabel("Increment")
+
+                    Button {
+                        nudge(-1)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isEditable)
+                    .accessibilityLabel("Decrement")
+                }
+                .foregroundStyle(isEditable ? Color.secondary : Color.secondary.opacity(0.42))
+                .frame(width: 18)
+                .accessibilityElement(children: .contain)
+            }
             if showsKeyframeButton {
                 Button {
                     toggleKeyframe()
@@ -98,6 +126,18 @@ struct NumberPropertyRow: View {
 
     private var fieldBackgroundColor: Color {
         isEditable ? Color(.secondarySystemBackground) : Color.secondary.opacity(0.08)
+    }
+
+    private func nudge(_ direction: Float) {
+        guard isEditable else { return }
+        let base = parsedDraft() ?? value
+        let next = base + direction * step
+        guard next.isFinite else { return }
+        draft = formattedValue(next)
+        hasInvalidDraft = false
+        if next != value {
+            onCommit(next)
+        }
     }
 
     private func commitDraft() {

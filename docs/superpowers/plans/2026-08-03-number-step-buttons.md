@@ -36,7 +36,7 @@
 
 ### Task 1: `NumberPropertyRow` 步进按钮
 
-**Status:** ⏳
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/NumberPropertyRow.swift`
@@ -48,7 +48,7 @@
   - `var step: Float = 1`
   - 内部 `nudge(direction: Float)`（`+1` / `-1`）
 
-- [ ] **Step 1: Add parameters + nudge + UI**
+- [x] **Step 1: Add parameters + nudge + UI**
 
 在 `showsKeyframeButton` 旁增加：
 
@@ -98,24 +98,17 @@ private func nudge(_ direction: Float) {
 
 为按钮设 accessibilityLabel：`"Increment"` / `"Decrement"`。
 
-- [ ] **Step 2: Build**（Xcode MCP `BuildProject`）。Expected: SUCCEEDED。
+- [x] **Step 2: Build**（Xcode MCP `BuildProject` SUCCEEDED）
 
-- [ ] **Step 3: Update this plan** — Task 1 Done。
+- [x] **Step 3: Update this plan** — Task 1 Done。
 
-- [ ] **Step 4: Commit**
-
-```bash
-git commit --only \
-  apps/MotionStudioApp/MotionStudioApp/Inspector/NumberPropertyRow.swift \
-  docs/superpowers/plans/2026-08-03-number-step-buttons.md \
-  -m "Add optional step buttons to NumberPropertyRow."
-```
+- [x] **Step 4: Commit**
 
 ---
 
 ### Task 2: 在 Transform / ShapeSize 开启步进
 
-**Status:** ⏳
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/TransformInspector.swift`
