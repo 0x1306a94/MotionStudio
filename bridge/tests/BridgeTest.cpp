@@ -9,8 +9,18 @@
 #include <string>
 #include <thread>
 
+#include "BridgeInternals.h"
+#include "DocumentLock.h"
 #include "FrameCommandCache.h"
+#include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/Layer.h"
 #include "motionstudio_bridge.h"
+
+using bridge::Doc;
+using bridge::FindLayer;
+using motion::EntityId;
+using motion::Layer;
 
 namespace {
 
@@ -1174,6 +1184,45 @@ TEST(BridgeCommandTest, ResizeLayerGeometryKeepsOuterDragMergeOpen) {
     ms_property_static_vec2(document, pathId, "transform.position", &posX, &posY);
     EXPECT_NE(posX, 50.0f);
 
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCompositionTest, MapCompositionDeltaIdentityWithoutParent) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+    float outX = 0;
+    float outY = 0;
+    ASSERT_TRUE(ms_layer_map_composition_delta(document, compositionId, layerId, 0.0, 10.0f, -20.0f,
+                                               &outX, &outY));
+    EXPECT_FLOAT_EQ(outX, 10.0f);
+    EXPECT_FLOAT_EQ(outY, -20.0f);
+    ms_document_destroy(document);
+}
+
+TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t parentId = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t childId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_NE(parentId, 0u);
+    ASSERT_NE(childId, 0u);
+    ms_command_set_static_float(document, parentId, "transform.rotation", 90.0f);
+    {
+        DocumentLock guard(document);
+        Layer *child = FindLayer(document, childId);
+        ASSERT_NE(child, nullptr);
+        ASSERT_TRUE(child->setParent(EntityId{parentId}, *Doc(document)));
+    }
+    float outX = 0;
+    float outY = 0;
+    ASSERT_TRUE(ms_layer_map_composition_delta(document, compositionId, childId, 0.0, 10.0f, 0.0f,
+                                               &outX, &outY));
+    EXPECT_NEAR(outX, 0.0f, 1e-3f);
+    EXPECT_NEAR(outY, -10.0f, 1e-3f);
     ms_document_destroy(document);
 }
 

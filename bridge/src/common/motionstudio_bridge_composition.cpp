@@ -1,13 +1,17 @@
 #include "motionstudio_bridge.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/Time.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/Layer.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/SelectionHandles.h"
@@ -21,7 +25,9 @@ using namespace bridge;
 using motion::Composition;
 using motion::Document;
 using motion::EntityId;
+using motion::FrameTime;
 using motion::Layer;
+using motion::Mat3;
 using motion::SceneEvaluator;
 using motion::Vec2;
 
@@ -162,6 +168,39 @@ bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, u
         return true;
     }
     return false;
+}
+
+bool ms_layer_map_composition_delta(MSDocument *document, uint64_t compositionId, uint64_t layerId,
+                                    double frameTime, float dx, float dy, float *outParentDx,
+                                    float *outParentDy) {
+    DocumentLock guard(document);
+    Document *doc = Doc(document);
+    if (doc == nullptr || outParentDx == nullptr || outParentDy == nullptr) {
+        return false;
+    }
+    if (FindComposition(document, compositionId) == nullptr) {
+        return false;
+    }
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return false;
+    }
+    Mat3 parentWorld = Mat3::Identity();
+    if (layer->parentId.isValid()) {
+        const Layer *parent = doc->entityIndex().findLayer(layer->parentId);
+        if (parent == nullptr) {
+            return false;
+        }
+        parentWorld = parent->worldTransform(static_cast<FrameTime>(std::llround(frameTime)), *doc);
+    }
+    Mat3 inverse;
+    if (!parentWorld.tryInvert(inverse)) {
+        return false;
+    }
+    const Vec2 mapped = inverse.transformVector(Vec2{dx, dy});
+    *outParentDx = mapped.x;
+    *outParentDy = mapped.y;
+    return true;
 }
 
 bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,

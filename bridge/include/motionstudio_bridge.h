@@ -270,6 +270,14 @@ uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositio
 bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
                                  float *minX, float *minY, float *maxX, float *maxY);
 
+// Maps a composition-space translation into the layer's parent space using the
+// inverse of the parent world linear transform. Identity when the layer has no
+// parent. Returns false when the layer is missing or the parent transform is
+// not invertible.
+bool ms_layer_map_composition_delta(MSDocument *document, uint64_t compositionId, uint64_t layerId,
+                                    double frameTime, float dx, float dy, float *outParentDx,
+                                    float *outParentDy);
+
 // Layer-local AABB (same source as selection handles localMin/localMax).
 // Runs EvaluatePreview → ResolvePointTextContainerSizes → BoundsOfLayerLocal.
 // Returns false when the layer is missing or has no local bounds.

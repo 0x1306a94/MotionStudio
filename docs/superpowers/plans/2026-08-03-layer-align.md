@@ -119,7 +119,7 @@ struct LayerAlignTests {
 
 ### Task 2: Bridge `ms_layer_map_composition_delta` + 测试
 
-**Status:** 🔄 in progress
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（`ms_composition_layer_bounds` 附近）
@@ -130,7 +130,7 @@ struct LayerAlignTests {
 - Consumes: `Layer::worldTransform`、`Mat3::tryInvert`、`Mat3::transformVector`、`FindLayer` / `FindComposition`
 - Produces: `bool ms_layer_map_composition_delta(MSDocument*, uint64_t compositionId, uint64_t layerId, double frameTime, float dx, float dy, float* outParentDx, float* outParentDy)`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `BridgeTest.cpp` 追加：
 
@@ -177,68 +177,21 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
 
 **注意：** Bridge 测试可 `#include` 内部头以 `FindLayer`/`Doc`/`DocumentLock`（其它 BridgeTest 已有先例则跟随）；若不便，则父级用例改放到 `tests/` 下 core 单测，Bridge 仅保留无父级恒等。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**（与实现一并落地）
 
-```bash
-cmake --build build --target bridge_test
-./build/bridge/bridge_test --gtest_filter='*MapCompositionDelta*'
-```
+- [x] **Step 3: Declare + implement**
 
-Expected: 链接/编译失败。
+- [x] **Step 4: Run tests to verify they pass**（2/2 PASS）
 
-- [ ] **Step 3: Declare + implement**
+- [x] **Step 5: Update this plan** — Task 2 `[x]` + Status Done。
 
-头文件：
-
-```c
-// Maps composition-space translation (dx,dy) into the layer's parent space
-// using the inverse of the parent world linear transform. Identity when no parent.
-bool ms_layer_map_composition_delta(MSDocument *document, uint64_t compositionId,
-                                    uint64_t layerId, double frameTime, float dx, float dy,
-                                    float *outParentDx, float *outParentDy);
-```
-
-实现要点：
-
-```cpp
-const Layer *layer = FindLayer(...);
-Mat3 parentWorld = Mat3::Identity();
-if (layer->parentId.isValid()) {
-    const Layer *parent = doc->entityIndex().findLayer(layer->parentId);
-    if (parent == nullptr) return false;
-    parentWorld = parent->worldTransform(static_cast<FrameTime>(llround(frameTime)), *doc);
-}
-Mat3 inverse;
-if (!parentWorld.tryInvert(inverse)) return false;
-const Vec2 mapped = inverse.transformVector(Vec2{dx, dy});
-*outParentDx = mapped.x;
-*outParentDy = mapped.y;
-return true;
-```
-
-`compositionId` 可用于校验层属于该合成（可选）；缺失则 false。
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-同 Step 2。Expected: PASS。
-
-- [ ] **Step 5: Update this plan** — Task 2 `[x]` + Status Done。
-
-- [ ] **Step 6: Commit**
-
-```bash
-git commit --only bridge/include/motionstudio_bridge.h \
-  bridge/src/common/motionstudio_bridge_composition.cpp \
-  bridge/tests/BridgeTest.cpp \
-  docs/superpowers/plans/2026-08-03-layer-align.md \
-  -m "Map composition-space align deltas into layer parent space."
-```
+- [x] **Step 6: Commit**
 
 ---
 
 ### Task 3: `MotionDocumentCore.alignLayers`
 
-**Status:** ⏳
+**Status:** 🔄 in progress
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`
