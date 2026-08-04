@@ -116,7 +116,7 @@ git commit --only <files> -m "Add TextPath model serialization and set command."
 
 ### Task 2: `TransformBezierPath` + 求值挂到 `EvaluatedTextItem`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/common/BezierPathTransform.h`、`src/common/BezierPathTransform.cpp`（若项目更习惯放 `render/`，可放 `FollowPathEval` 旁，但勿拉高依赖）
@@ -156,11 +156,11 @@ if content.textPath.enabled:
 
 注意：隐藏路径层可能未出现在 `state.layers` 绘制列表——求值必须从 **Document/EntityIndex** 取 path 层，并用与 Follow Path 相同的 world 变换 API（`FollowAwareWorldTransform` / 现有 world 计算），**不要**依赖「仅可见层」列表。
 
-- [ ] **Step 1: Failing tests** — 水平 path 层在 (0,0)-(100,0)；文本层 identity → local 端点；path 层 `position` 平移后 local 点变化；`pathLayer.visible=false` 仍有 `textPath`
+- [x] **Step 1: Failing tests** — 水平 path 层在 (0,0)-(100,0)；文本层 identity → local 端点；path 层 `position` 平移后 local 点变化；`pathLayer.visible=false` 仍有 `textPath`
 
-- [ ] **Step 2: Implement transform + SceneEvaluator wiring**
+- [x] **Step 2: Implement transform + SceneEvaluator wiring**
 
-- [ ] **Step 3: PASS + commit** `Evaluate text path geometry into text-local space.`
+- [x] **Step 3: PASS + commit** `Evaluate text path geometry into text-local space.`
 
 ---
 

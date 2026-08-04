@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "MotionStudio/common/BezierPathTransform.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/Document.h"
@@ -261,6 +262,33 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
             TextDrawStyle paint;
             paint.color = Color{0, 0, 0, 1};
             textItem.styles.push_back(paint);
+        }
+        const TextPath &textPath = textContent.textPath;
+        if (textPath.enabled && textPath.pathLayerId.isValid() &&
+            textPath.pathLayerId != layer.id) {
+            const Layer *pathLayer = document.entityIndex().findLayer(textPath.pathLayerId);
+            if (pathLayer != nullptr) {
+                const std::optional<BezierPath> optPath = EvaluateLayerPath(*pathLayer, time);
+                if (optPath) {
+                    std::vector<EntityId> pathParentVisiting;
+                    std::vector<EntityId> pathFollowVisiting;
+                    const Mat3 pathWorld = FollowAwareWorldTransform(
+                        document, *pathLayer, time, contextTransform, pathParentVisiting,
+                        pathFollowVisiting);
+                    Mat3 textInverse = Mat3::Identity();
+                    if (world.tryInvert(textInverse)) {
+                        EvaluatedTextPath evaluatedPath;
+                        evaluatedPath.path =
+                            TransformBezierPath(*optPath, textInverse * pathWorld);
+                        evaluatedPath.reversed = textPath.reversed;
+                        evaluatedPath.perpendicular = textPath.perpendicular;
+                        evaluatedPath.forceAlignment = textPath.forceAlignment;
+                        evaluatedPath.firstMargin = textPath.firstMargin.evaluatePreview(time);
+                        evaluatedPath.lastMargin = textPath.lastMargin.evaluatePreview(time);
+                        textItem.textPath = std::move(evaluatedPath);
+                    }
+                }
+            }
         }
         evaluated.textItem = std::move(textItem);
         out.push_back(std::move(evaluated));
