@@ -11,8 +11,10 @@
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TextAlign.h"
+#include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/CommandBuilder.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
@@ -573,4 +575,134 @@ TEST(TgfxRenderAdapterTest, DrawsTextOnPathAndCachesLayout) {
         }
     }
     EXPECT_TRUE(foundInk);
+}
+
+TEST(TgfxRenderAdapterTest, TextOnPathBaselineAlignsWithPathY) {
+    auto adapter = TgfxRenderAdapter::Make(200, 120);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    constexpr float kPathY = 60.0f;
+    BezierPath path;
+    path.closed = false;
+    path.vertices.push_back({{10.0f, kPathY}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    path.vertices.push_back({{190.0f, kPathY}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+
+    SceneState state;
+    state.viewportWidth = 200;
+    state.viewportHeight = 120;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    motion::EvaluatedTextItem text;
+    text.text = "Hello";
+    text.fontSize = 32.0f;
+    text.boxTextMode = false;
+    text.align = motion::TextAlign::Left;
+    text.fontFamily = "Helvetica";
+    motion::TextDrawStyle fill;
+    fill.color = Color{0, 0, 0, 1};
+    text.styles = {fill};
+    motion::EvaluatedTextPath textPath;
+    textPath.path = path;
+    textPath.perpendicular = true;
+    text.textPath = std::move(textPath);
+    layer.textItem = std::move(text);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(200, 120, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+
+    int inkTop = 120;
+    int inkBottom = -1;
+    for (int y = 0; y < 120; ++y) {
+        for (int x = 0; x < 200; ++x) {
+            const Pixel pixel = PixelAt(pixels, 200, x, y);
+            if (pixel.r < 240 || pixel.g < 240 || pixel.b < 240) {
+                inkTop = std::min(inkTop, y);
+                inkBottom = std::max(inkBottom, y);
+            }
+        }
+    }
+    ASSERT_GE(inkBottom, 0);
+    const float mid = 0.5f * static_cast<float>(inkTop + inkBottom);
+    // Baseline-on-path: pathY near inkBottom (caps), not vertical mid.
+    EXPECT_LT(std::fabs(kPathY - static_cast<float>(inkBottom)), std::fabs(kPathY - mid));
+    EXPECT_NEAR(kPathY, static_cast<float>(inkBottom), 8.0f);
+}
+
+TEST(TgfxRenderAdapterTest, SceneTextPathBaselineAlignsWithPathStroke) {
+    auto adapter = TgfxRenderAdapter::Make(200, 120);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->width = 200;
+    composition->height = 120;
+    composition->duration = 100;
+    composition->backgroundColor = Color{1, 1, 1, 1};
+
+    Layer *pathLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    pathLayer->outPoint = 100;
+    pathLayer->transform.position.setStaticValue({0.0f, 60.0f});
+    auto *pathContent = static_cast<ShapeContent *>(pathLayer->content.get());
+    auto pathElement = std::make_unique<motion::ShapePath>();
+    BezierPath path;
+    path.closed = false;
+    path.vertices.push_back({{10.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    path.vertices.push_back({{190.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    pathElement->path.setStaticValue(path);
+    pathContent->geometry = std::move(pathElement);
+    auto stroke = std::make_unique<motion::StrokeStyle>();
+    stroke->color.setStaticValue(Color{0.0f, 0.0f, 1.0f, 1.0f});  // blue path
+    stroke->width.setStaticValue(2.0f);
+    pathLayer->styles.push_back(std::move(stroke));
+
+    Layer *textLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    textLayer->outPoint = 100;
+    auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
+    textContent->text.setStaticValue("Hello");
+    textContent->fontSize = 32.0f;
+    textContent->fontFamily = "Helvetica";
+    textContent->textPath.enabled = true;
+    textContent->textPath.pathLayerId = pathLayer->id;
+    textContent->textPath.perpendicular = true;
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.0f, 0.0f, 0.0f, 1.0f});  // black text
+    textLayer->styles.push_back(std::move(fill));
+    document.refreshEntityIndex();
+
+    auto state = SceneEvaluator::Evaluate(document, composition->id, 0);
+    ASSERT_TRUE(state.hasValue()) << state.error();
+
+    adapter->beginFrame(200, 120, state->backgroundColor, state->cornerRadius);
+    PlayCommands(BuildCommands(*state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+
+    // Find black text ink (not blue path): r=g=b and dark.
+    int textTop = 120;
+    int textBottom = -1;
+    for (int y = 0; y < 120; ++y) {
+        for (int x = 15; x < 120; ++x) {
+            const Pixel pixel = PixelAt(pixels, 200, x, y);
+            if (pixel.r < 80 && pixel.g < 80 && pixel.b < 80) {
+                textTop = std::min(textTop, y);
+                textBottom = std::max(textBottom, y);
+            }
+        }
+    }
+    ASSERT_GE(textBottom, 0) << "no black text ink";
+    const float mid = 0.5f * static_cast<float>(textTop + textBottom);
+    std::printf("scene textTop=%d textBottom=%d mid=%.1f pathY=60\n", textTop, textBottom, mid);
+    EXPECT_LT(std::fabs(60.0f - static_cast<float>(textBottom)), std::fabs(60.0f - mid));
+    EXPECT_NEAR(60.0f, static_cast<float>(textBottom), 10.0f);
 }

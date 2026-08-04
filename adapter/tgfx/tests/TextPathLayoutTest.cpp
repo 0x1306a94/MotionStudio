@@ -96,3 +96,32 @@ TEST(TextPathLayoutTest, ArcPathBoundsDifferFromPointTextBox) {
         std::fabs((pathBounds.max.y - pathBounds.min.y) - pointSize.y) < 1.0f;
     EXPECT_FALSE(sameBox);
 }
+
+TEST(TextPathLayoutTest, HorizontalPathBaselineNearBoundsBottom) {
+    const TextPathLayoutResult result = LayoutTextOnPath(MakeInput("Hello"));
+    ASSERT_FALSE(result.glyphs.empty());
+    // Path at y=0; baseline origin ty~0; glyph body mostly above (negative Y).
+    EXPECT_NEAR(TranslationY(result.glyphs[0].matrix), 0.0f, 0.5f);
+    EXPECT_LT(result.boundsMin.y, -1.0f);
+    const float midY = 0.5f * (result.boundsMin.y + result.boundsMax.y);
+    EXPECT_LT(std::fabs(0.0f - result.boundsMax.y), std::fabs(0.0f - midY));
+}
+
+TEST(TextPathLayoutTest, VerticalPathKeepsBaselineCenterOnPath) {
+    BezierPath vertical;
+    vertical.closed = false;
+    vertical.vertices.push_back({{50.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    vertical.vertices.push_back({{50.0f, 200.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+
+    TextPathLayoutInput input = MakeInput("AB");
+    input.path = vertical;
+    const TextPathLayoutResult result = LayoutTextOnPath(input);
+    ASSERT_EQ(result.glyphs.size(), 2u);
+
+    // Local baseline mid (halfWidth, 0) must land on the path x=50 (not shifted by halfWidth).
+    for (const motion::TextPathGlyph &glyph : result.glyphs) {
+        const float halfWidth = glyph.advance * 0.5f;
+        const Vec2 onPath = glyph.matrix.transformPoint({halfWidth, 0.0f});
+        EXPECT_NEAR(onPath.x, 50.0f, 1.0f) << "baseline center must stay on the path";
+    }
+}

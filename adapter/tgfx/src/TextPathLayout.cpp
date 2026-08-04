@@ -281,12 +281,13 @@ TextPathLayoutResult LayoutTextOnPath(const TextPathLayoutInput &input) {
             tan.set(1.0f, 0.0f);
         }
 
+        // T(pos) * R * T(-halfWidth, y): halfWidth is local so baseline center stays on the
+        // path after rotation (parent-space halfWidth subtraction drifts along the normal).
         Mat3 matrix = Mat3::Identity();
         if (input.perpendicular) {
             const float degrees = std::atan2(tan.y, tan.x) * (180.0f / kPi);
-            matrix = Mat3::Translate({pos.x - tan.y * glyph.y - halfWidth,
-                                      pos.y + tan.x * glyph.y}) *
-                Mat3::Rotate(degrees);
+            matrix = Mat3::Translate({pos.x, pos.y}) * Mat3::Rotate(degrees) *
+                Mat3::Translate({-halfWidth, glyph.y});
         } else {
             matrix = Mat3::Translate({pos.x - halfWidth, pos.y + glyph.y});
         }
