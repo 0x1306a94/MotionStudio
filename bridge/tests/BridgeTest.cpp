@@ -198,6 +198,35 @@ TEST(BridgeCommandTest, FollowPathLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, TextPathSetGetAndSelfReference) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t pathLayerId = ms_command_add_path_layer(document, compositionId);
+    const uint64_t textId = ms_command_add_text_layer(document, compositionId);
+
+    EXPECT_FALSE(ms_layer_text_path_enabled(document, textId));
+    EXPECT_EQ(ms_layer_text_path_layer_id(document, textId), 0u);
+    EXPECT_TRUE(ms_layer_text_path_perpendicular(document, textId));
+
+    ms_command_set_text_path(document, textId, true, pathLayerId, true, false, true);
+    EXPECT_TRUE(ms_layer_text_path_enabled(document, textId));
+    EXPECT_EQ(ms_layer_text_path_layer_id(document, textId), pathLayerId);
+    EXPECT_TRUE(ms_layer_text_path_reversed(document, textId));
+    EXPECT_FALSE(ms_layer_text_path_perpendicular(document, textId));
+    EXPECT_TRUE(ms_layer_text_path_force_alignment(document, textId));
+
+    ms_command_set_static_float(document, textId, "content.textPath.firstMargin", 8.0f);
+    EXPECT_FLOAT_EQ(
+        ms_property_evaluate_float(document, textId, "content.textPath.firstMargin", 0), 8.0f);
+
+    ms_document_end_merge_group(document);
+    ms_command_set_text_path(document, textId, true, textId, false, true, false);
+    EXPECT_FALSE(ms_layer_text_path_enabled(document, textId));
+    EXPECT_EQ(ms_layer_text_path_layer_id(document, textId), 0u);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, LayerBlendModeSetAndUndo) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

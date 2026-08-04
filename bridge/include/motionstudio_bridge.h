@@ -546,6 +546,17 @@ MS_TEXT_ALIGN ms_layer_text_align(MSDocument *document, uint64_t layerId);
 char *ms_layer_text_font_family(MSDocument *document, uint64_t layerId);  // ms_string_free
 char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId);   // ms_string_free
 
+// Text Path on a text layer. pathLayerId is 0 when unbound. Margins use
+// ms_property_* with "content.textPath.firstMargin" / "lastMargin".
+void ms_command_set_text_path(MSDocument *document, uint64_t layerId, bool enabled,
+                              uint64_t pathLayerId, bool reversed, bool perpendicular,
+                              bool forceAlignment);
+bool ms_layer_text_path_enabled(MSDocument *document, uint64_t layerId);
+uint64_t ms_layer_text_path_layer_id(MSDocument *document, uint64_t layerId);
+bool ms_layer_text_path_reversed(MSDocument *document, uint64_t layerId);
+bool ms_layer_text_path_perpendicular(MSDocument *document, uint64_t layerId);
+bool ms_layer_text_path_force_alignment(MSDocument *document, uint64_t layerId);
+
 // Bakes Rect/Ellipse geometry on the layer into a ShapePath at frame.
 void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId, int64_t frame);
 

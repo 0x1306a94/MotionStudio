@@ -309,7 +309,7 @@ if text && useExactLocalBounds: min/max = localBounds*; else 现状 0..container
 
 ### Task 7: Bridge API
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`
@@ -328,9 +328,9 @@ bool ms_layer_text_path_force_alignment(...);
 // margins: 现有 ms_property_* + "content.textPath.firstMargin"
 ```
 
-- [ ] **Step 1: Bridge tests** — set/get + 自引用清空
-- [ ] **Step 2: Implement + PASS**
-- [ ] **Step 3: Commit** `Expose text path controls on the C bridge.`
+- [x] **Step 1: Bridge tests** — set/get + 自引用清空
+- [x] **Step 2: Implement + PASS**
+- [x] **Step 3: Commit** `Expose text path controls on the C bridge.`
 
 ---
 

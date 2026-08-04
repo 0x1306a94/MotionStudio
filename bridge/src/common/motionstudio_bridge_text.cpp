@@ -16,6 +16,7 @@
 #include "MotionStudio/undo/SetTextBoxTextModeCommand.h"
 #include "MotionStudio/undo/SetTextFontCommand.h"
 #include "MotionStudio/undo/SetTextFontSizeCommand.h"
+#include "MotionStudio/undo/SetTextPathCommand.h"
 #include "MotionStudio/undo/SetTextSizeCommand.h"
 
 #include "BridgeInternals.h"
@@ -195,4 +196,44 @@ char *ms_layer_text_font_style(MSDocument *document, uint64_t layerId) {
     DocumentLock lock(document);
     TextContent *content = TextContentOf(FindLayer(document, layerId));
     return content == nullptr ? nullptr : strdup(content->fontStyle.c_str());
+}
+
+void ms_command_set_text_path(MSDocument *document, uint64_t layerId, bool enabled,
+                              uint64_t pathLayerId, bool reversed, bool perpendicular,
+                              bool forceAlignment) {
+    DocumentLock lock(document);
+    if (TextContentOf(FindLayer(document, layerId)) == nullptr) {
+        return;
+    }
+    Execute(document, std::make_unique<motion::SetTextPathCommand>(EntityId{layerId}, enabled, EntityId{pathLayerId}, reversed, perpendicular, forceAlignment));
+}
+
+bool ms_layer_text_path_enabled(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content != nullptr ? content->textPath.enabled : false;
+}
+
+uint64_t ms_layer_text_path_layer_id(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content != nullptr ? content->textPath.pathLayerId.value : 0;
+}
+
+bool ms_layer_text_path_reversed(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content != nullptr ? content->textPath.reversed : false;
+}
+
+bool ms_layer_text_path_perpendicular(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content != nullptr ? content->textPath.perpendicular : true;
+}
+
+bool ms_layer_text_path_force_alignment(MSDocument *document, uint64_t layerId) {
+    DocumentLock lock(document);
+    TextContent *content = TextContentOf(FindLayer(document, layerId));
+    return content != nullptr ? content->textPath.forceAlignment : false;
 }

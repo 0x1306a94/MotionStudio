@@ -12,7 +12,7 @@ Started: 2026-08-04
 | 4 TextPathLayout | done | |
 | 5 Adapter draw + cache | done | |
 | 6 Selection AABB | done | |
-| 7 Bridge API | in_progress | |
-| 8 App Inspector | pending | UI commit waits for human smoke test |
+| 7 Bridge API | done | |
+| 8 App Inspector | in_progress | UI commit waits for human smoke test |
 | 9 PAG pathOption | pending | |
 | 10 Final verification | pending | |
