@@ -1,10 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+#include "MotionStudio/animation/Animatable.h"
+#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Expected.h"
 #include "MotionStudio/export/BitmapFrameSource.h"
 #include "MotionStudio/export/PagExporter.h"
@@ -72,9 +75,13 @@ class PagFileBuilder {
     Expected<pag::ImageBytes *, PagExportError> imageBytesForAsset(EntityId assetId,
                                                                    EntityId layerId);
     pag::Property<pag::TextDocumentHandle> *buildSourceText(const Layer &layer,
-                                                            const TextContent &content);
+                                                            const TextContent &content,
+                                                            bool forcePointText);
     pag::TextDocumentHandle makeTextDocument(const Layer &layer, const TextContent &content,
-                                             FrameTime time);
+                                             FrameTime time, bool forcePointText);
+    // Builds text-local path Animatable for PAG TextPathOptions; nullopt if unresolved.
+    std::optional<Animatable<BezierPath>> buildTextPathLocalAnimatable(const Layer &layer,
+                                                                       const TextContent &content);
     pag::Transform2D *buildTransform(const Transform &transform, EntityId layerId);
     pag::BlendMode mapBlendMode(BlendMode mode, EntityId layerId, bool *ok);
     const Composition *findComposition(EntityId id) const;

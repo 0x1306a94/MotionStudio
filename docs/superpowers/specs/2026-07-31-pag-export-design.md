@@ -382,6 +382,12 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 - `boxTextMode == true`（框文本：换行 + shrink）→ `boxText = true`，`boxTextPos = (0,0)`，`boxTextSize = size`；`firstBaseLine ≈ boxTextPos.y + ascent`（同上；**禁止**对框文本留 0，否则 PAG 会竖直居中）。框文本不改 position。
 - 不再为 shrink 发 `TextFeatureApproximated`（MS shrink 对齐 PAG 框文本适配）。
 
+**Text Path**（`TextContent.textPath`）→ `TextLayer.pathOption`（`pag::TextPathOptions`）：
+
+- 有效时：将路径层几何变换到**文本 local**（与预览相同，未 reverse）；写入 `pathOption.path` 为层上 `MaskData`（`maskMode = None`，仅作 codec 引用载体，不参与裁剪；路径/相对变换有动画时 `maskPath` 按关键帧时间 bake）。`reversedPath` / `perpendicularToPath` / `forceAlignment` 为静态 `Property<bool>`；`firstMargin` / `lastMargin` 从 `Animatable` 映射。
+- 有效时 **忽略** 存储的 `boxTextMode`，按点文本导出 `TextDocument`（含 position ascent 偏移）。
+- 无效 / 空路径：不写 `pathOption`，退回普通点文本 + warning `TextPathUnresolved`。
+
 **Image**：读 `Asset.path`（相对 `projectRoot`）→ 编码为 `ImageBytes`（**源像素尺寸**，对齐 AE）；`ImageContent.size` + `scaleMode` 按 `ComputeImageDestinationRect` **烘焙进** `transform.scale` / `anchor`（AE 无独立容器，改大小走 Transform）。`ImageFillRule::scaleMode` 保留给运行时换图。Zoom/None 溢出容器时加矩形 Mask。`size` 关键帧首版按 inPoint 静帧烘焙并 warning。
 
 **合成背景 / 圆角**：始终在图层栈最底插入 `CompositionBackground` Shape（铺 `backgroundColor`）——多数 PAG 预览只画图层、不铺 `Composition.backgroundColor` 字段。`cornerRadius > 0` 时 backdrop 用圆角矩形，并外包一层带圆角 Mask 的 PreCompose 做整体裁剪。
@@ -432,6 +438,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | `SpatialEasingApproximated` | 空间缓动被采样近似 |
 | `TextFeatureApproximated` | 文本特性部分丢失但仍矢量 |
 | `TextStyleApproximated` | 多 Fill/Stroke 折叠为 TextDocument 单组 |
+| `TextPathUnresolved` | Text Path 引用无效/无几何，已退回普通点文本 |
 | `ImageAssetMissing` | 图片资源缺失，层已跳过 |
 | `ImageSizeAnimationBakedAsStatic` | 容器尺寸关键帧按 inPoint 静帧烘焙 |
 | `BitmapFallback` | 通用降级（可带更具体 code 同时存在） |

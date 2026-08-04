@@ -10,6 +10,9 @@
 #include <vector>
 
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/BezierPathTransform.h"
+#include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/Time.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
@@ -27,7 +30,9 @@
 #include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TextAlign.h"
+#include "MotionStudio/model/TextPath.h"
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/FollowPathEval.h"
 #include "MotionStudio/render/ImageScaleLayout.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "PagAnimatableConvert.h"
@@ -175,6 +180,85 @@ void CollectTextKeyframeTimes(const Animatable<std::string> &text, std::set<Fram
     for (const auto &keyframe : text.keyframes()) {
         times->insert(keyframe.time);
     }
+}
+
+template <typename T>
+void CollectAnimatableTimes(const Animatable<T> &value, std::set<FrameTime> *times) {
+    for (const auto &keyframe : value.keyframes()) {
+        times->insert(keyframe.time);
+    }
+}
+
+void CollectTransformTimes(const Transform &transform, std::set<FrameTime> *times) {
+    CollectAnimatableTimes(transform.anchorPoint, times);
+    CollectAnimatableTimes(transform.position, times);
+    CollectAnimatableTimes(transform.scale, times);
+    CollectAnimatableTimes(transform.rotation, times);
+}
+
+void CollectPathGeometryTimes(const Layer &pathLayer, std::set<FrameTime> *times) {
+    if (pathLayer.content == nullptr || pathLayer.content->type() != LayerType::Shape) {
+        return;
+    }
+    const auto &shapeContent = static_cast<const ShapeContent &>(*pathLayer.content);
+    if (shapeContent.geometry == nullptr) {
+        return;
+    }
+    const ShapeElement &element = *shapeContent.geometry;
+    switch (element.type()) {
+        case ShapeType::Path: {
+            const auto &shape = static_cast<const ShapePath &>(element);
+            CollectAnimatableTimes(shape.path, times);
+            break;
+        }
+        case ShapeType::Rect: {
+            const auto &shape = static_cast<const ShapeRect &>(element);
+            CollectAnimatableTimes(shape.position, times);
+            CollectAnimatableTimes(shape.size, times);
+            CollectAnimatableTimes(shape.cornerRadius, times);
+            break;
+        }
+        case ShapeType::Ellipse: {
+            const auto &shape = static_cast<const ShapeEllipse &>(element);
+            CollectAnimatableTimes(shape.position, times);
+            CollectAnimatableTimes(shape.size, times);
+            break;
+        }
+        case ShapeType::TrimPath:
+            break;
+    }
+}
+
+std::optional<BezierPath> ResolveTextPathLocal(const Document &document, const Layer &textLayer,
+                                               const TextPath &textPath, FrameTime time) {
+    if (!textPath.enabled || !textPath.pathLayerId.isValid() ||
+        textPath.pathLayerId == textLayer.id) {
+        return std::nullopt;
+    }
+    const Layer *pathLayer = document.entityIndex().findLayer(textPath.pathLayerId);
+    if (pathLayer == nullptr) {
+        return std::nullopt;
+    }
+    const PreviewTime preview = static_cast<PreviewTime>(time);
+    const std::optional<BezierPath> optPath = EvaluateLayerPath(*pathLayer, preview);
+    if (!optPath) {
+        return std::nullopt;
+    }
+    std::vector<EntityId> pathParentVisiting;
+    std::vector<EntityId> pathFollowVisiting;
+    const Mat3 pathWorld =
+        FollowAwareWorldTransform(document, *pathLayer, preview, Mat3::Identity(),
+                                  pathParentVisiting, pathFollowVisiting);
+    std::vector<EntityId> textParentVisiting;
+    std::vector<EntityId> textFollowVisiting;
+    const Mat3 textWorld =
+        FollowAwareWorldTransform(document, textLayer, preview, Mat3::Identity(),
+                                  textParentVisiting, textFollowVisiting);
+    Mat3 textInverse = Mat3::Identity();
+    if (!textWorld.tryInvert(textInverse)) {
+        return std::nullopt;
+    }
+    return TransformBezierPath(*optPath, textInverse * pathWorld);
 }
 
 std::string JoinPath(const std::string &root, const std::string &relative) {
@@ -811,6 +895,53 @@ Expected<pag::NullLayer *, PagExportError> PagFileBuilder::buildNullLayer(const 
     return pagLayer;
 }
 
+std::optional<Animatable<BezierPath>> PagFileBuilder::buildTextPathLocalAnimatable(
+    const Layer &layer, const TextContent &content) {
+    const TextPath &textPath = content.textPath;
+    if (!textPath.enabled) {
+        return std::nullopt;
+    }
+    const std::optional<BezierPath> atInPoint =
+        ResolveTextPathLocal(document_, layer, textPath, layer.inPoint);
+    if (!atInPoint) {
+        return std::nullopt;
+    }
+
+    const Layer *pathLayer = document_.entityIndex().findLayer(textPath.pathLayerId);
+    std::set<FrameTime> times;
+    times.insert(layer.inPoint);
+    CollectTransformTimes(layer.transform, &times);
+    if (pathLayer != nullptr) {
+        CollectTransformTimes(pathLayer->transform, &times);
+        CollectPathGeometryTimes(*pathLayer, &times);
+    }
+
+    Animatable<BezierPath> localPath;
+    if (times.size() <= 1) {
+        localPath.setStaticValue(*atInPoint);
+        return localPath;
+    }
+
+    bool allResolved = true;
+    for (FrameTime time : times) {
+        const std::optional<BezierPath> sample =
+            ResolveTextPathLocal(document_, layer, textPath, time);
+        if (!sample) {
+            allResolved = false;
+            break;
+        }
+        Keyframe<BezierPath> keyframe;
+        keyframe.time = time;
+        keyframe.value = *sample;
+        localPath.addKeyframe(std::move(keyframe));
+    }
+    if (!allResolved || !localPath.isAnimated()) {
+        localPath.clearKeyframes();
+        localPath.setStaticValue(*atInPoint);
+    }
+    return localPath;
+}
+
 Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const Layer &layer) {
     const auto &content = static_cast<const TextContent &>(*layer.content);
     auto *pagLayer = new pag::TextLayer();
@@ -819,8 +950,46 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
         delete pagLayer;
         return Unexpected(filled.error());
     }
+
+    bool forcePointText = !content.boxTextMode;
+    if (content.textPath.enabled) {
+        std::optional<Animatable<BezierPath>> localPath =
+            buildTextPathLocalAnimatable(layer, content);
+        // Spec: unresolved textPath falls back to ordinary point text (no pathOption).
+        forcePointText = true;
+        if (!localPath) {
+            Warn(&warnings_, layer.id, "TextPathUnresolved",
+                 "Text path could not be resolved; exported as ordinary point text");
+        } else {
+            // PAG codec stores pathOption->path as a Mask ID reference into layer.masks.
+            // MaskMode::None keeps the geometry available without clipping the layer.
+            auto *mask = new pag::MaskData();
+            mask->id = nextMaskId_++;
+            mask->inverted = false;
+            mask->maskMode = pag::MaskMode::None;
+            mask->maskPath = ConvertPath(*localPath, &warnings_, layer.id);
+            mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
+            mask->maskExpansion = new pag::Property<float>(0);
+            pagLayer->masks.push_back(mask);
+
+            auto *pathOption = new pag::TextPathOptions();
+            pathOption->path = mask;
+            pathOption->reversedPath = new pag::Property<bool>(content.textPath.reversed);
+            pathOption->perpendicularToPath =
+                new pag::Property<bool>(content.textPath.perpendicular);
+            pathOption->forceAlignment =
+                new pag::Property<bool>(content.textPath.forceAlignment);
+            pathOption->firstMargin =
+                ConvertFloat(content.textPath.firstMargin, &warnings_, layer.id);
+            pathOption->lastMargin =
+                ConvertFloat(content.textPath.lastMargin, &warnings_, layer.id);
+            pagLayer->pathOption = pathOption;
+        }
+    }
+
     // Point text: MS position is the content top; PAG position is the first baseline.
-    if (!content.boxTextMode && pagLayer->transform != nullptr &&
+    // Valid textPath also exports as point text (boxTextMode ignored for layout).
+    if (forcePointText && pagLayer->transform != nullptr &&
         pagLayer->transform->position != nullptr) {
         const float ascent = ResolveTextAscent(options_, content.fontFamily, content.fontStyle,
                                                content.fontSize);
@@ -828,13 +997,13 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
             return pag::Point::Make(point.x, point.y + ascent);
         });
     }
-    pagLayer->sourceText = buildSourceText(layer, content);
+    pagLayer->sourceText = buildSourceText(layer, content, forcePointText);
     return pagLayer;
 }
 
 pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
                                                          const TextContent &content,
-                                                         FrameTime time) {
+                                                         FrameTime time, bool forcePointText) {
     auto document = std::make_shared<pag::TextDocument>();
     document->text = content.text.evaluate(time);
     document->fontFamily = content.fontFamily;
@@ -845,7 +1014,8 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
 
     // boxTextMode maps directly to PAG/AE paragraph (box) text.
     // firstBaseLine must be non-zero for box text or PAG vertically centers the block.
-    if (content.boxTextMode) {
+    // Valid textPath forces point text regardless of stored boxTextMode.
+    if (content.boxTextMode && !forcePointText) {
         document->boxText = true;
         document->boxTextPos = pag::Point::Zero();
         document->boxTextSize = pag::Point::Make(content.size.x, content.size.y);
@@ -906,15 +1076,18 @@ pag::TextDocumentHandle PagFileBuilder::makeTextDocument(const Layer &layer,
 }
 
 pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const Layer &layer,
-                                                                        const TextContent &content) {
+                                                                        const TextContent &content,
+                                                                        bool forcePointText) {
     if (!content.text.isAnimated()) {
-        return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(layer, content, 0));
+        return new pag::Property<pag::TextDocumentHandle>(
+            makeTextDocument(layer, content, 0, forcePointText));
     }
     std::set<FrameTime> times;
     CollectTextKeyframeTimes(content.text, &times);
     if (times.size() < 2) {
         const FrameTime time = times.empty() ? 0 : *times.begin();
-        return new pag::Property<pag::TextDocumentHandle>(makeTextDocument(layer, content, time));
+        return new pag::Property<pag::TextDocumentHandle>(
+            makeTextDocument(layer, content, time, forcePointText));
     }
     std::vector<FrameTime> ordered(times.begin(), times.end());
     std::vector<pag::Keyframe<pag::TextDocumentHandle> *> keyframes;
@@ -923,8 +1096,8 @@ pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const La
         auto *keyframe = new pag::Keyframe<pag::TextDocumentHandle>();
         keyframe->startTime = ordered[index];
         keyframe->endTime = ordered[index + 1];
-        keyframe->startValue = makeTextDocument(layer, content, ordered[index]);
-        keyframe->endValue = makeTextDocument(layer, content, ordered[index + 1]);
+        keyframe->startValue = makeTextDocument(layer, content, ordered[index], forcePointText);
+        keyframe->endValue = makeTextDocument(layer, content, ordered[index + 1], forcePointText);
         keyframe->interpolationType = pag::KeyframeInterpolationType::Hold;
         keyframes.push_back(keyframe);
     }

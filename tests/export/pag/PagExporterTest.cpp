@@ -449,6 +449,107 @@ TEST(PagExporterTest, TextLayerExports) {
     EXPECT_TRUE(textDocument.strokeOverFill);
 }
 
+TEST(PagExporterTest, TextPathExportsPathOption) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+
+    auto pathLayer = std::make_unique<Layer>(LayerType::Shape);
+    pathLayer->name = "Path";
+    pathLayer->inPoint = 0;
+    pathLayer->outPoint = composition->duration;
+    pathLayer->visible = false;
+    auto ellipse = std::make_unique<ShapeEllipse>();
+    ellipse->position.setStaticValue(Vec2{200.0f, 150.0f});
+    ellipse->size.setStaticValue(Vec2{240.0f, 120.0f});
+    auto *shapeContent = static_cast<ShapeContent *>(pathLayer->content.get());
+    shapeContent->geometry = std::move(ellipse);
+    Layer *path = document.addLayer(composition->id, std::move(pathLayer));
+
+    auto textLayer = std::make_unique<Layer>(LayerType::Text);
+    textLayer->name = "PathText";
+    textLayer->inPoint = 0;
+    textLayer->outPoint = composition->duration;
+    textLayer->transform.position.setStaticValue(Vec2{40.0f, 80.0f});
+    auto *content = static_cast<TextContent *>(textLayer->content.get());
+    content->text.setStaticValue("On Path");
+    content->fontFamily = "PingFang SC";
+    content->fontSize = 28.0f;
+    content->size = Vec2{300.0f, 100.0f};
+    // Stored box mode must be ignored when textPath resolves.
+    content->boxTextMode = true;
+    content->textPath.enabled = true;
+    content->textPath.pathLayerId = path->id;
+    content->textPath.reversed = true;
+    content->textPath.perpendicular = false;
+    content->textPath.forceAlignment = true;
+    content->textPath.firstMargin.setStaticValue(12.0f);
+    content->textPath.lastMargin.setStaticValue(8.0f);
+    document.addLayer(composition->id, std::move(textLayer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    for (const auto &warning : result.value().warnings) {
+        EXPECT_NE(warning.code, "TextPathUnresolved");
+    }
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::TextLayer *pagText = nullptr;
+    for (pag::Layer *layer : vector->layers) {
+        if (layer->type() == pag::LayerType::Text) {
+            pagText = static_cast<pag::TextLayer *>(layer);
+            break;
+        }
+    }
+    ASSERT_NE(pagText, nullptr);
+    ASSERT_NE(pagText->pathOption, nullptr);
+    ASSERT_NE(pagText->pathOption->path, nullptr);
+    ASSERT_NE(pagText->pathOption->path->maskPath, nullptr);
+    ASSERT_NE(pagText->pathOption->reversedPath, nullptr);
+    ASSERT_NE(pagText->pathOption->perpendicularToPath, nullptr);
+    ASSERT_NE(pagText->pathOption->forceAlignment, nullptr);
+    ASSERT_NE(pagText->pathOption->firstMargin, nullptr);
+    ASSERT_NE(pagText->pathOption->lastMargin, nullptr);
+    EXPECT_TRUE(pagText->pathOption->reversedPath->value);
+    EXPECT_FALSE(pagText->pathOption->perpendicularToPath->value);
+    EXPECT_TRUE(pagText->pathOption->forceAlignment->value);
+    EXPECT_FLOAT_EQ(pagText->pathOption->firstMargin->value, 12.0f);
+    EXPECT_FLOAT_EQ(pagText->pathOption->lastMargin->value, 8.0f);
+    ASSERT_NE(pagText->sourceText, nullptr);
+    ASSERT_NE(pagText->sourceText->value, nullptr);
+    EXPECT_FALSE(pagText->sourceText->value->boxText);
+}
+
+TEST(PagExporterTest, TextPathUnresolvedWarns) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto textLayer = std::make_unique<Layer>(LayerType::Text);
+    textLayer->inPoint = 0;
+    textLayer->outPoint = composition->duration;
+    auto *content = static_cast<TextContent *>(textLayer->content.get());
+    content->text.setStaticValue("Missing path");
+    content->fontSize = 24.0f;
+    content->boxTextMode = false;
+    content->textPath.enabled = true;
+    content->textPath.pathLayerId = EntityId{999999};
+    document.addLayer(composition->id, std::move(textLayer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    bool sawUnresolved = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "TextPathUnresolved") {
+            sawUnresolved = true;
+        }
+    }
+    EXPECT_TRUE(sawUnresolved);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *pagText = static_cast<pag::TextLayer *>(vector->layers[0]);
+    EXPECT_EQ(pagText->pathOption, nullptr);
+}
+
 TEST(PagExporterTest, TextPointUsesResolvedAscent) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);

@@ -336,7 +336,7 @@ bool ms_layer_text_path_force_alignment(...);
 
 ### Task 8: App Inspector + Timeline
 
-**Status:** ⏳ Pending
+**Status:** 🔄 in progress（待人机验收）
 
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/TextPathInspector.swift`（对照 `FollowPathInspector.swift`）
@@ -352,8 +352,8 @@ bool ms_layer_text_path_force_alignment(...);
 - firstMargin / lastMargin 行（复用 float + keyframe 行模式）
 - 候选层：有 path 的 shape（`hasBezierPath` 或 layerType==SHAPE，同 Follow Path）
 
-- [ ] **Step 1: Wire Core wrappers + Inspector UI**
-- [ ] **Step 2: Xcode MCP BuildProject（MotionStudioApp）**
+- [x] **Step 1: Wire Core wrappers + Inspector UI**
+- [x] **Step 2: Xcode MCP BuildProject（MotionStudioApp）**
 - [ ] **Step 3: 人机烟测** — 画圆路径、绑文本、隐藏路径层、选中框贴字形
 - [ ] **Step 4: Commit** `Add Text Path inspector and timeline margin tracks.`
 
@@ -361,7 +361,7 @@ bool ms_layer_text_path_force_alignment(...);
 
 ### Task 9: PagExporter `pathOption` + 文档
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp` — `buildTextLayer`
@@ -376,7 +376,7 @@ if content.textPath.enabled && resolvable:
   localPath = 与预览相同变换（未 reverse）
   // maskPath：静态或按路径/相对变换 KF 采样 bake
   pathOption = new TextPathOptions{
-    path: MaskData{ maskPath = localPath },  // 勿 push 到 layer.masks
+    path: MaskData{ maskPath = localPath },  // codec 需入 layer.masks（MaskMode::None）
     reversedPath / perpendicular / forceAlignment 静态 Property<bool>
     firstMargin / lastMargin 从 Animatable 映射
   }
@@ -385,9 +385,9 @@ else if enabled but unresolved:
   warning TextPathUnresolved
 ```
 
-- [ ] **Step 1: Failing export test** — Load 后 `pathOption != nullptr`，margins / flags 正确
-- [ ] **Step 2: Implement + PASS**
-- [ ] **Step 3: Update pag-export-design §3.4 + commit** `Export text path options into PAG pathOption.`
+- [x] **Step 1: Failing export test** — Load 后 `pathOption != nullptr`，margins / flags 正确
+- [x] **Step 2: Implement + PASS**
+- [x] **Step 3: Update pag-export-design §3.4 + commit** `Export text path options into PAG pathOption.`
 
 ---
 
