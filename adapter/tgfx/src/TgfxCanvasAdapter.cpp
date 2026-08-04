@@ -21,9 +21,11 @@
 
 #include "MotionStudio/render/ImageScaleLayout.h"
 #include "MotionStudio/textlayout/TextLayout.h"
+#include "TextPathLayout.h"
 #include "TgfxGlyphMetrics.h"
 #include "TgfxImageCache.h"
 #include "TgfxIsolation.h"
+#include "TgfxPathBuilder.h"
 #include "TgfxPathCache.h"
 #include "TgfxProfileTiming.h"
 #include "TgfxTextTypeface.h"
@@ -41,6 +43,76 @@ void DrawMaskPathContribution(tgfx::Canvas *target, const tgfx::Path &path, floa
     paint.setColor(tgfx::Color::FromRGBA(255, 255, 255, ToByte(opacity)));
     paint.setBlendMode(ToMaskBlendMode(mode));
     target->drawPath(path, paint);
+}
+
+uint64_t HashTextPathDrawParams(const TextDrawParams &params) {
+    uint64_t hash = 0;
+    hash = MixHash(hash, params.text.size());
+    for (unsigned char byte : params.text) {
+        hash = MixHash(hash, byte);
+    }
+    hash = MixHash(hash, params.fontFamily.size());
+    for (unsigned char byte : params.fontFamily) {
+        hash = MixHash(hash, byte);
+    }
+    hash = MixHash(hash, params.fontStyle.size());
+    for (unsigned char byte : params.fontStyle) {
+        hash = MixHash(hash, byte);
+    }
+    hash = MixHash(hash, FloatBits(params.fontSize));
+    hash = MixHash(hash, static_cast<uint64_t>(params.align));
+    hash = MixHash(hash, params.textPathReversed ? 1ULL : 0ULL);
+    hash = MixHash(hash, params.textPathPerpendicular ? 1ULL : 0ULL);
+    hash = MixHash(hash, params.textPathForceAlignment ? 1ULL : 0ULL);
+    hash = MixHash(hash, FloatBits(params.textPathFirstMargin));
+    hash = MixHash(hash, FloatBits(params.textPathLastMargin));
+    hash = MixHash(hash, params.textPath.closed ? 1ULL : 0ULL);
+    hash = MixHash(hash, params.textPath.vertices.size());
+    for (const BezierPath::Vertex &vertex : params.textPath.vertices) {
+        hash = MixHash(hash, FloatBits(vertex.point.x));
+        hash = MixHash(hash, FloatBits(vertex.point.y));
+        hash = MixHash(hash, FloatBits(vertex.inTangent.x));
+        hash = MixHash(hash, FloatBits(vertex.inTangent.y));
+        hash = MixHash(hash, FloatBits(vertex.outTangent.x));
+        hash = MixHash(hash, FloatBits(vertex.outTangent.y));
+    }
+    return hash;
+}
+
+void DrawTextOnPath(tgfx::Canvas *canvas, const TextDrawParams &params, float opacity,
+                    const TextPathLayoutResult &layout,
+                    const std::shared_ptr<tgfx::Typeface> &typeface) {
+    const tgfx::Font font(typeface, params.fontSize > 0.0f ? params.fontSize : 1.0f);
+    for (const TextDrawStyle &style : params.styles) {
+        for (const TextPathGlyph &glyph : layout.glyphs) {
+            if (glyph.utf8.empty()) {
+                continue;
+            }
+            std::shared_ptr<tgfx::TextBlob> blob = tgfx::TextBlob::MakeFrom(glyph.utf8, font);
+            if (blob == nullptr) {
+                continue;
+            }
+            Color color = style.color;
+            color.a *= opacity;
+            tgfx::Paint paint;
+            paint.setAntiAlias(true);
+            paint.setColor(ToTgfxColor(color));
+            paint.setBlendMode(ToTgfxBlendMode(style.blendMode));
+            if (style.isStroke) {
+                if (style.strokeWidth <= 0.0f) {
+                    continue;
+                }
+                paint.setStyle(tgfx::PaintStyle::Stroke);
+                paint.setStrokeWidth(style.strokeWidth);
+            } else {
+                paint.setStyle(tgfx::PaintStyle::Fill);
+            }
+            canvas->save();
+            canvas->concat(ToTgfxMatrix(glyph.matrix));
+            canvas->drawTextBlob(blob, 0.0f, 0.0f, paint);
+            canvas->restore();
+        }
+    }
 }
 
 }  // namespace
@@ -466,15 +538,39 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
     if (canvas == nullptr || params.styles.empty()) {
         return;
     }
-    // Path layout (Task 4/5) ignores boxTextMode; until then fall through to point/box layout.
-    const bool boxTextMode = params.boxTextMode &&
-        !(params.textPathEnabled && !params.textPath.vertices.empty());
-    if (boxTextMode && (params.containerSize.x <= 0.0f || params.containerSize.y <= 0.0f)) {
-        return;
-    }
     std::shared_ptr<tgfx::Typeface> typeface =
         ResolveTextTypeface(params.fontFamily, params.fontStyle);
     if (typeface == nullptr) {
+        return;
+    }
+
+    if (params.textPathEnabled && !params.textPath.vertices.empty()) {
+        const uint64_t key = HashTextPathDrawParams(params);
+        if (textPathCacheValid_ && key == textPathCacheKey_) {
+            ++textPathCacheHits_;
+        } else {
+            TextPathLayoutInput layoutInput;
+            layoutInput.text = params.text;
+            layoutInput.fontSize = params.fontSize;
+            layoutInput.align = params.align;
+            layoutInput.fontFamily = params.fontFamily;
+            layoutInput.fontStyle = params.fontStyle;
+            layoutInput.path = params.textPath;
+            layoutInput.reversed = params.textPathReversed;
+            layoutInput.perpendicular = params.textPathPerpendicular;
+            layoutInput.forceAlignment = params.textPathForceAlignment;
+            layoutInput.firstMargin = params.textPathFirstMargin;
+            layoutInput.lastMargin = params.textPathLastMargin;
+            textPathCacheResult_ = LayoutTextOnPath(layoutInput);
+            textPathCacheKey_ = key;
+            textPathCacheValid_ = true;
+        }
+        DrawTextOnPath(canvas, params, opacity_, textPathCacheResult_, typeface);
+        return;
+    }
+
+    const bool boxTextMode = params.boxTextMode;
+    if (boxTextMode && (params.containerSize.x <= 0.0f || params.containerSize.y <= 0.0f)) {
         return;
     }
 

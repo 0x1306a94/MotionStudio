@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -8,6 +9,7 @@
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/render/PreviewCanvasAdapter.h"
 #include "MotionStudio/render/TextDrawParams.h"
+#include "TextPathLayout.h"
 
 namespace tgfx {
 class AutoCanvasRestore;
@@ -60,6 +62,11 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
                    ImageScaleMode mode) override;
     void drawText(const TextDrawParams &params) override;
 
+    // Test helper: times the single-slot text-path layout cache was hit.
+    size_t textPathCacheHitsForTest() const {
+        return textPathCacheHits_;
+    }
+
   protected:
     TgfxCanvasAdapter();
 
@@ -106,6 +113,11 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
     std::unique_ptr<TgfxPathCache> pathCache_;
     std::unique_ptr<TgfxIsolationStack> isolationStack_;
     std::unique_ptr<TgfxImageCache> imageCache_;
+
+    uint64_t textPathCacheKey_ = 0;
+    bool textPathCacheValid_ = false;
+    TextPathLayoutResult textPathCacheResult_;
+    size_t textPathCacheHits_ = 0;
 };
 
 }  // namespace motion

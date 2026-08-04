@@ -10,8 +10,8 @@ Started: 2026-08-04
 | 2 TransformBezierPath + eval | done | |
 | 3 TextDrawParams | done | |
 | 4 TextPathLayout | done | |
-| 5 Adapter draw + cache | in_progress | |
-| 6 Selection AABB | pending | |
+| 5 Adapter draw + cache | done | |
+| 6 Selection AABB | in_progress | |
 | 7 Bridge API | pending | |
 | 8 App Inspector | pending | UI commit waits for human smoke test |
 | 9 PAG pathOption | pending | |

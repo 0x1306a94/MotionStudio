@@ -249,7 +249,7 @@ TextPathLayoutResult LayoutTextOnPath(const TextPathLayoutInput &input);
 
 ### Task 5: Adapter 绘制路径 + 单槽缓存
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxCanvasAdapter.cpp`（及 on-screen 若共用基类）
@@ -268,9 +268,9 @@ drawText(p):
   else: 现有直线路径
 ```
 
-- [ ] **Step 1: Wire path branch（可先无 cache）使画布可见路径文本**
-- [ ] **Step 2: Add single-slot cache + unit/integration assert 同输入二次 hit**
-- [ ] **Step 3: Commit** `Draw text on path with layout cache in tgfx adapter.`
+- [x] **Step 1: Wire path branch（可先无 cache）使画布可见路径文本**
+- [x] **Step 2: Add single-slot cache + unit/integration assert 同输入二次 hit**
+- [x] **Step 3: Commit** `Draw text on path with layout cache in tgfx adapter.`
 
 ---
 

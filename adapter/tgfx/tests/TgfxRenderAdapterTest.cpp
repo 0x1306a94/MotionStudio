@@ -519,3 +519,58 @@ TEST(TgfxRenderAdapterTest, DrawsTextOverBackground) {
     }
     EXPECT_TRUE(foundInk);
 }
+
+TEST(TgfxRenderAdapterTest, DrawsTextOnPathAndCachesLayout) {
+    auto adapter = TgfxRenderAdapter::Make(200, 120);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    BezierPath path;
+    path.closed = false;
+    path.vertices.push_back({{10.0f, 60.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    path.vertices.push_back({{190.0f, 60.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+
+    SceneState state;
+    state.viewportWidth = 200;
+    state.viewportHeight = 120;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    motion::EvaluatedTextItem text;
+    text.text = "AB";
+    text.fontSize = 32.0f;
+    text.boxTextMode = false;
+    text.align = motion::TextAlign::Left;
+    text.fontFamily = "Helvetica";
+    motion::TextDrawStyle fill;
+    fill.color = Color{0, 0, 0, 1};
+    text.styles = {fill};
+    motion::EvaluatedTextPath textPath;
+    textPath.path = path;
+    textPath.perpendicular = true;
+    text.textPath = std::move(textPath);
+    layer.textItem = std::move(text);
+    state.layers.push_back(std::move(layer));
+
+    const auto commands = BuildCommands(state);
+    adapter->beginFrame(200, 120, state.backgroundColor, state.cornerRadius);
+    PlayCommands(commands, *adapter);
+    EXPECT_EQ(adapter->textPathCacheHitsForTest(), 0u);
+    PlayCommands(commands, *adapter);
+    EXPECT_EQ(adapter->textPathCacheHitsForTest(), 1u);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    bool foundInk = false;
+    for (int y = 0; y < 120 && !foundInk; ++y) {
+        for (int x = 0; x < 200; ++x) {
+            const Pixel pixel = PixelAt(pixels, 200, x, y);
+            if (pixel.r < 240 || pixel.g < 240 || pixel.b < 240) {
+                foundInk = true;
+                break;
+            }
+        }
+    }
+    EXPECT_TRUE(foundInk);
+}
