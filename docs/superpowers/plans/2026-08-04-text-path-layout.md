@@ -208,7 +208,7 @@ virtual void drawText(const TextDrawParams &params) = 0;
 
 ### Task 4: `TextPathLayout`（tgfx PathMeasure）+ 单测
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `adapter/tgfx/include/TextPathLayout.h`（或 `adapter/tgfx/include/MotionStudio/...` 对齐现有）
@@ -241,9 +241,9 @@ TextPathLayoutResult LayoutTextOnPath(const TextPathLayoutInput &input);
 4. forceAlignment / 两端延长 / getPosTan / perpendicular 旋转 — 对齐 PAG 公式
 5. bounds = 各 glyph 轴对齐盒并集（可用 font metrics 近似：advance × ascent/descent）
 
-- [ ] **Step 1: Failing test** — 水平 path 上单行 "AB"：两字 matrix 平移递增；`perpendicular=true` 时切线水平 → 旋转≈0
-- [ ] **Step 2: Implement LayoutTextOnPath**
-- [ ] **Step 3: PASS + commit** `Add TextPathLayout using tgfx PathMeasure.`
+- [x] **Step 1: Failing test** — 水平 path 上单行 "AB"：两字 matrix 平移递增；`perpendicular=true` 时切线水平 → 旋转≈0
+- [x] **Step 2: Implement LayoutTextOnPath**
+- [x] **Step 3: PASS + commit** `Add TextPathLayout using tgfx PathMeasure.`
 
 ---
 
