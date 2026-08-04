@@ -206,6 +206,24 @@ enum TextProperty: String, CaseIterable {
     }
 }
 
+enum TextPathProperty: String, CaseIterable {
+    case firstMargin = "content.textPath.firstMargin"
+    case lastMargin = "content.textPath.lastMargin"
+
+    var path: String {
+        rawValue
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .firstMargin:
+            "First Margin"
+        case .lastMargin:
+            "Last Margin"
+        }
+    }
+}
+
 enum TransformField {
     case anchorX
     case anchorY

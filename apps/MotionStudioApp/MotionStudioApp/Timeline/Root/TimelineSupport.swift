@@ -54,6 +54,11 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     {
         paths.append(property.path)
     }
+    for property in TextPathProperty.allCases
+        where !core.keyframes(entityID: layerID, path: property.path).isEmpty
+    {
+        paths.append(property.path)
+    }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     paths.append(contentsOf: timelineMaskTracks(core: core, layerID: layerID).map(\.path))
     return paths
@@ -186,6 +191,12 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
         }
 
         for property in FollowPathProperty.allCases where animatedPaths.contains(property.path) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: property.path,
+                                            label: property.actionLabel))
+        }
+        for property in TextPathProperty.allCases where animatedPaths.contains(property.path) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: property.path,

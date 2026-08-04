@@ -336,7 +336,7 @@ bool ms_layer_text_path_force_alignment(...);
 
 ### Task 8: App Inspector + Timeline
 
-**Status:** 🔄 in progress（待人机验收）
+**Status:** ✅ Done
 
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/TextPathInspector.swift`（对照 `FollowPathInspector.swift`）
@@ -354,8 +354,8 @@ bool ms_layer_text_path_force_alignment(...);
 
 - [x] **Step 1: Wire Core wrappers + Inspector UI**
 - [x] **Step 2: Xcode MCP BuildProject（MotionStudioApp）**
-- [ ] **Step 3: 人机烟测** — 画圆路径、绑文本、隐藏路径层、选中框贴字形
-- [ ] **Step 4: Commit** `Add Text Path inspector and timeline margin tracks.`
+- [x] **Step 3: 人机烟测** — 画圆路径、绑文本、隐藏路径层、选中框贴字形
+- [x] **Step 4: Commit** `Add Text Path inspector and timeline margin tracks.`
 
 ---
 
@@ -396,7 +396,7 @@ else if enabled but unresolved:
 **Status:** ✅ Done
 
 - [x] **Step 1:** `ctest --test-dir build --output-on-failure -LE benchmark`（或至少 core/bridge/tgfx/pag 相关）
-- [x] **Step 2:** Spec 状态改为「已落地（App Inspector 待人机验收）」；Core/Adapter/Bridge/PAG Tasks ✅；Task 8 仍待人机烟测
+- [x] **Step 2:** Spec 状态改为「已落地」；全部 Tasks ✅（含 Task 8）
 - [x] **Step 3: Commit** `Mark text path layout plan complete.`
 
 ---

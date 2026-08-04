@@ -13,6 +13,7 @@ let textStringPath = TextProperty.text.path
 
 struct TextLayerInspector: View {
     let core: MotionDocumentCore
+    let compositionID: UInt64
     let layerID: UInt64
     @Environment(PlayheadClock.self) private var clock
     let isEditable: Bool
@@ -36,6 +37,8 @@ struct TextLayerInspector: View {
         let size = core.textSize(layerID: layerID)
         let fontSize = core.textFontSize(layerID: layerID)
         let boxTextMode = core.textBoxTextMode(layerID: layerID)
+        let textPathActive = core.textPathEnabled(layerID: layerID) &&
+            core.textPathLayerID(layerID: layerID) != 0
         let align = core.textAlign(layerID: layerID)
         let fontFamily = core.textFontFamily(layerID: layerID)
         let fontStyle = core.textFontStyle(layerID: layerID)
@@ -86,7 +89,7 @@ struct TextLayerInspector: View {
         NumberPropertyRow(label: "Width",
                           value: Float(size.dx),
                           hasKeyframeAtPlayhead: false,
-                          isEditable: isEditable && boxTextMode,
+                          isEditable: isEditable && boxTextMode && !textPathActive,
                           showsKeyframeButton: false)
         { newValue in
             setSize(value: CGVector(dx: CGFloat(max(1, newValue)), dy: size.dy))
@@ -95,7 +98,7 @@ struct TextLayerInspector: View {
         NumberPropertyRow(label: "Height",
                           value: Float(size.dy),
                           hasKeyframeAtPlayhead: false,
-                          isEditable: isEditable && boxTextMode,
+                          isEditable: isEditable && boxTextMode && !textPathActive,
                           showsKeyframeButton: false)
         { newValue in
             setSize(value: CGVector(dx: size.dx, dy: CGFloat(max(1, newValue))))
@@ -110,8 +113,14 @@ struct TextLayerInspector: View {
                 }
             },
         ))
-        .disabled(!isEditable)
+        .disabled(!isEditable || textPathActive)
         .font(.subheadline)
+
+        TextPathInspector(core: core,
+                          compositionID: compositionID,
+                          layerID: layerID,
+                          isEditable: isEditable,
+                          perform: perform)
 
         HStack(spacing: 8) {
             Text("Align")

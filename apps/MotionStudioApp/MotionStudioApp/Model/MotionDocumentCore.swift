@@ -543,6 +543,29 @@ final class MotionDocumentCore {
         ms_layer_follow_path_orient(handle, layerID)
     }
 
+    // MARK: - Text Path queries
+
+    func textPathEnabled(layerID: UInt64) -> Bool {
+        ms_layer_text_path_enabled(handle, layerID)
+    }
+
+    /// Path source layer id; 0 when unbound.
+    func textPathLayerID(layerID: UInt64) -> UInt64 {
+        ms_layer_text_path_layer_id(handle, layerID)
+    }
+
+    func textPathReversed(layerID: UInt64) -> Bool {
+        ms_layer_text_path_reversed(handle, layerID)
+    }
+
+    func textPathPerpendicular(layerID: UInt64) -> Bool {
+        ms_layer_text_path_perpendicular(handle, layerID)
+    }
+
+    func textPathForceAlignment(layerID: UInt64) -> Bool {
+        ms_layer_text_path_force_alignment(handle, layerID)
+    }
+
     // MARK: - Property queries
 
     /// Whether the entity exposes the given property path at all.
@@ -1243,6 +1266,14 @@ final class MotionDocumentCore {
 
     func setFollowPath(layerID: UInt64, enabled: Bool, pathLayerID: UInt64, orientAlongPath: Bool) {
         ms_command_set_follow_path(handle, layerID, enabled, pathLayerID, orientAlongPath)
+        changed()
+    }
+
+    func setTextPath(layerID: UInt64, enabled: Bool, pathLayerID: UInt64, reversed: Bool,
+                     perpendicular: Bool, forceAlignment: Bool)
+    {
+        ms_command_set_text_path(handle, layerID, enabled, pathLayerID, reversed, perpendicular,
+                                 forceAlignment)
         changed()
     }
 

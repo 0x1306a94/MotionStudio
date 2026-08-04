@@ -50,6 +50,7 @@ struct InspectorView: View {
                         }
                         if core.layerType(layerID) == .TEXT {
                             TextLayerInspector(core: core,
+                                               compositionID: core.firstCompositionID,
                                                layerID: layerID,
                                                isEditable: isEditable,
                                                perform: perform)
