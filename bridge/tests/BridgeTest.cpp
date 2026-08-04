@@ -718,6 +718,24 @@ TEST(BridgeCommandTest, StrokeStyleLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, PathLayerDefaultsToStroke) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+
+    // Pen-created paths start with one default stroke and no fill.
+    ASSERT_EQ(ms_layer_style_count(document, layerId), 1);
+    EXPECT_EQ(ms_layer_style_type_at(document, layerId, 0), MS_STYLE_STROKE);
+    EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 0),
+              MS_STROKE_POSITION_CENTER);
+
+    // Stroke carries the Figma-style 1px width.
+    EXPECT_FLOAT_EQ(ms_property_static_float(document, layerId, "styles[0].width"), 1.0f);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeBezierPathTest, StaticRoundTripAndKeyframe) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

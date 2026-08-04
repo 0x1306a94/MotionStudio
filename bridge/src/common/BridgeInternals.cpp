@@ -277,9 +277,11 @@ uint64_t AddPathLayer(MSDocument *handle, uint64_t compositionId) {
     auto *content = static_cast<ShapeContent *>(layer->content.get());
     content->geometry = std::make_unique<ShapePath>();
 
-    auto fill = std::make_unique<FillStyle>();
-    fill->color.setStaticValue(SHAPE_PALETTE[composition->layers.size() % 6]);
-    layer->styles.push_back(std::move(fill));
+    // Pen-created paths default to a stroke like Figma; fill is added manually.
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(SHAPE_PALETTE[composition->layers.size() % 6]);
+    stroke->width.setStaticValue(1.0f);
+    layer->styles.push_back(std::move(stroke));
 
     const uint64_t layerId = layer->id.value;
     Execute(handle, std::make_unique<motion::AddLayerCommand>(composition->id, std::move(layer)));

@@ -504,8 +504,8 @@ void ms_command_set_spatial_tangents(MSDocument *document, uint64_t entityId, co
 // Returns the new layer ID, 0 on failure.
 uint64_t ms_command_add_rect_layer(MSDocument *document, uint64_t compositionId);
 uint64_t ms_command_add_ellipse_layer(MSDocument *document, uint64_t compositionId);
-// Adds an empty open ShapePath layer with a default fill, centered on the
-// composition. Returns the new layer ID, 0 on failure.
+// Adds an empty open ShapePath layer with a default stroke (Figma-style, no
+// fill), centered on the composition. Returns the new layer ID, 0 on failure.
 uint64_t ms_command_add_path_layer(MSDocument *document, uint64_t compositionId);
 
 // Copies sourceAbsolutePath into {projectRoot}/assets/ (requires projectRoot),
