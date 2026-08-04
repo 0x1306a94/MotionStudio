@@ -300,6 +300,56 @@ ResolvePointTextContainerSizes / Bounds 路径:
 - 路径有效时：隐藏/灰显框文本与 size 手柄
 - 时间轴：两 margin 可打 KF
 
+### 用法：文字绕圆循环
+
+沿路径「转圈」靠动画 **`firstMargin`**（弧长像素），不是单独的 0–1 offset。闭合路径上采样会按弧长取模，margin 超过一周仍会绕回。
+
+**搭建**
+
+1. 画闭合圆/椭圆 Shape 层（路径层可随后隐藏）
+2. 文本层开启 Text Path，绑定该路径；`perpendicular` 默认开
+3. 需要字距拉开铺满整圈时开 `forceAlignment`；只平移不拉距则保持关闭
+4. 转圈方向见下「顺/逆时针」；字朝向整体反了再考虑 `reversed`
+
+**周长（椭圆 `size` = 宽×高包围盒）**
+
+- 圆（`width == height`）：半径 \(r = \text{size}/2\)，一周 \(L = 2\pi r = \pi\cdot\text{size}\)
+- 非圆椭圆：用实际路径弧长（近似或实测），不要用 \(\pi\cdot\text{width}\)
+
+**\(T\) 秒转 \(N\) 圈**
+
+\[
+\Delta\text{firstMargin} = N \times L
+\]
+
+关键帧用**线性**缓动：
+
+| 时间 | 帧（\(\mathrm{fps}\)） | `firstMargin` |
+|---|---|---|
+| \(0\) | \(0\) | \(0\) |
+| \(T\) | \(T\times\mathrm{fps}\) | \(N\times L\) |
+
+例：直径 `size = 200` 的圆，**3s 转 10 圈**（30 fps）：
+
+- \(L \approx \pi\times 200 \approx 628.3\)
+- \(\Delta = 10\times L \approx 6283\)
+- 帧 0 → `0`；帧 90 → `6283`；Composition ≥ 3s，循环播放即可连续转
+
+**顺/逆时针（转圈方向）**
+
+路径「正向」由路径顶点绘制顺序决定（圆/椭圆创建时的绕向）；`firstMargin` 增大 = 沿当前测量方向前进。
+
+| 目标 | 做法 | 字朝向 |
+|---|---|---|
+| 沿路径正向转 \(N\) 圈 | `firstMargin`: \(0\) → \(+N\times L\) | 不变 |
+| **反向转**（常见「逆时针」若当前正向是顺时针） | `firstMargin`: \(0\) → \(-N\times L\) | **不变**（推荐） |
+| 同上，但接受字随切线翻转 | 开 `reversed`，仍用 \(0\) → \(+N\times L\) | 会翻转 |
+
+`reversed` 语义（对齐 AE / PAG）：反转路径再 `PathMeasure`。切线约转 180°，`perpendicular=true` 时字跟着倒；同时 margin 沿原几何的行走方向也会对调。因此：
+
+- **只想改转圈方向、字保持正立** → 用 **负 `firstMargin`**，不要开 `reversed`
+- **字整体朝向反了**（例如贴在圆内侧/外侧读反）→ 再开 `reversed`；之后若转圈方向又不对，再用正/负 margin 微调
+
 ---
 
 
@@ -355,4 +405,4 @@ PAG 路径文本使用 text 层 **自身** `pathOption`（mask 引用），非�
 - [x] 设计对话锁定决策  
 - [x] Spec 人工审阅  
 - [x] Implementation plan  
-- [ ] 实现  
+- [x] 实现（App Inspector 人机验收后可再关 Task 8）
