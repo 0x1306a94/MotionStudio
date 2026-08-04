@@ -166,7 +166,7 @@ if content.textPath.enabled:
 
 ### Task 3: `TextDrawParams` 收拢 DrawText 接口
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/render/TextDrawParams.h`
@@ -200,9 +200,9 @@ virtual void drawText(const TextDrawParams &params) = 0;
 
 `AppendTextItem`：从 `EvaluatedTextItem` 填满 `TextDrawParams`（含 optional textPath）。
 
-- [ ] **Step 1: Refactor compile-green（行为不变，path 字段默认关）**
-- [ ] **Step 2: 现有 text / tgfx / bridge 相关测试仍绿**
-- [ ] **Step 3: Commit** `Collapse DrawText into TextDrawParams.`
+- [x] **Step 1: Refactor compile-green（行为不变，path 字段默认关）**
+- [x] **Step 2: 现有 text / tgfx / bridge 相关测试仍绿**
+- [x] **Step 3: Commit** `Collapse DrawText into TextDrawParams.`
 
 ---
 

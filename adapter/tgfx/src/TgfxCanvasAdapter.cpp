@@ -461,37 +461,38 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
     canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
 }
 
-void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 containerSize,
-                                 bool boxTextMode, TextAlign align, const std::string &fontFamily,
-                                 const std::string &fontStyle,
-                                 const std::vector<TextDrawStyle> &styles) {
+void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
     tgfx::Canvas *canvas = drawingCanvas();
-    if (canvas == nullptr || styles.empty()) {
+    if (canvas == nullptr || params.styles.empty()) {
         return;
     }
-    if (boxTextMode && (containerSize.x <= 0.0f || containerSize.y <= 0.0f)) {
+    // Path layout (Task 4/5) ignores boxTextMode; until then fall through to point/box layout.
+    const bool boxTextMode = params.boxTextMode &&
+        !(params.textPathEnabled && !params.textPath.vertices.empty());
+    if (boxTextMode && (params.containerSize.x <= 0.0f || params.containerSize.y <= 0.0f)) {
         return;
     }
-    std::shared_ptr<tgfx::Typeface> typeface = ResolveTextTypeface(fontFamily, fontStyle);
+    std::shared_ptr<tgfx::Typeface> typeface =
+        ResolveTextTypeface(params.fontFamily, params.fontStyle);
     if (typeface == nullptr) {
         return;
     }
 
     TgfxGlyphMetrics glyphMetrics(typeface);
     textlayout::TextLayoutInput input;
-    input.text = text;
+    input.text = params.text;
     input.softWrap = boxTextMode;
     input.shrinkToFit = boxTextMode;
     if (boxTextMode) {
-        input.boxWidth = containerSize.x;
-        input.boxHeight = containerSize.y;
+        input.boxWidth = params.containerSize.x;
+        input.boxHeight = params.containerSize.y;
     } else {
         // Unused when softWrap is false; keep positive for layout guards.
         input.boxWidth = 1.0f;
         input.boxHeight = 1.0f;
     }
-    input.fontSize = fontSize > 0.0f ? fontSize : 1.0f;
-    switch (align) {
+    input.fontSize = params.fontSize > 0.0f ? params.fontSize : 1.0f;
+    switch (params.align) {
         case TextAlign::Left: {
             input.align = textlayout::Align::Left;
             break;
@@ -509,7 +510,7 @@ void TgfxCanvasAdapter::drawText(const std::string &text, float fontSize, Vec2 c
     const textlayout::TextLayoutResult layout = textlayout::LayoutText(input);
 
     const tgfx::Font font(typeface, layout.appliedFontSize);
-    for (const TextDrawStyle &style : styles) {
+    for (const TextDrawStyle &style : params.styles) {
         for (const textlayout::TextLine &line : layout.lines) {
             if (line.text.empty()) {
                 continue;

@@ -73,14 +73,24 @@ void AppendTextItem(const std::optional<EvaluatedTextItem> &textItem, DrawComman
     }
     DrawCommand drawText;
     drawText.type = DrawCommandType::DrawText;
-    drawText.text = textItem->text;
-    drawText.textFontSize = textItem->fontSize;
-    drawText.textContainerSize = textItem->containerSize;
-    drawText.textBoxTextMode = textItem->boxTextMode;
-    drawText.textAlign = textItem->align;
-    drawText.textFontFamily = textItem->fontFamily;
-    drawText.textFontStyle = textItem->fontStyle;
-    drawText.textStyles = textItem->styles;
+    drawText.textParams.text = textItem->text;
+    drawText.textParams.fontSize = textItem->fontSize;
+    drawText.textParams.containerSize = textItem->containerSize;
+    drawText.textParams.boxTextMode = textItem->boxTextMode;
+    drawText.textParams.align = textItem->align;
+    drawText.textParams.fontFamily = textItem->fontFamily;
+    drawText.textParams.fontStyle = textItem->fontStyle;
+    drawText.textParams.styles = textItem->styles;
+    if (textItem->textPath.has_value()) {
+        const EvaluatedTextPath &path = *textItem->textPath;
+        drawText.textParams.textPathEnabled = true;
+        drawText.textParams.textPath = path.path;
+        drawText.textParams.textPathReversed = path.reversed;
+        drawText.textParams.textPathPerpendicular = path.perpendicular;
+        drawText.textParams.textPathForceAlignment = path.forceAlignment;
+        drawText.textParams.textPathFirstMargin = path.firstMargin;
+        drawText.textParams.textPathLastMargin = path.lastMargin;
+    }
     commands.push_back(std::move(drawText));
 }
 

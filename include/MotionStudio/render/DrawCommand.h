@@ -11,12 +11,11 @@
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/MaskMode.h"
-#include "MotionStudio/model/TextAlign.h"
-#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "MotionStudio/render/StrokeOptions.h"
+#include "MotionStudio/render/TextDrawParams.h"
 
 namespace motion {
 
@@ -59,14 +58,7 @@ struct DrawCommand {
     Vec2 imageContainerSize;                                    // DrawImage
     Vec2 imageIntrinsicSize;                                    // DrawImage
     ImageScaleMode imageScaleMode = ImageScaleMode::LetterBox;  // DrawImage
-    std::string text;                                           // DrawText
-    float textFontSize = 48.0f;                                 // DrawText
-    Vec2 textContainerSize;                                     // DrawText
-    bool textBoxTextMode = false;                               // DrawText
-    TextAlign textAlign = TextAlign::Left;                      // DrawText
-    std::string textFontFamily;                                 // DrawText
-    std::string textFontStyle;                                  // DrawText
-    std::vector<TextDrawStyle> textStyles;                      // DrawText fill/stroke passes
+    TextDrawParams textParams;                                  // DrawText
 };
 
 using DrawCommandList = std::vector<DrawCommand>;

@@ -6,8 +6,8 @@
 
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/model/BlendMode.h"
-#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/render/PreviewCanvasAdapter.h"
+#include "MotionStudio/render/TextDrawParams.h"
 
 namespace tgfx {
 class AutoCanvasRestore;
@@ -58,9 +58,7 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
                       float feather, float expansion) override;
     void drawImage(const std::string &path, Vec2 containerSize, Vec2 intrinsicSize,
                    ImageScaleMode mode) override;
-    void drawText(const std::string &text, float fontSize, Vec2 containerSize, bool boxTextMode,
-                  TextAlign align, const std::string &fontFamily, const std::string &fontStyle,
-                  const std::vector<TextDrawStyle> &styles) override;
+    void drawText(const TextDrawParams &params) override;
 
   protected:
     TgfxCanvasAdapter();

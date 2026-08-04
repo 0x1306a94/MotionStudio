@@ -9,14 +9,13 @@
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/MaskMode.h"
-#include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/render/DrawCommand.h"
-#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/PreviewBackdrop.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "MotionStudio/render/StrokeOptions.h"
+#include "MotionStudio/render/TextDrawParams.h"
 
 namespace motion {
 
@@ -97,17 +96,8 @@ class RenderAdapter {
                            ImageScaleMode mode) = 0;
 
     // Draws text in layer-local space (origin top-left of content bounds / box).
-    // text: UTF-8 string (may be empty).
-    // fontSize: model size cap (shrink applies when boxTextMode is true).
-    // containerSize: box size when boxTextMode; ignored for point-text layout.
-    // boxTextMode: true = wrap + shrink to fit box; false = point text (\\n only, no clip).
-    // align: horizontal alignment.
-    // fontFamily: system font family name.
-    // fontStyle: system style name within the family; empty = default/Regular.
-    // styles: fill/stroke passes in order; empty draws a black fill.
-    virtual void drawText(const std::string &text, float fontSize, Vec2 containerSize,
-                          bool boxTextMode, TextAlign align, const std::string &fontFamily,
-                          const std::string &fontStyle, const std::vector<TextDrawStyle> &styles) = 0;
+    // params: text, font, box/point mode, styles, and optional path layout fields.
+    virtual void drawText(const TextDrawParams &params) = 0;
 
     // Sets live-preview chrome behind the composition. Default is a no-op;
     // on-screen adapters override this. Offscreen adapters ignore it.
