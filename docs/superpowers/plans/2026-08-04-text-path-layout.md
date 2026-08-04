@@ -393,11 +393,11 @@ else if enabled but unresolved:
 
 ### Task 10: 收尾验证
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
-- [ ] **Step 1:** `ctest --test-dir build --output-on-failure -LE benchmark`（或至少 core/bridge/tgfx/pag 相关）
-- [ ] **Step 2:** Spec 状态改为「已落地」；本 plan 全部 Task ✅
-- [ ] **Step 3: Commit** `Mark text path layout plan complete.`
+- [x] **Step 1:** `ctest --test-dir build --output-on-failure -LE benchmark`（或至少 core/bridge/tgfx/pag 相关）
+- [x] **Step 2:** Spec 状态改为「已落地（App Inspector 待人机验收）」；Core/Adapter/Bridge/PAG Tasks ✅；Task 8 仍待人机烟测
+- [x] **Step 3: Commit** `Mark text path layout plan complete.`
 
 ---
 

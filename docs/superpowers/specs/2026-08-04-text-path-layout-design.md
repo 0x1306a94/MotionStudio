@@ -1,7 +1,7 @@
 # 文本曲线布局（Text Path）— 设计说明
 
 日期：2026-08-04  
-状态：已确认  
+状态：已落地（App Inspector 待人机验收）  
 实现计划：`docs/superpowers/plans/2026-08-04-text-path-layout.md`
 相关：`[2026-07-30-text-layer-design.md](./2026-07-30-text-layer-design.md)`、`[2026-08-01-point-vs-box-text-design.md](./2026-08-01-point-vs-box-text-design.md)`、`[2026-07-28-follow-path-design.md](./2026-07-28-follow-path-design.md)`、`[2026-07-31-pag-export-design.md](./2026-07-31-pag-export-design.md)`
 
