@@ -171,6 +171,20 @@ TEST(ResolveAnimatableTest, ResolvesTextContent) {
               static_cast<AnimatableBase *>(&textContent->text));
 }
 
+TEST(ResolveAnimatableTest, ResolvesTextPathMargins) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *textLayer =
+        document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
+
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.textPath.firstMargin"}),
+              static_cast<AnimatableBase *>(&textContent->textPath.firstMargin));
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.textPath.lastMargin"}),
+              static_cast<AnimatableBase *>(&textContent->textPath.lastMargin));
+    EXPECT_EQ(ResolveAnimatable(document, {textLayer->id, "content.textPath.enabled"}), nullptr);
+}
+
 TEST(ResolveAnimatableTest, ResolvesImageSize) {
     Document document;
     Composition *composition = document.addComposition(std::make_unique<Composition>());

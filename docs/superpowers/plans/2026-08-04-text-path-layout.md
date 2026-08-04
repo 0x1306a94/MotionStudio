@@ -46,7 +46,7 @@
 
 ### Task 1: `TextPath` 模型 + PropertyPath + 序列化 + `SetTextPathCommand`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/model/TextPath.h`
@@ -74,7 +74,7 @@ struct TextPath {
 // 自引用 / 无效 pathLayerId → enabled=false, pathLayerId 清空（同 Follow Path）
 ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```cpp
 TEST(ResolveAnimatableTest, ResolvesTextPathMargins) {
@@ -93,20 +93,20 @@ TEST(SerializerTextPathTest, RoundTrip) {
 }
 ```
 
-- [ ] **Step 2: Run tests — expect FAIL**
+- [x] **Step 2: Run tests — expect FAIL**
 
 ```bash
 cmake --build build --target core_tests
 ./build/tests/core_tests --gtest_filter='*TextPath*'
 ```
 
-- [ ] **Step 3: Implement model, command, PropertyPath, serialization**
+- [x] **Step 3: Implement model, command, PropertyPath, serialization**
 
 `PropertyPath` 在 `first.name == "content"` 时支持：
 - `segments.size()==2 && name=="text"`（现状）
 - `segments.size()==3 && segments[1]=="textPath" && (firstMargin|lastMargin)`
 
-- [ ] **Step 4: Tests PASS + commit**
+- [x] **Step 4: Tests PASS + commit**
 
 ```bash
 git commit --only <files> -m "Add TextPath model serialization and set command."

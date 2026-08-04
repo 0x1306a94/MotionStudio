@@ -34,6 +34,7 @@
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
+#include "MotionStudio/undo/SetTextPathCommand.h"
 #include "MotionStudio/undo/SetTrackMatteCommand.h"
 #include "MotionStudio/undo/UndoManager.h"
 
@@ -74,12 +75,14 @@ using motion::SetSpatialTangentsCommand;
 using motion::SetStaticValueCommand;
 using motion::SetStrokePositionCommand;
 using motion::SetStyleBlendModeCommand;
+using motion::SetTextPathCommand;
 using motion::SetTrackMatteCommand;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::ShapeType;
+using motion::TextContent;
 using motion::TrackMatteType;
 using motion::UndoManager;
 using motion::Vec2;
@@ -738,6 +741,45 @@ TEST(SetFollowPathCommandTest, ConsecutiveSetsMerge) {
 
     scene.undo.undo(scene.document);
     EXPECT_FALSE(scene.layer->followPath.enabled);
+}
+
+TEST(SetTextPathCommandTest, RejectsSelfReference) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *textLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    auto *textContent = static_cast<TextContent *>(textLayer->content.get());
+
+    undo.execute(document, std::make_unique<SetTextPathCommand>(textLayer->id, true, textLayer->id, false, true, false));
+    EXPECT_FALSE(textContent->textPath.enabled);
+    EXPECT_FALSE(textContent->textPath.pathLayerId.isValid());
+}
+
+TEST(SetTextPathCommandTest, SetAndClear) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *pathLayer =
+        document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *textLayer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    auto *textContent = static_cast<TextContent *>(textLayer->content.get());
+
+    undo.execute(document, std::make_unique<SetTextPathCommand>(textLayer->id, true, pathLayer->id, true, false, true));
+    EXPECT_TRUE(textContent->textPath.enabled);
+    EXPECT_EQ(textContent->textPath.pathLayerId, pathLayer->id);
+    EXPECT_TRUE(textContent->textPath.reversed);
+    EXPECT_FALSE(textContent->textPath.perpendicular);
+    EXPECT_TRUE(textContent->textPath.forceAlignment);
+
+    undo.endMergeGroup();
+
+    undo.execute(document, std::make_unique<SetTextPathCommand>(textLayer->id, false, EntityId{}, false, true, false));
+    EXPECT_FALSE(textContent->textPath.enabled);
+    EXPECT_FALSE(textContent->textPath.pathLayerId.isValid());
+
+    undo.undo(document);
+    EXPECT_TRUE(textContent->textPath.enabled);
+    EXPECT_EQ(textContent->textPath.pathLayerId, pathLayer->id);
 }
 
 TEST(ConvertGeometryToPathCommandTest, BakesRectAndUndoes) {

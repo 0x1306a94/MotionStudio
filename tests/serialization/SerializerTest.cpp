@@ -482,6 +482,44 @@ TEST(SerializerTest, FollowPathRoundTrip) {
     EXPECT_FLOAT_EQ(roundTrip->followPath.pathOffset.keyframes()[1].value, 1.0f);
 }
 
+TEST(SerializerTextPathTest, RoundTrip) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    Layer *pathLayer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *textLayer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    auto *textContent = static_cast<motion::TextContent *>(textLayer->content.get());
+    textContent->textPath.enabled = true;
+    textContent->textPath.pathLayerId = pathLayer->id;
+    textContent->textPath.reversed = true;
+    textContent->textPath.perpendicular = false;
+    textContent->textPath.forceAlignment = true;
+    Keyframe<float> marginStart;
+    marginStart.time = 0;
+    marginStart.value = 0.0f;
+    Keyframe<float> marginEnd;
+    marginEnd.time = 10;
+    marginEnd.value = 12.0f;
+    textContent->textPath.firstMargin.addKeyframe(marginStart);
+    textContent->textPath.firstMargin.addKeyframe(marginEnd);
+    textContent->textPath.lastMargin.setStaticValue(4.0f);
+    original.refreshEntityIndex();
+
+    const std::string text = Serializer::serialize(original);
+    Expected<std::unique_ptr<Document>, std::string> loaded = Serializer::deserialize(text);
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    auto *roundTrip =
+        static_cast<motion::TextContent *>((*loaded)->compositions[0]->layers[1]->content.get());
+    EXPECT_TRUE(roundTrip->textPath.enabled);
+    EXPECT_EQ(roundTrip->textPath.pathLayerId, pathLayer->id);
+    EXPECT_TRUE(roundTrip->textPath.reversed);
+    EXPECT_FALSE(roundTrip->textPath.perpendicular);
+    EXPECT_TRUE(roundTrip->textPath.forceAlignment);
+    ASSERT_TRUE(roundTrip->textPath.firstMargin.isAnimated());
+    ASSERT_EQ(roundTrip->textPath.firstMargin.keyframes().size(), 2u);
+    EXPECT_FLOAT_EQ(roundTrip->textPath.firstMargin.keyframes()[1].value, 12.0f);
+    EXPECT_FLOAT_EQ(roundTrip->textPath.lastMargin.staticValue(), 4.0f);
+}
+
 TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
     Document original;
     Composition *composition = original.addComposition(std::make_unique<Composition>());

@@ -238,13 +238,23 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             }
             return resolveShapeProperty(shapeContent->geometry.get(), first.name);
         }
-        if (first.name == "content" && segments.size() == 2) {
+        if (first.name == "content") {
             if (layer->content->type() != LayerType::Text) {
                 return nullptr;
             }
             auto *textContent = static_cast<TextContent *>(layer->content.get());
-            if (segments[1].name == "text") {
+            if (segments.size() == 2 && segments[1].name == "text") {
                 return &textContent->text;
+            }
+            if (segments.size() == 3 && segments[1].name == "textPath") {
+                const std::string &name = segments[2].name;
+                if (name == "firstMargin") {
+                    return &textContent->textPath.firstMargin;
+                }
+                if (name == "lastMargin") {
+                    return &textContent->textPath.lastMargin;
+                }
+                return nullptr;
             }
             return nullptr;
         }

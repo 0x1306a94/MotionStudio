@@ -1029,6 +1029,18 @@ json ContentToJson(const LayerContent &content) {
             node["size"] = StaticVec2ToJson(text.size);
             node["boxTextMode"] = text.boxTextMode;
             node["align"] = dto::ToString(text.align);
+            json textPath = json{{"enabled", text.textPath.enabled},
+                                 {"reversed", text.textPath.reversed},
+                                 {"perpendicular", text.textPath.perpendicular},
+                                 {"forceAlignment", text.textPath.forceAlignment},
+                                 {"firstMargin", AnimatableToJson(text.textPath.firstMargin)},
+                                 {"lastMargin", AnimatableToJson(text.textPath.lastMargin)}};
+            if (text.textPath.pathLayerId.isValid()) {
+                textPath["pathLayerId"] = IdToString(text.textPath.pathLayerId);
+            } else {
+                textPath["pathLayerId"] = nullptr;
+            }
+            node["textPath"] = std::move(textPath);
             break;
         }
         case LayerType::Group: {
@@ -1159,6 +1171,55 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
                     return Unexpected(align.error());
                 }
                 content->align = *align;
+            }
+            if (const json *textPathNode = FindChild(node, "textPath")) {
+                if (!textPathNode->is_object()) {
+                    return Unexpected(std::string("textPath must be an object"));
+                }
+                Expected<bool, std::string> enabled = ParseField<bool>(*textPathNode, "enabled");
+                if (enabled) {
+                    content->textPath.enabled = *enabled;
+                }
+                Expected<bool, std::string> reversed = ParseField<bool>(*textPathNode, "reversed");
+                if (reversed) {
+                    content->textPath.reversed = *reversed;
+                }
+                Expected<bool, std::string> perpendicular =
+                    ParseField<bool>(*textPathNode, "perpendicular");
+                if (perpendicular) {
+                    content->textPath.perpendicular = *perpendicular;
+                }
+                Expected<bool, std::string> forceAlignment =
+                    ParseField<bool>(*textPathNode, "forceAlignment");
+                if (forceAlignment) {
+                    content->textPath.forceAlignment = *forceAlignment;
+                }
+                const json *pathLayerNode = FindChild(*textPathNode, "pathLayerId");
+                if (pathLayerNode && !pathLayerNode->is_null()) {
+                    Expected<std::string, std::string> pathLayerText = AsString(*pathLayerNode);
+                    if (!pathLayerText) {
+                        return Unexpected(pathLayerText.error());
+                    }
+                    Expected<EntityId, std::string> pathLayerId = IdFromString(*pathLayerText);
+                    if (!pathLayerId) {
+                        return Unexpected(pathLayerId.error());
+                    }
+                    content->textPath.pathLayerId = *pathLayerId;
+                }
+                if (const json *firstMarginNode = FindChild(*textPathNode, "firstMargin")) {
+                    Expected<void, std::string> marginResult =
+                        AnimatableFromJson(*firstMarginNode, content->textPath.firstMargin);
+                    if (!marginResult) {
+                        return Unexpected(marginResult.error());
+                    }
+                }
+                if (const json *lastMarginNode = FindChild(*textPathNode, "lastMargin")) {
+                    Expected<void, std::string> marginResult =
+                        AnimatableFromJson(*lastMarginNode, content->textPath.lastMargin);
+                    if (!marginResult) {
+                        return Unexpected(marginResult.error());
+                    }
+                }
             }
             return std::unique_ptr<LayerContent>(std::move(content));
         }

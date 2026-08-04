@@ -6,6 +6,7 @@
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/LayerContent.h"
 #include "MotionStudio/model/TextAlign.h"
+#include "MotionStudio/model/TextPath.h"
 
 namespace motion {
 
@@ -27,6 +28,8 @@ class TextContent : public LayerContent {
     // true: PAG box text (wrap + shrink); false: point text.
     bool boxTextMode = false;
     TextAlign align = TextAlign::Left;
+    // Path layout for point text; ignored when invalid / unbound.
+    TextPath textPath;
 };
 
 }  // namespace motion
