@@ -2,12 +2,19 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+
+#include "MeasurePointTextSize.h"
+#include "MeasureTextPathBounds.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "TextPathLayout.h"
 
 using motion::BezierPath;
 using motion::LayoutTextOnPath;
+using motion::MeasurePointTextSize;
+using motion::MeasureTextPathBounds;
 using motion::TextAlign;
+using motion::TextPathBounds;
 using motion::TextPathLayoutInput;
 using motion::TextPathLayoutResult;
 using motion::Vec2;
@@ -67,4 +74,25 @@ TEST(TextPathLayoutTest, EmptyPathYieldsNoGlyphs) {
     input.path = {};
     const TextPathLayoutResult result = LayoutTextOnPath(input);
     EXPECT_TRUE(result.glyphs.empty());
+}
+
+TEST(TextPathLayoutTest, ArcPathBoundsDifferFromPointTextBox) {
+    BezierPath arc;
+    arc.closed = false;
+    // Approximate quarter circle (0,100) → (100,0) with cubic handles.
+    arc.vertices.push_back({{0.0f, 100.0f}, {0.0f, 0.0f}, {55.0f, 0.0f}});
+    arc.vertices.push_back({{100.0f, 0.0f}, {0.0f, 55.0f}, {0.0f, 0.0f}});
+
+    const TextPathBounds pathBounds =
+        MeasureTextPathBounds("Hello", 24.0f, TextAlign::Left, "Helvetica", "", arc, false, true,
+                              false, 0.0f, 0.0f);
+    const Vec2 pointSize =
+        MeasurePointTextSize("Hello", 24.0f, TextAlign::Left, "Helvetica", "");
+    EXPECT_GT(pathBounds.max.x - pathBounds.min.x, 1.0f);
+    EXPECT_GT(pathBounds.max.y - pathBounds.min.y, 1.0f);
+    // Curved layout should not match the axis-aligned point-text box origin..size.
+    const bool sameBox = std::fabs(pathBounds.min.x) < 0.5f && std::fabs(pathBounds.min.y) < 0.5f &&
+        std::fabs((pathBounds.max.x - pathBounds.min.x) - pointSize.x) < 1.0f &&
+        std::fabs((pathBounds.max.y - pathBounds.min.y) - pointSize.y) < 1.0f;
+    EXPECT_FALSE(sameBox);
 }

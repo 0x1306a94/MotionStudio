@@ -187,8 +187,13 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
             local.y <= container.y + pad;
     }
     if (layer.textItem.has_value()) {
-        const Vec2 hitSize = layer.textItem->containerSize;
-        if (hitSize.x <= 0.0f || hitSize.y <= 0.0f) {
+        Vec2 localMin{0.0f, 0.0f};
+        Vec2 localMax = layer.textItem->containerSize;
+        if (layer.textItem->useExactLocalBounds) {
+            localMin = layer.textItem->localBoundsMin;
+            localMax = layer.textItem->localBoundsMax;
+        }
+        if (localMax.x <= localMin.x || localMax.y <= localMin.y) {
             return false;
         }
         Mat3 inverse;
@@ -197,8 +202,8 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
         }
         const Vec2 local = inverse.transformPoint(point);
         const float pad = std::max(tolerance, 0.0f);
-        return local.x >= -pad && local.y >= -pad && local.x <= hitSize.x + pad &&
-            local.y <= hitSize.y + pad;
+        return local.x >= localMin.x - pad && local.y >= localMin.y - pad &&
+            local.x <= localMax.x + pad && local.y <= localMax.y + pad;
     }
     const float safeTolerance = std::max(tolerance, 0.0f);
     Vec2 minPoint{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
@@ -259,15 +264,20 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
         return true;
     }
     if (layer.textItem.has_value()) {
-        const Vec2 hitSize = layer.textItem->containerSize;
-        if (hitSize.x <= 0.0f || hitSize.y <= 0.0f) {
+        Vec2 localMin{0.0f, 0.0f};
+        Vec2 localMax = layer.textItem->containerSize;
+        if (layer.textItem->useExactLocalBounds) {
+            localMin = layer.textItem->localBoundsMin;
+            localMax = layer.textItem->localBoundsMax;
+        }
+        if (localMax.x <= localMin.x || localMax.y <= localMin.y) {
             return false;
         }
         const Vec2 corners[4] = {
-            layer.worldTransform.transformPoint({0.0f, 0.0f}),
-            layer.worldTransform.transformPoint({hitSize.x, 0.0f}),
-            layer.worldTransform.transformPoint({hitSize.x, hitSize.y}),
-            layer.worldTransform.transformPoint({0.0f, hitSize.y}),
+            layer.worldTransform.transformPoint({localMin.x, localMin.y}),
+            layer.worldTransform.transformPoint({localMax.x, localMin.y}),
+            layer.worldTransform.transformPoint({localMax.x, localMax.y}),
+            layer.worldTransform.transformPoint({localMin.x, localMax.y}),
         };
         minPoint = corners[0];
         maxPoint = corners[0];
@@ -311,6 +321,11 @@ bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPo
         return true;
     }
     if (layer.textItem.has_value()) {
+        if (layer.textItem->useExactLocalBounds) {
+            minPoint = layer.textItem->localBoundsMin;
+            maxPoint = layer.textItem->localBoundsMax;
+            return maxPoint.x > minPoint.x && maxPoint.y > minPoint.y;
+        }
         const Vec2 hitSize = layer.textItem->containerSize;
         if (hitSize.x <= 0.0f || hitSize.y <= 0.0f) {
             return false;

@@ -276,7 +276,7 @@ drawText(p):
 
 ### Task 6: 选中 AABB（路径布局 bounds）
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create/Modify: `adapter/tgfx/include/MeasureTextPathBounds.h` + cpp（或并入 TextPathLayout）
@@ -301,9 +301,9 @@ elif !boxTextMode:
 if text && useExactLocalBounds: min/max = localBounds*; else 现状 0..containerSize
 ```
 
-- [ ] **Step 1: Failing bridge/core test** — 圆弧路径文本 local bounds ≠ 直线点文本盒
-- [ ] **Step 2: Implement + PASS**
-- [ ] **Step 3: Commit** `Use path-layout bounds for text selection AABB.`
+- [x] **Step 1: Failing bridge/core test** — 圆弧路径文本 local bounds ≠ 直线点文本盒
+- [x] **Step 2: Implement + PASS**
+- [x] **Step 3: Commit** `Use path-layout bounds for text selection AABB.`
 
 ---
 

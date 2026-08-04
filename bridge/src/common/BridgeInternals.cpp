@@ -1,10 +1,12 @@
 #include "BridgeInternals.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 #include <vector>
 
 #include "MeasurePointTextSize.h"
+#include "MeasureTextPathBounds.h"
 
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -286,12 +288,31 @@ uint64_t AddPathLayer(MSDocument *handle, uint64_t compositionId) {
 
 void ResolvePointTextContainerSizes(motion::SceneState &state) {
     for (motion::EvaluatedLayer &layer : state.layers) {
-        if (!layer.textItem.has_value() || layer.textItem->boxTextMode) {
+        if (!layer.textItem.has_value()) {
             continue;
         }
         motion::EvaluatedTextItem &item = *layer.textItem;
+        if (item.textPath.has_value() && !item.textPath->path.vertices.empty()) {
+            const motion::EvaluatedTextPath &path = *item.textPath;
+            const motion::TextPathBounds bounds = MeasureTextPathBounds(
+                item.text, item.fontSize, item.align, item.fontFamily, item.fontStyle, path.path,
+                path.reversed, path.perpendicular, path.forceAlignment, path.firstMargin,
+                path.lastMargin);
+            item.useExactLocalBounds = true;
+            item.localBoundsMin = bounds.min;
+            item.localBoundsMax = bounds.max;
+            item.containerSize = {std::max(1.0f, bounds.max.x - bounds.min.x),
+                                  std::max(1.0f, bounds.max.y - bounds.min.y)};
+            continue;
+        }
+        if (item.boxTextMode) {
+            continue;
+        }
+        item.useExactLocalBounds = false;
         item.containerSize = MeasurePointTextSize(item.text, item.fontSize, item.align, item.fontFamily,
                                                   item.fontStyle);
+        item.localBoundsMin = {0.0f, 0.0f};
+        item.localBoundsMax = item.containerSize;
     }
 }
 

@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
+#include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::BezierPath;
+using motion::BoundsOfLayerLocal;
 using motion::EntityId;
 using motion::EvaluatedLayer;
 using motion::EvaluatedShapeItem;
+using motion::EvaluatedTextItem;
 using motion::HitTestLayer;
 using motion::HitTestLayerAtPoint;
 using motion::MakePathGeometry;
@@ -62,4 +65,25 @@ TEST(HitTestTest, HitsStrokeWithinTolerance) {
 
     EXPECT_TRUE(HitTestLayer(layer, Vec2{50, 4}, 2));
     EXPECT_FALSE(HitTestLayer(layer, Vec2{50, 8}, 1));
+}
+
+TEST(HitTestTest, TextExactLocalBoundsNotOriginAnchored) {
+    EvaluatedLayer layer;
+    layer.id = EntityId{1};
+    EvaluatedTextItem text;
+    text.containerSize = {40, 20};
+    text.useExactLocalBounds = true;
+    text.localBoundsMin = {-10.0f, -30.0f};
+    text.localBoundsMax = {50.0f, 10.0f};
+    layer.textItem = text;
+
+    Vec2 minPoint;
+    Vec2 maxPoint;
+    ASSERT_TRUE(BoundsOfLayerLocal(layer, minPoint, maxPoint));
+    EXPECT_FLOAT_EQ(minPoint.x, -10.0f);
+    EXPECT_FLOAT_EQ(minPoint.y, -30.0f);
+    EXPECT_FLOAT_EQ(maxPoint.x, 50.0f);
+    EXPECT_FLOAT_EQ(maxPoint.y, 10.0f);
+    EXPECT_TRUE(HitTestLayer(layer, {-5.0f, -10.0f}, 0));
+    EXPECT_FALSE(HitTestLayer(layer, {5.0f, 20.0f}, 0));
 }
