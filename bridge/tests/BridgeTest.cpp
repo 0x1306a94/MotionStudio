@@ -803,7 +803,7 @@ TEST(BridgeBezierPathTest, ConvertGeometryAndAddPathLayer) {
     ms_document_destroy(document);
 }
 
-TEST(BridgeBezierPathTest, ToggleSmoothAndRecenterShape) {
+TEST(BridgeBezierPathTest, SetMirrorModeAndRecenterShape) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
     const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
@@ -813,7 +813,14 @@ TEST(BridgeBezierPathTest, ToggleSmoothAndRecenterShape) {
     ms_command_path_edit_append_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 200, 100);
     ms_command_path_edit_append_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 200, 200);
 
-    ms_command_path_edit_toggle_smooth(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 1);
+    MSVectorNetwork *beforeSmooth = ms_property_static_vector_network(document, layerId, "path");
+    ASSERT_NE(beforeSmooth, nullptr);
+    ASSERT_GE(beforeSmooth->vertexCount, 3u);
+    const uint32_t midId = beforeSmooth->vertices[1].id;
+    ms_vector_network_free(beforeSmooth);
+
+    ms_command_path_edit_set_mirror_mode(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, midId,
+                                         MS_VERTEX_MIRROR_ANGLE);
     MSBezierPath *smooth = ms_property_static_bezier_path(document, layerId, "path");
     ASSERT_NE(smooth, nullptr);
     ASSERT_EQ(smooth->count, 3u);
@@ -919,7 +926,7 @@ TEST(BridgeVectorNetworkTest, RoundTripAndAddEdgeAfterClose) {
     ms_document_destroy(document);
 }
 
-TEST(BridgeVectorNetworkTest, ToggleSmoothSharedHubIsNoOp) {
+TEST(BridgeVectorNetworkTest, SetMirrorModeSharedHubWritesModeWithoutGeometry) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
     const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
@@ -940,25 +947,27 @@ TEST(BridgeVectorNetworkTest, ToggleSmoothSharedHubIsNoOp) {
     ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, hub, b, &e2);
     ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, hub, c, &e3);
 
-    MSVectorNetwork *before = ms_property_static_vector_network(document, layerId, "path");
-    ASSERT_NE(before, nullptr);
-    ASSERT_EQ(before->vertexCount, 4u);
-    ASSERT_EQ(before->edgeCount, 3u);
-
-    // Hub is vertices[0] in insertion order — double-click must not collapse network.
-    ms_command_path_edit_toggle_smooth(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 0);
+    ms_command_path_edit_set_mirror_mode(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, hub,
+                                         MS_VERTEX_MIRROR_ANGLE);
 
     MSVectorNetwork *after = ms_property_static_vector_network(document, layerId, "path");
     ASSERT_NE(after, nullptr);
-    EXPECT_EQ(after->vertexCount, before->vertexCount);
-    EXPECT_EQ(after->edgeCount, before->edgeCount);
+    EXPECT_EQ(after->vertexCount, 4u);
+    EXPECT_EQ(after->edgeCount, 3u);
+    bool foundHub = false;
+    for (size_t i = 0; i < after->vertexCount; ++i) {
+        if (after->vertices[i].id == hub) {
+            EXPECT_EQ(after->vertices[i].mirrorMode, MS_VERTEX_MIRROR_ANGLE);
+            foundHub = true;
+        }
+    }
+    EXPECT_TRUE(foundHub);
     for (size_t i = 0; i < after->edgeCount; ++i) {
         EXPECT_FLOAT_EQ(after->edges[i].startTangentX, 0.0f);
         EXPECT_FLOAT_EQ(after->edges[i].startTangentY, 0.0f);
         EXPECT_FLOAT_EQ(after->edges[i].endTangentX, 0.0f);
         EXPECT_FLOAT_EQ(after->edges[i].endTangentY, 0.0f);
     }
-    ms_vector_network_free(before);
     ms_vector_network_free(after);
     ms_document_destroy(document);
 }

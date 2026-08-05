@@ -347,3 +347,22 @@ struct CanvasFrameProfile: Equatable {
 extension MS_PATH_EDIT: @retroactive Equatable, @retroactive Hashable {}
 
 extension MS_PATH_HANDLE: @retroactive Equatable, @retroactive Hashable {}
+
+extension MS_VERTEX_MIRROR: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_VERTEX_MIRROR] {
+        [.NONE, .ANGLE, .ANGLE_LENGTH]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .NONE: "None"
+        case .ANGLE: "Angle"
+        case .ANGLE_LENGTH: "Angle and length"
+        default: "None"
+        }
+    }
+}

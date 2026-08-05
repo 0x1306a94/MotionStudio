@@ -19,9 +19,9 @@ VectorNetwork AddEdge(VectorNetwork network, uint32_t start, uint32_t end, uint3
 // Moves the vertex point. Incident edge tangents stay relative offsets.
 VectorNetwork MoveVertex(VectorNetwork network, uint32_t id, Vec2 point);
 
-// Sets the handle at one end of an edge. When mirror is true and the endpoint
-// has degree == 2, mirrors the other incident edge's handle at that vertex to
-// -tangent. Degree != 2 ignores mirror.
+// Sets the handle at one end of an edge. When mirror is true, applies the
+// endpoint vertex's mirrorMode (None: this side only; Angle: opposite dir keep
+// length; AngleLength: opposite = -tangent). Degree != 2 ignores mirror.
 VectorNetwork MoveEdgeTangent(VectorNetwork network, uint32_t edgeId, bool atStart, Vec2 tangent,
                               bool mirror);
 
@@ -33,8 +33,12 @@ VectorNetwork RemoveVertex(VectorNetwork network, uint32_t id);
 
 VectorNetwork RemoveEdge(VectorNetwork network, uint32_t id);
 
-// Corner ↔ smooth for a degree-2 vertex (auto 1/3-chord handles, or clear).
-// Degree ≠ 2 is a no-op — shared hubs must not mirror / auto-smooth.
+// Writes mirrorMode always. Degree == 2 also applies handle geometry:
+// None clears both sides; Angle / AngleLength generate collinear handles.
+// Degree ≠ 2: mode is stored, handles unchanged.
+VectorNetwork SetVertexMirrorMode(VectorNetwork network, uint32_t vertexId, VertexMirrorMode mode);
+
+// Thin None↔Angle toggle for legacy bridge callers; prefer SetVertexMirrorMode.
 VectorNetwork ToggleVertexSmooth(VectorNetwork network, uint32_t vertexId);
 
 // Translates all vertices so AABB center is at origin. Tangents unchanged

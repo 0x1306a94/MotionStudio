@@ -15,7 +15,7 @@
 
 | 项 | 选择 |
 |---|---|
-| 能力 | 新建、加点、删点、拖顶点/切线手柄；双击顶点角点↔平滑 |
+| 能力 | 新建、加点、删点、拖顶点/切线手柄；Inspector Mirroring（None/Angle/AngleLength） |
 | 目标 | ShapePath + Mask path |
 | 动画写回 | playhead：静态 `SetStaticValue`；已动画则 upsert `AddKeyframe` |
 | Rect / Ellipse | 进入钢笔时不可逆烘焙为 ShapePath |
@@ -118,7 +118,7 @@ DrawCommandList BuildPathEditCommands(...);
 - `MSBezierPath` / `MSBezierVertex` + free
 - `ms_property_static_bezier_path` / `evaluate` / `set_static` / `add_keyframe`
 - `ms_command_convert_geometry_to_path` / `ms_command_add_path_layer`
-- `ms_command_path_edit_*`（move / tangent / insert / remove / close / append / toggle_smooth / recenter_shape）
+- `ms_command_path_edit_*`（move / tangent / insert / remove / close / append / set_mirror_mode / recenter_shape）
 - `ms_canvas_set_path_edit_target` / `ms_canvas_hit_path_edit` / `ms_canvas_set_path_overlays`
 
 ## 进入钢笔
@@ -147,11 +147,11 @@ DrawCommandList BuildPathEditCommands(...);
 | 点首点 CloseRing | ClosePath + Shape recenter 并提交 |
 | 点边（顶点区外） | InsertVertexOnSegment |
 | 按下顶点/手柄 | 立即选中；拖动写回（零延时 long-press，非 UIPan 阈值） |
-| 双击顶点 | `ToggleVertexSmooth`（角点↔平滑） |
+| Inspector Mirroring | `SetVertexMirrorMode`（None / Angle / AngleLength）；见 vertex-mirroring spec |
 | Delete | RemoveVertex（至少保留 2 点） |
 | 钢笔态双击画布 | **不**触发合成居中 |
 
-零切线角点选中后不显示切线手柄；双击变平滑后才出现可拖手柄。Append 的点默认角点；边上插点因 de Casteljau 可带非零切线。
+零切线角点选中后不显示切线手柄；切到 Angle / AngleLength 后才出现可拖手柄。Append 的点默认角点；边上插点因 de Casteljau 可带非零切线。
 
 ### 选择模式 · 画布双击
 
@@ -175,7 +175,7 @@ Mask path **不**由画布双击进入。
 - `PathEdit*`：hit 优先级（顶点区优先于边）、空 path、chrome 命令非空
 - `ConvertGeometryToPath*`：Rect/Ellipse → Path；undo；已是 Path no-op
 - Bridge：BezierPath round-trip；toggle + close recenter；动画 upsert
-- 手动：Pen 建闭合路径；双击顶点平滑；退出后锚点在形状中心；选择态双击 Rect 进钢笔；Mask 仅 Inspector；工具栏钢笔时创建按钮置灰
+- 手动：Pen 建闭合路径；Inspector 切换 Mirroring；退出后锚点在形状中心；选择态双击 Rect 进钢笔；Mask 仅 Inspector；工具栏钢笔时创建按钮置灰
 
 ## 与既有 spec 关系
 

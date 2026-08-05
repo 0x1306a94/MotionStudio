@@ -7,12 +7,20 @@
 
 namespace motion {
 
+// Figma-style handle mirroring at a vertex (Inspector Mirroring control).
+enum class VertexMirrorMode : uint8_t {
+    None = 0,
+    Angle = 1,
+    AngleLength = 2,
+};
+
 // Authoring graph for pen paths: shared vertices connected by cubic edges.
 // Tangents live on edges (Lottie-relative offsets from the endpoint).
 struct VectorNetwork {
     struct Vertex {
         uint32_t id = 0;
         Vec2 point = {};
+        VertexMirrorMode mirrorMode = VertexMirrorMode::None;
 
         bool operator==(const Vertex &other) const;
         bool operator!=(const Vertex &other) const;

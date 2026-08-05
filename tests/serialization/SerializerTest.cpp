@@ -49,6 +49,7 @@ using motion::ShapeTrimPath;
 using motion::ShapeType;
 using motion::Vec2;
 using motion::VectorNetwork;
+using motion::VertexMirrorMode;
 
 namespace {
 
@@ -631,6 +632,62 @@ TEST(SerializerTest, RoundTripVectorNetworkSharedVertex) {
     EXPECT_EQ(root["schemaVersion"], 1);
     EXPECT_TRUE(root["compositions"][0]["layers"][0]["content"]["geometry"]["path"]["static"].contains(
         "edges"));
+}
+
+TEST(SerializerTest, RoundTripVertexMirrorMode) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto path = std::make_unique<ShapePath>();
+    VectorNetwork network;
+    network.vertices = {{1, {0, 0}, VertexMirrorMode::AngleLength},
+                        {2, {10, 0}, VertexMirrorMode::Angle}};
+    network.edges = {{1, 1, 2, {}, {}}};
+    path->path.setStaticValue(network);
+    content->geometry = std::move(path);
+    original.refreshEntityIndex();
+
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(Serializer::serialize(original));
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    auto *shapeContent =
+        static_cast<ShapeContent *>((*loaded)->compositions[0]->layers[0]->content.get());
+    const VectorNetwork &roundTrip =
+        static_cast<ShapePath *>(shapeContent->geometry.get())->path.staticValue();
+    ASSERT_EQ(roundTrip.vertices.size(), 2u);
+    EXPECT_EQ(roundTrip.vertices[0].mirrorMode, VertexMirrorMode::AngleLength);
+    EXPECT_EQ(roundTrip.vertices[1].mirrorMode, VertexMirrorMode::Angle);
+}
+
+TEST(SerializerTest, MissingMirrorModeDefaultsToNone) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto path = std::make_unique<ShapePath>();
+    VectorNetwork network;
+    network.vertices = {{1, {0, 0}}, {2, {10, 0}}};
+    network.edges = {{1, 1, 2, {}, {}}};
+    path->path.setStaticValue(network);
+    content->geometry = std::move(path);
+    original.refreshEntityIndex();
+
+    nlohmann::json root = nlohmann::json::parse(Serializer::serialize(original));
+    auto &vertex0 =
+        root["compositions"][0]["layers"][0]["content"]["geometry"]["path"]["static"]["vertices"][0];
+    vertex0.erase("mirrorMode");
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(root.dump());
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    auto *shapeContent =
+        static_cast<ShapeContent *>((*loaded)->compositions[0]->layers[0]->content.get());
+    const VectorNetwork &parsed =
+        static_cast<ShapePath *>(shapeContent->geometry.get())->path.staticValue();
+    ASSERT_FALSE(parsed.vertices.empty());
+    EXPECT_EQ(parsed.vertices[0].mirrorMode, VertexMirrorMode::None);
 }
 
 TEST(SerializerTest, ImageLayerRoundTripPreservesContainerAndScaleMode) {

@@ -21,7 +21,7 @@
 | 权威模型 | `VectorNetwork` 整体替换存盘/关键帧中的路径（方案 A） |
 | Shape / Mask | 二者均改为 `Animatable<VectorNetwork>` |
 | 切线存放 | 挂在边两端（`startTangent` / `endTangent`）；顶点只存 `point` |
-| Mirroring | 仅顶点度数 == 2 时有效；度数 ≠ 2 设置无效 / UI 禁用 |
+| Mirroring | 仅顶点度数 == 2 时有效；Inspector 三段（None / Angle / AngleLength）；度数 ≠ 2 UI 禁用 |
 | Fill | 提取所有最小封闭面并全部填充 |
 | Stroke | 描全部边（含内部边） |
 | 关键帧 / morph | 对 `VectorNetwork` 插值（同拓扑）；**不对**编译后 Path 插值 |
@@ -198,8 +198,9 @@ SceneEvaluator
 ### 拖拽与 mirroring
 
 - 拖顶点：更新该 `Vertex.point`；所有关联边跟随（需求 1.5）
-- 拖切线：改对应 `Edge` 端 handle；仅度数 == 2 时默认 mirror 另一条边在该点的 handle；度数 ≠ 2 **禁用 mirroring**（需求 1.4）
-- Alt：度数 == 2 时断开镜像
+- 拖切线：改对应 `Edge` 端 handle；按该点持久化的 `mirrorMode` 约束对侧（None / Angle / AngleLength）；度数 ≠ 2 **禁用 mirroring**（需求 1.4）
+- Alt：本趟临时断开镜像，不改 `mirrorMode`
+- Inspector：选中顶点后切换 Mirroring（详见 `2026-08-05-vertex-mirroring-design.md`）；**无**双击切换平滑
 
 ### 相对旧钢笔的行为变更
 

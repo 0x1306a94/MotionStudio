@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/common/VectorNetworkEdit.h"
@@ -16,16 +18,43 @@ using motion::MoveVertex;
 using motion::RecenterNetwork;
 using motion::RemoveEdge;
 using motion::RemoveVertex;
+using motion::SetVertexMirrorMode;
 using motion::ToggleVertexSmooth;
 using motion::Vec2;
 using motion::VectorNetwork;
 using motion::VertexDegree;
+using motion::VertexMirrorMode;
 
 namespace {
 
 VectorNetwork ClosedTriangle() {
     return BezierPathToVectorNetwork(
         MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true));
+}
+
+VectorNetwork MakeDegreeTwoChain() {
+    VectorNetwork network;
+    network.vertices = {{1, {0, 0}}, {2, {10, 0}}, {3, {20, 0}}};
+    network.edges = {{1, 1, 2, {}, {}}, {2, 2, 3, {}, {}}};
+    return network;
+}
+
+Vec2 HandleAt(const VectorNetwork &network, uint32_t edgeId, uint32_t vertexId) {
+    const VectorNetwork::Edge *edge = FindEdge(network, edgeId);
+    if (edge == nullptr) {
+        return {};
+    }
+    if (edge->start == vertexId) {
+        return edge->startTangent;
+    }
+    if (edge->end == vertexId) {
+        return edge->endTangent;
+    }
+    return {};
+}
+
+float HandleLength(Vec2 value) {
+    return std::sqrt(value.x * value.x + value.y * value.y);
 }
 
 }  // namespace
@@ -122,6 +151,7 @@ TEST(VectorNetworkEditTest, MirrorWhenDegreeTwo) {
     ASSERT_EQ(network.edges.size(), 2u);
     const uint32_t mid = network.vertices[1].id;
     ASSERT_EQ(VertexDegree(network, mid), 2);
+    network = SetVertexMirrorMode(network, mid, VertexMirrorMode::AngleLength);
 
     // Edge 0: v0→v1, Edge 1: v1→v2. Edit end handle of edge 0 (at mid).
     const uint32_t leftEdge = network.edges[0].id;
@@ -215,6 +245,7 @@ TEST(VectorNetworkEditTest, ToggleSmoothCornerToSmoothWhenDegreeTwo) {
     ASSERT_NE(right, nullptr);
     EXPECT_NE(left->endTangent.x, 0.0f);
     EXPECT_NE(right->startTangent.x, 0.0f);
+    EXPECT_EQ(FindVertex(network, mid)->mirrorMode, VertexMirrorMode::Angle);
 
     network = ToggleVertexSmooth(network, mid);
     left = FindEdge(network, network.edges[0].id);
@@ -225,4 +256,95 @@ TEST(VectorNetworkEditTest, ToggleSmoothCornerToSmoothWhenDegreeTwo) {
     EXPECT_FLOAT_EQ(left->endTangent.y, 0.0f);
     EXPECT_FLOAT_EQ(right->startTangent.x, 0.0f);
     EXPECT_FLOAT_EQ(right->startTangent.y, 0.0f);
+    EXPECT_EQ(FindVertex(network, mid)->mirrorMode, VertexMirrorMode::None);
+}
+
+TEST(VectorNetworkEditTest, SetMirrorModeNoneClearsHandles) {
+    VectorNetwork network = MakeDegreeTwoChain();
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::Angle);
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::None);
+    EXPECT_EQ(FindVertex(network, 2)->mirrorMode, VertexMirrorMode::None);
+    EXPECT_FLOAT_EQ(HandleAt(network, 1, 2).x, 0.0f);
+    EXPECT_FLOAT_EQ(HandleAt(network, 1, 2).y, 0.0f);
+    EXPECT_FLOAT_EQ(HandleAt(network, 2, 2).x, 0.0f);
+    EXPECT_FLOAT_EQ(HandleAt(network, 2, 2).y, 0.0f);
+}
+
+TEST(VectorNetworkEditTest, SetMirrorModeAngleGeneratesIndependentLengths) {
+    VectorNetwork network = MakeDegreeTwoChain();
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::Angle);
+    EXPECT_EQ(FindVertex(network, 2)->mirrorMode, VertexMirrorMode::Angle);
+    const Vec2 inHandle = HandleAt(network, 1, 2);
+    const Vec2 outHandle = HandleAt(network, 2, 2);
+    EXPECT_NEAR(HandleLength(inHandle), 10.0f / 3.0f, 1e-4f);
+    EXPECT_NEAR(HandleLength(outHandle), 10.0f / 3.0f, 1e-4f);
+    EXPECT_NEAR(inHandle.x * outHandle.y - inHandle.y * outHandle.x, 0.0f, 1e-4f);
+    EXPECT_LT(inHandle.x * outHandle.x + inHandle.y * outHandle.y, 0.0f);
+}
+
+TEST(VectorNetworkEditTest, SetMirrorModeAngleLengthEqualizes) {
+    VectorNetwork network;
+    network.vertices = {{1, {0, 0}}, {2, {10, 0}}, {3, {16, 0}}};
+    network.edges = {{1, 1, 2, {}, {}}, {2, 2, 3, {}, {}}};
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::AngleLength);
+    EXPECT_EQ(FindVertex(network, 2)->mirrorMode, VertexMirrorMode::AngleLength);
+    const float expected = ((10.0f / 3.0f) + (6.0f / 3.0f)) * 0.5f;
+    EXPECT_NEAR(HandleLength(HandleAt(network, 1, 2)), expected, 1e-4f);
+    EXPECT_NEAR(HandleLength(HandleAt(network, 2, 2)), expected, 1e-4f);
+}
+
+TEST(VectorNetworkEditTest, SetMirrorModeDegreeNotTwoWritesModeOnly) {
+    VectorNetwork network;
+    uint32_t hub = 0;
+    uint32_t a = 0;
+    uint32_t b = 0;
+    uint32_t c = 0;
+    network = AddVertex(network, {0, 0}, &hub);
+    network = AddVertex(network, {10, 0}, &a);
+    network = AddVertex(network, {0, 10}, &b);
+    network = AddVertex(network, {-10, 0}, &c);
+    network = AddEdge(network, hub, a, nullptr);
+    network = AddEdge(network, hub, b, nullptr);
+    network = AddEdge(network, hub, c, nullptr);
+    ASSERT_EQ(VertexDegree(network, hub), 3);
+
+    const VectorNetwork before = network;
+    network = SetVertexMirrorMode(network, hub, VertexMirrorMode::AngleLength);
+    EXPECT_EQ(FindVertex(network, hub)->mirrorMode, VertexMirrorMode::AngleLength);
+    EXPECT_EQ(network.edges, before.edges);
+}
+
+TEST(VectorNetworkEditTest, MoveEdgeTangentAnglePreservesOppositeLength) {
+    VectorNetwork network = MakeDegreeTwoChain();
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::Angle);
+    const float preserved = HandleLength(HandleAt(network, 1, 2));
+    network = MoveEdgeTangent(network, 2, true, {6, 0}, true);
+    EXPECT_FLOAT_EQ(HandleAt(network, 2, 2).x, 6.0f);
+    EXPECT_NEAR(HandleLength(HandleAt(network, 1, 2)), preserved, 1e-4f);
+    EXPECT_LT(HandleAt(network, 1, 2).x, 0.0f);
+}
+
+TEST(VectorNetworkEditTest, MoveEdgeTangentAngleLengthNegates) {
+    VectorNetwork network = MakeDegreeTwoChain();
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::AngleLength);
+    network = MoveEdgeTangent(network, 2, true, {4, 0}, true);
+    EXPECT_FLOAT_EQ(HandleAt(network, 2, 2).x, 4.0f);
+    EXPECT_FLOAT_EQ(HandleAt(network, 1, 2).x, -4.0f);
+}
+
+TEST(VectorNetworkEditTest, MoveEdgeTangentMirrorFalseDoesNotTouchOther) {
+    VectorNetwork network = MakeDegreeTwoChain();
+    network = SetVertexMirrorMode(network, 2, VertexMirrorMode::AngleLength);
+    const Vec2 beforeOther = HandleAt(network, 1, 2);
+    network = MoveEdgeTangent(network, 2, true, {5, 0}, false);
+    EXPECT_FLOAT_EQ(HandleAt(network, 2, 2).x, 5.0f);
+    EXPECT_EQ(HandleAt(network, 1, 2), beforeOther);
+}
+
+TEST(VectorNetworkEditTest, MoveEdgeTangentNoneIgnoresMirrorFlagForOtherSide) {
+    VectorNetwork network = MakeDegreeTwoChain();
+    EXPECT_EQ(FindVertex(network, 2)->mirrorMode, VertexMirrorMode::None);
+    network = MoveEdgeTangent(network, 2, true, {3, 0}, true);
+    EXPECT_FLOAT_EQ(HandleAt(network, 2, 2).x, 3.0f);
+    EXPECT_FLOAT_EQ(HandleAt(network, 1, 2).x, 0.0f);
 }

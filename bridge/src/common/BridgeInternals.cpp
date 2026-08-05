@@ -185,6 +185,8 @@ MSVectorNetwork *AllocateMSVectorNetwork(const motion::VectorNetwork &network) {
             result->vertices[index].id = vertex.id;
             result->vertices[index].x = vertex.point.x;
             result->vertices[index].y = vertex.point.y;
+            result->vertices[index].mirrorMode =
+                static_cast<MS_VERTEX_MIRROR>(static_cast<int>(vertex.mirrorMode));
         }
     }
     if (result->edgeCount > 0) {
@@ -218,8 +220,14 @@ motion::VectorNetwork FromMSVectorNetwork(const MSVectorNetwork *network) {
         result.vertices.reserve(network->vertexCount);
         for (size_t index = 0; index < network->vertexCount; ++index) {
             const MSVectorNetworkVertex &vertex = network->vertices[index];
+            motion::VertexMirrorMode mirrorMode = motion::VertexMirrorMode::None;
+            if (vertex.mirrorMode == MS_VERTEX_MIRROR_ANGLE) {
+                mirrorMode = motion::VertexMirrorMode::Angle;
+            } else if (vertex.mirrorMode == MS_VERTEX_MIRROR_ANGLE_LENGTH) {
+                mirrorMode = motion::VertexMirrorMode::AngleLength;
+            }
             result.vertices.push_back(
-                {vertex.id, motion::Vec2{vertex.x, vertex.y}});
+                {vertex.id, motion::Vec2{vertex.x, vertex.y}, mirrorMode});
         }
     }
     if (network->edges != nullptr && network->edgeCount > 0) {

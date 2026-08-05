@@ -99,9 +99,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     /// Hit captured on press when not starting a vertex/tangent drag (segment / blank).
     private var penPressHit: MSPathEditHit?
     private var penPressStartPoint: CGPoint?
-    private var lastPenVertexClickTime: CFTimeInterval = 0
-    private var lastPenVertexClickIndex: Int = -1
-    private static let penDoubleClickInterval: CFTimeInterval = 0.35
 
     private var motionPathDrag: MotionPathDragState?
     private var motionPathDragDidMove = false
@@ -1275,34 +1272,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         penDrag = nil
         if pressedHandle {
             // Vertex/tangent already selected on press.
-            // Double-click a vertex toggles corner ↔ smooth.
             if let hit, hit.kind == .VERTEX || hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT
                 || hit.kind == .CLOSE_RING || hit.kind == .EDGE_TANGENT
             {
-                let now = CACurrentMediaTime()
-                let index = Int(hit.index)
-                if hit.kind == .VERTEX || hit.kind == .CLOSE_RING,
-                   index == lastPenVertexClickIndex,
-                   now - lastPenVertexClickTime <= Self.penDoubleClickInterval,
-                   let target = editorState.pathEditTarget
-                {
-                    lastPenVertexClickIndex = -1
-                    lastPenVertexClickTime = 0
-                    performPenEdit("Toggle Vertex Smooth") {
-                        document.core.pathEditToggleSmooth(layerID: target.layerID,
-                                                           kind: target.kind,
-                                                           maskIndex: target.maskIndex,
-                                                           frame: evaluationFrame,
-                                                           index: index)
-                    }
-                    updatePathEditChrome()
-                    requestDraw()
-                    return
-                }
-                if hit.kind == .VERTEX || hit.kind == .CLOSE_RING {
-                    lastPenVertexClickIndex = index
-                    lastPenVertexClickTime = now
-                }
                 // Apply connection / resume-drawing rules for a click without drag.
                 if var target = editorState.pathEditTarget,
                    hit.kind == .VERTEX || hit.kind == .CLOSE_RING,
@@ -1316,7 +1288,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             }
             return
         }
-        lastPenVertexClickIndex = -1
         // Segment / blank click.
         handlePenTap(at: viewPoint, alternate: alternate)
     }

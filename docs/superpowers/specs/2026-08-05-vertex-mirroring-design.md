@@ -1,7 +1,7 @@
 # Vertex Mirroring（Inspector 三段式）— 设计说明
 
 日期：2026-08-05  
-状态：设计已确认，待写实现计划  
+状态：已实现（Core / Bridge / App）；人机验收 Mirroring 控件  
 关联：[Vector Network 钢笔](./2026-08-05-vector-network-pen-design.md)、[钢笔路径自由编辑](./2026-07-28-pen-path-edit-design.md)
 
 ## 目标

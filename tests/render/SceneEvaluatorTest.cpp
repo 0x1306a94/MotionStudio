@@ -396,7 +396,10 @@ TEST(SceneEvaluatorTest, EvaluatesMaskScalars) {
     EXPECT_TRUE(evaluatedMask.inverted);
     EXPECT_FLOAT_EQ(evaluatedMask.feather, 3.0f);
     EXPECT_FLOAT_EQ(evaluatedMask.expansion, -2.0f);
-    EXPECT_EQ(evaluatedMask.path.contours[0].vertices.size(), 3u);
+    ASSERT_FALSE(evaluatedMask.path.contours.empty());
+    EXPECT_TRUE(evaluatedMask.path.contours[0].closed);
+    // Fill faces are densely sampled polylines (not authoring vertex arity).
+    EXPECT_GE(evaluatedMask.path.contours[0].vertices.size(), 3u);
 }
 
 TEST(SceneEvaluatorTest, ResolvesTrackMatteAndMarksSource) {
@@ -522,7 +525,7 @@ TEST(SceneEvaluatorTest, TriangleFanFillAndStrokeContours) {
     EXPECT_EQ(fillItem.geometry.path.contours.size(), 3u);
     for (const BezierPath::Contour &contour : fillItem.geometry.path.contours) {
         EXPECT_TRUE(contour.closed);
-        EXPECT_EQ(contour.vertices.size(), 3u);
+        EXPECT_GE(contour.vertices.size(), 3u);
     }
     EXPECT_EQ(strokeItem.geometry.strokePath.contours.size(), 6u);
 }

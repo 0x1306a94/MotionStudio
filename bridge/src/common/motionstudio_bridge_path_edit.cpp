@@ -343,23 +343,24 @@ void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, 
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
-void ms_command_path_edit_toggle_smooth(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
-                                        int maskIndex, int64_t frame, size_t index) {
+void ms_command_path_edit_set_mirror_mode(MSDocument *document, uint64_t layerId,
+                                          MS_PATH_EDIT kind, int maskIndex, int64_t frame,
+                                          uint32_t vertexId, MS_VERTEX_MIRROR mode) {
     DocumentLock guard(document);
-    if (document == nullptr || kind == MS_PATH_EDIT_NONE) {
+    if (document == nullptr || kind == MS_PATH_EDIT_NONE || vertexId == 0) {
         return;
     }
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     motion::VectorNetwork network =
         CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime);
-    if (index >= network.vertices.size()) {
-        return;
+    motion::VertexMirrorMode mirrorMode = motion::VertexMirrorMode::None;
+    if (mode == MS_VERTEX_MIRROR_ANGLE) {
+        mirrorMode = motion::VertexMirrorMode::Angle;
+    } else if (mode == MS_VERTEX_MIRROR_ANGLE_LENGTH) {
+        mirrorMode = motion::VertexMirrorMode::AngleLength;
     }
-    const uint32_t vertexId = network.vertices[index].id;
-    // Degree ≠ 2 is a no-op inside ToggleVertexSmooth — never round-trip via
-    // BezierPath (that collapses shared-vertex networks to a single ring).
-    network = motion::ToggleVertexSmooth(std::move(network), vertexId);
+    network = motion::SetVertexMirrorMode(std::move(network), vertexId, mirrorMode);
     WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frameTime, network);
 }
 

@@ -55,3 +55,14 @@ TEST(VectorNetworkMorphTest, SameTopologyLerpsEdgeTangents) {
     EXPECT_FLOAT_EQ(mid.edges[0].startTangent.x, 2.0f);
     EXPECT_FLOAT_EQ(mid.edges[0].endTangent.x, -2.0f);
 }
+
+TEST(VectorNetworkMorphTest, MirrorModeHoldsFromLeftKeyframe) {
+    VectorNetwork from = MakeSharedPointNetwork(0.0f);
+    from.vertices[0].mirrorMode = motion::VertexMirrorMode::Angle;
+    VectorNetwork to = from;
+    to.vertices[0].mirrorMode = motion::VertexMirrorMode::AngleLength;
+    to.vertices[0].point = {0, 10};
+    const VectorNetwork mid = Interpolator<VectorNetwork>::Lerp(from, to, 0.5f);
+    EXPECT_EQ(mid.vertices[0].mirrorMode, motion::VertexMirrorMode::Angle);
+    EXPECT_FLOAT_EQ(mid.vertices[0].point.y, 5.0f);
+}

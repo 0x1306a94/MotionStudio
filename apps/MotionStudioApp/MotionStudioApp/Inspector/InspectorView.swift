@@ -61,6 +61,20 @@ struct InspectorView: View {
                                                   isEditable: isEditable,
                                                   perform: perform)
                         }
+                        if editorState.tool == .pen,
+                           let target = editorState.pathEditTarget,
+                           target.layerID == layerID,
+                           target.activeVertexId != 0
+                        {
+                            VertexMirroringInspector(core: core,
+                                                     layerID: target.layerID,
+                                                     kind: target.kind,
+                                                     maskIndex: target.maskIndex,
+                                                     vertexId: target.activeVertexId,
+                                                     path: target.propertyPath,
+                                                     isEditable: isEditable,
+                                                     perform: perform)
+                        }
 
                         Text("Transform")
                             .font(.subheadline)

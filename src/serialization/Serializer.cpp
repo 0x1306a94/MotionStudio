@@ -312,7 +312,9 @@ Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
 json VectorNetworkToJson(const VectorNetwork &network) {
     json vertices = json::array();
     for (const VectorNetwork::Vertex &vertex : network.vertices) {
-        vertices.push_back({{"id", vertex.id}, {"point", Vec2ToJson(vertex.point)}});
+        vertices.push_back({{"id", vertex.id},
+                            {"point", Vec2ToJson(vertex.point)},
+                            {"mirrorMode", static_cast<int>(vertex.mirrorMode)}});
     }
     json edges = json::array();
     for (const VectorNetwork::Edge &edge : network.edges) {
@@ -347,7 +349,14 @@ Expected<VectorNetwork, std::string> VectorNetworkFromJson(const json &node) {
             if (!id || !point) {
                 return Unexpected(std::string("invalid network vertex"));
             }
-            network.vertices.push_back({*id, *point});
+            VertexMirrorMode mirrorMode = VertexMirrorMode::None;
+            if (const json *modeNode = FindChild(vertexNode, "mirrorMode")) {
+                Expected<int, std::string> modeValue = AsInt(*modeNode);
+                if (modeValue && (*modeValue == 0 || *modeValue == 1 || *modeValue == 2)) {
+                    mirrorMode = static_cast<VertexMirrorMode>(*modeValue);
+                }
+            }
+            network.vertices.push_back({*id, *point, mirrorMode});
         }
         for (const json &edgeNode : *edgesNode) {
             Expected<const json *, std::string> idNode = Child(edgeNode, "id");

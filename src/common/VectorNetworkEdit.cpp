@@ -152,6 +152,10 @@ VectorNetwork MoveEdgeTangent(VectorNetwork network, uint32_t edgeId, bool atSta
     if (!mirror) {
         return network;
     }
+    const VectorNetwork::Vertex *vertex = FindVertex(network, vertexId);
+    if (vertex == nullptr || vertex->mirrorMode == VertexMirrorMode::None) {
+        return network;
+    }
     const uint32_t otherId = OtherIncidentEdgeId(network, vertexId, edgeId);
     if (otherId == 0) {
         return network;
@@ -160,7 +164,16 @@ VectorNetwork MoveEdgeTangent(VectorNetwork network, uint32_t edgeId, bool atSta
     if (other == nullptr) {
         return network;
     }
-    SetHandleAtVertex(*other, vertexId, -tangent);
+    if (vertex->mirrorMode == VertexMirrorMode::AngleLength) {
+        SetHandleAtVertex(*other, vertexId, -tangent);
+        return network;
+    }
+    // Angle: opposite direction, preserve opposite length (or use dragged length).
+    const Vec2 opposite = HandleAtVertex(*other, vertexId);
+    const float length =
+        IsNearZero(opposite) ? std::sqrt(LengthSquared(tangent)) : std::sqrt(LengthSquared(opposite));
+    const Vec2 direction = SafeNormalize(-tangent);
+    SetHandleAtVertex(*other, vertexId, direction * length);
     return network;
 }
 
@@ -238,9 +251,13 @@ VectorNetwork RemoveEdge(VectorNetwork network, uint32_t id) {
     return network;
 }
 
-VectorNetwork ToggleVertexSmooth(VectorNetwork network, uint32_t vertexId) {
-    const VectorNetwork::Vertex *vertex = FindVertex(network, vertexId);
-    if (vertex == nullptr || VertexDegree(network, vertexId) != 2) {
+VectorNetwork SetVertexMirrorMode(VectorNetwork network, uint32_t vertexId, VertexMirrorMode mode) {
+    VectorNetwork::Vertex *vertex = FindVertex(network, vertexId);
+    if (vertex == nullptr) {
+        return network;
+    }
+    vertex->mirrorMode = mode;
+    if (VertexDegree(network, vertexId) != 2) {
         return network;
     }
 
@@ -258,9 +275,7 @@ VectorNetwork ToggleVertexSmooth(VectorNetwork network, uint32_t vertexId) {
         return network;
     }
 
-    const bool isCorner = IsNearZero(HandleAtVertex(*incident[0], vertexId)) &&
-        IsNearZero(HandleAtVertex(*incident[1], vertexId));
-    if (!isCorner) {
+    if (mode == VertexMirrorMode::None) {
         SetHandleAtVertex(*incident[0], vertexId, {});
         SetHandleAtVertex(*incident[1], vertexId, {});
         return network;
@@ -289,14 +304,18 @@ VectorNetwork ToggleVertexSmooth(VectorNetwork network, uint32_t vertexId) {
         if (IsNearZero(direction)) {
             return network;
         }
-        const float inLength = std::sqrt(LengthSquared(point - prev->point)) / 3.0f;
-        const float outLength = std::sqrt(LengthSquared(next->point - point)) / 3.0f;
+        float inLength = std::sqrt(LengthSquared(point - prev->point)) / 3.0f;
+        float outLength = std::sqrt(LengthSquared(next->point - point)) / 3.0f;
+        if (mode == VertexMirrorMode::AngleLength) {
+            const float shared = (inLength + outLength) * 0.5f;
+            inLength = shared;
+            outLength = shared;
+        }
         incoming->endTangent = direction * (-inLength);
         outgoing->startTangent = direction * outLength;
         return network;
     }
 
-    // Both edges share the same endpoint role — align handles along the chord.
     const uint32_t other0 =
         incident[0]->start == vertexId ? incident[0]->end : incident[0]->start;
     const uint32_t other1 =
@@ -310,11 +329,40 @@ VectorNetwork ToggleVertexSmooth(VectorNetwork network, uint32_t vertexId) {
     if (IsNearZero(direction)) {
         return network;
     }
-    const float length0 = std::sqrt(LengthSquared(point - neighbor0->point)) / 3.0f;
-    const float length1 = std::sqrt(LengthSquared(neighbor1->point - point)) / 3.0f;
+    float length0 = std::sqrt(LengthSquared(point - neighbor0->point)) / 3.0f;
+    float length1 = std::sqrt(LengthSquared(neighbor1->point - point)) / 3.0f;
+    if (mode == VertexMirrorMode::AngleLength) {
+        const float shared = (length0 + length1) * 0.5f;
+        length0 = shared;
+        length1 = shared;
+    }
     SetHandleAtVertex(*incident[0], vertexId, direction * (-length0));
     SetHandleAtVertex(*incident[1], vertexId, direction * length1);
     return network;
+}
+
+VectorNetwork ToggleVertexSmooth(VectorNetwork network, uint32_t vertexId) {
+    const VectorNetwork::Vertex *vertex = FindVertex(network, vertexId);
+    if (vertex == nullptr || VertexDegree(network, vertexId) != 2) {
+        return network;
+    }
+    const VectorNetwork::Edge *incident[2] = {nullptr, nullptr};
+    int incidentCount = 0;
+    for (const VectorNetwork::Edge &edge : network.edges) {
+        if (edge.start != vertexId && edge.end != vertexId) {
+            continue;
+        }
+        if (incidentCount < 2) {
+            incident[incidentCount++] = &edge;
+        }
+    }
+    if (incidentCount != 2) {
+        return network;
+    }
+    const bool isCorner = IsNearZero(HandleAtVertex(*incident[0], vertexId)) &&
+        IsNearZero(HandleAtVertex(*incident[1], vertexId));
+    return SetVertexMirrorMode(network, vertexId,
+                               isCorner ? VertexMirrorMode::Angle : VertexMirrorMode::None);
 }
 
 VectorNetwork RecenterNetwork(VectorNetwork network, Vec2 &localCenterOut) {

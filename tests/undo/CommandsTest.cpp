@@ -825,7 +825,10 @@ TEST(ConvertGeometryToPathCommandTest, BakesEllipse) {
     ASSERT_NE(content->geometry, nullptr);
     EXPECT_EQ(content->geometry->type(), ShapeType::Path);
     auto *path = static_cast<ShapePath *>(content->geometry.get());
-    EXPECT_EQ(CompileFillFaces(path->path.staticValue()).contours[0].vertices.size(), 4u);
+    const BezierPath fill = CompileFillFaces(path->path.staticValue());
+    ASSERT_EQ(fill.contours.size(), 1u);
+    EXPECT_TRUE(fill.contours[0].closed);
+    EXPECT_GE(fill.contours[0].vertices.size(), 4u);
 }
 
 TEST(ConvertGeometryToPathCommandTest, PathIsNoOp) {

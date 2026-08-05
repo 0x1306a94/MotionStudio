@@ -179,10 +179,17 @@ typedef struct MSBezierPath {
 void ms_bezier_path_free(MSBezierPath *path);
 
 // One VectorNetwork vertex (authoring graph).
+typedef CF_CLOSED_ENUM(int, MS_VERTEX_MIRROR) {
+    MS_VERTEX_MIRROR_NONE = 0,
+    MS_VERTEX_MIRROR_ANGLE = 1,
+    MS_VERTEX_MIRROR_ANGLE_LENGTH = 2,
+};
+
 typedef struct MSVectorNetworkVertex {
     uint32_t id;
     float x;
     float y;
+    MS_VERTEX_MIRROR mirrorMode;
 } MSVectorNetworkVertex;
 
 // One directed cubic edge; tangents are Lottie-relative offsets from endpoints.
@@ -522,9 +529,10 @@ void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_
                                 int maskIndex, int64_t frame);
 void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
                                         int maskIndex, int64_t frame, float sceneX, float sceneY);
-// Corner ↔ smooth convert at index (auto tangents from neighbors).
-void ms_command_path_edit_toggle_smooth(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
-                                        int maskIndex, int64_t frame, size_t index);
+// Sets vertex mirroring mode (Figma-style). Degree ≠ 2 stores mode only.
+void ms_command_path_edit_set_mirror_mode(MSDocument *document, uint64_t layerId,
+                                          MS_PATH_EDIT kind, int maskIndex, int64_t frame,
+                                          uint32_t vertexId, MS_VERTEX_MIRROR mode);
 // Shape path only: rebase path so bounds center is local origin and bump
 // transform.position so the world silhouette stays put. No-op for masks /
 // already-centered paths.

@@ -1111,10 +1111,11 @@ final class MotionDocumentCore {
         changed()
     }
 
-    func pathEditToggleSmooth(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
-                              index: Int)
+    func pathEditSetMirrorMode(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                               vertexId: UInt32, mode: MS_VERTEX_MIRROR)
     {
-        ms_command_path_edit_toggle_smooth(handle, layerID, kind, Int32(maskIndex), frame, index)
+        ms_command_path_edit_set_mirror_mode(handle, layerID, kind, Int32(maskIndex), frame, vertexId,
+                                             mode)
         changed()
     }
 
@@ -1205,6 +1206,47 @@ final class MotionDocumentCore {
             }
         }
         return -1
+    }
+
+    func networkVertexMirrorMode(entityID: UInt64, path: String, frame: Int64,
+                                 vertexId: UInt32) -> MS_VERTEX_MIRROR
+    {
+        guard vertexId != 0,
+              let network = ms_property_evaluate_vector_network(handle, entityID, path, frame)
+        else {
+            return .NONE
+        }
+        defer { ms_vector_network_free(network) }
+        let count = network.pointee.vertexCount
+        guard count > 0, let vertices = network.pointee.vertices else {
+            return .NONE
+        }
+        for index in 0 ..< count {
+            if vertices[index].id == vertexId {
+                return vertices[index].mirrorMode
+            }
+        }
+        return .NONE
+    }
+
+    func networkVertexDegree(entityID: UInt64, path: String, frame: Int64, vertexId: UInt32) -> Int {
+        guard vertexId != 0,
+              let network = ms_property_evaluate_vector_network(handle, entityID, path, frame)
+        else {
+            return 0
+        }
+        defer { ms_vector_network_free(network) }
+        let edgeCount = network.pointee.edgeCount
+        guard edgeCount > 0, let edges = network.pointee.edges else {
+            return 0
+        }
+        var degree = 0
+        for index in 0 ..< edgeCount {
+            if edges[index].start == vertexId || edges[index].end == vertexId {
+                degree += 1
+            }
+        }
+        return degree
     }
 
     /// Scales shape geometry and mask paths in layer-local space about `localPivot`.

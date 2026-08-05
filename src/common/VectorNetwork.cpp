@@ -5,7 +5,7 @@
 namespace motion {
 
 bool VectorNetwork::Vertex::operator==(const Vertex &other) const {
-    return id == other.id && point == other.point;
+    return id == other.id && point == other.point && mirrorMode == other.mirrorMode;
 }
 
 bool VectorNetwork::Vertex::operator!=(const Vertex &other) const {
