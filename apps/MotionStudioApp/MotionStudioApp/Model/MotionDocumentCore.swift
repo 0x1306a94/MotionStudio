@@ -748,13 +748,15 @@ final class MotionDocumentCore {
         changed()
     }
 
-    /// Adds a BezierPath keyframe at `frame` using the property's evaluated path.
+    /// Adds a path keyframe at `frame` using the evaluated VectorNetwork.
+    /// Must not round-trip through BezierPath — that keeps only the first fill
+    /// face and destroys shared-vertex networks.
     func addKeyframeBezierPathAtPlayhead(entityID: UInt64, path: String, frame: Int64) {
-        guard let evaluated = ms_property_evaluate_bezier_path(handle, entityID, path, frame) else {
+        guard let evaluated = ms_property_evaluate_vector_network(handle, entityID, path, frame) else {
             return
         }
-        defer { ms_bezier_path_free(evaluated) }
-        ms_command_add_keyframe_bezier_path(handle, entityID, path, frame, evaluated)
+        defer { ms_vector_network_free(evaluated) }
+        ms_command_add_keyframe_vector_network(handle, entityID, path, frame, evaluated)
         changed()
     }
 
@@ -1121,6 +1123,90 @@ final class MotionDocumentCore {
         changed()
     }
 
+    @discardableResult
+    func networkEditAddVertex(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                              scenePoint: CGPoint) -> UInt32
+    {
+        var vertexId: UInt32 = 0
+        ms_command_network_edit_add_vertex(handle, layerID, kind, Int32(maskIndex), frame,
+                                           Float(scenePoint.x), Float(scenePoint.y), &vertexId)
+        changed()
+        return vertexId
+    }
+
+    @discardableResult
+    func networkEditAddEdge(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                            startId: UInt32, endId: UInt32) -> UInt32
+    {
+        var edgeId: UInt32 = 0
+        ms_command_network_edit_add_edge(handle, layerID, kind, Int32(maskIndex), frame, startId,
+                                         endId, &edgeId)
+        changed()
+        return edgeId
+    }
+
+    func networkEditMoveVertex(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                               vertexId: UInt32, scenePoint: CGPoint)
+    {
+        ms_command_network_edit_move_vertex(handle, layerID, kind, Int32(maskIndex), frame, vertexId,
+                                            Float(scenePoint.x), Float(scenePoint.y))
+        changed()
+    }
+
+    func networkEditMoveEdgeTangent(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int,
+                                    frame: Int64, edgeId: UInt32, atStart: Bool,
+                                    scenePoint: CGPoint, mirror: Bool)
+    {
+        ms_command_network_edit_move_edge_tangent(handle, layerID, kind, Int32(maskIndex), frame,
+                                                  edgeId, atStart, Float(scenePoint.x),
+                                                  Float(scenePoint.y), mirror)
+        changed()
+    }
+
+    @discardableResult
+    func networkEditInsertOnEdge(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                                 edgeId: UInt32, t: Float) -> UInt32
+    {
+        var vertexId: UInt32 = 0
+        ms_command_network_edit_insert_on_edge(handle, layerID, kind, Int32(maskIndex), frame,
+                                               edgeId, t, &vertexId)
+        changed()
+        return vertexId
+    }
+
+    func networkEditRemoveVertex(layerID: UInt64, kind: MS_PATH_EDIT, maskIndex: Int, frame: Int64,
+                                 vertexId: UInt32)
+    {
+        ms_command_network_edit_remove_vertex(handle, layerID, kind, Int32(maskIndex), frame,
+                                              vertexId)
+        changed()
+    }
+
+    func networkEditRecenterShape(layerID: UInt64, frame: Int64) {
+        ms_command_network_edit_recenter_shape(handle, layerID, frame)
+        changed()
+    }
+
+    /// Index of `vertexId` in the evaluated network, or -1 when missing.
+    func networkVertexIndex(entityID: UInt64, path: String, frame: Int64, vertexId: UInt32) -> Int {
+        guard vertexId != 0,
+              let network = ms_property_evaluate_vector_network(handle, entityID, path, frame)
+        else {
+            return -1
+        }
+        defer { ms_vector_network_free(network) }
+        let count = network.pointee.vertexCount
+        guard count > 0, let vertices = network.pointee.vertices else {
+            return -1
+        }
+        for index in 0 ..< count {
+            if vertices[index].id == vertexId {
+                return Int(index)
+            }
+        }
+        return -1
+    }
+
     /// Scales shape geometry and mask paths in layer-local space about `localPivot`.
     /// One-shot relative to *current* geometry — FreeTransform must apply from a drag-start snapshot.
     @discardableResult
@@ -1144,11 +1230,30 @@ final class MotionDocumentCore {
         return CapturedBezierPath(msPath: evaluated)
     }
 
+    /// Evaluated VectorNetwork at `frame`, or nil when missing / empty.
+    func evaluateVectorNetwork(entityID: UInt64, path: String, frame: Int64) -> CapturedVectorNetwork? {
+        guard let evaluated = ms_property_evaluate_vector_network(handle, entityID, path, frame) else {
+            return nil
+        }
+        defer { ms_vector_network_free(evaluated) }
+        let captured = CapturedVectorNetwork(msNetwork: evaluated)
+        return captured.vertices.isEmpty ? nil : captured
+    }
+
     func writeBezierPathAtPlayhead(entityID: UInt64, path: String, frame: Int64,
                                    value: CapturedBezierPath)
     {
         value.withMSBezierPath { msPath in
             ms_command_write_bezier_path_at_playhead(handle, entityID, path, frame, msPath)
+        }
+        changed()
+    }
+
+    func writeVectorNetworkAtPlayhead(entityID: UInt64, path: String, frame: Int64,
+                                      value: CapturedVectorNetwork)
+    {
+        value.withMSVectorNetwork { msNetwork in
+            ms_command_write_vector_network_at_playhead(handle, entityID, path, frame, msNetwork)
         }
         changed()
     }

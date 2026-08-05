@@ -5,6 +5,7 @@
 
 using motion::ApproxEqual;
 using motion::BezierPath;
+using motion::MakeSingleContour;
 using motion::PathArcLength;
 using motion::PathSample;
 using motion::PointAndTangentAtArcLength;
@@ -13,10 +14,7 @@ using motion::Vec2;
 namespace {
 
 BezierPath MakeHorizontalSegment() {
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{100.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    BezierPath path = MakeSingleContour({{{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{100.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     return path;
 }
 

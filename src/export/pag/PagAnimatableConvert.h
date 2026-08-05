@@ -6,6 +6,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/export/PagExporter.h"
 
 #include "pag/file.h"
@@ -32,9 +33,13 @@ pag::Property<pag::Opacity> *ConvertColorAlpha(const Animatable<Color> &source,
 pag::Property<pag::Opacity> *ConvertOpacity(const Animatable<float> &source,
                                             std::vector<PagExportWarning> *warnings,
                                             EntityId entityId);
-pag::Property<pag::PathHandle> *ConvertPath(const Animatable<BezierPath> &source,
+pag::Property<pag::PathHandle> *ConvertPath(const Animatable<VectorNetwork> &source,
                                             std::vector<PagExportWarning> *warnings,
                                             EntityId entityId);
+// Compiled / helper paths that are already BezierPath (clip masks, text-path bake).
+pag::Property<pag::PathHandle> *ConvertBezierPath(const Animatable<BezierPath> &source,
+                                                  std::vector<PagExportWarning> *warnings,
+                                                  EntityId entityId);
 pag::Property<pag::Percent> *ConvertPercent(const Animatable<float> &source,
                                             std::vector<PagExportWarning> *warnings,
                                             EntityId entityId);

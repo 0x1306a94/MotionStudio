@@ -66,15 +66,18 @@ uint64_t HashTextPathDrawParams(const TextDrawParams &params) {
     hash = MixHash(hash, params.textPathForceAlignment ? 1ULL : 0ULL);
     hash = MixHash(hash, FloatBits(params.textPathFirstMargin));
     hash = MixHash(hash, FloatBits(params.textPathLastMargin));
-    hash = MixHash(hash, params.textPath.closed ? 1ULL : 0ULL);
-    hash = MixHash(hash, params.textPath.vertices.size());
-    for (const BezierPath::Vertex &vertex : params.textPath.vertices) {
-        hash = MixHash(hash, FloatBits(vertex.point.x));
-        hash = MixHash(hash, FloatBits(vertex.point.y));
-        hash = MixHash(hash, FloatBits(vertex.inTangent.x));
-        hash = MixHash(hash, FloatBits(vertex.inTangent.y));
-        hash = MixHash(hash, FloatBits(vertex.outTangent.x));
-        hash = MixHash(hash, FloatBits(vertex.outTangent.y));
+    hash = MixHash(hash, params.textPath.contours.size());
+    for (const BezierPath::Contour &contour : params.textPath.contours) {
+        hash = MixHash(hash, contour.closed ? 1ULL : 0ULL);
+        hash = MixHash(hash, contour.vertices.size());
+        for (const BezierPath::Vertex &vertex : contour.vertices) {
+            hash = MixHash(hash, FloatBits(vertex.point.x));
+            hash = MixHash(hash, FloatBits(vertex.point.y));
+            hash = MixHash(hash, FloatBits(vertex.inTangent.x));
+            hash = MixHash(hash, FloatBits(vertex.inTangent.y));
+            hash = MixHash(hash, FloatBits(vertex.outTangent.x));
+            hash = MixHash(hash, FloatBits(vertex.outTangent.y));
+        }
     }
     return hash;
 }
@@ -277,7 +280,13 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
     if (canvas == nullptr || !pathCache_ || geometry.isZero()) {
         return;
     }
-    const tgfx::Path path = pathCache_->Resolve(geometry, paint.fillRule);
+    // Fill uses faces only; ignore strokePath for cache identity.
+    ShapeGeometry fillGeometry = geometry;
+    fillGeometry.strokePath = {};
+    if (fillGeometry.kind == motion::ShapeGeometryKind::Path && fillGeometry.path.contours.empty()) {
+        return;
+    }
+    const tgfx::Path path = pathCache_->Resolve(fillGeometry, paint.fillRule);
     if (path.isEmpty()) {
         return;
     }
@@ -297,16 +306,27 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
     if (canvas == nullptr || !pathCache_ || geometry.isZero()) {
         return;
     }
-    const tgfx::Path fullPath = pathCache_->Resolve(geometry, paint.fillRule);
+    // Fill silhouette (for Inside/Outside boolean).
+    ShapeGeometry fillGeometry = geometry;
+    fillGeometry.strokePath = {};
+    const tgfx::Path fullPath = pathCache_->Resolve(fillGeometry, paint.fillRule);
+
+    // Edges / fallback path actually stroked.
+    ShapeGeometry strokeSource = geometry;
+    if (!geometry.strokePath.contours.empty()) {
+        strokeSource.path = geometry.strokePath;
+    }
+    strokeSource.strokePath = {};
     const bool hasTrim = NeedsTrim(options);
     TrimWindow trimWindow{};
-    tgfx::Path strokeGeometry = fullPath;
+    tgfx::Path strokeGeometry = pathCache_->Resolve(strokeSource, paint.fillRule);
     if (hasTrim) {
         trimWindow = NormalizeTrimWindow(options.trimStart, options.trimEnd, options.trimOffset);
         if (trimWindow.start == trimWindow.end) {
             return;
         }
-        strokeGeometry = pathCache_->ResolveTrimmed(geometry, paint.fillRule, trimWindow, fullPath);
+        strokeGeometry =
+            pathCache_->ResolveTrimmed(strokeSource, paint.fillRule, trimWindow, strokeGeometry);
     }
     if (strokeGeometry.isEmpty()) {
         return;
@@ -335,7 +355,9 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
 
     // Inside/outside: cache the boolean outline so PathRef identity stays
     // stable and tgfx GPU shape proxies can hit across frames.
-    const tgfx::Path outline = pathCache_->ResolvePositionedOutline(geometry, paint.fillRule, hasTrim, trimWindow, options, fullPath, strokeGeometry);
+    // fullPath is the fill silhouette; strokeGeometry is the edge set.
+    const tgfx::Path outline = pathCache_->ResolvePositionedOutline(
+        strokeSource, paint.fillRule, hasTrim, trimWindow, options, fullPath, strokeGeometry);
     if (outline.isEmpty()) {
         return;
     }
@@ -544,7 +566,7 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
         return;
     }
 
-    if (params.textPathEnabled && !params.textPath.vertices.empty()) {
+    if (params.textPathEnabled && !params.textPath.contours.empty()) {
         const uint64_t key = HashTextPathDrawParams(params);
         if (textPathCacheValid_ && key == textPathCacheKey_) {
             ++textPathCacheHits_;

@@ -6,8 +6,9 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
-#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -40,6 +41,7 @@ using motion::LayerType;
 using motion::LineCap;
 using motion::MakePathGeometry;
 using motion::MakeRectGeometry;
+using motion::MakeSingleContour;
 using motion::MaskMode;
 using motion::Mat3;
 using motion::Paint;
@@ -147,9 +149,7 @@ TEST(TgfxRenderAdapterTest, StrokeDrawsAlongPath) {
     EvaluatedLayer layer;
     EvaluatedShapeItem item;
     item.isStroke = true;
-    BezierPath path;
-    path.vertices.push_back({{20, 50}, {}, {}});
-    path.vertices.push_back({{80, 50}, {}, {}});
+    BezierPath path = MakeSingleContour({{{20, 50}, {}, {}}, {{80, 50}, {}, {}}}, false);
     item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{0, 0, 1, 1}};
     item.stroke.width = 6;
@@ -230,12 +230,7 @@ TEST(TgfxRenderAdapterTest, PathMaskAddClipsLayerContent) {
     mask.mode = MaskMode::Add;
     // 20x20 rect centered at (50,50) in path form via MakeRectGeometry converted...
     // Use an explicit closed path covering [40,60] x [40,60].
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{40, 40}, {}, {}});
-    path.vertices.push_back({{60, 40}, {}, {}});
-    path.vertices.push_back({{60, 60}, {}, {}});
-    path.vertices.push_back({{40, 60}, {}, {}});
+    BezierPath path = MakeSingleContour({{{40, 40}, {}, {}}, {{60, 40}, {}, {}}, {{60, 60}, {}, {}}, {{40, 60}, {}, {}}}, true);
     mask.path = path;
     layer.masks.push_back(mask);
     state.layers.push_back(std::move(layer));
@@ -270,12 +265,7 @@ TEST(TgfxRenderAdapterTest, PathMaskFeatherSoftensEdge) {
     EvaluatedMask mask;
     mask.mode = MaskMode::Add;
     mask.feather = 8.0f;
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{40, 40}, {}, {}});
-    path.vertices.push_back({{60, 40}, {}, {}});
-    path.vertices.push_back({{60, 60}, {}, {}});
-    path.vertices.push_back({{40, 60}, {}, {}});
+    BezierPath path = MakeSingleContour({{{40, 40}, {}, {}}, {{60, 40}, {}, {}}, {{60, 60}, {}, {}}, {{40, 60}, {}, {}}}, true);
     mask.path = path;
     layer.masks.push_back(mask);
     state.layers.push_back(std::move(layer));
@@ -347,9 +337,7 @@ TEST(TgfxRenderAdapterTest, StrokeTrimKeepsOnlyPartialSegment) {
     EvaluatedLayer layer;
     EvaluatedShapeItem item;
     item.isStroke = true;
-    BezierPath path;
-    path.vertices.push_back({{20, 50}, {}, {}});
-    path.vertices.push_back({{80, 50}, {}, {}});
+    BezierPath path = MakeSingleContour({{{20, 50}, {}, {}}, {{80, 50}, {}, {}}}, false);
     item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{0, 0, 1, 1}};
     item.stroke.width = 6;
@@ -386,9 +374,7 @@ TEST(TgfxRenderAdapterTest, StrokeEmptyTrimDrawsNothing) {
     EvaluatedLayer layer;
     EvaluatedShapeItem item;
     item.isStroke = true;
-    BezierPath path;
-    path.vertices.push_back({{20, 50}, {}, {}});
-    path.vertices.push_back({{80, 50}, {}, {}});
+    BezierPath path = MakeSingleContour({{{20, 50}, {}, {}}, {{80, 50}, {}, {}}}, false);
     item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{0, 0, 1, 1}};
     item.stroke.width = 6;
@@ -528,11 +514,7 @@ TEST(TgfxRenderAdapterTest, DrawsTextOnPathAndCachesLayout) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
 
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{10.0f, 60.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{190.0f, 60.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-
+    BezierPath path = MakeSingleContour({{{10.0f, 60.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{190.0f, 60.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     SceneState state;
     state.viewportWidth = 200;
     state.viewportHeight = 120;
@@ -584,11 +566,7 @@ TEST(TgfxRenderAdapterTest, TextOnPathBaselineAlignsWithPathY) {
     }
 
     constexpr float kPathY = 60.0f;
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{10.0f, kPathY}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{190.0f, kPathY}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-
+    BezierPath path = MakeSingleContour({{{10.0f, kPathY}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{190.0f, kPathY}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     SceneState state;
     state.viewportWidth = 200;
     state.viewportHeight = 120;
@@ -653,11 +631,8 @@ TEST(TgfxRenderAdapterTest, SceneTextPathBaselineAlignsWithPathStroke) {
     pathLayer->transform.position.setStaticValue({0.0f, 60.0f});
     auto *pathContent = static_cast<ShapeContent *>(pathLayer->content.get());
     auto pathElement = std::make_unique<motion::ShapePath>();
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{10.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{190.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    pathElement->path.setStaticValue(path);
+    BezierPath path = MakeSingleContour({{{10.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{190.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
+    pathElement->path.setStaticValue(motion::BezierPathToVectorNetwork(path));
     pathContent->geometry = std::move(pathElement);
     auto stroke = std::make_unique<motion::StrokeStyle>();
     stroke->color.setStaticValue(Color{0.0f, 0.0f, 1.0f, 1.0f});  // blue path

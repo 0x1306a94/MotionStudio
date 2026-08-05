@@ -125,12 +125,12 @@ ShapeGeometry AxisAlignedSquare(Vec2 center, float size) {
 }
 
 ShapeGeometry ClosedPolyline(const Vec2 *points, size_t count) {
-    BezierPath path;
-    path.closed = true;
-    path.vertices.reserve(count);
+    std::vector<BezierPath::Vertex> vertices;
+    vertices.reserve(count);
     for (size_t index = 0; index < count; ++index) {
-        path.vertices.push_back({points[index], {}, {}});
+        vertices.push_back({points[index], {}, {}});
     }
+    BezierPath path = MakeSingleContour(std::move(vertices), true);
     return MakePathGeometry(std::move(path));
 }
 
@@ -293,12 +293,8 @@ DrawCommandList BuildSelectionHandleCommands(const SelectionHandles &handles,
         {handles.anchor.x, handles.anchor.y - cross},
         {handles.anchor.x, handles.anchor.y + cross},
     };
-    BezierPath hPath;
-    hPath.vertices.push_back({horizontal[0], {}, {}});
-    hPath.vertices.push_back({horizontal[1], {}, {}});
-    BezierPath vPath;
-    vPath.vertices.push_back({vertical[0], {}, {}});
-    vPath.vertices.push_back({vertical[1], {}, {}});
+    BezierPath hPath = MakeSingleContour({{horizontal[0], {}, {}}, {horizontal[1], {}, {}}}, false);
+    BezierPath vPath = MakeSingleContour({{vertical[0], {}, {}}, {vertical[1], {}, {}}}, false);
     AppendStroke(commands, MakePathGeometry(std::move(hPath)), safeStroke);
     AppendStroke(commands, MakePathGeometry(std::move(vPath)), safeStroke);
     return commands;

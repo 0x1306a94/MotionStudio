@@ -6,6 +6,7 @@
 
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -16,6 +17,7 @@
 
 using motion::ApproxEqual;
 using motion::BezierPath;
+using motion::BezierPathToVectorNetwork;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -26,6 +28,7 @@ using motion::FillStyle;
 using motion::FollowSample;
 using motion::Layer;
 using motion::LayerType;
+using motion::MakeSingleContour;
 using motion::Mat3;
 using motion::SceneEvaluator;
 using motion::SceneState;
@@ -37,10 +40,7 @@ using motion::Vec2;
 namespace {
 
 BezierPath MakeHorizontalPath() {
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{100.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    BezierPath path = MakeSingleContour({{{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{100.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     return path;
 }
 
@@ -61,7 +61,7 @@ struct FollowScene {
         auto *pathContent = static_cast<ShapeContent *>(pathLayer->content.get());
         auto pathElement = std::make_unique<ShapePath>();
         pathShape = pathElement.get();
-        pathShape->path.setStaticValue(MakeHorizontalPath());
+        pathShape->path.setStaticValue(BezierPathToVectorNetwork(MakeHorizontalPath()));
         pathContent->geometry = std::move(pathElement);
         auto pathFill = std::make_unique<FillStyle>();
         pathFill->color.setStaticValue(Color{0, 1, 0, 1});
@@ -109,9 +109,9 @@ TEST(FollowPathEvalTest, EvaluateLayerPathReadsShapePath) {
     FollowScene scene;
     const std::optional<BezierPath> path = EvaluateLayerPath(*scene.pathLayer, 0.0);
     ASSERT_TRUE(path.has_value());
-    ASSERT_EQ(path->vertices.size(), 2u);
-    EXPECT_TRUE(ApproxEqual(path->vertices[0].point, {0.0f, 0.0f}));
-    EXPECT_TRUE(ApproxEqual(path->vertices[1].point, {100.0f, 0.0f}));
+    ASSERT_EQ(path->contours[0].vertices.size(), 2u);
+    EXPECT_TRUE(ApproxEqual(path->contours[0].vertices[0].point, {0.0f, 0.0f}));
+    EXPECT_TRUE(ApproxEqual(path->contours[0].vertices[1].point, {100.0f, 0.0f}));
 }
 
 TEST(FollowPathEvalTest, OffsetDrivesParentSpacePosition) {

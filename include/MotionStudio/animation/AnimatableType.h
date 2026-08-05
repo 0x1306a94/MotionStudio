@@ -9,7 +9,10 @@ enum class AnimatableType {
     Float,
     Vec2,
     Color,
+    // Authoring paths use VectorNetwork. BezierPath remains for export/helper
+    // Animatable instances that hold compiled contours.
     BezierPath,
+    VectorNetwork,
     String
 };
 

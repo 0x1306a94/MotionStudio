@@ -53,7 +53,7 @@ TEST(MaskPathBakeTest, BakesEllipseGeometry) {
     const BezierPath expected =
         ShapeGeometryToBezierPath(MakeEllipseGeometry(Vec2{0, 0}, Vec2{200, 200}));
     EXPECT_EQ(baked, expected);
-    EXPECT_EQ(baked.vertices.size(), 4u);
+    EXPECT_EQ(baked.contours[0].vertices.size(), 4u);
 }
 
 TEST(MaskPathBakeTest, FallsBackWhenGeometryMissing) {
@@ -62,8 +62,8 @@ TEST(MaskPathBakeTest, FallsBackWhenGeometryMissing) {
     Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
 
     const BezierPath baked = BakeMaskPathFromLayer(*layer, 0);
-    EXPECT_TRUE(baked.closed);
-    ASSERT_EQ(baked.vertices.size(), 4u);
-    EXPECT_EQ(baked.vertices[0].point, (Vec2{-100, -100}));
-    EXPECT_EQ(baked.vertices[2].point, (Vec2{100, 100}));
+    EXPECT_TRUE(baked.contours[0].closed);
+    ASSERT_EQ(baked.contours[0].vertices.size(), 4u);
+    EXPECT_EQ(baked.contours[0].vertices[0].point, (Vec2{-100, -100}));
+    EXPECT_EQ(baked.contours[0].vertices[2].point, (Vec2{100, 100}));
 }

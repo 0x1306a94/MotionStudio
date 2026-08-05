@@ -129,7 +129,7 @@ extension EditorViewController {
         else {
             return false
         }
-        return target.selectedVertex >= 0
+        return target.activeVertexId != 0
     }
 
     func canDeleteSelection() -> Bool {
@@ -151,14 +151,15 @@ extension EditorViewController {
         else {
             return
         }
+        let vertexId = target.activeVertexId
         perform("Delete Vertex") {
-            document.core.pathEditRemoveVertex(layerID: target.layerID, kind: target.kind,
-                                               maskIndex: target.maskIndex,
-                                               frame: playheadClock.frame,
-                                               index: target.selectedVertex)
+            document.core.networkEditRemoveVertex(layerID: target.layerID, kind: target.kind,
+                                                  maskIndex: target.maskIndex,
+                                                  frame: playheadClock.frame,
+                                                  vertexId: vertexId)
         }
         var next = target
-        next.selectedVertex = -1
+        next.clearVertexSelection()
         editorState.pathEditTarget = next
     }
 

@@ -20,6 +20,7 @@ using motion::DrawCommandType;
 using motion::EntityId;
 using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
+using motion::MakeSingleContour;
 using motion::MaskMode;
 using motion::Mat3;
 using motion::PathOverlayItem;
@@ -30,12 +31,7 @@ using motion::Vec2;
 namespace {
 
 BezierPath UnitSquare() {
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{100, 0}, {}, {}});
-    path.vertices.push_back({{100, 100}, {}, {}});
-    path.vertices.push_back({{0, 100}, {}, {}});
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{100, 0}, {}, {}}, {{100, 100}, {}, {}}, {{0, 100}, {}, {}}}, true);
     return path;
 }
 
@@ -47,23 +43,21 @@ TEST(PathOverlayTest, BuildCommandsEmptyWhenNoItems) {
 
 TEST(PathOverlayTest, BuildCommandsSkipsSingleVertexPath) {
     PathOverlayItem item;
-    item.path.vertices.push_back({{0, 0}, {}, {}});
+    item.path = MakeSingleContour({{{0, 0}, {}, {}}}, false);
     item.color = Color{1, 0.85f, 0.2f, 1};
     EXPECT_TRUE(BuildPathOverlayCommands({item}, 1.5f).empty());
 }
 
 TEST(PathOverlayTest, BuildCommandsSkipsCollapsedMultiVertexPath) {
     PathOverlayItem item;
-    item.path.vertices.push_back({{40, 50}, {}, {}});
-    item.path.vertices.push_back({{40, 50}, {}, {}});
+    item.path = MakeSingleContour({{{40, 50}, {}, {}}, {{40, 50}, {}, {}}}, false);
     item.color = Color{0.35f, 0.75f, 1.0f, 1};
     EXPECT_TRUE(BuildPathOverlayCommands({item}, 1.5f).empty());
 }
 
 TEST(PathOverlayTest, BuildCommandsKeepsHairlinePath) {
     PathOverlayItem item;
-    item.path.vertices.push_back({{0, 10}, {}, {}});
-    item.path.vertices.push_back({{20, 10}, {}, {}});
+    item.path = MakeSingleContour({{{0, 10}, {}, {}}, {{20, 10}, {}, {}}}, false);
     item.color = Color{1, 0.85f, 0.2f, 1};
 
     auto commands = BuildPathOverlayCommands({item}, 1.5f);

@@ -75,7 +75,7 @@ std::vector<PathOverlayItem> CollectMaskPathOverlays(const SceneState &state,
             continue;
         }
         for (const EvaluatedMask &mask : layer->masks) {
-            if (mask.path.vertices.empty()) {
+            if (mask.path.contours.empty()) {
                 continue;
             }
             PathOverlayItem item;

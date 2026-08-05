@@ -22,10 +22,10 @@ Keyframe<Vec2> MakeVec2Keyframe(motion::FrameTime time, Vec2 value) {
 
 TEST(MotionPathTest, FewerThanTwoKeyframesYieldsEmptyPath) {
     Animatable<Vec2> position;
-    EXPECT_TRUE(BuildMotionPath(position).vertices.empty());
+    EXPECT_TRUE(BuildMotionPath(position).contours.empty());
 
     position.addKeyframe(MakeVec2Keyframe(0, {0, 0}));
-    EXPECT_TRUE(BuildMotionPath(position).vertices.empty());
+    EXPECT_TRUE(BuildMotionPath(position).contours.empty());
 }
 
 TEST(MotionPathTest, StraightSegmentUsesZeroTangents) {
@@ -34,12 +34,12 @@ TEST(MotionPathTest, StraightSegmentUsesZeroTangents) {
     position.addKeyframe(MakeVec2Keyframe(10, {100, 0}));
 
     BezierPath path = BuildMotionPath(position);
-    ASSERT_EQ(path.vertices.size(), 2u);
-    EXPECT_FALSE(path.closed);
-    EXPECT_EQ(path.vertices[0].point, (Vec2{0, 0}));
-    EXPECT_EQ(path.vertices[1].point, (Vec2{100, 0}));
-    EXPECT_EQ(path.vertices[0].outTangent, (Vec2{0, 0}));
-    EXPECT_EQ(path.vertices[1].inTangent, (Vec2{0, 0}));
+    ASSERT_EQ(path.contours[0].vertices.size(), 2u);
+    EXPECT_FALSE(path.contours[0].closed);
+    EXPECT_EQ(path.contours[0].vertices[0].point, (Vec2{0, 0}));
+    EXPECT_EQ(path.contours[0].vertices[1].point, (Vec2{100, 0}));
+    EXPECT_EQ(path.contours[0].vertices[0].outTangent, (Vec2{0, 0}));
+    EXPECT_EQ(path.contours[0].vertices[1].inTangent, (Vec2{0, 0}));
 }
 
 TEST(MotionPathTest, SpatialSegmentPreservesTangents) {
@@ -52,7 +52,7 @@ TEST(MotionPathTest, SpatialSegmentPreservesTangents) {
     position.addKeyframe(to);
 
     BezierPath path = BuildMotionPath(position);
-    ASSERT_EQ(path.vertices.size(), 2u);
-    EXPECT_EQ(path.vertices[0].outTangent, (Vec2{10, 10}));
-    EXPECT_EQ(path.vertices[1].inTangent, (Vec2{-10, 10}));
+    ASSERT_EQ(path.contours[0].vertices.size(), 2u);
+    EXPECT_EQ(path.contours[0].vertices[0].outTangent, (Vec2{10, 10}));
+    EXPECT_EQ(path.contours[0].vertices[1].inTangent, (Vec2{-10, 10}));
 }

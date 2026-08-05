@@ -853,6 +853,116 @@ TEST(BridgeBezierPathTest, ToggleSmoothAndRecenterShape) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeVectorNetworkTest, RoundTripAndAddEdgeAfterClose) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+
+    uint32_t v1 = 0;
+    uint32_t v2 = 0;
+    uint32_t v3 = 0;
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 100, 100, &v1);
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 200, 100, &v2);
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 150, 200, &v3);
+    ASSERT_NE(v1, 0u);
+    ASSERT_NE(v2, 0u);
+    ASSERT_NE(v3, 0u);
+
+    uint32_t e12 = 0;
+    uint32_t e23 = 0;
+    uint32_t e31 = 0;
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, v1, v2, &e12);
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, v2, v3, &e23);
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, v3, v1, &e31);
+    ASSERT_NE(e12, 0u);
+    ASSERT_NE(e23, 0u);
+    ASSERT_NE(e31, 0u);
+
+    MSVectorNetwork *closed = ms_property_static_vector_network(document, layerId, "path");
+    ASSERT_NE(closed, nullptr);
+    EXPECT_EQ(closed->vertexCount, 3u);
+    EXPECT_EQ(closed->edgeCount, 3u);
+    ms_vector_network_free(closed);
+
+    // After closing the triangle, continue drawing from v1 to a new blank point.
+    uint32_t v4 = 0;
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 50, 50, &v4);
+    ASSERT_NE(v4, 0u);
+    uint32_t e14 = 0;
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, v1, v4, &e14);
+    ASSERT_NE(e14, 0u);
+
+    // Duplicate directed edge is a no-op.
+    uint32_t duplicate = 0;
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, v1, v4, &duplicate);
+    EXPECT_EQ(duplicate, 0u);
+
+    MSVectorNetwork *extended = ms_property_static_vector_network(document, layerId, "path");
+    ASSERT_NE(extended, nullptr);
+    EXPECT_EQ(extended->vertexCount, 4u);
+    EXPECT_EQ(extended->edgeCount, 4u);
+    ms_vector_network_free(extended);
+
+    // Adding a path keyframe must keep the full network (not PrimaryContour fill face).
+    MSVectorNetwork *atPlayhead = ms_property_evaluate_vector_network(document, layerId, "path", 0);
+    ASSERT_NE(atPlayhead, nullptr);
+    ms_command_add_keyframe_vector_network(document, layerId, "path", 10, atPlayhead);
+    ms_vector_network_free(atPlayhead);
+
+    MSVectorNetwork *keyed = ms_property_evaluate_vector_network(document, layerId, "path", 10);
+    ASSERT_NE(keyed, nullptr);
+    EXPECT_EQ(keyed->vertexCount, 4u);
+    EXPECT_EQ(keyed->edgeCount, 4u);
+    ms_vector_network_free(keyed);
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeVectorNetworkTest, ToggleSmoothSharedHubIsNoOp) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+
+    uint32_t hub = 0;
+    uint32_t a = 0;
+    uint32_t b = 0;
+    uint32_t c = 0;
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 0, 0, &hub);
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 100, 0, &a);
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 0, 100, &b);
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, -100, 0, &c);
+    uint32_t e1 = 0;
+    uint32_t e2 = 0;
+    uint32_t e3 = 0;
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, hub, a, &e1);
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, hub, b, &e2);
+    ms_command_network_edit_add_edge(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, hub, c, &e3);
+
+    MSVectorNetwork *before = ms_property_static_vector_network(document, layerId, "path");
+    ASSERT_NE(before, nullptr);
+    ASSERT_EQ(before->vertexCount, 4u);
+    ASSERT_EQ(before->edgeCount, 3u);
+
+    // Hub is vertices[0] in insertion order — double-click must not collapse network.
+    ms_command_path_edit_toggle_smooth(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 0);
+
+    MSVectorNetwork *after = ms_property_static_vector_network(document, layerId, "path");
+    ASSERT_NE(after, nullptr);
+    EXPECT_EQ(after->vertexCount, before->vertexCount);
+    EXPECT_EQ(after->edgeCount, before->edgeCount);
+    for (size_t i = 0; i < after->edgeCount; ++i) {
+        EXPECT_FLOAT_EQ(after->edges[i].startTangentX, 0.0f);
+        EXPECT_FLOAT_EQ(after->edges[i].startTangentY, 0.0f);
+        EXPECT_FLOAT_EQ(after->edges[i].endTangentX, 0.0f);
+        EXPECT_FLOAT_EQ(after->edges[i].endTangentY, 0.0f);
+    }
+    ms_vector_network_free(before);
+    ms_vector_network_free(after);
+    ms_document_destroy(document);
+}
+
 TEST(BridgeBezierPathTest, MorphEvaluateMidpointAndKeyframeTimes) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

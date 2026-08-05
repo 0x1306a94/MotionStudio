@@ -9,6 +9,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/VectorNetwork.h"
 
 namespace motion {
 
@@ -171,6 +172,10 @@ AnimatableType Animatable<BezierPath>::valueType() const {
     return AnimatableType::BezierPath;
 }
 template <>
+AnimatableType Animatable<VectorNetwork>::valueType() const {
+    return AnimatableType::VectorNetwork;
+}
+template <>
 AnimatableType Animatable<std::string>::valueType() const {
     return AnimatableType::String;
 }
@@ -180,6 +185,7 @@ template class Animatable<float>;
 template class Animatable<Vec2>;
 template class Animatable<Color>;
 template class Animatable<BezierPath>;
+template class Animatable<VectorNetwork>;
 template class Animatable<std::string>;
 
 }  // namespace motion

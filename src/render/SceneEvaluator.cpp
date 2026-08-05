@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "MotionStudio/common/BezierPathTransform.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/Document.h"
@@ -58,7 +59,9 @@ void FillCommonLayerFields(const Document &document, const Layer &layer, Preview
     evaluated.blendMode = layer.blendMode;
     for (const Mask &mask : layer.masks) {
         EvaluatedMask evaluatedMask;
-        evaluatedMask.path = mask.path.evaluatePreview(time);
+        const VectorNetwork network = mask.path.evaluatePreview(time);
+        evaluatedMask.network = network;
+        evaluatedMask.path = CompileFillFaces(network);
         evaluatedMask.mode = mask.mode;
         evaluatedMask.opacity = mask.opacity.evaluatePreview(time);
         evaluatedMask.inverted = mask.inverted;
@@ -80,7 +83,10 @@ void CollectGeometry(const ShapeElement &element, PreviewTime time,
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
-            geometries.push_back(MakePathGeometry(shape.path.evaluatePreview(time)));
+            const VectorNetwork network = shape.path.evaluatePreview(time);
+            ShapeGeometry geometry = MakePathGeometry(CompileFillFaces(network));
+            geometry.strokePath = CompileStrokeEdges(network);
+            geometries.push_back(std::move(geometry));
             break;
         }
         case ShapeType::Rect: {
@@ -134,6 +140,8 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
                                             stroke.trimEnd.evaluatePreview(time),
                                             stroke.trimOffset.evaluatePreview(time)};
                 for (const ShapeGeometry &geometry : geometries) {
+                    // Stroke uses strokePath when present; fill faces stay on
+                    // geometry.path for Inside/Outside positioning.
                     items.push_back({geometry, paint, true, options});
                 }
                 break;
@@ -300,6 +308,10 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     const auto &shapeContent = static_cast<const ShapeContent &>(*layer.content);
     EvaluatedLayer evaluated;
     FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
+    if (shapeContent.geometry != nullptr && shapeContent.geometry->type() == ShapeType::Path) {
+        const auto &shape = static_cast<const ShapePath &>(*shapeContent.geometry);
+        evaluated.shapeNetwork = shape.path.evaluatePreview(time);
+    }
     if (!layer.styles.empty()) {
         std::vector<ShapeGeometry> geometries;
         if (shapeContent.geometry) {
@@ -307,7 +319,8 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         }
         ApplyLayerStyles(layer, time, 1.0f, geometries, evaluated.shapeItems);
     }
-    if (!evaluated.shapeItems.empty()) {
+    // Path networks without styles still need an evaluated layer for path edit.
+    if (!evaluated.shapeItems.empty() || !evaluated.shapeNetwork.vertices.empty()) {
         out.push_back(std::move(evaluated));
     }
 }

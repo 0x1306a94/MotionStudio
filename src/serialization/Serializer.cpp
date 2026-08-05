@@ -13,6 +13,9 @@
 #include <nlohmann/json.hpp>
 
 #include "MotionStudio/animation/Animatable.h"
+#include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/VectorNetwork.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
@@ -223,17 +226,32 @@ Expected<Color, std::string> ColorFromJson(const json &node) {
     return Unexpected(std::string("Color must be a #RRGGBBAA hex string"));
 }
 
-json BezierPathToJson(const BezierPath &path) {
+json ContourToJson(const BezierPath::Contour &contour) {
     json vertices = json::array();
-    for (const BezierPath::Vertex &vertex : path.vertices) {
+    for (const BezierPath::Vertex &vertex : contour.vertices) {
         vertices.push_back({{"point", Vec2ToJson(vertex.point)},
                             {"inTangent", Vec2ToJson(vertex.inTangent)},
                             {"outTangent", Vec2ToJson(vertex.outTangent)}});
     }
-    return {{"closed", path.closed}, {"vertices", vertices}};
+    return {{"closed", contour.closed}, {"vertices", vertices}};
 }
 
-Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
+json BezierPathToJson(const BezierPath &path) {
+    // Preserve legacy single-contour shape when possible for existing documents.
+    if (path.contours.size() <= 1) {
+        if (path.contours.empty()) {
+            return {{"closed", false}, {"vertices", json::array()}};
+        }
+        return ContourToJson(path.contours.front());
+    }
+    json contours = json::array();
+    for (const BezierPath::Contour &contour : path.contours) {
+        contours.push_back(ContourToJson(contour));
+    }
+    return {{"contours", contours}};
+}
+
+Expected<BezierPath::Contour, std::string> ContourFromJson(const json &node) {
     Expected<const json *, std::string> closedNode = Child(node, "closed");
     if (!closedNode) {
         return Unexpected(closedNode.error());
@@ -246,8 +264,8 @@ Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
     if (!verticesNode || !verticesNode->is_array()) {
         return Unexpected(std::string("missing the vertices array"));
     }
-    BezierPath path;
-    path.closed = *closed;
+    BezierPath::Contour contour;
+    contour.closed = *closed;
     for (const json &vertexNode : *verticesNode) {
         Expected<const json *, std::string> pointNode = Child(vertexNode, "point");
         Expected<const json *, std::string> inNode = Child(vertexNode, "inTangent");
@@ -261,9 +279,104 @@ Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
         if (!point || !inTangent || !outTangent) {
             return Unexpected(std::string("invalid vertex coordinates"));
         }
-        path.vertices.push_back({*point, *inTangent, *outTangent});
+        contour.vertices.push_back({*point, *inTangent, *outTangent});
     }
+    return contour;
+}
+
+Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
+    const json *contoursNode = FindChild(node, "contours");
+    if (contoursNode != nullptr) {
+        if (!contoursNode->is_array()) {
+            return Unexpected(std::string("contours must be an array"));
+        }
+        BezierPath path;
+        for (const json &contourNode : *contoursNode) {
+            Expected<BezierPath::Contour, std::string> contour = ContourFromJson(contourNode);
+            if (!contour) {
+                return Unexpected(contour.error());
+            }
+            path.contours.push_back(*contour);
+        }
+        return path;
+    }
+    Expected<BezierPath::Contour, std::string> contour = ContourFromJson(node);
+    if (!contour) {
+        return Unexpected(contour.error());
+    }
+    BezierPath path;
+    path.contours.push_back(*contour);
     return path;
+}
+
+json VectorNetworkToJson(const VectorNetwork &network) {
+    json vertices = json::array();
+    for (const VectorNetwork::Vertex &vertex : network.vertices) {
+        vertices.push_back({{"id", vertex.id}, {"point", Vec2ToJson(vertex.point)}});
+    }
+    json edges = json::array();
+    for (const VectorNetwork::Edge &edge : network.edges) {
+        edges.push_back({{"id", edge.id},
+                         {"start", edge.start},
+                         {"end", edge.end},
+                         {"startTangent", Vec2ToJson(edge.startTangent)},
+                         {"endTangent", Vec2ToJson(edge.endTangent)}});
+    }
+    return {{"vertices", vertices}, {"edges", edges}};
+}
+
+Expected<VectorNetwork, std::string> VectorNetworkFromJson(const json &node) {
+    const json *edgesNode = FindChild(node, "edges");
+    if (edgesNode != nullptr) {
+        if (!edgesNode->is_array()) {
+            return Unexpected(std::string("edges must be an array"));
+        }
+        const json *verticesNode = FindChild(node, "vertices");
+        if (verticesNode == nullptr || !verticesNode->is_array()) {
+            return Unexpected(std::string("missing the vertices array"));
+        }
+        VectorNetwork network;
+        for (const json &vertexNode : *verticesNode) {
+            Expected<const json *, std::string> idNode = Child(vertexNode, "id");
+            Expected<const json *, std::string> pointNode = Child(vertexNode, "point");
+            if (!idNode || !pointNode) {
+                return Unexpected(std::string("vertex is missing id or point"));
+            }
+            Expected<uint32_t, std::string> id = AsUint32(**idNode);
+            Expected<Vec2, std::string> point = Vec2FromJson(**pointNode);
+            if (!id || !point) {
+                return Unexpected(std::string("invalid network vertex"));
+            }
+            network.vertices.push_back({*id, *point});
+        }
+        for (const json &edgeNode : *edgesNode) {
+            Expected<const json *, std::string> idNode = Child(edgeNode, "id");
+            Expected<const json *, std::string> startNode = Child(edgeNode, "start");
+            Expected<const json *, std::string> endNode = Child(edgeNode, "end");
+            Expected<const json *, std::string> startTangentNode = Child(edgeNode, "startTangent");
+            Expected<const json *, std::string> endTangentNode = Child(edgeNode, "endTangent");
+            if (!idNode || !startNode || !endNode || !startTangentNode || !endTangentNode) {
+                return Unexpected(std::string("edge is missing a required field"));
+            }
+            Expected<uint32_t, std::string> id = AsUint32(**idNode);
+            Expected<uint32_t, std::string> start = AsUint32(**startNode);
+            Expected<uint32_t, std::string> end = AsUint32(**endNode);
+            Expected<Vec2, std::string> startTangent = Vec2FromJson(**startTangentNode);
+            Expected<Vec2, std::string> endTangent = Vec2FromJson(**endTangentNode);
+            if (!id || !start || !end || !startTangent || !endTangent) {
+                return Unexpected(std::string("invalid network edge"));
+            }
+            network.edges.push_back({*id, *start, *end, *startTangent, *endTangent});
+        }
+        return network;
+    }
+
+    // Legacy BezierPath JSON (single contour or multi-contour) → VectorNetwork.
+    Expected<BezierPath, std::string> path = BezierPathFromJson(node);
+    if (!path) {
+        return Unexpected(path.error());
+    }
+    return BezierPathToVectorNetwork(*path);
 }
 
 template <typename T>
@@ -306,8 +419,8 @@ Expected<Color, std::string> FromJson<Color>(const json &node) {
     return ColorFromJson(node);
 }
 template <>
-Expected<BezierPath, std::string> FromJson<BezierPath>(const json &node) {
-    return BezierPathFromJson(node);
+Expected<VectorNetwork, std::string> FromJson<VectorNetwork>(const json &node) {
+    return VectorNetworkFromJson(node);
 }
 
 template <typename T>
@@ -469,8 +582,8 @@ json ValueToJson(const Vec2 &value) {
 json ValueToJson(const Color &value) {
     return ColorToJson(value);
 }
-json ValueToJson(const BezierPath &value) {
-    return BezierPathToJson(value);
+json ValueToJson(const VectorNetwork &value) {
+    return VectorNetworkToJson(value);
 }
 json ValueToJson(const std::string &value) {
     return value;
@@ -667,7 +780,7 @@ Expected<Mask, std::string> MaskFromJson(const json &node) {
             return Unexpected(result.error());
         }
     } else {
-        Expected<BezierPath, std::string> path = BezierPathFromJson(**pathNode);
+        Expected<VectorNetwork, std::string> path = VectorNetworkFromJson(**pathNode);
         if (!path) {
             return Unexpected(path.error());
         }

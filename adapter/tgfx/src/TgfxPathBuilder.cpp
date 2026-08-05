@@ -32,18 +32,19 @@ void AppendBezierSegment(tgfx::Path &result, const BezierPath::Vertex &from,
 
 tgfx::Path BezierToTgfxPath(const BezierPath &path, FillRule fillRule) {
     tgfx::Path result;
-    if (path.vertices.empty()) {
-        result.setFillType(ToTgfxFillType(fillRule));
-        return result;
-    }
-    const BezierPath::Vertex &first = path.vertices.front();
-    result.moveTo(first.point.x, first.point.y);
-    for (size_t i = 1; i < path.vertices.size(); ++i) {
-        AppendBezierSegment(result, path.vertices[i - 1], path.vertices[i]);
-    }
-    if (path.closed && path.vertices.size() > 1) {
-        AppendBezierSegment(result, path.vertices.back(), first);
-        result.close();
+    for (const BezierPath::Contour &contour : path.contours) {
+        if (contour.vertices.empty()) {
+            continue;
+        }
+        const BezierPath::Vertex &first = contour.vertices.front();
+        result.moveTo(first.point.x, first.point.y);
+        for (size_t i = 1; i < contour.vertices.size(); ++i) {
+            AppendBezierSegment(result, contour.vertices[i - 1], contour.vertices[i]);
+        }
+        if (contour.closed && contour.vertices.size() > 1) {
+            AppendBezierSegment(result, contour.vertices.back(), first);
+            result.close();
+        }
     }
     result.setFillType(ToTgfxFillType(fillRule));
     return result;
@@ -101,15 +102,18 @@ uint64_t HashGeometry(const ShapeGeometry &geometry, FillRule fillRule) {
     hash = MixHash(hash, static_cast<uint64_t>(fillRule));
     switch (geometry.kind) {
         case ShapeGeometryKind::Path: {
-            hash = MixHash(hash, geometry.path.closed ? 1ULL : 0ULL);
-            hash = MixHash(hash, geometry.path.vertices.size());
-            for (const BezierPath::Vertex &vertex : geometry.path.vertices) {
-                hash = MixHash(hash, FloatBits(vertex.point.x));
-                hash = MixHash(hash, FloatBits(vertex.point.y));
-                hash = MixHash(hash, FloatBits(vertex.inTangent.x));
-                hash = MixHash(hash, FloatBits(vertex.inTangent.y));
-                hash = MixHash(hash, FloatBits(vertex.outTangent.x));
-                hash = MixHash(hash, FloatBits(vertex.outTangent.y));
+            hash = MixHash(hash, geometry.path.contours.size());
+            for (const BezierPath::Contour &contour : geometry.path.contours) {
+                hash = MixHash(hash, contour.closed ? 1ULL : 0ULL);
+                hash = MixHash(hash, contour.vertices.size());
+                for (const BezierPath::Vertex &vertex : contour.vertices) {
+                    hash = MixHash(hash, FloatBits(vertex.point.x));
+                    hash = MixHash(hash, FloatBits(vertex.point.y));
+                    hash = MixHash(hash, FloatBits(vertex.inTangent.x));
+                    hash = MixHash(hash, FloatBits(vertex.inTangent.y));
+                    hash = MixHash(hash, FloatBits(vertex.outTangent.x));
+                    hash = MixHash(hash, FloatBits(vertex.outTangent.y));
+                }
             }
             break;
         }

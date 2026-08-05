@@ -4,6 +4,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/VectorNetwork.h"
 
 namespace motion {
 
@@ -54,6 +55,13 @@ struct Interpolator<BezierPath> {
     // to: end path.
     // t: blend factor in [0,1].
     static BezierPath Lerp(const BezierPath &from, const BezierPath &to, float t);
+};
+
+template <>
+struct Interpolator<VectorNetwork> {
+    // Same-topology lerp of vertex points and edge tangents (matched by id).
+    // Different topology holds `from`.
+    static VectorNetwork Lerp(const VectorNetwork &from, const VectorNetwork &to, float t);
 };
 
 // Evaluates a point on a cubic bezier curve:

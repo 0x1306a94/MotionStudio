@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace motion {
 
@@ -19,25 +20,23 @@ BezierPath RectToBezierPath(Vec2 center, Vec2 size, float cornerRadius) {
     const float top = center.y - halfHeight;
     const float bottom = center.y + halfHeight;
 
-    BezierPath path;
-    path.closed = true;
     if (radius <= 0) {
-        path.vertices.push_back({{left, top}, {}, {}});
-        path.vertices.push_back({{right, top}, {}, {}});
-        path.vertices.push_back({{right, bottom}, {}, {}});
-        path.vertices.push_back({{left, bottom}, {}, {}});
-        return path;
+        return MakeSingleContour({{{left, top}, {}, {}},
+                                  {{right, top}, {}, {}},
+                                  {{right, bottom}, {}, {}},
+                                  {{left, bottom}, {}, {}}},
+                                 true);
     }
     const float k = kEllipseKappa * radius;
-    path.vertices.push_back({{left, top + radius}, {}, {0, -k}});
-    path.vertices.push_back({{left + radius, top}, {-k, 0}, {}});
-    path.vertices.push_back({{right - radius, top}, {}, {k, 0}});
-    path.vertices.push_back({{right, top + radius}, {0, -k}, {}});
-    path.vertices.push_back({{right, bottom - radius}, {}, {0, k}});
-    path.vertices.push_back({{right - radius, bottom}, {k, 0}, {}});
-    path.vertices.push_back({{left + radius, bottom}, {}, {-k, 0}});
-    path.vertices.push_back({{left, bottom - radius}, {0, k}, {}});
-    return path;
+    return MakeSingleContour({{{left, top + radius}, {}, {0, -k}},
+                              {{left + radius, top}, {-k, 0}, {}},
+                              {{right - radius, top}, {}, {k, 0}},
+                              {{right, top + radius}, {0, -k}, {}},
+                              {{right, bottom - radius}, {}, {0, k}},
+                              {{right - radius, bottom}, {k, 0}, {}},
+                              {{left + radius, bottom}, {}, {-k, 0}},
+                              {{left, bottom - radius}, {0, k}, {}}},
+                             true);
 }
 
 BezierPath EllipseToBezierPath(Vec2 center, Vec2 size) {
@@ -46,13 +45,21 @@ BezierPath EllipseToBezierPath(Vec2 center, Vec2 size) {
     const float kx = kEllipseKappa * halfWidth;
     const float ky = kEllipseKappa * halfHeight;
 
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{center.x + halfWidth, center.y}, {0, -ky}, {0, ky}});
-    path.vertices.push_back({{center.x, center.y + halfHeight}, {kx, 0}, {-kx, 0}});
-    path.vertices.push_back({{center.x - halfWidth, center.y}, {0, ky}, {0, -ky}});
-    path.vertices.push_back({{center.x, center.y - halfHeight}, {-kx, 0}, {kx, 0}});
-    return path;
+    return MakeSingleContour(
+        {{{center.x + halfWidth, center.y}, {0, -ky}, {0, ky}},
+         {{center.x, center.y + halfHeight}, {kx, 0}, {-kx, 0}},
+         {{center.x - halfWidth, center.y}, {0, ky}, {0, -ky}},
+         {{center.x, center.y - halfHeight}, {-kx, 0}, {kx, 0}}},
+        true);
+}
+
+bool PathHasClosedContour(const BezierPath &path) {
+    for (const BezierPath::Contour &contour : path.contours) {
+        if (contour.closed && !contour.vertices.empty()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -84,7 +91,7 @@ ShapeGeometry MakeEllipseGeometry(Vec2 center, Vec2 size) {
 bool ShapeGeometry::isZero() const {
     switch (kind) {
         case ShapeGeometryKind::Path: {
-            return path.isZero();
+            return path.isZero() && strokePath.isZero();
         }
         case ShapeGeometryKind::Rect:
         case ShapeGeometryKind::Ellipse: {
@@ -97,7 +104,7 @@ bool ShapeGeometry::isZero() const {
 bool ShapeGeometryIsClosed(const ShapeGeometry &geometry) {
     switch (geometry.kind) {
         case ShapeGeometryKind::Path: {
-            return geometry.path.closed;
+            return PathHasClosedContour(geometry.path);
         }
         case ShapeGeometryKind::Rect:
         case ShapeGeometryKind::Ellipse: {
@@ -120,6 +127,13 @@ BezierPath ShapeGeometryToBezierPath(const ShapeGeometry &geometry) {
         }
     }
     return {};
+}
+
+BezierPath ShapeGeometryStrokePath(const ShapeGeometry &geometry) {
+    if (geometry.kind == ShapeGeometryKind::Path && !geometry.strokePath.contours.empty()) {
+        return geometry.strokePath;
+    }
+    return ShapeGeometryToBezierPath(geometry);
 }
 
 }  // namespace motion

@@ -9,6 +9,7 @@
 #include "FakeBitmapFrameSource.h"
 #include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/export/PagExporter.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/Composition.h"
@@ -31,6 +32,7 @@
 using motion::Asset;
 using motion::AssetType;
 using motion::BezierPath;
+using motion::BezierPathToVectorNetwork;
 using motion::BlendMode;
 using motion::Color;
 using motion::Composition;
@@ -45,6 +47,7 @@ using motion::ImageScaleMode;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
+using motion::MakeSingleContour;
 using motion::Mask;
 using motion::MaskMode;
 using motion::PagExporter;
@@ -60,6 +63,7 @@ using motion::StrokeStyle;
 using motion::TextContent;
 using motion::TrackMatteType;
 using motion::Vec2;
+using motion::VectorNetwork;
 
 namespace {
 
@@ -672,12 +676,8 @@ TEST(PagExporterTest, MaskExports) {
     Composition *composition = Primary(document);
     Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 100});
     Mask mask;
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({Vec2{0, 0}, {}, {}});
-    path.vertices.push_back({Vec2{50, 0}, {}, {}});
-    path.vertices.push_back({Vec2{50, 50}, {}, {}});
-    mask.path.setStaticValue(path);
+    BezierPath path = MakeSingleContour({{Vec2{0, 0}, {}, {}}, {Vec2{50, 0}, {}, {}}, {Vec2{50, 50}, {}, {}}}, true);
+    mask.path.setStaticValue(BezierPathToVectorNetwork(path));
     mask.mode = MaskMode::Add;
     layer->masks.push_back(mask);
 
@@ -780,15 +780,41 @@ TEST(PagExporterTest, ShapePath) {
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
     auto path = std::make_unique<ShapePath>();
-    motion::BezierPath bezier;
-    bezier.closed = true;
-    bezier.vertices.push_back({Vec2{0, 0}, {}, {}});
-    bezier.vertices.push_back({Vec2{40, 0}, {}, {}});
-    bezier.vertices.push_back({Vec2{40, 40}, {}, {}});
-    path->path.setStaticValue(bezier);
+    motion::BezierPath bezier = MakeSingleContour({{Vec2{0, 0}, {}, {}}, {Vec2{40, 0}, {}, {}}, {Vec2{40, 40}, {}, {}}}, true);
+    path->path.setStaticValue(BezierPathToVectorNetwork(bezier));
     static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
     auto fill = std::make_unique<FillStyle>();
     fill->color.setStaticValue(Color{0, 0, 1, 1});
+    layer->styles.push_back(std::move(fill));
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_NE(DecodeBytes(result.value().bytes), nullptr);
+}
+
+TEST(PagExporterTest, SharedVertexNetworkFlattened) {
+    // Triangle fan (degree-3 hub) must export as compiled fill faces, not Network.
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto path = std::make_unique<ShapePath>();
+    motion::VectorNetwork network;
+    network.vertices = {{1, {0, 0}}, {2, {40, 0}}, {3, {0, 40}}, {4, {-40, 0}}};
+    network.edges = {
+        {1, 1, 2, {}, {}},
+        {2, 1, 3, {}, {}},
+        {3, 1, 4, {}, {}},
+        {4, 2, 3, {}, {}},
+        {5, 3, 4, {}, {}},
+        {6, 4, 2, {}, {}},
+    };
+    path->path.setStaticValue(network);
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0, 0.5f, 1, 1});
     layer->styles.push_back(std::move(fill));
     document.addLayer(composition->id, std::move(layer));
 
@@ -807,13 +833,8 @@ TEST(PagExporterTest, InsideOutsideStrokeBakedAsParallelLayers) {
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
     auto path = std::make_unique<ShapePath>();
-    BezierPath geometry;
-    geometry.closed = true;
-    geometry.vertices.push_back({{-50, -50}, {}, {}});
-    geometry.vertices.push_back({{50, -50}, {}, {}});
-    geometry.vertices.push_back({{50, 50}, {}, {}});
-    geometry.vertices.push_back({{-50, 50}, {}, {}});
-    path->path.setStaticValue(geometry);
+    BezierPath geometry = MakeSingleContour({{{-50, -50}, {}, {}}, {{50, -50}, {}, {}}, {{50, 50}, {}, {}}, {{-50, 50}, {}, {}}}, true);
+    path->path.setStaticValue(BezierPathToVectorNetwork(geometry));
     static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
 
     auto fill = std::make_unique<FillStyle>();
@@ -891,13 +912,8 @@ TEST(PagExporterTest, PositionedStrokeTrimDoesNotClipMainFill) {
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
     auto path = std::make_unique<ShapePath>();
-    BezierPath geometry;
-    geometry.closed = true;
-    geometry.vertices.push_back({{-50, -50}, {}, {}});
-    geometry.vertices.push_back({{50, -50}, {}, {}});
-    geometry.vertices.push_back({{50, 50}, {}, {}});
-    geometry.vertices.push_back({{-50, 50}, {}, {}});
-    path->path.setStaticValue(geometry);
+    BezierPath geometry = MakeSingleContour({{{-50, -50}, {}, {}}, {{50, -50}, {}, {}}, {{50, 50}, {}, {}}, {{-50, 50}, {}, {}}}, true);
+    path->path.setStaticValue(BezierPathToVectorNetwork(geometry));
     static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
 
     auto fill = std::make_unique<FillStyle>();

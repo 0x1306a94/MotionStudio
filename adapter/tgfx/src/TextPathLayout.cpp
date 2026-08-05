@@ -28,17 +28,20 @@ struct LaidOutGlyph {
 };
 
 BezierPath ReverseBezierPath(const BezierPath &path) {
-    BezierPath reversed;
-    reversed.closed = path.closed;
-    reversed.vertices.reserve(path.vertices.size());
-    for (auto it = path.vertices.rbegin(); it != path.vertices.rend(); ++it) {
+    const BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr) {
+        return {};
+    }
+    std::vector<BezierPath::Vertex> vertices;
+    vertices.reserve(contour->vertices.size());
+    for (auto it = contour->vertices.rbegin(); it != contour->vertices.rend(); ++it) {
         BezierPath::Vertex vertex;
         vertex.point = it->point;
         vertex.inTangent = it->outTangent;
         vertex.outTangent = it->inTangent;
-        reversed.vertices.push_back(vertex);
+        vertices.push_back(vertex);
     }
-    return reversed;
+    return MakeSingleContour(std::move(vertices), contour->closed);
 }
 
 bool NextUtf8(const std::string &text, size_t &offset, std::string &utf8, uint32_t &unichar) {
@@ -161,7 +164,7 @@ TextPathLayoutResult LayoutTextOnPath(const TextPathLayoutInput &input) {
     TextPathLayoutResult result;
     result.boundsMin = {};
     result.boundsMax = {};
-    if (input.path.vertices.empty()) {
+    if (input.path.contours.empty()) {
         return result;
     }
 

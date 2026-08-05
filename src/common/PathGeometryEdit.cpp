@@ -36,12 +36,12 @@ SegmentSplit SplitSegment(Vec2 p0, Vec2 outTangent0, Vec2 inTangent3, Vec2 p3, f
     return split;
 }
 
-size_t SegmentCount(const BezierPath &path) {
-    const size_t count = path.vertices.size();
+size_t SegmentCount(const BezierPath::Contour &contour) {
+    const size_t count = contour.vertices.size();
     if (count < 2) {
         return 0;
     }
-    return path.closed ? count : count - 1;
+    return contour.closed ? count : count - 1;
 }
 
 float LengthSquared(Vec2 value) {
@@ -63,10 +63,11 @@ Vec2 SafeNormalize(Vec2 value) {
 }  // namespace
 
 BezierPath MoveVertex(BezierPath path, size_t index, Vec2 newPoint, bool linkedHandles) {
-    if (index >= path.vertices.size()) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || index >= contour->vertices.size()) {
         return path;
     }
-    BezierPath::Vertex &vertex = path.vertices[index];
+    BezierPath::Vertex &vertex = contour->vertices[index];
     if (!linkedHandles) {
         const Vec2 absoluteIn = vertex.point + vertex.inTangent;
         const Vec2 absoluteOut = vertex.point + vertex.outTangent;
@@ -80,10 +81,11 @@ BezierPath MoveVertex(BezierPath path, size_t index, Vec2 newPoint, bool linkedH
 }
 
 BezierPath MoveInTangent(BezierPath path, size_t index, Vec2 newIn, bool mirrorOut) {
-    if (index >= path.vertices.size()) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || index >= contour->vertices.size()) {
         return path;
     }
-    BezierPath::Vertex &vertex = path.vertices[index];
+    BezierPath::Vertex &vertex = contour->vertices[index];
     vertex.inTangent = newIn;
     if (mirrorOut) {
         vertex.outTangent = -newIn;
@@ -92,10 +94,11 @@ BezierPath MoveInTangent(BezierPath path, size_t index, Vec2 newIn, bool mirrorO
 }
 
 BezierPath MoveOutTangent(BezierPath path, size_t index, Vec2 newOut, bool mirrorIn) {
-    if (index >= path.vertices.size()) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || index >= contour->vertices.size()) {
         return path;
     }
-    BezierPath::Vertex &vertex = path.vertices[index];
+    BezierPath::Vertex &vertex = contour->vertices[index];
     vertex.outTangent = newOut;
     if (mirrorIn) {
         vertex.inTangent = -newOut;
@@ -104,51 +107,63 @@ BezierPath MoveOutTangent(BezierPath path, size_t index, Vec2 newOut, bool mirro
 }
 
 BezierPath InsertVertexOnSegment(BezierPath path, size_t segmentIndex, float t) {
-    const size_t count = path.vertices.size();
-    if (segmentIndex >= SegmentCount(path)) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path)) {
+        return path;
+    }
+    const size_t count = contour->vertices.size();
+    if (segmentIndex >= SegmentCount(*contour)) {
         return path;
     }
     const size_t nextIndex = (segmentIndex + 1) % count;
-    BezierPath::Vertex &from = path.vertices[segmentIndex];
-    BezierPath::Vertex &to = path.vertices[nextIndex];
+    BezierPath::Vertex &from = contour->vertices[segmentIndex];
+    BezierPath::Vertex &to = contour->vertices[nextIndex];
     const SegmentSplit split =
         SplitSegment(from.point, from.outTangent, to.inTangent, to.point, t);
     from.outTangent = split.leftOutTangent;
     to.inTangent = split.rightInTangent;
-    path.vertices.insert(path.vertices.begin() + static_cast<std::ptrdiff_t>(nextIndex),
-                         split.mid);
+    contour->vertices.insert(contour->vertices.begin() + static_cast<std::ptrdiff_t>(nextIndex),
+                             split.mid);
     return path;
 }
 
 BezierPath RemoveVertex(BezierPath path, size_t index) {
-    if (index >= path.vertices.size() || path.vertices.size() <= 2) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || index >= contour->vertices.size() ||
+        contour->vertices.size() <= 2) {
         return path;
     }
-    path.vertices.erase(path.vertices.begin() + static_cast<std::ptrdiff_t>(index));
+    contour->vertices.erase(contour->vertices.begin() + static_cast<std::ptrdiff_t>(index));
     return path;
 }
 
 BezierPath ClosePath(BezierPath path) {
-    if (path.vertices.size() < 2) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || contour->vertices.size() < 2) {
         return path;
     }
-    path.closed = true;
+    contour->closed = true;
     return path;
 }
 
 BezierPath AppendVertex(BezierPath path, BezierPath::Vertex vertex) {
-    if (path.closed) {
+    if (path.contours.empty()) {
+        path.contours.push_back({});
+    }
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || contour->closed) {
         return path;
     }
-    path.vertices.push_back(std::move(vertex));
+    contour->vertices.push_back(std::move(vertex));
     return path;
 }
 
 BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
-    if (index >= path.vertices.size()) {
+    BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path) || index >= contour->vertices.size()) {
         return path;
     }
-    BezierPath::Vertex &vertex = path.vertices[index];
+    BezierPath::Vertex &vertex = contour->vertices[index];
     const bool isCorner = IsNearZero(vertex.inTangent) && IsNearZero(vertex.outTangent);
     if (!isCorner) {
         vertex.inTangent = {};
@@ -156,13 +171,13 @@ BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
         return path;
     }
 
-    const size_t count = path.vertices.size();
+    const size_t count = contour->vertices.size();
     if (count < 2) {
         return path;
     }
 
-    const bool hasPrev = path.closed || index > 0;
-    const bool hasNext = path.closed || index + 1 < count;
+    const bool hasPrev = contour->closed || index > 0;
+    const bool hasNext = contour->closed || index + 1 < count;
     if (!hasPrev && !hasNext) {
         return path;
     }
@@ -171,10 +186,10 @@ BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
     Vec2 prevPoint = point;
     Vec2 nextPoint = point;
     if (hasPrev) {
-        prevPoint = path.vertices[(index + count - 1) % count].point;
+        prevPoint = contour->vertices[(index + count - 1) % count].point;
     }
     if (hasNext) {
-        nextPoint = path.vertices[(index + 1) % count].point;
+        nextPoint = contour->vertices[(index + 1) % count].point;
     }
 
     Vec2 direction;
@@ -200,24 +215,37 @@ BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
 
 BezierPath RecenterPath(BezierPath path, Vec2 &localCenterOut) {
     localCenterOut = {};
-    if (path.vertices.empty()) {
+    if (path.contours.empty()) {
         return path;
     }
-    Vec2 minPoint = path.vertices.front().point;
-    Vec2 maxPoint = minPoint;
-    for (const BezierPath::Vertex &vertex : path.vertices) {
-        minPoint.x = std::min(minPoint.x, vertex.point.x);
-        minPoint.y = std::min(minPoint.y, vertex.point.y);
-        maxPoint.x = std::max(maxPoint.x, vertex.point.x);
-        maxPoint.y = std::max(maxPoint.y, vertex.point.y);
+    bool hasVertex = false;
+    Vec2 minPoint = {};
+    Vec2 maxPoint = {};
+    for (const BezierPath::Contour &contour : path.contours) {
+        for (const BezierPath::Vertex &vertex : contour.vertices) {
+            if (!hasVertex) {
+                minPoint = vertex.point;
+                maxPoint = vertex.point;
+                hasVertex = true;
+            }
+            minPoint.x = std::min(minPoint.x, vertex.point.x);
+            minPoint.y = std::min(minPoint.y, vertex.point.y);
+            maxPoint.x = std::max(maxPoint.x, vertex.point.x);
+            maxPoint.y = std::max(maxPoint.y, vertex.point.y);
+        }
+    }
+    if (!hasVertex) {
+        return path;
     }
     const Vec2 center{(minPoint.x + maxPoint.x) * 0.5f, (minPoint.y + maxPoint.y) * 0.5f};
     if (IsNearZero(center)) {
         return path;
     }
     localCenterOut = center;
-    for (BezierPath::Vertex &vertex : path.vertices) {
-        vertex.point = vertex.point - center;
+    for (BezierPath::Contour &contour : path.contours) {
+        for (BezierPath::Vertex &vertex : contour.vertices) {
+            vertex.point = vertex.point - center;
+        }
     }
     return path;
 }

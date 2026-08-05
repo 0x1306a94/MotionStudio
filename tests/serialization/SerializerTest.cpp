@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
+#include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
@@ -13,6 +15,7 @@
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -22,6 +25,7 @@
 using motion::Asset;
 using motion::AssetType;
 using motion::BezierPath;
+using motion::BezierPathToVectorNetwork;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -32,6 +36,7 @@ using motion::FillStyle;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
+using motion::MakeSingleContour;
 using motion::MaskMode;
 using motion::PrecompContent;
 using motion::SchemaMigrator;
@@ -43,6 +48,7 @@ using motion::ShapeRect;
 using motion::ShapeTrimPath;
 using motion::ShapeType;
 using motion::Vec2;
+using motion::VectorNetwork;
 
 namespace {
 
@@ -93,10 +99,9 @@ std::unique_ptr<Document> BuildRichDocument() {
 
     motion::Mask mask;
     mask.mode = MaskMode::Subtract;
-    motion::BezierPath maskPath;
-    maskPath.vertices.push_back({{0, 0}, {}, {}});
-    maskPath.closed = true;
-    mask.path.setStaticValue(maskPath);
+    motion::BezierPath maskPath = MakeSingleContour({{{0, 0}, {}, {}}}, false);
+    maskPath.contours[0].closed = true;
+    mask.path.setStaticValue(BezierPathToVectorNetwork(maskPath));
     mask.inverted = true;
     mask.feather.setStaticValue(2.0f);
     mask.expansion.setStaticValue(-1.0f);
@@ -126,11 +131,8 @@ std::unique_ptr<Document> BuildRichDocument() {
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
 
     auto path = std::make_unique<ShapePath>();
-    motion::BezierPath bezier;
-    bezier.closed = true;
-    bezier.vertices.push_back({{0, 0}, {-1, 0}, {1, 0}});
-    bezier.vertices.push_back({{10, 0}, {-1, 0}, {1, 0}});
-    path->path.setStaticValue(bezier);
+    motion::BezierPath bezier = MakeSingleContour({{{0, 0}, {-1, 0}, {1, 0}}, {{10, 0}, {-1, 0}, {1, 0}}}, true);
+    path->path.setStaticValue(BezierPathToVectorNetwork(bezier));
     shapeContent->geometry = std::move(path);
 
     composition->layers.push_back(std::move(shapeLayer));
@@ -527,20 +529,17 @@ TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
     auto *content = static_cast<ShapeContent *>(layer->content.get());
     auto path = std::make_unique<ShapePath>();
 
-    BezierPath p0;
-    p0.closed = true;
-    p0.vertices.push_back({{0, 0}, {}, {}});
-    p0.vertices.push_back({{10, 0}, {}, {}});
-    p0.vertices.push_back({{5, 8}, {}, {}});
-    BezierPath p1 = p0;
-    p1.vertices[2].point = {5, 20};
+    VectorNetwork n0 = BezierPathToVectorNetwork(
+        MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{5, 8}, {}, {}}}, true));
+    VectorNetwork n1 = n0;
+    n1.vertices[2].point = {5, 20};
 
-    Keyframe<BezierPath> kf0;
+    Keyframe<VectorNetwork> kf0;
     kf0.time = 0;
-    kf0.value = p0;
-    Keyframe<BezierPath> kf1;
+    kf0.value = n0;
+    Keyframe<VectorNetwork> kf1;
     kf1.time = 30;
-    kf1.value = p1;
+    kf1.value = n1;
     path->path.addKeyframe(kf0);
     path->path.addKeyframe(kf1);
     content->geometry = std::move(path);
@@ -562,8 +561,76 @@ TEST(SerializerTest, ShapePathKeyframeRoundTrip) {
     ASSERT_EQ(anim.keyframes().size(), 2u);
     EXPECT_EQ(anim.keyframes()[0].time, 0);
     EXPECT_EQ(anim.keyframes()[1].time, 30);
-    EXPECT_EQ(anim.keyframes()[0].value, p0);
-    EXPECT_EQ(anim.keyframes()[1].value, p1);
+    EXPECT_EQ(anim.keyframes()[0].value, n0);
+    EXPECT_EQ(anim.keyframes()[1].value, n1);
+}
+
+TEST(SerializerTest, LoadsLegacyBezierPathAsVectorNetwork) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->width = 100;
+    composition->height = 100;
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto path = std::make_unique<ShapePath>();
+    path->path.setStaticValue(BezierPathToVectorNetwork(
+        MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true)));
+    content->geometry = std::move(path);
+    original.refreshEntityIndex();
+
+    nlohmann::json root = nlohmann::json::parse(Serializer::serialize(original));
+    // Force legacy single-contour path JSON (no edges).
+    root["compositions"][0]["layers"][0]["content"]["geometry"]["path"] = nlohmann::json::parse(R"({
+      "static": {
+        "closed": true,
+        "vertices": [
+          {"point": [0, 0], "inTangent": [0, 0], "outTangent": [0, 0]},
+          {"point": [10, 0], "inTangent": [0, 0], "outTangent": [0, 0]},
+          {"point": [0, 10], "inTangent": [0, 0], "outTangent": [0, 0]}
+        ]
+      }
+    })");
+
+    Expected<std::unique_ptr<Document>, std::string> loaded = Serializer::deserialize(root.dump());
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    auto *shapeContent =
+        static_cast<ShapeContent *>((*loaded)->compositions[0]->layers[0]->content.get());
+    ASSERT_EQ(shapeContent->geometry->type(), ShapeType::Path);
+    const VectorNetwork &network =
+        static_cast<ShapePath *>(shapeContent->geometry.get())->path.staticValue();
+    EXPECT_EQ(network.vertices.size(), 3u);
+    EXPECT_EQ(network.edges.size(), 3u);
+    EXPECT_EQ(SchemaMigrator::currentVersion(), 1);
+}
+
+TEST(SerializerTest, RoundTripVectorNetworkSharedVertex) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto path = std::make_unique<ShapePath>();
+    VectorNetwork network;
+    network.vertices = {{1, {0, 0}}, {2, {10, 0}}, {3, {-10, 0}}};
+    network.edges = {{1, 1, 2, {1, 0}, {-1, 0}}, {2, 1, 3, {}, {}}};
+    path->path.setStaticValue(network);
+    content->geometry = std::move(path);
+    original.refreshEntityIndex();
+
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(Serializer::serialize(original));
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    auto *shapeContent =
+        static_cast<ShapeContent *>((*loaded)->compositions[0]->layers[0]->content.get());
+    const VectorNetwork &roundTrip =
+        static_cast<ShapePath *>(shapeContent->geometry.get())->path.staticValue();
+    EXPECT_EQ(roundTrip, network);
+
+    nlohmann::json root = nlohmann::json::parse(Serializer::serialize(*loaded.value()));
+    EXPECT_EQ(root["schemaVersion"], 1);
+    EXPECT_TRUE(root["compositions"][0]["layers"][0]["content"]["geometry"]["path"]["static"].contains(
+        "edges"));
 }
 
 TEST(SerializerTest, ImageLayerRoundTripPreservesContainerAndScaleMode) {

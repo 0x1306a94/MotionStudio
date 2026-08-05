@@ -52,19 +52,23 @@ BezierPath::Vertex SplitVertex(Vec2 p0, Vec2 outTangent0, Vec2 inTangent3, Vec2 
 }  // namespace
 
 BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
-    const size_t count = path.vertices.size();
+    const BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || !IsSingleContour(path)) {
+        return path;
+    }
+    const size_t count = contour->vertices.size();
     if (count < 2 || vertexCount < 2 || vertexCount == count) {
         return path;
     }
-    const size_t segmentCount = path.closed ? count : count - 1;
+    const size_t segmentCount = contour->closed ? count : count - 1;
 
     // Flatten every segment and build the cumulative arc-length table.
     std::vector<float> cumulative;
     cumulative.reserve(segmentCount * kSamplesPerSegment + 1);
     cumulative.push_back(0);
     for (size_t segment = 0; segment < segmentCount; ++segment) {
-        const BezierPath::Vertex &from = path.vertices[segment];
-        const BezierPath::Vertex &to = path.vertices[(segment + 1) % count];
+        const BezierPath::Vertex &from = contour->vertices[segment];
+        const BezierPath::Vertex &to = contour->vertices[(segment + 1) % count];
         const Vec2 c1 = from.point + from.outTangent;
         const Vec2 c2 = to.point + to.inTangent;
         Vec2 previous = from.point;
@@ -80,10 +84,9 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
         return path;  // degenerate path
     }
 
-    BezierPath result;
-    result.closed = path.closed;
-    result.vertices.reserve(vertexCount);
-    const size_t spanCount = path.closed ? vertexCount : vertexCount - 1;
+    std::vector<BezierPath::Vertex> resultVertices;
+    resultVertices.reserve(vertexCount);
+    const size_t spanCount = contour->closed ? vertexCount : vertexCount - 1;
     for (size_t k = 0; k < vertexCount; ++k) {
         const float target = total * static_cast<float>(k) / static_cast<float>(spanCount);
         const auto it = std::lower_bound(cumulative.begin(), cumulative.end(), target);
@@ -91,8 +94,8 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
             std::clamp(static_cast<size_t>(it - cumulative.begin()), static_cast<size_t>(1),
                        cumulative.size() - 1);
         const size_t segment = (sampleIndex - 1) / kSamplesPerSegment;
-        const BezierPath::Vertex &from = path.vertices[segment];
-        const BezierPath::Vertex &to = path.vertices[(segment + 1) % count];
+        const BezierPath::Vertex &from = contour->vertices[segment];
+        const BezierPath::Vertex &to = contour->vertices[(segment + 1) % count];
         const Vec2 c1 = from.point + from.outTangent;
         const Vec2 c2 = to.point + to.inTangent;
 
@@ -109,11 +112,11 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
                 tHi = mid;
             }
         }
-        result.vertices.push_back(SplitVertex(from.point, from.outTangent,
-                                              to.inTangent, to.point,
-                                              (tLo + tHi) * 0.5f));
+        resultVertices.push_back(SplitVertex(from.point, from.outTangent,
+                                             to.inTangent, to.point,
+                                             (tLo + tHi) * 0.5f));
     }
-    return result;
+    return MakeSingleContour(std::move(resultVertices), contour->closed);
 }
 
 }  // namespace motion

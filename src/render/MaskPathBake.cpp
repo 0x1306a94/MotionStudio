@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <vector>
 
+#include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -16,11 +18,11 @@ namespace {
 
 BezierPath FallbackMaskPath() {
     BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{-100, -100}, {}, {}});
-    path.vertices.push_back({{100, -100}, {}, {}});
-    path.vertices.push_back({{100, 100}, {}, {}});
-    path.vertices.push_back({{-100, 100}, {}, {}});
+    path = MakeSingleContour({{{-100, -100}, {}, {}},
+                              {{100, -100}, {}, {}},
+                              {{100, 100}, {}, {}},
+                              {{-100, 100}, {}, {}}},
+                             true);
     return path;
 }
 
@@ -29,7 +31,8 @@ void AppendShapeGeometry(const ShapeElement &element, PreviewTime time,
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
-            geometries.push_back(MakePathGeometry(shape.path.evaluatePreview(time)));
+            geometries.push_back(
+                MakePathGeometry(CompileFillFaces(shape.path.evaluatePreview(time))));
             break;
         }
         case ShapeType::Rect: {
@@ -73,7 +76,7 @@ BezierPath BakeMaskPathFromLayer(const Layer &layer, FrameTime time) {
     }
 
     BezierPath path = ShapeGeometryToBezierPath(geometries.front());
-    if (path.vertices.empty()) {
+    if (path.contours.empty()) {
         return FallbackMaskPath();
     }
     return path;

@@ -5,6 +5,7 @@
 
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/BezierPathTransform.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -14,12 +15,14 @@
 
 using motion::ApproxEqual;
 using motion::BezierPath;
+using motion::BezierPathToVectorNetwork;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
 using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
+using motion::MakeSingleContour;
 using motion::Mat3;
 using motion::SceneEvaluator;
 using motion::SceneState;
@@ -32,10 +35,7 @@ using motion::Vec2;
 namespace {
 
 BezierPath MakeHorizontalPath() {
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{100.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    BezierPath path = MakeSingleContour({{{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{100.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     return path;
 }
 
@@ -57,7 +57,7 @@ struct TextPathScene {
         auto *pathContent = static_cast<ShapeContent *>(pathLayer->content.get());
         auto pathElement = std::make_unique<ShapePath>();
         pathShape = pathElement.get();
-        pathShape->path.setStaticValue(MakeHorizontalPath());
+        pathShape->path.setStaticValue(BezierPathToVectorNetwork(MakeHorizontalPath()));
         pathContent->geometry = std::move(pathElement);
         auto pathFill = std::make_unique<FillStyle>();
         pathFill->color.setStaticValue(Color{0, 1, 0, 1});
@@ -99,9 +99,9 @@ TEST(TextPathEvalTest, IdentityLayersKeepLocalEndpoints) {
     ASSERT_TRUE(text->textItem.has_value());
     ASSERT_TRUE(text->textItem->textPath.has_value());
     const BezierPath &path = text->textItem->textPath->path;
-    ASSERT_EQ(path.vertices.size(), 2u);
-    EXPECT_TRUE(ApproxEqual(path.vertices[0].point, {0.0f, 0.0f}));
-    EXPECT_TRUE(ApproxEqual(path.vertices[1].point, {100.0f, 0.0f}));
+    ASSERT_EQ(path.contours[0].vertices.size(), 2u);
+    EXPECT_TRUE(ApproxEqual(path.contours[0].vertices[0].point, {0.0f, 0.0f}));
+    EXPECT_TRUE(ApproxEqual(path.contours[0].vertices[1].point, {100.0f, 0.0f}));
 }
 
 TEST(TextPathEvalTest, PathLayerTranslationChangesLocalPoints) {
@@ -113,9 +113,9 @@ TEST(TextPathEvalTest, PathLayerTranslationChangesLocalPoints) {
     ASSERT_NE(text, nullptr);
     ASSERT_TRUE(text->textItem->textPath.has_value());
     const BezierPath &path = text->textItem->textPath->path;
-    ASSERT_EQ(path.vertices.size(), 2u);
-    EXPECT_TRUE(ApproxEqual(path.vertices[0].point, {30.0f, 10.0f}));
-    EXPECT_TRUE(ApproxEqual(path.vertices[1].point, {130.0f, 10.0f}));
+    ASSERT_EQ(path.contours[0].vertices.size(), 2u);
+    EXPECT_TRUE(ApproxEqual(path.contours[0].vertices[0].point, {30.0f, 10.0f}));
+    EXPECT_TRUE(ApproxEqual(path.contours[0].vertices[1].point, {130.0f, 10.0f}));
 }
 
 TEST(TextPathEvalTest, HiddenPathLayerStillEvaluatesTextPath) {
@@ -128,7 +128,7 @@ TEST(TextPathEvalTest, HiddenPathLayerStillEvaluatesTextPath) {
     ASSERT_NE(text, nullptr);
     ASSERT_TRUE(text->textItem.has_value());
     ASSERT_TRUE(text->textItem->textPath.has_value());
-    EXPECT_EQ(text->textItem->textPath->path.vertices.size(), 2u);
+    EXPECT_EQ(text->textItem->textPath->path.contours[0].vertices.size(), 2u);
 }
 
 TEST(TextPathEvalTest, SelfReferenceYieldsNoTextPath) {
@@ -143,12 +143,11 @@ TEST(TextPathEvalTest, SelfReferenceYieldsNoTextPath) {
 }
 
 TEST(TextPathEvalTest, TransformBezierPathMapsTangentsWithoutTranslation) {
-    BezierPath path;
-    path.vertices.push_back({{10.0f, 0.0f}, {0.0f, 5.0f}, {2.0f, 0.0f}});
+    BezierPath path = MakeSingleContour({{{10.0f, 0.0f}, {0.0f, 5.0f}, {2.0f, 0.0f}}}, false);
     const Mat3 matrix = Mat3::Translate({100.0f, 50.0f}) * Mat3::Scale({2.0f, 2.0f});
     const BezierPath transformed = TransformBezierPath(path, matrix);
-    ASSERT_EQ(transformed.vertices.size(), 1u);
-    EXPECT_TRUE(ApproxEqual(transformed.vertices[0].point, {120.0f, 50.0f}));
-    EXPECT_TRUE(ApproxEqual(transformed.vertices[0].inTangent, {0.0f, 10.0f}));
-    EXPECT_TRUE(ApproxEqual(transformed.vertices[0].outTangent, {4.0f, 0.0f}));
+    ASSERT_EQ(transformed.contours[0].vertices.size(), 1u);
+    EXPECT_TRUE(ApproxEqual(transformed.contours[0].vertices[0].point, {120.0f, 50.0f}));
+    EXPECT_TRUE(ApproxEqual(transformed.contours[0].vertices[0].inTangent, {0.0f, 10.0f}));
+    EXPECT_TRUE(ApproxEqual(transformed.contours[0].vertices[0].outTangent, {4.0f, 0.0f}));
 }

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "MotionStudio/common/VectorNetworkCompile.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerType.h"
@@ -21,7 +23,7 @@ BezierPath BakePathAtFrame(const ShapeElement &element, FrameTime frame) {
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
-            return shape.path.evaluate(frame);
+            return CompileFillFaces(shape.path.evaluate(frame));
         }
         case ShapeType::Rect: {
             const auto &shape = static_cast<const ShapeRect &>(element);
@@ -89,13 +91,13 @@ void ConvertGeometryToPathCommand::execute(Document &document) {
     }
 
     BezierPath baked = BakePathAtFrame(*content->geometry, frame_);
-    if (baked.vertices.empty()) {
+    if (baked.contours.empty()) {
         return;
     }
 
     auto pathShape = std::make_unique<ShapePath>();
     pathShape->id = content->geometry->id;
-    pathShape->path.setStaticValue(std::move(baked));
+    pathShape->path.setStaticValue(BezierPathToVectorNetwork(baked));
 
     stashed_ = std::move(content->geometry);
     content->geometry = std::move(pathShape);

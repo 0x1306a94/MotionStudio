@@ -65,7 +65,11 @@ bool ApplyStaticValueAny(AnimatableBase *target, const PropertyValue &newValue,
                                     oldValue);
         }
         case AnimatableType::BezierPath: {
-            return ApplyStaticValue(static_cast<Animatable<BezierPath> *>(target),
+            // Authoring properties use VectorNetwork; BezierPath Animatables are export-only.
+            return false;
+        }
+        case AnimatableType::VectorNetwork: {
+            return ApplyStaticValue(static_cast<Animatable<VectorNetwork> *>(target),
                                     newValue, oldValue);
         }
         case AnimatableType::String: {
@@ -88,7 +92,10 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase *target, FrameTime ti
             return TakeKeyframeTyped(static_cast<Animatable<Color> *>(target), time);
         }
         case AnimatableType::BezierPath: {
-            return TakeKeyframeTyped(static_cast<Animatable<BezierPath> *>(target), time);
+            return std::nullopt;
+        }
+        case AnimatableType::VectorNetwork: {
+            return TakeKeyframeTyped(static_cast<Animatable<VectorNetwork> *>(target), time);
         }
         case AnimatableType::String: {
             return TakeKeyframeTyped(static_cast<Animatable<std::string> *>(target), time);
@@ -98,7 +105,7 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase *target, FrameTime ti
 }
 
 void AddKeyframeAny(AnimatableBase *target, const KeyframeData &keyframe) {
-    // Variant alternative order: float / Vec2 / Color / BezierPath / std::string.
+    // Variant alternative order: float / Vec2 / Color / VectorNetwork / std::string.
     // Silently skip when keyframe type does not match property type.
     switch (keyframe.index()) {
         case 0: {
@@ -120,8 +127,8 @@ void AddKeyframeAny(AnimatableBase *target, const KeyframeData &keyframe) {
             break;
         }
         case 3: {
-            if (target->valueType() == AnimatableType::BezierPath) {
-                static_cast<Animatable<BezierPath> *>(target)->addKeyframe(
+            if (target->valueType() == AnimatableType::VectorNetwork) {
+                static_cast<Animatable<VectorNetwork> *>(target)->addKeyframe(
                     std::get<3>(keyframe));
             }
             break;
@@ -197,7 +204,10 @@ bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing
                                oldEasingOut);
         }
         case AnimatableType::BezierPath: {
-            return ApplyEasing(static_cast<Animatable<BezierPath> *>(target), time,
+            return false;
+        }
+        case AnimatableType::VectorNetwork: {
+            return ApplyEasing(static_cast<Animatable<VectorNetwork> *>(target), time,
                                easing, oldEasingOut);
         }
         case AnimatableType::String: {

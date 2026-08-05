@@ -6,6 +6,7 @@
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
@@ -25,6 +26,8 @@ struct EvaluatedLayer {
     float opacity = 1;  // inherited from ancestors
     BlendMode blendMode = BlendMode::Normal;
     std::vector<EvaluatedShapeItem> shapeItems;
+    // Authoring network for ShapePath layers (empty for Rect/Ellipse/etc.).
+    VectorNetwork shapeNetwork;
     std::optional<EvaluatedImageItem> imageItem;
     std::optional<EvaluatedTextItem> textItem;
     std::vector<EvaluatedMask> masks;

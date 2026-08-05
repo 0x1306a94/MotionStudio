@@ -11,6 +11,7 @@
 
 using motion::BezierPath;
 using motion::LayoutTextOnPath;
+using motion::MakeSingleContour;
 using motion::MeasurePointTextSize;
 using motion::MeasureTextPathBounds;
 using motion::TextAlign;
@@ -22,10 +23,7 @@ using motion::Vec2;
 namespace {
 
 BezierPath MakeHorizontalPath(float length = 100.0f) {
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    path.vertices.push_back({{length, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
+    BezierPath path = MakeSingleContour({{{0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{length, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     return path;
 }
 
@@ -77,11 +75,9 @@ TEST(TextPathLayoutTest, EmptyPathYieldsNoGlyphs) {
 }
 
 TEST(TextPathLayoutTest, ArcPathBoundsDifferFromPointTextBox) {
-    BezierPath arc;
-    arc.closed = false;
-    // Approximate quarter circle (0,100) → (100,0) with cubic handles.
-    arc.vertices.push_back({{0.0f, 100.0f}, {0.0f, 0.0f}, {55.0f, 0.0f}});
-    arc.vertices.push_back({{100.0f, 0.0f}, {0.0f, 55.0f}, {0.0f, 0.0f}});
+    BezierPath arc = MakeSingleContour({{{0.0f, 100.0f}, {0.0f, 0.0f}, {55.0f, 0.0f}},
+                                        {{100.0f, 0.0f}, {0.0f, 55.0f}, {0.0f, 0.0f}}},
+                                       false);
 
     const TextPathBounds pathBounds =
         MeasureTextPathBounds("Hello", 24.0f, TextAlign::Left, "Helvetica", "", arc, false, true,
@@ -108,11 +104,7 @@ TEST(TextPathLayoutTest, HorizontalPathBaselineNearBoundsBottom) {
 }
 
 TEST(TextPathLayoutTest, VerticalPathKeepsBaselineCenterOnPath) {
-    BezierPath vertical;
-    vertical.closed = false;
-    vertical.vertices.push_back({{50.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-    vertical.vertices.push_back({{50.0f, 200.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}});
-
+    BezierPath vertical = MakeSingleContour({{{50.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}, {{50.0f, 200.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}}}, false);
     TextPathLayoutInput input = MakeInput("AB");
     input.path = vertical;
     const TextPathLayoutResult result = LayoutTextOnPath(input);

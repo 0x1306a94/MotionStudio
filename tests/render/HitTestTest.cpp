@@ -14,6 +14,7 @@ using motion::HitTestLayer;
 using motion::HitTestLayerAtPoint;
 using motion::MakePathGeometry;
 using motion::MakeRectGeometry;
+using motion::MakeSingleContour;
 using motion::Paint;
 using motion::SceneState;
 using motion::Vec2;
@@ -56,10 +57,7 @@ TEST(HitTestTest, HitsStrokeWithinTolerance) {
     EvaluatedShapeItem item;
     item.isStroke = true;
     item.stroke.width = 4;
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{100, 0}, {}, {}});
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{100, 0}, {}, {}}}, false);
     item.geometry = MakePathGeometry(std::move(path));
     layer.shapeItems.push_back(item);
 

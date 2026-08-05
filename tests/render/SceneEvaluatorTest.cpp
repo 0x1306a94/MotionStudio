@@ -4,6 +4,7 @@
 
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
@@ -16,14 +17,17 @@
 #include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::BezierPath;
+using motion::BezierPathToVectorNetwork;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
 using motion::EntityId;
+using motion::EvaluatedShapeItem;
 using motion::Expected;
 using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
+using motion::MakeSingleContour;
 using motion::Mat3;
 using motion::SceneEvaluator;
 using motion::SceneState;
@@ -33,6 +37,7 @@ using motion::ShapePath;
 using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::Vec2;
+using motion::VectorNetwork;
 
 namespace {
 
@@ -70,10 +75,7 @@ struct RectScene {
 };
 
 BezierPath MakeShiftedSegment(float x0, float x1) {
-    BezierPath path;
-    path.closed = false;
-    path.vertices.push_back({{x0, 0}, {0, 0}, {0, 0}});
-    path.vertices.push_back({{x1, 0}, {0, 0}, {0, 0}});
+    BezierPath path = MakeSingleContour({{{x0, 0}, {0, 0}, {0, 0}}, {{x1, 0}, {0, 0}, {0, 0}}}, false);
     return path;
 }
 
@@ -375,12 +377,8 @@ TEST(SceneEvaluatorTest, PreviewEvaluatesFractionalTransformTime) {
 TEST(SceneEvaluatorTest, EvaluatesMaskScalars) {
     RectScene scene;
     motion::Mask mask;
-    motion::BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{10, 0}, {}, {}});
-    path.vertices.push_back({{10, 10}, {}, {}});
-    mask.path.setStaticValue(path);
+    motion::BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{10, 10}, {}, {}}}, true);
+    mask.path.setStaticValue(BezierPathToVectorNetwork(path));
     mask.mode = motion::MaskMode::Intersect;
     mask.opacity.setStaticValue(0.5f);
     mask.inverted = true;
@@ -398,7 +396,7 @@ TEST(SceneEvaluatorTest, EvaluatesMaskScalars) {
     EXPECT_TRUE(evaluatedMask.inverted);
     EXPECT_FLOAT_EQ(evaluatedMask.feather, 3.0f);
     EXPECT_FLOAT_EQ(evaluatedMask.expansion, -2.0f);
-    EXPECT_EQ(evaluatedMask.path.vertices.size(), 3u);
+    EXPECT_EQ(evaluatedMask.path.contours[0].vertices.size(), 3u);
 }
 
 TEST(SceneEvaluatorTest, ResolvesTrackMatteAndMarksSource) {
@@ -454,12 +452,19 @@ TEST(SceneEvaluatorTest, SelfTrackMatteIsIgnored) {
 
 TEST(SceneEvaluatorTest, AnimatedShapePathMorphsBetweenKeyframes) {
     PathScene scene;
-    motion::Keyframe<BezierPath> from;
+    // Open segments have no fill faces; morph shows up on stroke edges.
+    scene.layer->styles.clear();
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(Color{1, 0, 0, 1});
+    stroke->width.setStaticValue(2.0f);
+    scene.layer->styles.push_back(std::move(stroke));
+
+    motion::Keyframe<VectorNetwork> from;
     from.time = 0;
-    from.value = MakeShiftedSegment(0, 10);
-    motion::Keyframe<BezierPath> to;
+    from.value = BezierPathToVectorNetwork(MakeShiftedSegment(0, 10));
+    motion::Keyframe<VectorNetwork> to;
     to.time = 20;
-    to.value = MakeShiftedSegment(20, 30);
+    to.value = BezierPathToVectorNetwork(MakeShiftedSegment(20, 30));
     scene.pathShape->path.addKeyframe(from);
     scene.pathShape->path.addKeyframe(to);
 
@@ -467,10 +472,57 @@ TEST(SceneEvaluatorTest, AnimatedShapePathMorphsBetweenKeyframes) {
     ASSERT_TRUE(mid.hasValue());
     ASSERT_EQ(mid->layers.size(), 1u);
     ASSERT_FALSE(mid->layers[0].shapeItems.empty());
+    EXPECT_TRUE(mid->layers[0].shapeItems[0].isStroke);
 
-    const BezierPath baked =
-        motion::ShapeGeometryToBezierPath(mid->layers[0].shapeItems[0].geometry);
-    ASSERT_EQ(baked.vertices.size(), 2u);
-    EXPECT_FLOAT_EQ(baked.vertices[0].point.x, 10.0f);
-    EXPECT_FLOAT_EQ(baked.vertices[1].point.x, 20.0f);
+    const BezierPath stroked =
+        motion::ShapeGeometryStrokePath(mid->layers[0].shapeItems[0].geometry);
+    ASSERT_EQ(stroked.contours.size(), 1u);
+    ASSERT_EQ(stroked.contours[0].vertices.size(), 2u);
+    EXPECT_FLOAT_EQ(stroked.contours[0].vertices[0].point.x, 10.0f);
+    EXPECT_FLOAT_EQ(stroked.contours[0].vertices[1].point.x, 20.0f);
+}
+
+TEST(SceneEvaluatorTest, TriangleFanFillAndStrokeContours) {
+    PathScene scene;
+    scene.layer->styles.clear();
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{1, 0, 0, 1});
+    scene.layer->styles.push_back(std::move(fill));
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(Color{0, 0, 0, 1});
+    stroke->width.setStaticValue(1.0f);
+    scene.layer->styles.push_back(std::move(stroke));
+
+    VectorNetwork network;
+    network.vertices = {
+        {1, {0, 2}},
+        {2, {6, 0}},
+        {3, {0, 8}},
+        {4, {-6, 0}},
+    };
+    network.edges = {
+        {1, 1, 2, {}, {}},
+        {2, 1, 3, {}, {}},
+        {3, 1, 4, {}, {}},
+        {4, 2, 3, {}, {}},
+        {5, 3, 4, {}, {}},
+        {6, 4, 2, {}, {}},
+    };
+    scene.pathShape->path.setStaticValue(network);
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers.size(), 1u);
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
+
+    const EvaluatedShapeItem &fillItem = result->layers[0].shapeItems[0];
+    const EvaluatedShapeItem &strokeItem = result->layers[0].shapeItems[1];
+    EXPECT_FALSE(fillItem.isStroke);
+    EXPECT_TRUE(strokeItem.isStroke);
+    EXPECT_EQ(fillItem.geometry.path.contours.size(), 3u);
+    for (const BezierPath::Contour &contour : fillItem.geometry.path.contours) {
+        EXPECT_TRUE(contour.closed);
+        EXPECT_EQ(contour.vertices.size(), 3u);
+    }
+    EXPECT_EQ(strokeItem.geometry.strokePath.contours.size(), 6u);
 }

@@ -24,9 +24,17 @@ struct BezierPath {
         bool operator!=(const Vertex &other) const;
     };
 
-    std::vector<Vertex> vertices;
-    // True if the last vertex connects back to the first, forming a closed loop.
-    bool closed = false;
+    // A single connected ring of vertices, either open or closed.
+    struct Contour {
+        std::vector<Vertex> vertices;
+        // True if the last vertex connects back to the first, forming a closed loop.
+        bool closed = false;
+
+        bool operator==(const Contour &other) const;
+        bool operator!=(const Contour &other) const;
+    };
+
+    std::vector<Contour> contours;
 
     // True when the path collapses to a point (width and height both zero),
     // including empty paths. Hairlines (zero on only one axis) return false.
@@ -35,5 +43,15 @@ struct BezierPath {
     bool operator==(const BezierPath &other) const;
     bool operator!=(const BezierPath &other) const;
 };
+
+// Builds a BezierPath consisting of a single contour with the given vertices.
+BezierPath MakeSingleContour(std::vector<BezierPath::Vertex> vertices, bool closed);
+
+// True if the path has exactly one contour.
+bool IsSingleContour(const BezierPath &path);
+
+// Returns the first contour, or nullptr if the path has no contours.
+const BezierPath::Contour *PrimaryContour(const BezierPath &path);
+BezierPath::Contour *PrimaryContour(BezierPath &path);
 
 }  // namespace motion

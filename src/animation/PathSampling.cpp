@@ -28,11 +28,15 @@ Vec2 CubicBezierTangent(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, float t) {
 }
 
 size_t SegmentCount(const BezierPath &path) {
-    const size_t count = path.vertices.size();
+    const BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr) {
+        return 0;
+    }
+    const size_t count = contour->vertices.size();
     if (count < 2) {
         return 0;
     }
-    if (path.closed) {
+    if (contour->closed) {
         return count;
     }
     return count - 1;
@@ -40,9 +44,10 @@ size_t SegmentCount(const BezierPath &path) {
 
 void SegmentControlPoints(const BezierPath &path, size_t segmentIndex, Vec2 &p0, Vec2 &p1,
                           Vec2 &p2, Vec2 &p3) {
-    const size_t count = path.vertices.size();
-    const BezierPath::Vertex &from = path.vertices[segmentIndex];
-    const BezierPath::Vertex &to = path.vertices[(segmentIndex + 1) % count];
+    const BezierPath::Contour *contour = PrimaryContour(path);
+    const size_t count = contour->vertices.size();
+    const BezierPath::Vertex &from = contour->vertices[segmentIndex];
+    const BezierPath::Vertex &to = contour->vertices[(segmentIndex + 1) % count];
     p0 = from.point;
     p1 = from.point + from.outTangent;
     p2 = to.point + to.inTangent;
@@ -80,10 +85,11 @@ float PathArcLength(const BezierPath &path) {
 PathSample PointAndTangentAtArcLength(const BezierPath &path, float arcLength) {
     PathSample sample;
     sample.tangent = {1.0f, 0.0f};
-    if (path.vertices.empty()) {
+    const BezierPath::Contour *contour = PrimaryContour(path);
+    if (contour == nullptr || contour->vertices.empty()) {
         return sample;
     }
-    sample.point = path.vertices.front().point;
+    sample.point = contour->vertices.front().point;
 
     const size_t segments = SegmentCount(path);
     if (segments == 0) {

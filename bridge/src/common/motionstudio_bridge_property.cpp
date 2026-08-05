@@ -42,7 +42,24 @@ const Keyframe<T> *KeyframeAt(const Animatable<T> *property, int index) {
 MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *path) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
-    return property != nullptr ? static_cast<MS_VALUE>(property->valueType()) : MS_VALUE_INVALID;
+    if (property == nullptr) {
+        return MS_VALUE_INVALID;
+    }
+    switch (property->valueType()) {
+        case AnimatableType::Float:
+            return MS_VALUE_FLOAT;
+        case AnimatableType::Vec2:
+            return MS_VALUE_VEC2;
+        case AnimatableType::Color:
+            return MS_VALUE_COLOR;
+        case AnimatableType::BezierPath:
+        case AnimatableType::VectorNetwork:
+            // Bridge ABI still exposes path properties as MSBezierPath until Task 9.
+            return MS_VALUE_BEZIER_PATH;
+        case AnimatableType::String:
+            return MS_VALUE_STRING;
+    }
+    return MS_VALUE_INVALID;
 }
 
 bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char *path) {
@@ -62,7 +79,10 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
             return AsColor(property)->isAnimated();
         }
         case AnimatableType::BezierPath: {
-            return static_cast<const Animatable<motion::BezierPath> *>(property)->isAnimated();
+            return false;
+        }
+        case AnimatableType::VectorNetwork: {
+            return static_cast<const Animatable<motion::VectorNetwork> *>(property)->isAnimated();
         }
         case AnimatableType::String: {
             return static_cast<const Animatable<std::string> *>(property)->isAnimated();
@@ -125,11 +145,22 @@ char *ms_property_static_string(MSDocument *document, uint64_t entityId, const c
 
 MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path) {
     DocumentLock guard(document);
-    const Animatable<motion::BezierPath> *property = AsBezierPath(FindProperty(document, entityId, path));
+    const Animatable<motion::VectorNetwork> *property = AsVectorNetwork(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return nullptr;
     }
-    return AllocateMSBezierPath(property->staticValue());
+    return AllocateMSBezierPath(BridgePathFromNetwork(property->staticValue()));
+}
+
+MSVectorNetwork *ms_property_static_vector_network(MSDocument *document, uint64_t entityId,
+                                                   const char *path) {
+    DocumentLock guard(document);
+    const Animatable<motion::VectorNetwork> *property =
+        AsVectorNetwork(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSVectorNetwork(property->staticValue());
 }
 
 int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const char *path) {
@@ -149,7 +180,10 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
             return static_cast<int>(AsColor(property)->keyframes().size());
         }
         case AnimatableType::BezierPath: {
-            return static_cast<int>(static_cast<const Animatable<motion::BezierPath> *>(property)->keyframes().size());
+            return 0;
+        }
+        case AnimatableType::VectorNetwork: {
+            return static_cast<int>(static_cast<const Animatable<motion::VectorNetwork> *>(property)->keyframes().size());
         }
         case AnimatableType::String: {
             return static_cast<int>(static_cast<const Animatable<std::string> *>(property)->keyframes().size());
@@ -173,7 +207,7 @@ int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, co
     if (colorKey != nullptr) {
         return colorKey->time;
     }
-    const Keyframe<motion::BezierPath> *pathKey = KeyframeAt(AsBezierPath(property), index);
+    const Keyframe<motion::VectorNetwork> *pathKey = KeyframeAt(AsVectorNetwork(property), index);
     if (pathKey != nullptr) {
         return pathKey->time;
     }
@@ -216,7 +250,7 @@ MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId
     if (colorKey != nullptr) {
         easing = &colorKey->easing;
     }
-    const Keyframe<motion::BezierPath> *pathKey = KeyframeAt(AsBezierPath(property), index);
+    const Keyframe<motion::VectorNetwork> *pathKey = KeyframeAt(AsVectorNetwork(property), index);
     if (pathKey != nullptr) {
         easing = &pathKey->easing;
     }
@@ -280,7 +314,7 @@ MSBezierPath *ms_property_build_motion_path(MSDocument *document, uint64_t entit
         return nullptr;
     }
     motion::BezierPath built = motion::BuildMotionPath(*property);
-    if (built.vertices.empty()) {
+    if (built.contours.empty()) {
         return nullptr;
     }
     return AllocateMSBezierPath(built);
@@ -331,9 +365,20 @@ void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const c
 MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
                                                int64_t frame) {
     DocumentLock guard(document);
-    const Animatable<motion::BezierPath> *property = AsBezierPath(FindProperty(document, entityId, path));
+    const Animatable<motion::VectorNetwork> *property = AsVectorNetwork(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return nullptr;
     }
-    return AllocateMSBezierPath(property->evaluate(static_cast<FrameTime>(frame)));
+    return AllocateMSBezierPath(BridgePathFromNetwork(property->evaluate(static_cast<FrameTime>(frame))));
+}
+
+MSVectorNetwork *ms_property_evaluate_vector_network(MSDocument *document, uint64_t entityId,
+                                                     const char *path, int64_t frame) {
+    DocumentLock guard(document);
+    const Animatable<motion::VectorNetwork> *property =
+        AsVectorNetwork(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return nullptr;
+    }
+    return AllocateMSVectorNetwork(property->evaluate(static_cast<FrameTime>(frame)));
 }

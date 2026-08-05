@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
@@ -44,7 +46,9 @@ using motion::AddLayerStyleCommand;
 using motion::AddMaskCommand;
 using motion::Animatable;
 using motion::BezierPath;
+using motion::BezierPathToVectorNetwork;
 using motion::Color;
+using motion::CompileFillFaces;
 using motion::Composition;
 using motion::ConvertGeometryToPathCommand;
 using motion::Document;
@@ -55,6 +59,7 @@ using motion::Keyframe;
 using motion::KeyframeData;
 using motion::Layer;
 using motion::LayerType;
+using motion::MakeSingleContour;
 using motion::Mask;
 using motion::MaskMode;
 using motion::MoveKeyframeCommand;
@@ -86,6 +91,7 @@ using motion::TextContent;
 using motion::TrackMatteType;
 using motion::UndoManager;
 using motion::Vec2;
+using motion::VectorNetwork;
 
 namespace {
 
@@ -598,12 +604,8 @@ namespace {
 Mask MakeTestMask(MaskMode mode) {
     Mask mask;
     mask.mode = mode;
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{10, 0}, {}, {}});
-    path.vertices.push_back({{10, 10}, {}, {}});
-    mask.path.setStaticValue(path);
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{10, 10}, {}, {}}}, true);
+    mask.path.setStaticValue(BezierPathToVectorNetwork(path));
     return mask;
 }
 
@@ -796,8 +798,10 @@ TEST(ConvertGeometryToPathCommandTest, BakesRectAndUndoes) {
     EXPECT_EQ(content->geometry->type(), ShapeType::Path);
     EXPECT_EQ(content->geometry->id, shapeId);
     auto *path = static_cast<ShapePath *>(content->geometry.get());
-    EXPECT_TRUE(path->path.staticValue().closed);
-    EXPECT_GE(path->path.staticValue().vertices.size(), 4u);
+    const BezierPath baked = CompileFillFaces(path->path.staticValue());
+    ASSERT_FALSE(baked.contours.empty());
+    EXPECT_TRUE(baked.contours[0].closed);
+    EXPECT_GE(baked.contours[0].vertices.size(), 4u);
     EXPECT_NE(scene.document.entityIndex().findShape(shapeId), nullptr);
 
     scene.undo.undo(scene.document);
@@ -821,18 +825,15 @@ TEST(ConvertGeometryToPathCommandTest, BakesEllipse) {
     ASSERT_NE(content->geometry, nullptr);
     EXPECT_EQ(content->geometry->type(), ShapeType::Path);
     auto *path = static_cast<ShapePath *>(content->geometry.get());
-    EXPECT_EQ(path->path.staticValue().vertices.size(), 4u);
+    EXPECT_EQ(CompileFillFaces(path->path.staticValue()).contours[0].vertices.size(), 4u);
 }
 
 TEST(ConvertGeometryToPathCommandTest, PathIsNoOp) {
     Scene scene;
     auto *content = static_cast<ShapeContent *>(scene.layer->content.get());
     auto pathShape = std::make_unique<ShapePath>();
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{1, 0}, {}, {}});
-    pathShape->path.setStaticValue(path);
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{1, 0}, {}, {}}}, true);
+    pathShape->path.setStaticValue(BezierPathToVectorNetwork(path));
     content->geometry = std::move(pathShape);
     scene.document.refreshEntityIndex();
 
@@ -854,10 +855,9 @@ TEST(AddKeyframeCommandTest, BezierPathAddAndUndo) {
     scene.document.refreshEntityIndex();
 
     PropertyPath property{scene.layer->id, "path"};
-    BezierPath value;
-    value.vertices.push_back({{1, 2}, {}, {}});
-    value.vertices.push_back({{3, 4}, {}, {}});
-    Keyframe<BezierPath> keyframe;
+    VectorNetwork value =
+        BezierPathToVectorNetwork(MakeSingleContour({{{1, 2}, {}, {}}, {{3, 4}, {}, {}}}, false));
+    Keyframe<VectorNetwork> keyframe;
     keyframe.time = 12;
     keyframe.value = value;
 
@@ -878,15 +878,14 @@ TEST(RemoveKeyframeCommandTest, BezierPathRemoveAndUndo) {
     content->geometry = std::move(pathShape);
     scene.document.refreshEntityIndex();
 
-    BezierPath a;
-    a.vertices.push_back({{0, 0}, {}, {}});
-    a.vertices.push_back({{10, 0}, {}, {}});
-    BezierPath b = a;
+    VectorNetwork a =
+        BezierPathToVectorNetwork(MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}}, false));
+    VectorNetwork b = a;
     b.vertices[1].point = {20, 0};
-    Keyframe<BezierPath> kf0;
+    Keyframe<VectorNetwork> kf0;
     kf0.time = 0;
     kf0.value = a;
-    Keyframe<BezierPath> kf1;
+    Keyframe<VectorNetwork> kf1;
     kf1.time = 10;
     kf1.value = b;
     pathPtr->path.addKeyframe(kf0);

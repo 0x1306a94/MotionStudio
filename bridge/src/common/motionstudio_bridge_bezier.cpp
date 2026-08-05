@@ -21,6 +21,15 @@ void ms_bezier_path_free(MSBezierPath *path) {
     free(path);
 }
 
+void ms_vector_network_free(MSVectorNetwork *network) {
+    if (network == nullptr) {
+        return;
+    }
+    free(network->vertices);
+    free(network->edges);
+    free(network);
+}
+
 MSBezierPath *ms_bezier_move_vertex(const MSBezierPath *path, size_t index, float x, float y,
                                     bool linkedHandles) {
     if (path == nullptr) {

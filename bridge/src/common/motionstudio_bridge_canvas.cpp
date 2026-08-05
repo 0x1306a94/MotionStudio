@@ -64,6 +64,9 @@ MS_PATH_HANDLE ToMSPathHandle(motion::PathHandleKind kind) {
         case motion::PathHandleKind::CloseRing: {
             return MS_PATH_HANDLE_CLOSE_RING;
         }
+        case motion::PathHandleKind::EdgeTangent: {
+            return MS_PATH_HANDLE_EDGE_TANGENT;
+        }
     }
     return MS_PATH_HANDLE_NONE;
 }
@@ -227,6 +230,9 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document, ui
     hit.kind = ToMSPathHandle(coreHit.kind);
     hit.index = coreHit.index;
     hit.segmentT = coreHit.segmentT;
+    hit.vertexId = coreHit.vertexId;
+    hit.edgeId = coreHit.edgeId;
+    hit.atStart = coreHit.atStart;
     return hit;
 }
 

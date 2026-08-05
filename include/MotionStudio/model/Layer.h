@@ -5,10 +5,10 @@
 #include <vector>
 
 #include "MotionStudio/animation/Animatable.h"
-#include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Time.h"
+#include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FollowPath.h"
 #include "MotionStudio/model/LayerContent.h"
@@ -22,7 +22,7 @@ namespace motion {
 class Document;
 
 struct Mask {
-    Animatable<BezierPath> path;
+    Animatable<VectorNetwork> path;
     MaskMode mode = MaskMode::Add;
     Animatable<float> opacity{1.0f};
     bool inverted = false;

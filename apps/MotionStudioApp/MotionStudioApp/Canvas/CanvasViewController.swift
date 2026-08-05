@@ -82,6 +82,9 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private struct PenDragState {
         var kind: MS_PATH_HANDLE
         var index: Int
+        var vertexId: UInt32
+        var edgeId: UInt32
+        var atStart: Bool
         var linkedHandles: Bool
     }
 
@@ -1121,7 +1124,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
         if editorState.pathEditTarget == nil {
             // Blank create happens on release so a press-drag doesn't spawn a layer.
-            penPressHit = MSPathEditHit(kind: .NONE, index: 0, segmentT: 0)
+            penPressHit = MSPathEditHit(kind: .NONE, index: 0, segmentT: 0, vertexId: 0, edgeId: 0,
+                                        atStart: true)
             return
         }
         guard let target = editorState.pathEditTarget else {
@@ -1130,13 +1134,15 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         pushPathEditTarget(target)
         let hit = hitPathEdit(at: scenePoint)
         switch hit.kind {
-        case .CLOSE_RING, .VERTEX, .IN_TANGENT, .OUT_TANGENT:
+        case .CLOSE_RING, .VERTEX, .IN_TANGENT, .OUT_TANGENT, .EDGE_TANGENT:
             let dragKind: MS_PATH_HANDLE = hit.kind == .CLOSE_RING ? .VERTEX : hit.kind
+            // Chrome only — keep activeVertexId until click-without-drag resolves.
             var next = target
             next.selectedVertex = Int(hit.index)
             editorState.pathEditTarget = next
-            penDrag = PenDragState(kind: dragKind, index: Int(hit.index), linkedHandles: !alternate)
-            // Remember CloseRing so a click-without-drag still closes the path.
+            penDrag = PenDragState(kind: dragKind, index: Int(hit.index), vertexId: hit.vertexId,
+                                   edgeId: hit.edgeId, atStart: hit.atStart,
+                                   linkedHandles: !alternate)
             penPressHit = hit
             updatePathEditChrome()
             requestDraw()
@@ -1166,32 +1172,92 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     private func applyPenClick(hit: MSPathEditHit, target: inout PathEditTarget, scenePoint: CGPoint) {
         switch hit.kind {
-        case .CLOSE_RING:
-            performPenEdit("Close Path") {
-                document.core.pathEditClose(layerID: target.layerID, kind: target.kind,
-                                            maskIndex: target.maskIndex, frame: evaluationFrame)
-            }
-            target.selectedVertex = -1
-            editorState.pathEditTarget = target
         case .SEGMENT:
+            var newId: UInt32 = 0
             performPenEdit("Insert Vertex") {
-                document.core.pathEditInsertOnSegment(layerID: target.layerID, kind: target.kind,
-                                                      maskIndex: target.maskIndex,
-                                                      frame: evaluationFrame,
-                                                      segmentIndex: Int(hit.index),
-                                                      t: hit.segmentT)
+                newId = document.core.networkEditInsertOnEdge(layerID: target.layerID,
+                                                              kind: target.kind,
+                                                              maskIndex: target.maskIndex,
+                                                              frame: evaluationFrame,
+                                                              edgeId: hit.edgeId,
+                                                              t: hit.segmentT)
             }
-            target.selectedVertex = Int(hit.index) + 1
+            if newId != 0 {
+                let index = document.core.networkVertexIndex(entityID: target.layerID,
+                                                             path: target.propertyPath,
+                                                             frame: evaluationFrame,
+                                                             vertexId: newId)
+                target.selectVertex(id: newId, index: index, drawing: true)
+            }
             editorState.pathEditTarget = target
-        case .VERTEX, .IN_TANGENT, .OUT_TANGENT:
-            target.selectedVertex = Int(hit.index)
+        case .VERTEX, .CLOSE_RING, .IN_TANGENT, .OUT_TANGENT, .EDGE_TANGENT:
+            let vertexId = hit.vertexId
+            let index = Int(hit.index)
+            if target.drawing {
+                if vertexId != 0, vertexId == target.activeVertexId {
+                    // Click active endpoint → stop drawing, keep highlight.
+                    target.selectVertex(id: vertexId, index: index, drawing: false)
+                } else if vertexId != 0, target.activeVertexId != 0 {
+                    performPenEdit("Add Edge") {
+                        _ = document.core.networkEditAddEdge(layerID: target.layerID,
+                                                             kind: target.kind,
+                                                             maskIndex: target.maskIndex,
+                                                             frame: evaluationFrame,
+                                                             startId: target.activeVertexId,
+                                                             endId: vertexId)
+                    }
+                    target.selectVertex(id: vertexId, index: index, drawing: true)
+                } else {
+                    target.selectVertex(id: vertexId, index: index, drawing: true)
+                }
+            } else {
+                // Resume drawing from an existing vertex without creating an edge.
+                target.selectVertex(id: vertexId, index: index, drawing: true)
+            }
             editorState.pathEditTarget = target
         default:
-            performPenEdit("Add Vertex") {
-                document.core.pathEditAppendVertex(layerID: target.layerID, kind: target.kind,
-                                                   maskIndex: target.maskIndex,
-                                                   frame: evaluationFrame, scenePoint: scenePoint)
+            if target.drawing, target.activeVertexId != 0 {
+                var newId: UInt32 = 0
+                performPenEdit("Add Vertex") {
+                    newId = document.core.networkEditAddVertex(layerID: target.layerID,
+                                                               kind: target.kind,
+                                                               maskIndex: target.maskIndex,
+                                                               frame: evaluationFrame,
+                                                               scenePoint: scenePoint)
+                    if newId != 0 {
+                        _ = document.core.networkEditAddEdge(layerID: target.layerID,
+                                                             kind: target.kind,
+                                                             maskIndex: target.maskIndex,
+                                                             frame: evaluationFrame,
+                                                             startId: target.activeVertexId,
+                                                             endId: newId)
+                    }
+                }
+                if newId != 0 {
+                    let index = document.core.networkVertexIndex(entityID: target.layerID,
+                                                                 path: target.propertyPath,
+                                                                 frame: evaluationFrame,
+                                                                 vertexId: newId)
+                    target.selectVertex(id: newId, index: index, drawing: true)
+                }
+            } else {
+                var newId: UInt32 = 0
+                performPenEdit("Add Vertex") {
+                    newId = document.core.networkEditAddVertex(layerID: target.layerID,
+                                                               kind: target.kind,
+                                                               maskIndex: target.maskIndex,
+                                                               frame: evaluationFrame,
+                                                               scenePoint: scenePoint)
+                }
+                if newId != 0 {
+                    let index = document.core.networkVertexIndex(entityID: target.layerID,
+                                                                 path: target.propertyPath,
+                                                                 frame: evaluationFrame,
+                                                                 vertexId: newId)
+                    target.selectVertex(id: newId, index: index, drawing: true)
+                }
             }
+            editorState.pathEditTarget = target
         }
     }
 
@@ -1208,12 +1274,15 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let hit = penPressHit
         penDrag = nil
         if pressedHandle {
-            // Vertex/tangent already selected on press; CloseRing click still closes.
-            // Double-click a vertex (not CloseRing) toggles corner ↔ smooth.
-            if let hit, hit.kind == .VERTEX || hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT {
+            // Vertex/tangent already selected on press.
+            // Double-click a vertex toggles corner ↔ smooth.
+            if let hit, hit.kind == .VERTEX || hit.kind == .IN_TANGENT || hit.kind == .OUT_TANGENT
+                || hit.kind == .CLOSE_RING || hit.kind == .EDGE_TANGENT
+            {
                 let now = CACurrentMediaTime()
                 let index = Int(hit.index)
-                if index == lastPenVertexClickIndex,
+                if hit.kind == .VERTEX || hit.kind == .CLOSE_RING,
+                   index == lastPenVertexClickIndex,
                    now - lastPenVertexClickTime <= Self.penDoubleClickInterval,
                    let target = editorState.pathEditTarget
                 {
@@ -1230,13 +1299,20 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                     requestDraw()
                     return
                 }
-                lastPenVertexClickIndex = index
-                lastPenVertexClickTime = now
+                if hit.kind == .VERTEX || hit.kind == .CLOSE_RING {
+                    lastPenVertexClickIndex = index
+                    lastPenVertexClickTime = now
+                }
+                // Apply connection / resume-drawing rules for a click without drag.
+                if var target = editorState.pathEditTarget,
+                   hit.kind == .VERTEX || hit.kind == .CLOSE_RING,
+                   let scenePoint = scenePoint(fromViewPoint: viewPoint)
+                {
+                    applyPenClick(hit: hit, target: &target, scenePoint: scenePoint)
+                    updatePathEditChrome()
+                    requestDraw()
+                }
                 return
-            }
-            if hit?.kind == .CLOSE_RING {
-                lastPenVertexClickIndex = -1
-                handlePenTap(at: viewPoint, alternate: alternate)
             }
             return
         }
@@ -1258,20 +1334,39 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let linked = !alternate
         switch penDrag.kind {
         case .VERTEX:
-            document.core.pathEditMoveVertex(layerID: target.layerID, kind: target.kind,
-                                             maskIndex: target.maskIndex, frame: evaluationFrame,
-                                             index: penDrag.index, scenePoint: scenePoint,
-                                             linkedHandles: linked)
-        case .IN_TANGENT:
-            document.core.pathEditMoveInTangent(layerID: target.layerID, kind: target.kind,
-                                                maskIndex: target.maskIndex, frame: evaluationFrame,
-                                                index: penDrag.index, scenePoint: scenePoint,
-                                                mirrorOut: linked)
-        case .OUT_TANGENT:
-            document.core.pathEditMoveOutTangent(layerID: target.layerID, kind: target.kind,
+            if penDrag.vertexId != 0 {
+                document.core.networkEditMoveVertex(layerID: target.layerID, kind: target.kind,
+                                                    maskIndex: target.maskIndex,
+                                                    frame: evaluationFrame,
+                                                    vertexId: penDrag.vertexId,
+                                                    scenePoint: scenePoint)
+            } else {
+                document.core.pathEditMoveVertex(layerID: target.layerID, kind: target.kind,
                                                  maskIndex: target.maskIndex, frame: evaluationFrame,
                                                  index: penDrag.index, scenePoint: scenePoint,
-                                                 mirrorIn: linked)
+                                                 linkedHandles: linked)
+            }
+        case .IN_TANGENT, .OUT_TANGENT, .EDGE_TANGENT:
+            if penDrag.edgeId != 0 {
+                document.core.networkEditMoveEdgeTangent(layerID: target.layerID, kind: target.kind,
+                                                         maskIndex: target.maskIndex,
+                                                         frame: evaluationFrame,
+                                                         edgeId: penDrag.edgeId,
+                                                         atStart: penDrag.atStart,
+                                                         scenePoint: scenePoint, mirror: linked)
+            } else if penDrag.kind == .IN_TANGENT {
+                document.core.pathEditMoveInTangent(layerID: target.layerID, kind: target.kind,
+                                                    maskIndex: target.maskIndex,
+                                                    frame: evaluationFrame,
+                                                    index: penDrag.index, scenePoint: scenePoint,
+                                                    mirrorOut: linked)
+            } else {
+                document.core.pathEditMoveOutTangent(layerID: target.layerID, kind: target.kind,
+                                                     maskIndex: target.maskIndex,
+                                                     frame: evaluationFrame,
+                                                     index: penDrag.index, scenePoint: scenePoint,
+                                                     mirrorIn: linked)
+            }
         default:
             return
         }
@@ -1302,11 +1397,15 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             document.core.endMergeGroup()
             return false
         }
-        document.core.pathEditAppendVertex(layerID: layerID, kind: .SHAPE, maskIndex: 0,
-                                           frame: evaluationFrame, scenePoint: scenePoint)
+        let vertexId = document.core.networkEditAddVertex(layerID: layerID, kind: .SHAPE,
+                                                          maskIndex: 0, frame: evaluationFrame,
+                                                          scenePoint: scenePoint)
         document.core.endMergeGroup()
         editorState.selectedLayerID = layerID
-        editorState.pathEditTarget = .shape(layerID: layerID, selectedVertex: 0)
+        let index = document.core.networkVertexIndex(entityID: layerID, path: ShapeProperty.path.path,
+                                                     frame: evaluationFrame, vertexId: vertexId)
+        editorState.pathEditTarget = .shape(layerID: layerID, selectedVertex: index,
+                                            activeVertexId: vertexId, drawing: true)
         registerEdit("Add Path")
         return true
     }
@@ -1321,7 +1420,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     private func hitPathEdit(at scenePoint: CGPoint) -> MSPathEditHit {
         guard let canvas else {
-            return MSPathEditHit(kind: .NONE, index: 0, segmentT: 0)
+            return MSPathEditHit(kind: .NONE, index: 0, segmentT: 0, vertexId: 0, edgeId: 0,
+                                 atStart: true)
         }
         return document.core.hitPathEdit(canvas: canvas, compositionID: compositionID,
                                          frameTime: evaluationTime, point: scenePoint)

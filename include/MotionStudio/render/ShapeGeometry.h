@@ -18,8 +18,12 @@ enum class ShapeGeometryKind {
 struct ShapeGeometry {
     ShapeGeometryKind kind = ShapeGeometryKind::Path;
 
-    // Meaningful when kind == Path.
+    // Meaningful when kind == Path. Fill faces (CompileFillFaces).
     BezierPath path;
+
+    // Meaningful when kind == Path. All network edges for stroking
+    // (CompileStrokeEdges). Empty means stroke falls back to `path`.
+    BezierPath strokePath;
 
     // Meaningful when kind == Rect or Ellipse (Lottie center + size).
     Vec2 center{};
@@ -29,7 +33,8 @@ struct ShapeGeometry {
     float cornerRadius = 0;
 
     // True when geometry collapses to a point (width and height both zero).
-    // Path uses BezierPath::isZero; Rect/Ellipse use size. Hairlines return false.
+    // Path uses BezierPath::isZero on fill and stroke; Rect/Ellipse use size.
+    // Hairlines return false.
     bool isZero() const;
 };
 
@@ -52,6 +57,10 @@ bool ShapeGeometryIsClosed(const ShapeGeometry &geometry);
 
 // Expands parametric geometry into a BezierPath for hit-testing and other
 // path-only consumers. Rect/Ellipse match the previous SceneEvaluator expansion.
+// For Path kind returns fill faces (`path`), not stroke edges.
 BezierPath ShapeGeometryToBezierPath(const ShapeGeometry &geometry);
+
+// Path to stroke: strokePath when non-empty, otherwise the fill/parametric path.
+BezierPath ShapeGeometryStrokePath(const ShapeGeometry &geometry);
 
 }  // namespace motion

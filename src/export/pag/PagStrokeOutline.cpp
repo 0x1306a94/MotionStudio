@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "MotionStudio/common/Time.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
@@ -65,7 +66,10 @@ ShapeGeometry GeometryAt(const ShapeElement &element, FrameTime time) {
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &path = static_cast<const ShapePath &>(element);
-            return MakePathGeometry(path.path.evaluatePreview(preview));
+            const VectorNetwork network = path.path.evaluatePreview(preview);
+            ShapeGeometry geometry = MakePathGeometry(CompileFillFaces(network));
+            geometry.strokePath = CompileStrokeEdges(network);
+            return geometry;
         }
         case ShapeType::Rect: {
             const auto &rect = static_cast<const ShapeRect &>(element);
@@ -91,32 +95,34 @@ bool IsStraightSegment(const BezierPath::Vertex &from, const BezierPath::Vertex 
 
 tgfx::Path BezierToTgfxPath(const BezierPath &path) {
     tgfx::Path result;
-    if (path.vertices.empty()) {
-        return result;
-    }
-    const BezierPath::Vertex &first = path.vertices.front();
-    result.moveTo(first.point.x, first.point.y);
-    for (size_t index = 1; index < path.vertices.size(); ++index) {
-        const BezierPath::Vertex &from = path.vertices[index - 1];
-        const BezierPath::Vertex &to = path.vertices[index];
-        if (IsStraightSegment(from, to)) {
-            result.lineTo(to.point.x, to.point.y);
-        } else {
-            result.cubicTo(from.point.x + from.outTangent.x, from.point.y + from.outTangent.y,
-                           to.point.x + to.inTangent.x, to.point.y + to.inTangent.y, to.point.x,
-                           to.point.y);
+    for (const BezierPath::Contour &contour : path.contours) {
+        if (contour.vertices.empty()) {
+            continue;
         }
-    }
-    if (path.closed && path.vertices.size() > 1) {
-        const BezierPath::Vertex &last = path.vertices.back();
-        if (IsStraightSegment(last, first)) {
-            result.lineTo(first.point.x, first.point.y);
-        } else {
-            result.cubicTo(last.point.x + last.outTangent.x, last.point.y + last.outTangent.y,
-                           first.point.x + first.inTangent.x, first.point.y + first.inTangent.y,
-                           first.point.x, first.point.y);
+        const BezierPath::Vertex &first = contour.vertices.front();
+        result.moveTo(first.point.x, first.point.y);
+        for (size_t index = 1; index < contour.vertices.size(); ++index) {
+            const BezierPath::Vertex &from = contour.vertices[index - 1];
+            const BezierPath::Vertex &to = contour.vertices[index];
+            if (IsStraightSegment(from, to)) {
+                result.lineTo(to.point.x, to.point.y);
+            } else {
+                result.cubicTo(from.point.x + from.outTangent.x, from.point.y + from.outTangent.y,
+                               to.point.x + to.inTangent.x, to.point.y + to.inTangent.y, to.point.x,
+                               to.point.y);
+            }
         }
-        result.close();
+        if (contour.closed && contour.vertices.size() > 1) {
+            const BezierPath::Vertex &last = contour.vertices.back();
+            if (IsStraightSegment(last, first)) {
+                result.lineTo(first.point.x, first.point.y);
+            } else {
+                result.cubicTo(last.point.x + last.outTangent.x, last.point.y + last.outTangent.y,
+                               first.point.x + first.inTangent.x, first.point.y + first.inTangent.y,
+                               first.point.x, first.point.y);
+            }
+            result.close();
+        }
     }
     return result;
 }
@@ -260,14 +266,17 @@ pag::PathHandle BakePositionedStrokeOutline(const ShapeElement &geometry, const 
     if (shape.isZero()) {
         return {};
     }
-    const BezierPath bezier = ShapeGeometryToBezierPath(shape);
-    const tgfx::Path fullPath = BezierToTgfxPath(bezier);
+    const BezierPath fillPath = ShapeGeometryToBezierPath(shape);
+    const BezierPath strokePath = ShapeGeometryStrokePath(shape);
+    const tgfx::Path fullPath = BezierToTgfxPath(fillPath);
+    const tgfx::Path strokeSource = BezierToTgfxPath(strokePath);
     // Match MS: trim the stroke geometry, boolean against the full path for Inside/Outside.
     const TrimWindow window =
         NormalizeTrimWindow(stroke.trimStart.evaluate(time), stroke.trimEnd.evaluate(time),
                             stroke.trimOffset.evaluate(time));
     const tgfx::Path strokeGeometry =
-        (window.end - window.start < 1.0f - 1e-6f) ? ApplyTrimWindow(fullPath, window) : fullPath;
+        (window.end - window.start < 1.0f - 1e-6f) ? ApplyTrimWindow(strokeSource, window)
+                                                   : strokeSource;
     const float width = stroke.width.evaluate(time);
     const tgfx::Path outline =
         BuildPositionedOutline(strokeGeometry, fullPath, width, stroke.cap, stroke.join,

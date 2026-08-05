@@ -517,7 +517,7 @@ pag::VectorComposition *PagFileBuilder::wrapCompositionWithCornerClip(
     mask->id = nextMaskId_++;
     mask->inverted = false;
     mask->maskMode = pag::MaskMode::Add;
-    mask->maskPath = ConvertPath(maskAnimatable, &warnings_, composition.id);
+    mask->maskPath = ConvertBezierPath(maskAnimatable, &warnings_, composition.id);
     mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
     mask->maskExpansion = new pag::Property<float>(0);
     wrap->masks.push_back(mask);
@@ -578,7 +578,7 @@ void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Lay
     mask->id = nextMaskId_++;
     mask->inverted = false;
     mask->maskMode = pag::MaskMode::Add;
-    mask->maskPath = ConvertPath(clipAnimatable, &warnings_, layer.id);
+    mask->maskPath = ConvertBezierPath(clipAnimatable, &warnings_, layer.id);
     mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
     mask->maskExpansion = new pag::Property<float>(0);
     pagLayer->masks.push_back(mask);
@@ -967,7 +967,7 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
             mask->id = nextMaskId_++;
             mask->inverted = false;
             mask->maskMode = pag::MaskMode::None;
-            mask->maskPath = ConvertPath(*localPath, &warnings_, layer.id);
+            mask->maskPath = ConvertBezierPath(*localPath, &warnings_, layer.id);
             mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
             mask->maskExpansion = new pag::Property<float>(0);
             pagLayer->masks.push_back(mask);

@@ -73,7 +73,15 @@ void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const 
 void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
                                        const MSBezierPath *value) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(BridgeNetworkFromPath(FromMSBezierPath(value)))));
+}
+
+void ms_command_set_static_vector_network(MSDocument *document, uint64_t entityId, const char *path,
+                                          const MSVectorNetwork *value) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::SetStaticValueCommand>(
+                MakePath(entityId, path), motion::PropertyValue(FromMSVectorNetwork(value))));
 }
 
 void ms_command_set_static_string(MSDocument *document, uint64_t entityId, const char *path,
@@ -157,7 +165,17 @@ void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId
             std::make_unique<motion::AddKeyframeCommand>(
                 MakePath(entityId, path),
                 motion::KeyframeData(
-                    MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+                    MakeKeyframe(static_cast<FrameTime>(frame), BridgeNetworkFromPath(FromMSBezierPath(value))))));
+}
+
+void ms_command_add_keyframe_vector_network(MSDocument *document, uint64_t entityId, const char *path,
+                                            int64_t frame, const MSVectorNetwork *value) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::AddKeyframeCommand>(
+                MakePath(entityId, path),
+                motion::KeyframeData(
+                    MakeKeyframe(static_cast<FrameTime>(frame), FromMSVectorNetwork(value)))));
 }
 
 void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t entityId,
@@ -165,19 +183,38 @@ void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t ent
                                               const MSBezierPath *value) {
     DocumentLock guard(document);
     AnimatableBase *property = FindProperty(document, entityId, path);
-    if (property == nullptr || property->valueType() != AnimatableType::BezierPath) {
+    if (property == nullptr || property->valueType() != AnimatableType::VectorNetwork) {
         return;
     }
-    const bool animated = static_cast<Animatable<motion::BezierPath> *>(property)->isAnimated();
+    const bool animated = static_cast<Animatable<motion::VectorNetwork> *>(property)->isAnimated();
     if (animated) {
         Execute(document,
                 std::make_unique<motion::AddKeyframeCommand>(
                     MakePath(entityId, path),
                     motion::KeyframeData(
-                        MakeKeyframe(static_cast<FrameTime>(frame), FromMSBezierPath(value)))));
+                        MakeKeyframe(static_cast<FrameTime>(frame), BridgeNetworkFromPath(FromMSBezierPath(value))))));
         return;
     }
-    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(FromMSBezierPath(value))));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(BridgeNetworkFromPath(FromMSBezierPath(value)))));
+}
+
+void ms_command_write_vector_network_at_playhead(MSDocument *document, uint64_t entityId,
+                                                 const char *path, int64_t frame,
+                                                 const MSVectorNetwork *value) {
+    DocumentLock guard(document);
+    AnimatableBase *property = FindProperty(document, entityId, path);
+    if (property == nullptr || property->valueType() != AnimatableType::VectorNetwork) {
+        return;
+    }
+    const motion::VectorNetwork network = FromMSVectorNetwork(value);
+    if (static_cast<Animatable<motion::VectorNetwork> *>(property)->isAnimated()) {
+        Execute(document,
+                std::make_unique<motion::AddKeyframeCommand>(
+                    MakePath(entityId, path),
+                    motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), network))));
+        return;
+    }
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(network)));
 }
 
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {

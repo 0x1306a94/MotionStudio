@@ -14,6 +14,7 @@ using motion::EvaluatedLayer;
 using motion::EvaluatedShapeItem;
 using motion::HitTestSelectionHandle;
 using motion::MakePathGeometry;
+using motion::MakeSingleContour;
 using motion::Mat3;
 using motion::Paint;
 using motion::SceneState;
@@ -25,12 +26,7 @@ namespace {
 
 EvaluatedShapeItem MakeUnitFill() {
     EvaluatedShapeItem item;
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{10, 0}, {}, {}});
-    path.vertices.push_back({{10, 10}, {}, {}});
-    path.vertices.push_back({{0, 10}, {}, {}});
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{10, 10}, {}, {}}, {{0, 10}, {}, {}}}, true);
     item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{1, 0, 0, 1}, motion::FillRule::NonZero};
     return item;

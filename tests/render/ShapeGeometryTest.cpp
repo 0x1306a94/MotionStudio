@@ -8,17 +8,14 @@ using motion::BezierPath;
 using motion::MakeEllipseGeometry;
 using motion::MakePathGeometry;
 using motion::MakeRectGeometry;
+using motion::MakeSingleContour;
 using motion::Vec2;
 
 TEST(ShapeGeometryTest, IsZeroForPathRectEllipse) {
-    BezierPath collapsed;
-    collapsed.vertices.push_back({{1, 2}, {}, {}});
-    collapsed.vertices.push_back({{1, 2}, {}, {}});
+    BezierPath collapsed = MakeSingleContour({{{1, 2}, {}, {}}, {{1, 2}, {}, {}}}, false);
     EXPECT_TRUE(MakePathGeometry(collapsed).isZero());
 
-    BezierPath hairline;
-    hairline.vertices.push_back({{0, 0}, {}, {}});
-    hairline.vertices.push_back({{10, 0}, {}, {}});
+    BezierPath hairline = MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}}, false);
     EXPECT_FALSE(MakePathGeometry(hairline).isZero());
 
     EXPECT_TRUE(MakeRectGeometry({0, 0}, {0, 0}).isZero());

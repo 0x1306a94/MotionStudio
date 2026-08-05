@@ -25,6 +25,7 @@ using motion::EvaluatedTextItem;
 using motion::LineCap;
 using motion::LineJoin;
 using motion::MakePathGeometry;
+using motion::MakeSingleContour;
 using motion::MaskApplyMode;
 using motion::MaskMode;
 using motion::Mat3;
@@ -38,10 +39,7 @@ namespace {
 
 EvaluatedShapeItem MakeFillItem(BlendMode blendMode = BlendMode::Normal) {
     EvaluatedShapeItem item;
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{10, 0}, {}, {}});
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}}, true);
     item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{1, 0, 0, 1}, motion::FillRule::NonZero, blendMode};
     return item;
@@ -50,9 +48,7 @@ EvaluatedShapeItem MakeFillItem(BlendMode blendMode = BlendMode::Normal) {
 EvaluatedShapeItem MakeStrokeItem(BlendMode blendMode = BlendMode::Normal) {
     EvaluatedShapeItem item;
     item.isStroke = true;
-    BezierPath path;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{10, 10}, {}, {}});
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{10, 10}, {}, {}}}, false);
     item.geometry = MakePathGeometry(std::move(path));
     item.paint = Paint{Color{0, 0, 1, 1}, motion::FillRule::NonZero, blendMode};
     item.stroke.width = 3;
@@ -175,10 +171,7 @@ TEST(CommandBuilderTest, PathMasksEmitBeginLayerAndDrawMaskPath) {
     mask.inverted = true;
     mask.feather = 4.0f;
     mask.expansion = 1.0f;
-    BezierPath path;
-    path.closed = true;
-    path.vertices.push_back({{0, 0}, {}, {}});
-    path.vertices.push_back({{5, 0}, {}, {}});
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{5, 0}, {}, {}}}, true);
     mask.path = path;
     layer.masks.push_back(mask);
     state.layers.push_back(std::move(layer));

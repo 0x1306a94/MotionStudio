@@ -178,6 +178,34 @@ typedef struct MSBezierPath {
 // Frees a path returned by this API (vertices + the struct itself).
 void ms_bezier_path_free(MSBezierPath *path);
 
+// One VectorNetwork vertex (authoring graph).
+typedef struct MSVectorNetworkVertex {
+    uint32_t id;
+    float x;
+    float y;
+} MSVectorNetworkVertex;
+
+// One directed cubic edge; tangents are Lottie-relative offsets from endpoints.
+typedef struct MSVectorNetworkEdge {
+    uint32_t id;
+    uint32_t start;
+    uint32_t end;
+    float startTangentX;
+    float startTangentY;
+    float endTangentX;
+    float endTangentY;
+} MSVectorNetworkEdge;
+
+// Heap-allocated VectorNetwork. Release with ms_vector_network_free.
+typedef struct MSVectorNetwork {
+    MSVectorNetworkVertex *vertices;
+    size_t vertexCount;
+    MSVectorNetworkEdge *edges;
+    size_t edgeCount;
+} MSVectorNetwork;
+
+void ms_vector_network_free(MSVectorNetwork *network);
+
 // Pure local-space PathGeometryEdit wrappers. Return a new heap path (free with
 // ms_bezier_path_free). NULL path / invalid index yields NULL or a copy.
 MSBezierPath *ms_bezier_move_vertex(const MSBezierPath *path, size_t index, float x, float y,
@@ -400,6 +428,9 @@ void ms_property_static_color(MSDocument *document, uint64_t entityId, const cha
 // Returns a heap-allocated path copy. Release with ms_bezier_path_free.
 // Returns NULL when the property is missing or not a BezierPath.
 MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path);
+// Authoring VectorNetwork. Release with ms_vector_network_free. NULL on miss.
+MSVectorNetwork *ms_property_static_vector_network(MSDocument *document, uint64_t entityId,
+                                                   const char *path);
 // Returns a malloc'd UTF-8 string. Release with ms_string_free.
 // Returns NULL when the property is missing or not a String.
 char *ms_property_static_string(MSDocument *document, uint64_t entityId, const char *path);
@@ -434,6 +465,9 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
 void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *r, float *g, float *b, float *a);
 // Evaluated BezierPath at frame. Release with ms_bezier_path_free. NULL on miss.
 MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
+// Evaluated VectorNetwork at frame. Release with ms_vector_network_free.
+MSVectorNetwork *ms_property_evaluate_vector_network(MSDocument *document, uint64_t entityId,
+                                                     const char *path, int64_t frame);
 
 /* ============================ commands ============================ */
 // Every function below executes a command through the document's undo
@@ -444,6 +478,8 @@ void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const c
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a);
 // value may be NULL (treated as empty open path).
 void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path, const MSBezierPath *value);
+void ms_command_set_static_vector_network(MSDocument *document, uint64_t entityId, const char *path,
+                                          const MSVectorNetwork *value);
 // value may be NULL (treated as empty string).
 void ms_command_set_static_string(MSDocument *document, uint64_t entityId, const char *path, const char *value);
 void ms_command_set_composition_background_color(MSDocument *document, uint64_t compositionId, float r, float g, float b, float a);
@@ -457,11 +493,16 @@ void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, cons
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a);
 void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSBezierPath *value);
+void ms_command_add_keyframe_vector_network(MSDocument *document, uint64_t entityId, const char *path,
+                                            int64_t frame, const MSVectorNetwork *value);
 // Writes value at playhead: static SetStaticValue when not animated, otherwise
 // AddKeyframe upsert at frame.
 void ms_command_write_bezier_path_at_playhead(MSDocument *document, uint64_t entityId,
                                               const char *path, int64_t frame,
                                               const MSBezierPath *value);
+void ms_command_write_vector_network_at_playhead(MSDocument *document, uint64_t entityId,
+                                                 const char *path, int64_t frame,
+                                                 const MSVectorNetwork *value);
 // Scene-space path edits on a Shape or Mask target. Writes via playhead policy.
 void ms_command_path_edit_move_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
                                       int maskIndex, int64_t frame, size_t index, float sceneX,
@@ -488,6 +529,28 @@ void ms_command_path_edit_toggle_smooth(MSDocument *document, uint64_t layerId, 
 // transform.position so the world silhouette stays put. No-op for masks /
 // already-centered paths.
 void ms_command_path_edit_recenter_shape(MSDocument *document, uint64_t layerId, int64_t frame);
+
+// VectorNetwork topology edits (scene-space where a point is required).
+// outVertexId / outEdgeId may be NULL; written 0 on failure / no-op.
+void ms_command_network_edit_add_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                        int maskIndex, int64_t frame, float sceneX, float sceneY,
+                                        uint32_t *outVertexId);
+void ms_command_network_edit_add_edge(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                      int maskIndex, int64_t frame, uint32_t startId, uint32_t endId,
+                                      uint32_t *outEdgeId);
+void ms_command_network_edit_move_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                         int maskIndex, int64_t frame, uint32_t vertexId,
+                                         float sceneX, float sceneY);
+void ms_command_network_edit_move_edge_tangent(MSDocument *document, uint64_t layerId,
+                                               MS_PATH_EDIT kind, int maskIndex, int64_t frame,
+                                               uint32_t edgeId, bool atStart, float sceneX,
+                                               float sceneY, bool mirror);
+void ms_command_network_edit_insert_on_edge(MSDocument *document, uint64_t layerId,
+                                            MS_PATH_EDIT kind, int maskIndex, int64_t frame,
+                                            uint32_t edgeId, float t, uint32_t *outVertexId);
+void ms_command_network_edit_remove_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
+                                           int maskIndex, int64_t frame, uint32_t vertexId);
+void ms_command_network_edit_recenter_shape(MSDocument *document, uint64_t layerId, int64_t frame);
 void ms_command_remove_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_command_move_keyframe(MSDocument *document, uint64_t entityId, const char *path, int64_t oldFrame, int64_t newFrame);
 // easingType: MS_EASING_* tag. Control points are only used for MS_EASING_CUBIC_BEZIER.
@@ -704,12 +767,16 @@ typedef CF_CLOSED_ENUM(int, MS_PATH_HANDLE) {
     MS_PATH_HANDLE_OUT_TANGENT = 3,
     MS_PATH_HANDLE_SEGMENT = 4,
     MS_PATH_HANDLE_CLOSE_RING = 5,
+    MS_PATH_HANDLE_EDGE_TANGENT = 6,
 };
 
 typedef struct MSPathEditHit {
     MS_PATH_HANDLE kind;
     size_t index;
     float segmentT;
+    uint32_t vertexId;
+    uint32_t edgeId;
+    bool atStart;
 } MSPathEditHit;
 
 // One preview path overlay. transform is the affine 2x3 of Mat3

@@ -4,6 +4,8 @@
 #include <cmath>
 
 #include "MotionStudio/animation/PathSampling.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerType.h"
@@ -13,6 +15,8 @@
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/render/ShapeGeometry.h"
+
+#include <utility>
 
 namespace motion {
 namespace {
@@ -59,8 +63,30 @@ std::optional<BezierPath> EvaluateLayerPath(const Layer &layer, PreviewTime time
     switch (element.type()) {
         case ShapeType::Path: {
             const auto &shape = static_cast<const ShapePath &>(element);
-            BezierPath path = shape.path.evaluatePreview(time);
-            if (path.vertices.empty()) {
+            const VectorNetwork network = shape.path.evaluatePreview(time);
+            // Prefer a simple ring/chain when the network is one; otherwise use
+            // the longest closed fill face, then fall back to stroke edges.
+            BezierPath path = VectorNetworkToSingleRingBezierPath(network);
+            if (path.contours.empty()) {
+                path = CompileFillFaces(network);
+                if (path.contours.size() > 1) {
+                    size_t best = 0;
+                    size_t bestCount = 0;
+                    for (size_t i = 0; i < path.contours.size(); ++i) {
+                        if (path.contours[i].vertices.size() > bestCount) {
+                            best = i;
+                            bestCount = path.contours[i].vertices.size();
+                        }
+                    }
+                    BezierPath longest;
+                    longest.contours.push_back(path.contours[best]);
+                    path = std::move(longest);
+                }
+            }
+            if (path.contours.empty()) {
+                path = CompileStrokeEdges(network);
+            }
+            if (path.contours.empty()) {
                 return std::nullopt;
             }
             return path;

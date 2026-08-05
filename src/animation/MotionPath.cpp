@@ -4,13 +4,12 @@ namespace motion {
 
 BezierPath BuildMotionPath(const Animatable<Vec2> &position) {
     const std::vector<Keyframe<Vec2>> &keyframes = position.keyframes();
-    BezierPath path;
-    path.closed = false;
     if (keyframes.size() < 2) {
-        return path;
+        return {};
     }
 
-    path.vertices.reserve(keyframes.size());
+    std::vector<BezierPath::Vertex> vertices;
+    vertices.reserve(keyframes.size());
     for (size_t index = 0; index < keyframes.size(); ++index) {
         BezierPath::Vertex vertex;
         vertex.point = keyframes[index].value;
@@ -23,9 +22,9 @@ BezierPath BuildMotionPath(const Animatable<Vec2> &position) {
             keyframes[index].spatialInTangent) {
             vertex.inTangent = *keyframes[index].spatialInTangent;
         }
-        path.vertices.push_back(vertex);
+        vertices.push_back(vertex);
     }
-    return path;
+    return MakeSingleContour(std::move(vertices), false);
 }
 
 }  // namespace motion

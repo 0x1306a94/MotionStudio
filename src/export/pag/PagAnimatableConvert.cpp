@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "MotionStudio/animation/Easing.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
 #include "base/keyframes/SingleEaseKeyframe.h"
 #include "base/keyframes/SpatialPointKeyframe.h"
 
@@ -119,6 +120,25 @@ pag::Keyframe<pag::PathHandle> *MakePathKeyframe(const Keyframe<BezierPath> &fro
     return keyframe;
 }
 
+pag::Keyframe<pag::PathHandle> *MakeNetworkPathKeyframe(const Keyframe<VectorNetwork> &from,
+                                                        const Keyframe<VectorNetwork> &) {
+    auto *keyframe = new pag::SingleEaseKeyframe<pag::PathHandle>();
+    ApplyBezierHandles(keyframe, from.easing, 1);
+    return keyframe;
+}
+
+BezierPath NetworkToExportPath(const VectorNetwork &network) {
+    BezierPath fill = CompileFillFaces(network);
+    if (!fill.contours.empty()) {
+        return fill;
+    }
+    return CompileStrokeEdges(network);
+}
+
+pag::PathHandle ToPagPathFromNetwork(const VectorNetwork &network) {
+    return ToPagPath(NetworkToExportPath(network));
+}
+
 pag::Keyframe<pag::Percent> *MakePercentKeyframe(const Keyframe<float> &from,
                                                  const Keyframe<float> &) {
     auto *keyframe = new pag::SingleEaseKeyframe<pag::Percent>();
@@ -213,39 +233,42 @@ pag::Opacity ToPagOpacityFromColor(const Color &value) {
 
 pag::PathHandle ToPagPath(const BezierPath &path) {
     auto data = std::make_shared<pag::PathData>();
-    if (path.vertices.empty()) {
-        return data;
-    }
-    const BezierPath::Vertex &first = path.vertices.front();
-    data->moveTo(first.point.x, first.point.y);
-    for (size_t index = 1; index < path.vertices.size(); ++index) {
-        const BezierPath::Vertex &previous = path.vertices[index - 1];
-        const BezierPath::Vertex &current = path.vertices[index];
-        const float controlX1 = previous.point.x + previous.outTangent.x;
-        const float controlY1 = previous.point.y + previous.outTangent.y;
-        const float controlX2 = current.point.x + current.inTangent.x;
-        const float controlY2 = current.point.y + current.inTangent.y;
-        const bool isLine = previous.outTangent.x == 0 && previous.outTangent.y == 0 &&
-            current.inTangent.x == 0 && current.inTangent.y == 0;
-        if (isLine) {
-            data->lineTo(current.point.x, current.point.y);
-        } else {
-            data->cubicTo(controlX1, controlY1, controlX2, controlY2, current.point.x,
-                          current.point.y);
+    for (const BezierPath::Contour &contour : path.contours) {
+        if (contour.vertices.empty()) {
+            continue;
         }
-    }
-    if (path.closed) {
-        const BezierPath::Vertex &last = path.vertices.back();
-        const float controlX1 = last.point.x + last.outTangent.x;
-        const float controlY1 = last.point.y + last.outTangent.y;
-        const float controlX2 = first.point.x + first.inTangent.x;
-        const float controlY2 = first.point.y + first.inTangent.y;
-        const bool isLine = last.outTangent.x == 0 && last.outTangent.y == 0 &&
-            first.inTangent.x == 0 && first.inTangent.y == 0;
-        if (!isLine) {
-            data->cubicTo(controlX1, controlY1, controlX2, controlY2, first.point.x, first.point.y);
+        const BezierPath::Vertex &first = contour.vertices.front();
+        data->moveTo(first.point.x, first.point.y);
+        for (size_t index = 1; index < contour.vertices.size(); ++index) {
+            const BezierPath::Vertex &previous = contour.vertices[index - 1];
+            const BezierPath::Vertex &current = contour.vertices[index];
+            const float controlX1 = previous.point.x + previous.outTangent.x;
+            const float controlY1 = previous.point.y + previous.outTangent.y;
+            const float controlX2 = current.point.x + current.inTangent.x;
+            const float controlY2 = current.point.y + current.inTangent.y;
+            const bool isLine = previous.outTangent.x == 0 && previous.outTangent.y == 0 &&
+                current.inTangent.x == 0 && current.inTangent.y == 0;
+            if (isLine) {
+                data->lineTo(current.point.x, current.point.y);
+            } else {
+                data->cubicTo(controlX1, controlY1, controlX2, controlY2, current.point.x,
+                              current.point.y);
+            }
         }
-        data->close();
+        if (contour.closed) {
+            const BezierPath::Vertex &last = contour.vertices.back();
+            const float controlX1 = last.point.x + last.outTangent.x;
+            const float controlY1 = last.point.y + last.outTangent.y;
+            const float controlX2 = first.point.x + first.inTangent.x;
+            const float controlY2 = first.point.y + first.inTangent.y;
+            const bool isLine = last.outTangent.x == 0 && last.outTangent.y == 0 &&
+                first.inTangent.x == 0 && first.inTangent.y == 0;
+            if (!isLine) {
+                data->cubicTo(controlX1, controlY1, controlX2, controlY2, first.point.x,
+                              first.point.y);
+            }
+            data->close();
+        }
     }
     return data;
 }
@@ -275,8 +298,13 @@ pag::Property<pag::Opacity> *ConvertOpacity(const Animatable<float> &source,
     return ConvertAnimatable(source, MakeOpacityKeyframe, ToPagOpacity);
 }
 
-pag::Property<pag::PathHandle> *ConvertPath(const Animatable<BezierPath> &source,
+pag::Property<pag::PathHandle> *ConvertPath(const Animatable<VectorNetwork> &source,
                                             std::vector<PagExportWarning> *, EntityId) {
+    return ConvertAnimatableRef(source, MakeNetworkPathKeyframe, ToPagPathFromNetwork);
+}
+
+pag::Property<pag::PathHandle> *ConvertBezierPath(const Animatable<BezierPath> &source,
+                                                  std::vector<PagExportWarning> *, EntityId) {
     return ConvertAnimatableRef(source, MakePathKeyframe, ToPagPath);
 }
 

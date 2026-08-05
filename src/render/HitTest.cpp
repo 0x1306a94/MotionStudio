@@ -40,24 +40,26 @@ bool HasCurveHandles(const BezierPath::Vertex &from, const BezierPath::Vertex &t
 
 std::vector<Vec2> FlattenPath(const BezierPath &path) {
     std::vector<Vec2> points;
-    const size_t count = path.vertices.size();
-    if (count == 0) {
-        return points;
-    }
-    points.push_back(path.vertices.front().point);
-    const size_t segmentCount = path.closed ? count : count - 1;
-    for (size_t segment = 0; segment < segmentCount; ++segment) {
-        const BezierPath::Vertex &from = path.vertices[segment];
-        const BezierPath::Vertex &to = path.vertices[(segment + 1) % count];
-        if (HasCurveHandles(from, to)) {
-            const Vec2 c1 = from.point + from.outTangent;
-            const Vec2 c2 = to.point + to.inTangent;
-            for (int sample = 1; sample <= kSamplesPerSegment; ++sample) {
-                const float t = static_cast<float>(sample) / static_cast<float>(kSamplesPerSegment);
-                points.push_back(CubicPoint(from.point, c1, c2, to.point, t));
+    for (const BezierPath::Contour &contour : path.contours) {
+        const size_t count = contour.vertices.size();
+        if (count == 0) {
+            continue;
+        }
+        points.push_back(contour.vertices.front().point);
+        const size_t segmentCount = contour.closed ? count : count - 1;
+        for (size_t segment = 0; segment < segmentCount; ++segment) {
+            const BezierPath::Vertex &from = contour.vertices[segment];
+            const BezierPath::Vertex &to = contour.vertices[(segment + 1) % count];
+            if (HasCurveHandles(from, to)) {
+                const Vec2 c1 = from.point + from.outTangent;
+                const Vec2 c2 = to.point + to.inTangent;
+                for (int sample = 1; sample <= kSamplesPerSegment; ++sample) {
+                    const float t = static_cast<float>(sample) / static_cast<float>(kSamplesPerSegment);
+                    points.push_back(CubicPoint(from.point, c1, c2, to.point, t));
+                }
+            } else {
+                points.push_back(to.point);
             }
-        } else {
-            points.push_back(to.point);
         }
     }
     return points;
@@ -215,8 +217,9 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
         FlattenedShapeItem flattened;
         flattened.item = &item;
-        flattened.points =
-            FlattenPathInWorld(ShapeGeometryToBezierPath(item.geometry), layer.worldTransform);
+        const BezierPath localPath = item.isStroke ? ShapeGeometryStrokePath(item.geometry)
+                                                   : ShapeGeometryToBezierPath(item.geometry);
+        flattened.points = FlattenPathInWorld(localPath, layer.worldTransform);
         if (flattened.points.empty()) {
             continue;
         }
@@ -296,8 +299,10 @@ bool BoundsOfLayer(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPoint) 
     maxPoint = {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
     bool hasBounds = false;
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
+        const BezierPath localPath = item.isStroke ? ShapeGeometryStrokePath(item.geometry)
+                                                   : ShapeGeometryToBezierPath(item.geometry);
         std::vector<Vec2> points =
-            FlattenPathInWorld(ShapeGeometryToBezierPath(item.geometry), layer.worldTransform);
+            FlattenPathInWorld(localPath, layer.worldTransform);
         if (points.empty()) {
             continue;
         }
@@ -341,7 +346,10 @@ bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPo
     maxPoint = {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
     bool hasBounds = false;
     for (const EvaluatedShapeItem &item : layer.shapeItems) {
-        std::vector<Vec2> points = FlattenPath(ShapeGeometryToBezierPath(item.geometry));
+        // Stroke items must use strokePath (all network edges); fill uses faces.
+        const BezierPath localPath = item.isStroke ? ShapeGeometryStrokePath(item.geometry)
+                                                   : ShapeGeometryToBezierPath(item.geometry);
+        std::vector<Vec2> points = FlattenPath(localPath);
         if (points.empty()) {
             continue;
         }

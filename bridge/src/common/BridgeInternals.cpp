@@ -8,6 +8,8 @@
 #include "MeasurePointTextSize.h"
 #include "MeasureTextPathBounds.h"
 
+#include "MotionStudio/common/VectorNetworkCompile.h"
+#include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
@@ -95,11 +97,11 @@ const Animatable<Color> *AsColor(AnimatableBase *base) {
     return static_cast<const Animatable<Color> *>(base);
 }
 
-const Animatable<motion::BezierPath> *AsBezierPath(AnimatableBase *base) {
-    if (base == nullptr || base->valueType() != AnimatableType::BezierPath) {
+const Animatable<motion::VectorNetwork> *AsVectorNetwork(AnimatableBase *base) {
+    if (base == nullptr || base->valueType() != AnimatableType::VectorNetwork) {
         return nullptr;
     }
-    return static_cast<const Animatable<motion::BezierPath> *>(base);
+    return static_cast<const Animatable<motion::VectorNetwork> *>(base);
 }
 
 MSBezierPath *AllocateMSBezierPath(const motion::BezierPath &path) {
@@ -107,8 +109,9 @@ MSBezierPath *AllocateMSBezierPath(const motion::BezierPath &path) {
     if (result == nullptr) {
         return nullptr;
     }
-    result->count = path.vertices.size();
-    result->closed = path.closed;
+    const motion::BezierPath::Contour *contour = motion::PrimaryContour(path);
+    result->count = contour == nullptr ? 0 : contour->vertices.size();
+    result->closed = contour != nullptr && contour->closed;
     result->vertices = nullptr;
     if (result->count > 0) {
         result->vertices =
@@ -118,7 +121,7 @@ MSBezierPath *AllocateMSBezierPath(const motion::BezierPath &path) {
             return nullptr;
         }
         for (size_t index = 0; index < result->count; ++index) {
-            const motion::BezierPath::Vertex &vertex = path.vertices[index];
+            const motion::BezierPath::Vertex &vertex = contour->vertices[index];
             result->vertices[index].pointX = vertex.point.x;
             result->vertices[index].pointY = vertex.point.y;
             result->vertices[index].inTangentX = vertex.inTangent.x;
@@ -131,20 +134,106 @@ MSBezierPath *AllocateMSBezierPath(const motion::BezierPath &path) {
 }
 
 motion::BezierPath FromMSBezierPath(const MSBezierPath *path) {
-    motion::BezierPath result;
-    if (path == nullptr) {
-        return result;
+    if (path == nullptr || path->vertices == nullptr || path->count == 0) {
+        return {};
     }
-    result.closed = path->closed;
-    if (path->vertices == nullptr || path->count == 0) {
-        return result;
-    }
-    result.vertices.reserve(path->count);
+    std::vector<motion::BezierPath::Vertex> vertices;
+    vertices.reserve(path->count);
     for (size_t index = 0; index < path->count; ++index) {
         const MSBezierVertex &vertex = path->vertices[index];
-        result.vertices.push_back({{vertex.pointX, vertex.pointY},
-                                   {vertex.inTangentX, vertex.inTangentY},
-                                   {vertex.outTangentX, vertex.outTangentY}});
+        vertices.push_back({{vertex.pointX, vertex.pointY},
+                            {vertex.inTangentX, vertex.inTangentY},
+                            {vertex.outTangentX, vertex.outTangentY}});
+    }
+    return motion::MakeSingleContour(std::move(vertices), path->closed);
+}
+
+motion::BezierPath BridgePathFromNetwork(const motion::VectorNetwork &network) {
+    motion::BezierPath path = motion::VectorNetworkToSingleRingBezierPath(network);
+    if (!path.contours.empty()) {
+        return path;
+    }
+    path = motion::CompileFillFaces(network);
+    if (!path.contours.empty()) {
+        return path;
+    }
+    return motion::CompileStrokeEdges(network);
+}
+
+motion::VectorNetwork BridgeNetworkFromPath(const motion::BezierPath &path) {
+    return motion::BezierPathToVectorNetwork(path);
+}
+
+MSVectorNetwork *AllocateMSVectorNetwork(const motion::VectorNetwork &network) {
+    auto *result = static_cast<MSVectorNetwork *>(std::malloc(sizeof(MSVectorNetwork)));
+    if (result == nullptr) {
+        return nullptr;
+    }
+    result->vertices = nullptr;
+    result->vertexCount = network.vertices.size();
+    result->edges = nullptr;
+    result->edgeCount = network.edges.size();
+    if (result->vertexCount > 0) {
+        result->vertices = static_cast<MSVectorNetworkVertex *>(
+            std::calloc(result->vertexCount, sizeof(MSVectorNetworkVertex)));
+        if (result->vertices == nullptr) {
+            std::free(result);
+            return nullptr;
+        }
+        for (size_t index = 0; index < result->vertexCount; ++index) {
+            const motion::VectorNetwork::Vertex &vertex = network.vertices[index];
+            result->vertices[index].id = vertex.id;
+            result->vertices[index].x = vertex.point.x;
+            result->vertices[index].y = vertex.point.y;
+        }
+    }
+    if (result->edgeCount > 0) {
+        result->edges = static_cast<MSVectorNetworkEdge *>(
+            std::calloc(result->edgeCount, sizeof(MSVectorNetworkEdge)));
+        if (result->edges == nullptr) {
+            std::free(result->vertices);
+            std::free(result);
+            return nullptr;
+        }
+        for (size_t index = 0; index < result->edgeCount; ++index) {
+            const motion::VectorNetwork::Edge &edge = network.edges[index];
+            result->edges[index].id = edge.id;
+            result->edges[index].start = edge.start;
+            result->edges[index].end = edge.end;
+            result->edges[index].startTangentX = edge.startTangent.x;
+            result->edges[index].startTangentY = edge.startTangent.y;
+            result->edges[index].endTangentX = edge.endTangent.x;
+            result->edges[index].endTangentY = edge.endTangent.y;
+        }
+    }
+    return result;
+}
+
+motion::VectorNetwork FromMSVectorNetwork(const MSVectorNetwork *network) {
+    motion::VectorNetwork result;
+    if (network == nullptr) {
+        return result;
+    }
+    if (network->vertices != nullptr && network->vertexCount > 0) {
+        result.vertices.reserve(network->vertexCount);
+        for (size_t index = 0; index < network->vertexCount; ++index) {
+            const MSVectorNetworkVertex &vertex = network->vertices[index];
+            result.vertices.push_back(
+                {vertex.id, motion::Vec2{vertex.x, vertex.y}});
+        }
+    }
+    if (network->edges != nullptr && network->edgeCount > 0) {
+        result.edges.reserve(network->edgeCount);
+        for (size_t index = 0; index < network->edgeCount; ++index) {
+            const MSVectorNetworkEdge &edge = network->edges[index];
+            motion::VectorNetwork::Edge out;
+            out.id = edge.id;
+            out.start = edge.start;
+            out.end = edge.end;
+            out.startTangent = {edge.startTangentX, edge.startTangentY};
+            out.endTangent = {edge.endTangentX, edge.endTangentY};
+            result.edges.push_back(out);
+        }
     }
     return result;
 }
@@ -190,7 +279,7 @@ motion::TrackMatteType MakeTrackMatteType(MS_TRACK_MATTE type) {
 
 motion::Mask MakeMaskFromLayer(const Layer &layer, int64_t frame) {
     motion::Mask mask;
-    mask.path.setStaticValue(motion::BakeMaskPathFromLayer(layer, frame));
+    mask.path.setStaticValue(BridgeNetworkFromPath(motion::BakeMaskPathFromLayer(layer, frame)));
     return mask;
 }
 
@@ -294,7 +383,7 @@ void ResolvePointTextContainerSizes(motion::SceneState &state) {
             continue;
         }
         motion::EvaluatedTextItem &item = *layer.textItem;
-        if (item.textPath.has_value() && !item.textPath->path.vertices.empty()) {
+        if (item.textPath.has_value() && !item.textPath->path.contours.empty()) {
             const motion::EvaluatedTextPath &path = *item.textPath;
             const motion::TextPathBounds bounds = MeasureTextPathBounds(
                 item.text, item.fontSize, item.align, item.fontFamily, item.fontStyle, path.path,

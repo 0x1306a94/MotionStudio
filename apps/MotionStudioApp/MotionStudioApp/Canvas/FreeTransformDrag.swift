@@ -48,6 +48,60 @@ struct CapturedBezierPath {
     }
 }
 
+/// Snapshot of a VectorNetwork for drag-start absolute rewrites (preserves shared vertices).
+struct CapturedVectorNetwork {
+    var vertices: [MSVectorNetworkVertex]
+    var edges: [MSVectorNetworkEdge]
+
+    init(msNetwork: UnsafePointer<MSVectorNetwork>) {
+        let vertexCount = Int(msNetwork.pointee.vertexCount)
+        if vertexCount > 0, let base = msNetwork.pointee.vertices {
+            vertices = Array(UnsafeBufferPointer(start: base, count: vertexCount))
+        } else {
+            vertices = []
+        }
+        let edgeCount = Int(msNetwork.pointee.edgeCount)
+        if edgeCount > 0, let base = msNetwork.pointee.edges {
+            edges = Array(UnsafeBufferPointer(start: base, count: edgeCount))
+        } else {
+            edges = []
+        }
+    }
+
+    func scaled(about pivot: CGPoint, scaleX: CGFloat, scaleY: CGFloat) -> CapturedVectorNetwork {
+        var copy = self
+        for index in copy.vertices.indices {
+            var vertex = copy.vertices[index]
+            vertex.x = Float(pivot.x + (CGFloat(vertex.x) - pivot.x) * scaleX)
+            vertex.y = Float(pivot.y + (CGFloat(vertex.y) - pivot.y) * scaleY)
+            copy.vertices[index] = vertex
+        }
+        for index in copy.edges.indices {
+            var edge = copy.edges[index]
+            edge.startTangentX = Float(CGFloat(edge.startTangentX) * scaleX)
+            edge.startTangentY = Float(CGFloat(edge.startTangentY) * scaleY)
+            edge.endTangentX = Float(CGFloat(edge.endTangentX) * scaleX)
+            edge.endTangentY = Float(CGFloat(edge.endTangentY) * scaleY)
+            copy.edges[index] = edge
+        }
+        return copy
+    }
+
+    func withMSVectorNetwork<Result>(_ body: (UnsafePointer<MSVectorNetwork>) -> Result) -> Result {
+        var verts = vertices
+        var eds = edges
+        return verts.withUnsafeMutableBufferPointer { vertexBuffer in
+            eds.withUnsafeMutableBufferPointer { edgeBuffer in
+                var network = MSVectorNetwork(vertices: vertexBuffer.baseAddress,
+                                              vertexCount: vertexBuffer.count,
+                                              edges: edgeBuffer.baseAddress,
+                                              edgeCount: edgeBuffer.count)
+                return withUnsafePointer(to: &network, body)
+            }
+        }
+    }
+}
+
 struct LayerTransformStart {
     let layerID: UInt64
     let position: CGVector
@@ -58,11 +112,11 @@ struct LayerTransformStart {
     /// `image.size` or `content.size` when the layer has a box container.
     let contentSizePath: String?
     /// ShapePath baseline (drag-start), when present.
-    let shapePath: CapturedBezierPath?
+    let shapePath: CapturedVectorNetwork?
     /// ShapeRect / ShapeEllipse center + size baseline.
     let shapePosition: CGVector?
     let shapeSize: CGVector?
-    let maskPaths: [(index: Int, path: CapturedBezierPath, animated: Bool)]
+    let maskPaths: [(index: Int, path: CapturedVectorNetwork, animated: Bool)]
     let positionAnimated: Bool
     let scaleAnimated: Bool
     let rotationAnimated: Bool
@@ -108,16 +162,17 @@ struct FreeTransformDrag {
             } else {
                 nil
             }
-            var shapePath: CapturedBezierPath?
+            var shapePath: CapturedVectorNetwork?
             var shapePosition: CGVector?
             var shapeSize: CGVector?
             var shapePathAnimated = false
             var shapePositionAnimated = false
             var shapeSizeAnimated = false
-            var maskPaths: [(index: Int, path: CapturedBezierPath, animated: Bool)] = []
+            var maskPaths: [(index: Int, path: CapturedVectorNetwork, animated: Bool)] = []
             if core.layerType(layerID) == .SHAPE {
                 if core.hasProperty(entityID: layerID, path: ShapeProperty.path.path),
-                   let path = core.evaluateBezierPath(entityID: layerID, path: ShapeProperty.path.path, frame: frame)
+                   let path = core.evaluateVectorNetwork(entityID: layerID, path: ShapeProperty.path.path,
+                                                         frame: frame)
                 {
                     shapePath = path
                     shapePathAnimated = core.isAnimated(entityID: layerID, path: ShapeProperty.path.path)
@@ -132,7 +187,7 @@ struct FreeTransformDrag {
                 let maskCount = core.maskCount(layerID: layerID)
                 for index in 0 ..< maskCount {
                     let maskPathKey = MaskProperty.path.path(at: index)
-                    guard let path = core.evaluateBezierPath(entityID: layerID, path: maskPathKey, frame: frame),
+                    guard let path = core.evaluateVectorNetwork(entityID: layerID, path: maskPathKey, frame: frame),
                           !path.vertices.isEmpty
                     else {
                         continue
@@ -356,8 +411,8 @@ struct FreeTransformDrag {
         // Always rewrite from drag-start geometry — never scale the already-resized path.
         if let shapePath = start.shapePath {
             let scaled = shapePath.scaled(about: localPivot, scaleX: scaleX, scaleY: scaleY)
-            core.writeBezierPathAtPlayhead(entityID: start.layerID, path: ShapeProperty.path.path, frame: frame,
-                                           value: scaled)
+            core.writeVectorNetworkAtPlayhead(entityID: start.layerID, path: ShapeProperty.path.path,
+                                              frame: frame, value: scaled)
         } else if let shapePosition = start.shapePosition, let shapeSize = start.shapeSize {
             let newPosition = CGVector(
                 dx: localPivot.x + (shapePosition.dx - localPivot.x) * scaleX,
@@ -373,8 +428,9 @@ struct FreeTransformDrag {
 
         for mask in start.maskPaths {
             let scaled = mask.path.scaled(about: localPivot, scaleX: scaleX, scaleY: scaleY)
-            core.writeBezierPathAtPlayhead(entityID: start.layerID, path: MaskProperty.path.path(at: mask.index),
-                                           frame: frame, value: scaled)
+            core.writeVectorNetworkAtPlayhead(entityID: start.layerID,
+                                              path: MaskProperty.path.path(at: mask.index),
+                                              frame: frame, value: scaled)
         }
 
         // Keep anchor at the same relative point in local space; compensate position so
