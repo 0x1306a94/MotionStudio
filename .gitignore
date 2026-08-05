@@ -64,3 +64,4 @@ tests/baseline/.cache/
 
 /.codegraph
 /.superpowers
+/**/tests/out

@@ -29,9 +29,6 @@ ${@} \
 -S $PROJECT_DIR
 
 
-# CMake 默认 shellPath=/bin/sh，不会读 ~/.zshenv，且 Xcode 会重写 PATH。
-# 改成 zsh 后，生成的 Script-*.sh 为 #!/bin/zsh，exec 时加载 ~/.zshenv 并重建 PATH。
-# （日志里仍可能显示 /bin/sh -c Script-xxx.sh，但 shebang 会转到 zsh。）
-echo "[*] patch xcode script phases: shellPath /bin/sh -> /bin/zsh"
-sed -i '' 's#shellPath = /bin/sh;#shellPath = /bin/zsh;#' "$GEN_XCODE_PROJEC_FILE"
+echo "[*] patch xcode project file PATH environment"
+sed -i '' "s#shellScript = \"#shellScript = \"source ~/.zshenv\\n#" "$GEN_XCODE_PROJEC_FILE"
 echo "[*] Patch done."
