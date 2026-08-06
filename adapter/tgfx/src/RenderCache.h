@@ -2,11 +2,12 @@
 
 #include "effects/ColorSourceEffectResources.h"
 
+#include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
-
-#include <MotionStudio/common/EntityId.h>
+#include <vector>
 
 namespace tgfx {
 class RenderPipeline;
@@ -17,6 +18,11 @@ class GPU;
 
 namespace motion {
 
+/**
+ * Per-context GPU cache for ColorSourceEffect: shared pipelines keyed by shader
+ * fingerprint, and a triple-buffered bump allocator for uniform uploads so
+ * Metal Shared storage is not rewritten while a prior frame still reads it.
+ */
 class RenderCache {
 
   public:
@@ -31,13 +37,16 @@ class RenderCache {
         return context_;
     }
 
-    ColorSourceEffectResource *findColorSourceEffectResource(EntityId ID);
+    std::shared_ptr<tgfx::RenderPipeline> findColorSourcePipeline(const std::string &key) const;
 
-    void addColorSourceEffectResource(EntityId ID, std::unique_ptr<ColorSourceEffectResource> resources);
+    void addColorSourcePipeline(const std::string &key, std::shared_ptr<tgfx::RenderPipeline> pipeline);
 
-    void setMainImageSource(EntityId ID, std::string source);
+    // Bump-allocates aligned space in the current uniform packet. Call
+    // advanceUniformFrame() once per submitted frame before encoding the next.
+    UniformBufferSlice acquireUniformSlice(tgfx::GPU *gpu, size_t size);
 
-    const std::string *findMainImageSource(EntityId ID) const;
+    // Rotates to the next uniform packet and resets its bump cursor.
+    void advanceUniformFrame();
 
     // Shared clip-space fullscreen triangle VBO for the current context. Created lazily.
     std::shared_ptr<tgfx::GPUBuffer> getFullscreenVertexBuffer(tgfx::GPU *gpu);
@@ -45,10 +54,19 @@ class RenderCache {
     void releaseAll();
 
   private:
+    // Mirrors tgfx GlobalCache::UniformBufferPacket (see
+    // third_party/libpag/third_party/tgfx/src/gpu/GlobalCache.h).
+    struct UniformBufferPacket {
+        std::vector<std::shared_ptr<tgfx::GPUBuffer>> buffers = {};
+        size_t bufferIndex = 0;
+        size_t cursor = 0;
+    };
+
     uint32_t contextID_ = 0;
     tgfx::Context *context_ = nullptr;
-    std::unordered_map<EntityId, std::unique_ptr<ColorSourceEffectResource>> colorSourceEffectResourceMap_ = {};
-    std::unordered_map<EntityId, std::string> mainImageSourceMap_ = {};
+    std::unordered_map<std::string, std::shared_ptr<tgfx::RenderPipeline>> colorSourcePipelineMap_ = {};
+    std::array<UniformBufferPacket, 3> uniformPackets_ = {};
+    uint32_t uniformPacketIndex_ = 0;
     std::shared_ptr<tgfx::GPUBuffer> fullscreenVertexBuffer_ = nullptr;
 };
 };  // namespace motion

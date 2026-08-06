@@ -3,13 +3,13 @@
 #include "RenderCache.h"
 #include "UniformData.h"
 
-#include <cassert>
 #include <cstring>
 
 #include <tgfx/core/Data.h>
 #include <tgfx/core/Image.h>
 #include <tgfx/core/ImageFilter.h>
 #include <tgfx/core/ImageInfo.h>
+#include <tgfx/core/Matrix.h>
 #include <tgfx/core/Point.h>
 #include <tgfx/core/Shader.h>
 #include <tgfx/core/TileMode.h>
@@ -109,12 +109,12 @@ static std::shared_ptr<tgfx::Image> GetPlaceholderImage() {
     return image;
 }
 
-std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(EntityId effectId, std::vector<Uniform> uniforms) {
-    return std::shared_ptr<ColorSourceEffect>(new ColorSourceEffect(effectId, std::move(uniforms)));
+std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(std::string mainImage, std::vector<Uniform> uniforms) {
+    return std::shared_ptr<ColorSourceEffect>(new ColorSourceEffect(std::move(mainImage), std::move(uniforms)));
 }
 
-ColorSourceEffect::ColorSourceEffect(EntityId effectId, std::vector<Uniform> uniforms)
-    : effectId_(effectId) {
+ColorSourceEffect::ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms)
+    : mainImage_(std::move(mainImage)) {
     Uniform inputDimsData{"inputDimsData", UniformFormat::Float2};
     uniforms.insert(uniforms.begin(), inputDimsData);
     uniformData_ = std::make_unique<UniformData>(std::move(uniforms));
@@ -124,8 +124,8 @@ ColorSourceEffect::ColorSourceEffect(EntityId effectId, std::vector<Uniform> uni
     }
 }
 
-void ColorSourceEffect::prepare(const tgfx::Size &sourceSize, RenderCache *cache) {
-    sourceSize_ = sourceSize;
+void ColorSourceEffect::prepare(const tgfx::Rect &bounds, RenderCache *cache) {
+    sourceBounds_ = bounds;
     cache_ = cache;
 }
 
@@ -145,21 +145,42 @@ std::shared_ptr<tgfx::Shader> ColorSourceEffect::makeImageShader() {
         return nullptr;
     }
 
-    return tgfx::Shader::MakeImageShader(filtered, tgfx::TileMode::Clamp, tgfx::TileMode::Clamp);
+    auto shader = tgfx::Shader::MakeImageShader(filtered, tgfx::TileMode::Clamp, tgfx::TileMode::Clamp);
+    if (shader == nullptr) {
+        return nullptr;
+    }
+    if (sourceBounds_.left != 0.0f || sourceBounds_.top != 0.0f) {
+        shader = shader->makeWithMatrix(tgfx::Matrix::MakeTrans(sourceBounds_.left, sourceBounds_.top));
+    }
+    return shader;
+}
+
+static std::string BuildPipelineKey(const std::string &mainImage, const std::vector<Uniform> &uniforms) {
+    std::string key;
+    key.reserve(mainImage.size() + uniforms.size() * 32);
+    for (const auto &uniform : uniforms) {
+        key += uniform.name();
+        key += ':';
+        key += UniformFormatGLSLTypeName(uniform.format());
+        if (uniform.isArray()) {
+            key += '[';
+            key += std::to_string(uniform.count());
+            key += ']';
+        }
+        key += ';';
+    }
+    key += '\n';
+    key += mainImage;
+    return key;
 }
 
 std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::createPipeline(tgfx::GPU *gpu) const {
-    if (cache_ == nullptr || uniformData_ == nullptr || gpu == nullptr) {
-        return nullptr;
-    }
-
-    const auto *mainImage = cache_->findMainImageSource(effectId_);
-    if (mainImage == nullptr || mainImage->empty()) {
+    if (cache_ == nullptr || uniformData_ == nullptr || gpu == nullptr || mainImage_.empty()) {
         return nullptr;
     }
 
     auto vertexCode = BuildVertexShaderSource(gpu);
-    auto fragmentCode = BuildFragmentShaderSource(gpu, uniformData_->uniforms(), *mainImage);
+    auto fragmentCode = BuildFragmentShaderSource(gpu, uniformData_->uniforms(), mainImage_);
 
     tgfx::ShaderModuleDescriptor vertexDesc;
     vertexDesc.code = std::move(vertexCode);
@@ -195,35 +216,37 @@ std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::createPipeline(tgfx::GP
     return gpu->createRenderPipeline(pipelineDesc);
 }
 
-ColorSourceEffectResource *ColorSourceEffect::getEffectResource(tgfx::GPU *gpu) const {
-    auto resources = cache_->findColorSourceEffectResource(effectId_);
-    if (resources == nullptr) {
-        auto pipeline = createPipeline(gpu);
-        if (pipeline == nullptr) {
-            return nullptr;
-        }
-
-        auto newResources = std::make_unique<ColorSourceEffectResource>();
-        newResources->pipeline = std::move(pipeline);
-        resources = newResources.get();
-        cache_->addColorSourceEffectResource(effectId_, std::move(newResources));
+std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::getOrCreatePipeline(tgfx::GPU *gpu) const {
+    if (cache_ == nullptr || uniformData_ == nullptr || mainImage_.empty()) {
+        return nullptr;
     }
-    assert(resources->pipeline != nullptr);
-    return resources;
+
+    const std::string key = BuildPipelineKey(mainImage_, uniformData_->uniforms());
+    auto pipeline = cache_->findColorSourcePipeline(key);
+    if (pipeline != nullptr) {
+        return pipeline;
+    }
+
+    pipeline = createPipeline(gpu);
+    if (pipeline == nullptr) {
+        return nullptr;
+    }
+    cache_->addColorSourcePipeline(key, pipeline);
+    return pipeline;
 }
 
 tgfx::Rect ColorSourceEffect::filterBounds(const tgfx::Rect &srcRect, tgfx::MapDirection) const {
-    return tgfx::Rect::MakeWH(sourceSize_.width, sourceSize_.height);
+    return tgfx::Rect::MakeWH(sourceBounds_.width(), sourceBounds_.height());
 }
 
 bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> & /*inputTextures*/, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point & /*offset*/) const {
-    if (sourceSize_.isZero() || cache_ == nullptr || uniformData_ == nullptr || outputTexture == nullptr || encoder == nullptr) {
+    if (sourceBounds_.isEmpty() || cache_ == nullptr || uniformData_ == nullptr || outputTexture == nullptr || encoder == nullptr) {
         return false;
     }
 
     auto *gpu = encoder->gpu();
-    auto *resources = getEffectResource(gpu);
-    if (resources == nullptr || resources->pipeline == nullptr) {
+    auto pipeline = getOrCreatePipeline(gpu);
+    if (pipeline == nullptr) {
         return false;
     }
 
@@ -232,28 +255,28 @@ bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<
         return false;
     }
 
-    const float inputDims[2] = {sourceSize_.width, sourceSize_.height};
+    const float inputDims[2] = {sourceBounds_.width(), sourceBounds_.height()};
     uniformData_->setData("inputDimsData", inputDims, sizeof(inputDims));
 
-    auto uniformBuffer = resources->acquireUniformBuffer(gpu, uniformBytes_.size());
-    if (uniformBuffer == nullptr) {
+    auto slice = cache_->acquireUniformSlice(gpu, uniformBytes_.size());
+    if (slice.buffer == nullptr) {
         return false;
     }
 
-    void *mapped = uniformBuffer->map();
+    void *mapped = slice.buffer->map(slice.offset, uniformBytes_.size());
     if (mapped == nullptr) {
         return false;
     }
     std::memcpy(mapped, uniformBytes_.data(), uniformBytes_.size());
-    uniformBuffer->unmap();
+    slice.buffer->unmap();
 
     tgfx::RenderPassDescriptor passDescriptor(outputTexture, tgfx::LoadAction::Clear, tgfx::StoreAction::Store);
     auto renderPass = encoder->beginRenderPass(passDescriptor);
     if (renderPass == nullptr) {
         return false;
     }
-    renderPass->setPipeline(resources->pipeline);
-    renderPass->setUniformBuffer(0, uniformBuffer, 0, uniformBytes_.size());
+    renderPass->setPipeline(pipeline);
+    renderPass->setUniformBuffer(0, slice.buffer, slice.offset, uniformBytes_.size());
     renderPass->setVertexBuffer(0, vertexBuffer);
     renderPass->draw(tgfx::PrimitiveType::Triangles, 3);
     renderPass->end();
