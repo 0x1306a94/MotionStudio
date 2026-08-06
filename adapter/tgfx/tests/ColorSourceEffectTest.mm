@@ -27,19 +27,19 @@
 #include <tgfx/gpu/metal/MetalDevice.h>
 
 using motion::ColorSourceEffect;
+using motion::ColorSourceFrameContext;
 using motion::RenderCache;
 using motion::Uniform;
 using motion::UniformFormat;
 
 namespace {
 
-// Ripple body for ColorSourceEffect. UniformBlock (inputDimsData + rippleCount)
-// is injected by BuildFragmentShaderSource; this only supplies the mainImage(uv)
-// entry used by the generated main().
+// Ripple body for ColorSourceEffect. Shadertoy built-ins (iResolution, iTime, …)
+// are injected by ColorSourceEffect; this only supplies mainImage(uv).
 constexpr const char *kMainImage = R"GLSL(
 vec4 mainImage(vec2 uv) {
-    vec2 inputDims = max(inputDimsData, vec2(1.0));
-    float aspect = inputDims.x / max(inputDims.y, 1.0);
+    vec2 dims = max(iResolution.xy, vec2(1.0));
+    float aspect = dims.x / max(dims.y, 1.0);
 
     vec2 p = (uv - vec2(0.5)) * vec2(aspect, 1.0);
     float dist = length(p);
@@ -65,9 +65,7 @@ vec4 mainImage(vec2 uv) {
 
 // Adapted from Shadertoy "Digital Atavism" by David A Roberts:
 // https://www.shadertoy.com/view/Xs3GWj
-// ColorSourceEffect entry is vec4 mainImage(vec2 uv); iResolution maps to
-// inputDimsData; iTime/aa are uniforms. Loop bound is compile-time AA_MAX;
-// aa selects how many of those samples run (default 1 in the test).
+// Built-in iResolution / iTime are injected; aa is a user uniform.
 constexpr const char *kXs3GWjMainImage = R"GLSL(
 #define AA_MAX 4.0
 #define PI 3.141592653589793
@@ -167,8 +165,8 @@ vec3 sunlight_revealed(in vec2 p) {
 }
 
 vec4 mainImage(vec2 uv) {
-    vec2 iResolution = max(inputDimsData, vec2(1.0));
-    vec2 fragCoord = uv * iResolution;
+    vec2 resolution = max(iResolution.xy, vec2(1.0));
+    vec2 fragCoord = uv * resolution;
     float sampleCount = max(aa, 1.0);
     float t = mod(iTime, 10.0);
     vec3 color = vec3(0.0);
@@ -177,7 +175,7 @@ vec4 mainImage(vec2 uv) {
             break;
         }
         vec2 sampleUV = (fragCoord + vec2(floor(i / sampleCount), mod(i, sampleCount)) / sampleCount)
-            / iResolution;
+            / resolution;
         vec2 crtUV = CRTCurveUV(sampleUV);
         if (crtUV.x < 0.0 || crtUV.x > 1.0 || crtUV.y < 0.0 || crtUV.y > 1.0) {
             continue;
@@ -185,10 +183,10 @@ vec4 mainImage(vec2 uv) {
         vec2 p = 50.0 * crtUV - 25.0;
         p *= 0.75 + 0.05 * mod(iTime, 10.0);
         p += mod(iTime, 10.0) - 5.0;
-        p.x *= iResolution.x / iResolution.y;
+        p.x *= resolution.x / resolution.y;
         if (t < 2.0 || 8.0 < t) {
             float fade = smoothstep(0.0, 2.0, t) - smoothstep(8.0, 10.0, t);
-            float scale = iResolution.y / 50.0 * sampleCount * fade + 1.0;
+            float scale = resolution.y / 50.0 * sampleCount * fade + 1.0;
             p = floor(p * scale) / scale;
         }
 
@@ -210,8 +208,7 @@ vec4 mainImage(vec2 uv) {
 
 // Adapted from Shadertoy "Clouds" by drift:
 // https://www.shadertoy.com/view/4tdSWr
-// ColorSourceEffect entry is vec4 mainImage(vec2 uv); iResolution maps to
-// inputDimsData; iTime is a uniform.
+// Built-in iResolution / iTime are injected by ColorSourceEffect.
 constexpr const char *kCloudsMainImage = R"GLSL(
 const float cloudscale = 1.1;
 const float speed = 0.03;
@@ -255,9 +252,9 @@ float fbm(vec2 n) {
 }
 
 vec4 mainImage(vec2 uv) {
-    vec2 iResolution = max(inputDimsData, vec2(1.0));
+    vec2 resolution = max(iResolution.xy, vec2(1.0));
     vec2 p = uv;
-    vec2 sampleUV = p * vec2(iResolution.x / iResolution.y, 1.0);
+    vec2 sampleUV = p * vec2(resolution.x / resolution.y, 1.0);
     float time = iTime * speed;
     float q = fbm(sampleUV * cloudscale * 0.5);
 
@@ -272,7 +269,7 @@ vec4 mainImage(vec2 uv) {
     }
 
     float f = 0.0;
-    sampleUV = p * vec2(iResolution.x / iResolution.y, 1.0);
+    sampleUV = p * vec2(resolution.x / resolution.y, 1.0);
     sampleUV *= cloudscale;
     sampleUV -= q - time;
     weight = 0.7;
@@ -286,7 +283,7 @@ vec4 mainImage(vec2 uv) {
 
     float c = 0.0;
     time = iTime * speed * 2.0;
-    sampleUV = p * vec2(iResolution.x / iResolution.y, 1.0);
+    sampleUV = p * vec2(resolution.x / resolution.y, 1.0);
     sampleUV *= cloudscale * 2.0;
     sampleUV -= q - time;
     weight = 0.4;
@@ -298,7 +295,7 @@ vec4 mainImage(vec2 uv) {
 
     float c1 = 0.0;
     time = iTime * speed * 3.0;
-    sampleUV = p * vec2(iResolution.x / iResolution.y, 1.0);
+    sampleUV = p * vec2(resolution.x / resolution.y, 1.0);
     sampleUV *= cloudscale * 3.0;
     sampleUV -= q - time;
     weight = 0.4;
@@ -445,9 +442,8 @@ TEST(ColorSourceEffectTest, FillsStarPathWithEffect) {
     std::vector<Uniform> uniforms = {
         {"rippleCount", UniformFormat::Float},
     };
-    auto effect = ColorSourceEffect::Make(kMainImage, std::move(uniforms));
+    auto effect = ColorSourceEffect::Make(kMainImage, std::move(uniforms), star.getBounds(), &cache);
     ASSERT_NE(effect, nullptr);
-    effect->prepare(star.getBounds(), &cache);
 
     auto *uniformData = effect->getUniformData();
     ASSERT_NE(uniformData, nullptr);
@@ -507,12 +503,10 @@ TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
     tgfx::ImageInfo info = tgfx::ImageInfo::Make(kWidth, kHeight, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
 
     std::vector<Uniform> uniforms = {
-        {"iTime", UniformFormat::Float},
         {"aa", UniformFormat::Float},
     };
-    auto effect = ColorSourceEffect::Make(kXs3GWjMainImage, std::move(uniforms));
+    auto effect = ColorSourceEffect::Make(kXs3GWjMainImage, std::move(uniforms), fullFrame, &cache);
     ASSERT_NE(effect, nullptr);
-    effect->prepare(fullFrame, &cache);
 
     auto *uniformData = effect->getUniformData();
     ASSERT_NE(uniformData, nullptr);
@@ -528,6 +522,7 @@ TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
         float iTime;
         const char *name;
     };
+    constexpr float kFrameRate = 30.f;
     const Frame frames[] = {
         {5.0f, "margarita"},
         {15.0f, "plaid_meltdown"},
@@ -537,7 +532,8 @@ TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
     };
 
     for (const auto &frame : frames) {
-        uniformData->setData("iTime", frame.iTime);
+        effect->setFrameContext(
+            {frame.iTime, static_cast<int64_t>(frame.iTime * kFrameRate), kFrameRate});
 
         canvas->clear();
         canvas->drawRect(fullFrame, paint);
@@ -572,15 +568,8 @@ TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
     const tgfx::Rect fullFrame = tgfx::Rect::MakeWH(static_cast<float>(kWidth), static_cast<float>(kHeight));
     tgfx::ImageInfo info = tgfx::ImageInfo::Make(kWidth, kHeight, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
 
-    std::vector<Uniform> uniforms = {
-        {"iTime", UniformFormat::Float},
-    };
-    auto effect = ColorSourceEffect::Make(kCloudsMainImage, std::move(uniforms));
+    auto effect = ColorSourceEffect::Make(kCloudsMainImage, {}, fullFrame, &cache);
     ASSERT_NE(effect, nullptr);
-    effect->prepare(fullFrame, &cache);
-
-    auto *uniformData = effect->getUniformData();
-    ASSERT_NE(uniformData, nullptr);
 
     auto fillShader = effect->makeImageShader();
     ASSERT_NE(fillShader, nullptr);
@@ -591,6 +580,7 @@ TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
         float iTime;
         const char *name;
     };
+    constexpr float kFrameRate = 30.f;
     const Frame frames[] = {
         {0.0f, "t0"},
         {10.0f, "t10"},
@@ -599,7 +589,8 @@ TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
     };
 
     for (const auto &frame : frames) {
-        uniformData->setData("iTime", frame.iTime);
+        effect->setFrameContext(
+            {frame.iTime, static_cast<int64_t>(frame.iTime * kFrameRate), kFrameRate});
 
         canvas->clear();
         canvas->drawRect(fullFrame, paint);
@@ -632,19 +623,15 @@ TEST(ColorSourceEffectTest, SharesPipelineAcrossTwoEffectInstances) {
     // Same mainImage on two instances → one shared pipeline (fingerprint cache).
     // Two ColorSourceEffect instances are required for different uniforms in one
     // flush: RuntimeImageFilter keys its texture by the RuntimeEffect object.
-    std::vector<Uniform> leftUniforms = {{"iTime", UniformFormat::Float}};
-    std::vector<Uniform> rightUniforms = {{"iTime", UniformFormat::Float}};
-    auto leftEffect = ColorSourceEffect::Make(kCloudsMainImage, std::move(leftUniforms));
-    auto rightEffect = ColorSourceEffect::Make(kCloudsMainImage, std::move(rightUniforms));
+    const tgfx::Rect leftBounds = tgfx::Rect::MakeXYWH(0.0f, 0.0f, 128.0f, 256.0f);
+    const tgfx::Rect rightBounds = tgfx::Rect::MakeXYWH(128.0f, 0.0f, 128.0f, 256.0f);
+    auto leftEffect = ColorSourceEffect::Make(kCloudsMainImage, {}, leftBounds, &cache);
+    auto rightEffect = ColorSourceEffect::Make(kCloudsMainImage, {}, rightBounds, &cache);
     ASSERT_NE(leftEffect, nullptr);
     ASSERT_NE(rightEffect, nullptr);
 
-    const tgfx::Rect leftBounds = tgfx::Rect::MakeXYWH(0.0f, 0.0f, 128.0f, 256.0f);
-    const tgfx::Rect rightBounds = tgfx::Rect::MakeXYWH(128.0f, 0.0f, 128.0f, 256.0f);
-    leftEffect->prepare(leftBounds, &cache);
-    rightEffect->prepare(rightBounds, &cache);
-    leftEffect->getUniformData()->setData("iTime", 0.0f);
-    rightEffect->getUniformData()->setData("iTime", 40.0f);
+    leftEffect->setFrameContext({0.f, 0, 30.f});
+    rightEffect->setFrameContext({40.f, 1200, 30.f});
 
     auto leftShader = leftEffect->makeImageShader();
     auto rightShader = rightEffect->makeImageShader();

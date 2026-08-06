@@ -26,6 +26,48 @@
 
 namespace motion {
 
+namespace {
+
+bool HasUniform(const std::vector<Uniform> &uniforms, const std::string &name) {
+    for (const auto &uniform : uniforms) {
+        if (uniform.name() == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void PrependShadertoyBuiltinUniforms(std::vector<Uniform> &uniforms) {
+    std::vector<Uniform> builtins;
+    auto add = [&](const char *name, UniformFormat format, int count = 1) {
+        if (!HasUniform(uniforms, name)) {
+            builtins.emplace_back(name, format, count);
+        }
+    };
+
+    add("iResolution", UniformFormat::Float3);
+    add("iTime", UniformFormat::Float);
+    add("iTimeDelta", UniformFormat::Float);
+    add("iFrame", UniformFormat::Int);
+    add("iFrameRate", UniformFormat::Float);
+
+    uniforms.insert(uniforms.begin(), builtins.begin(), builtins.end());
+}
+
+void WriteShadertoyBuiltinUniforms(UniformData *uniformData, const tgfx::Rect &sourceBounds,
+                                   const ColorSourceFrameContext &frameContext, float timeDelta) {
+    const float resolution[3] = {sourceBounds.width(), sourceBounds.height(), 1.f};
+    uniformData->setData("iResolution", resolution, sizeof(resolution));
+    uniformData->setData("iTime", frameContext.timeSeconds);
+    uniformData->setData("iTimeDelta", timeDelta);
+
+    const int32_t frame = static_cast<int32_t>(frameContext.frameIndex);
+    uniformData->setData("iFrame", frame);
+    uniformData->setData("iFrameRate", frameContext.frameRate);
+}
+
+}  // namespace
+
 // Fullscreen triangle driven by aPosition (GLES-portable). Three clip-space
 // vertices cover [-1,1]^2; uv is derived from position. Avoid gl_VertexIndex —
 // RuntimeEffect shaders are GLES-style and GL backends compile them as-is.
@@ -109,24 +151,28 @@ static std::shared_ptr<tgfx::Image> GetPlaceholderImage() {
     return image;
 }
 
-std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(std::string mainImage, std::vector<Uniform> uniforms) {
-    return std::shared_ptr<ColorSourceEffect>(new ColorSourceEffect(std::move(mainImage), std::move(uniforms)));
+std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(std::string mainImage, std::vector<Uniform> uniforms,
+                                                           const tgfx::Rect &sourceBounds, RenderCache *cache) {
+    return std::shared_ptr<ColorSourceEffect>(
+        new ColorSourceEffect(std::move(mainImage), std::move(uniforms), sourceBounds, cache));
 }
 
-ColorSourceEffect::ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms)
-    : mainImage_(std::move(mainImage)) {
-    Uniform inputDimsData{"inputDimsData", UniformFormat::Float2};
-    uniforms.insert(uniforms.begin(), inputDimsData);
-    uniformData_ = std::make_unique<UniformData>(std::move(uniforms));
+ColorSourceEffect::ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms, tgfx::Rect sourceBounds,
+                                     RenderCache *cache)
+    : mainImage_(std::move(mainImage))
+    , sourceBounds_(sourceBounds)
+    , cache_(cache) {
+    std::vector<Uniform> finalUniforms = std::move(uniforms);
+    PrependShadertoyBuiltinUniforms(finalUniforms);
+    uniformData_ = std::make_unique<UniformData>(std::move(finalUniforms));
     uniformBytes_.assign(uniformData_->size(), 0);
     if (!uniformBytes_.empty()) {
         uniformData_->setBuffer(uniformBytes_.data());
     }
 }
 
-void ColorSourceEffect::prepare(const tgfx::Rect &bounds, RenderCache *cache) {
-    sourceBounds_ = bounds;
-    cache_ = cache;
+void ColorSourceEffect::setFrameContext(ColorSourceFrameContext frameContext) {
+    frameContext_ = frameContext;
 }
 
 UniformData *ColorSourceEffect::getUniformData() const {
@@ -255,8 +301,15 @@ bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<
         return false;
     }
 
-    const float inputDims[2] = {sourceBounds_.width(), sourceBounds_.height()};
-    uniformData_->setData("inputDimsData", inputDims, sizeof(inputDims));
+    float timeDelta = 0.f;
+    if (hasPreviousTime_) {
+        timeDelta = frameContext_.timeSeconds - lastTimeSeconds_;
+    } else if (frameContext_.frameRate > 0.f) {
+        timeDelta = 1.f / frameContext_.frameRate;
+    }
+    lastTimeSeconds_ = frameContext_.timeSeconds;
+    hasPreviousTime_ = true;
+    WriteShadertoyBuiltinUniforms(uniformData_.get(), sourceBounds_, frameContext_, timeDelta);
 
     auto slice = cache_->acquireUniformSlice(gpu, uniformBytes_.size());
     if (slice.buffer == nullptr) {

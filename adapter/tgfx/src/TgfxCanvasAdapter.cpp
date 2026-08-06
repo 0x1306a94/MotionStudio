@@ -21,6 +21,7 @@
 
 #include "MotionStudio/render/ImageScaleLayout.h"
 #include "MotionStudio/textlayout/TextLayout.h"
+#include "RenderCache.h"
 #include "TextPathLayout.h"
 #include "TgfxGlyphMetrics.h"
 #include "TgfxImageCache.h"
@@ -123,7 +124,8 @@ void DrawTextOnPath(tgfx::Canvas *canvas, const TextDrawParams &params, float op
 TgfxCanvasAdapter::TgfxCanvasAdapter()
     : pathCache_(std::make_unique<TgfxPathCache>())
     , isolationStack_(std::make_unique<TgfxIsolationStack>())
-    , imageCache_(std::make_unique<TgfxImageCache>()) {
+    , imageCache_(std::make_unique<TgfxImageCache>())
+    , renderCache_(std::make_unique<RenderCache>()) {
 }
 
 TgfxCanvasAdapter::~TgfxCanvasAdapter() {
@@ -151,8 +153,7 @@ void TgfxCanvasAdapter::releaseGpuCaches(tgfx::Context *context) {
 void TgfxCanvasAdapter::drawPreviewBackdrop() {
 }
 
-void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,
-                                     float cornerRadius) {
+void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor, float cornerRadius) {
     if (!surface_ || sceneWidth <= 0 || sceneHeight <= 0) {
         return;
     }
@@ -177,8 +178,8 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
     }
 }
 
-void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
-                                   float cornerRadius) {
+void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor, float cornerRadius) {
+    renderCache_->advanceUniformFrame();
     // Release before acquireTarget: size changes may destroy the old surface/canvas.
     frameRestore_.reset();
     if (!acquireTarget(width, height) || !surface_) {

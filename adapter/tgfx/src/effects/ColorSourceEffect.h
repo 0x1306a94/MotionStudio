@@ -3,6 +3,7 @@
 #include "Uniform.h"
 #include "UniformData.h"
 
+#include <tgfx/core/Rect.h>
 #include <tgfx/gpu/RuntimeEffect.h>
 
 #include <memory>
@@ -19,24 +20,31 @@ class Shader;
 namespace motion {
 class RenderCache;
 
+// Shadertoy-compatible playback context written into built-in uniforms each draw.
+struct ColorSourceFrameContext {
+    float timeSeconds = 0.f;
+    int64_t frameIndex = 0;
+    float frameRate = 30.f;
+};
+
 /**
  * Lightweight procedural color RuntimeEffect. User supplies a GLSL mainImage(uv)
- * plus uniforms; output is a generated color field sized to prepare()'s AABB.
+ * plus uniforms; output is a generated color field sized to sourceBounds.
  */
 class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_from_this<ColorSourceEffect> {
   public:
-    static std::shared_ptr<ColorSourceEffect> Make(std::string mainImage, std::vector<Uniform> uniforms);
+    static std::shared_ptr<ColorSourceEffect> Make(std::string mainImage, std::vector<Uniform> uniforms,
+                                                   const tgfx::Rect &sourceBounds, RenderCache *cache);
 
-    // bounds.size drives the offscreen color field; bounds.origin is baked into
-    // makeImageShader()'s local matrix so callers can draw with world XYWH.
-    void prepare(const tgfx::Rect &bounds, RenderCache *cache);
+    void setFrameContext(ColorSourceFrameContext frameContext);
     UniformData *getUniformData() const;
 
-    // Builds a Clamp ImageShader placed at prepare()'s bounds origin.
+    // Builds a Clamp ImageShader placed at sourceBounds origin.
     std::shared_ptr<tgfx::Shader> makeImageShader();
 
   private:
-    ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms);
+    ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms, tgfx::Rect sourceBounds,
+                      RenderCache *cache);
 
     std::shared_ptr<tgfx::RenderPipeline> createPipeline(tgfx::GPU *gpu) const;
     std::shared_ptr<tgfx::RenderPipeline> getOrCreatePipeline(tgfx::GPU *gpu) const;
@@ -52,5 +60,8 @@ class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_
     mutable std::vector<uint8_t> uniformBytes_ = {};
     tgfx::Rect sourceBounds_ = {};
     RenderCache *cache_ = nullptr;
+    ColorSourceFrameContext frameContext_ = {};
+    mutable float lastTimeSeconds_ = 0.f;
+    mutable bool hasPreviousTime_ = false;
 };
 }  // namespace motion
