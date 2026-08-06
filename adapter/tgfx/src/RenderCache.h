@@ -1,6 +1,6 @@
 #pragma once
 
-#include "effects/CustomColorEffectResources.h"
+#include "effects/ColorSourceEffectResources.h"
 
 #include <memory>
 #include <string>
@@ -31,9 +31,9 @@ class RenderCache {
         return context_;
     }
 
-    CustomColorEffectResource *findCustomColorEffectResource(EntityId ID);
+    ColorSourceEffectResource *findColorSourceEffectResource(EntityId ID);
 
-    void addCustomColorEffectResource(EntityId ID, std::unique_ptr<CustomColorEffectResource> resources);
+    void addColorSourceEffectResource(EntityId ID, std::unique_ptr<ColorSourceEffectResource> resources);
 
     void setMainImageSource(EntityId ID, std::string source);
 
@@ -47,7 +47,7 @@ class RenderCache {
   private:
     uint32_t contextID_ = 0;
     tgfx::Context *context_ = nullptr;
-    std::unordered_map<EntityId, std::unique_ptr<CustomColorEffectResource>> customColorEffectResourceMap_ = {};
+    std::unordered_map<EntityId, std::unique_ptr<ColorSourceEffectResource>> colorSourceEffectResourceMap_ = {};
     std::unordered_map<EntityId, std::string> mainImageSourceMap_ = {};
     std::shared_ptr<tgfx::GPUBuffer> fullscreenVertexBuffer_ = nullptr;
 };

@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 
 #include "RenderCache.h"
-#include "effects/CustomColorEffect.h"
+#include "effects/ColorSourceEffect.h"
 #include "effects/Uniform.h"
 
 #include <MotionStudio/common/EntityId.h>
@@ -27,7 +27,7 @@
 #include <tgfx/gpu/GPU.h>
 #include <tgfx/gpu/metal/MetalDevice.h>
 
-using motion::CustomColorEffect;
+using motion::ColorSourceEffect;
 using motion::EntityId;
 using motion::RenderCache;
 using motion::Uniform;
@@ -35,7 +35,7 @@ using motion::UniformFormat;
 
 namespace {
 
-// Ripple body for CustomColorEffect. UniformBlock (inputDimsData + rippleCount)
+// Ripple body for ColorSourceEffect. UniformBlock (inputDimsData + rippleCount)
 // is injected by BuildFragmentShaderSource; this only supplies the mainImage(uv)
 // entry used by the generated main().
 constexpr const char *kMainImage = R"GLSL(
@@ -171,7 +171,7 @@ std::string OutputPath(const std::string &fileName) {
 
 }  // namespace
 
-TEST(CustomColorEffectTest, FillsStarPathWithEffect) {
+TEST(ColorSourceEffectTest, FillsStarPathWithEffect) {
     constexpr int kSize = 256;
     auto env = TestEnvironment::Make(kSize, kSize);
     if (!env) {
@@ -192,7 +192,7 @@ TEST(CustomColorEffectTest, FillsStarPathWithEffect) {
     std::vector<Uniform> uniforms = {
         {"rippleCount", UniformFormat::Float},
     };
-    auto effect = CustomColorEffect::Make(effectId, std::move(uniforms));
+    auto effect = ColorSourceEffect::Make(effectId, std::move(uniforms));
     ASSERT_NE(effect, nullptr);
     effect->prepare(star.getBounds().size(), &cache);
 
@@ -214,7 +214,7 @@ TEST(CustomColorEffectTest, FillsStarPathWithEffect) {
     {
         std::vector<uint8_t> pixels(static_cast<size_t>(info.rowBytes() * info.height()));
         ASSERT_TRUE(env->surface()->readPixels(info, pixels.data()));
-        const std::string webpPath = OutputPath("CustomColorEffect_RippleStar_Fill.webp");
+        const std::string webpPath = OutputPath("ColorSourceEffect_RippleStar_Fill.webp");
         ASSERT_TRUE(SaveWebp(pixels, kSize, kSize, webpPath))
             << "failed to save " << webpPath;
     }
@@ -226,7 +226,7 @@ TEST(CustomColorEffectTest, FillsStarPathWithEffect) {
     {
         std::vector<uint8_t> pixels(static_cast<size_t>(info.rowBytes() * info.height()));
         ASSERT_TRUE(env->surface()->readPixels(info, pixels.data()));
-        const std::string webpPath = OutputPath("CustomColorEffect_RippleStar_Stroke.webp");
+        const std::string webpPath = OutputPath("ColorSourceEffect_RippleStar_Stroke.webp");
         ASSERT_TRUE(SaveWebp(pixels, kSize, kSize, webpPath))
             << "failed to save " << webpPath;
     }

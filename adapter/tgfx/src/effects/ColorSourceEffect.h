@@ -19,15 +19,15 @@ class Shader;
 
 namespace motion {
 class RenderCache;
-struct CustomColorEffectResource;
+struct ColorSourceEffectResource;
 
 /**
  * Lightweight procedural color RuntimeEffect. User supplies a GLSL mainImage(uv)
  * plus uniforms; output is a generated color field sized to prepare()'s AABB.
  */
-class CustomColorEffect : public tgfx::RuntimeEffect, public std::enable_shared_from_this<CustomColorEffect> {
+class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_from_this<ColorSourceEffect> {
   public:
-    static std::shared_ptr<CustomColorEffect> Make(EntityId effectId, std::vector<Uniform> uniforms);
+    static std::shared_ptr<ColorSourceEffect> Make(EntityId effectId, std::vector<Uniform> uniforms);
 
     void prepare(const tgfx::Size &sourceSize, RenderCache *cache);
     UniformData *getUniformData() const;
@@ -37,10 +37,10 @@ class CustomColorEffect : public tgfx::RuntimeEffect, public std::enable_shared_
     std::shared_ptr<tgfx::Shader> makeImageShader();
 
   private:
-    CustomColorEffect(EntityId effectId, std::vector<Uniform> uniforms);
+    ColorSourceEffect(EntityId effectId, std::vector<Uniform> uniforms);
 
     std::shared_ptr<tgfx::RenderPipeline> createPipeline(tgfx::GPU *gpu) const;
-    CustomColorEffectResource *getEffectResource(tgfx::GPU *gpu) const;
+    ColorSourceEffectResource *getEffectResource(tgfx::GPU *gpu) const;
 
     tgfx::Rect filterBounds(const tgfx::Rect &srcRect, tgfx::MapDirection) const override;
 

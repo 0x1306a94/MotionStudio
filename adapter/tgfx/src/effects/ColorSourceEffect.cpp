@@ -1,4 +1,4 @@
-#include "CustomColorEffect.h"
+#include "ColorSourceEffect.h"
 
 #include "RenderCache.h"
 #include "UniformData.h"
@@ -109,11 +109,11 @@ static std::shared_ptr<tgfx::Image> GetPlaceholderImage() {
     return image;
 }
 
-std::shared_ptr<CustomColorEffect> CustomColorEffect::Make(EntityId effectId, std::vector<Uniform> uniforms) {
-    return std::shared_ptr<CustomColorEffect>(new CustomColorEffect(effectId, std::move(uniforms)));
+std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(EntityId effectId, std::vector<Uniform> uniforms) {
+    return std::shared_ptr<ColorSourceEffect>(new ColorSourceEffect(effectId, std::move(uniforms)));
 }
 
-CustomColorEffect::CustomColorEffect(EntityId effectId, std::vector<Uniform> uniforms)
+ColorSourceEffect::ColorSourceEffect(EntityId effectId, std::vector<Uniform> uniforms)
     : effectId_(effectId) {
     Uniform inputDimsData{"inputDimsData", UniformFormat::Float2};
     uniforms.insert(uniforms.begin(), inputDimsData);
@@ -124,16 +124,16 @@ CustomColorEffect::CustomColorEffect(EntityId effectId, std::vector<Uniform> uni
     }
 }
 
-void CustomColorEffect::prepare(const tgfx::Size &sourceSize, RenderCache *cache) {
+void ColorSourceEffect::prepare(const tgfx::Size &sourceSize, RenderCache *cache) {
     sourceSize_ = sourceSize;
     cache_ = cache;
 }
 
-UniformData *CustomColorEffect::getUniformData() const {
+UniformData *ColorSourceEffect::getUniformData() const {
     return uniformData_.get();
 }
 
-std::shared_ptr<tgfx::Shader> CustomColorEffect::makeImageShader() {
+std::shared_ptr<tgfx::Shader> ColorSourceEffect::makeImageShader() {
     auto source = GetPlaceholderImage();
     if (source == nullptr) {
         return nullptr;
@@ -148,7 +148,7 @@ std::shared_ptr<tgfx::Shader> CustomColorEffect::makeImageShader() {
     return tgfx::Shader::MakeImageShader(filtered, tgfx::TileMode::Clamp, tgfx::TileMode::Clamp);
 }
 
-std::shared_ptr<tgfx::RenderPipeline> CustomColorEffect::createPipeline(tgfx::GPU *gpu) const {
+std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::createPipeline(tgfx::GPU *gpu) const {
     if (cache_ == nullptr || uniformData_ == nullptr || gpu == nullptr) {
         return nullptr;
     }
@@ -190,8 +190,8 @@ std::shared_ptr<tgfx::RenderPipeline> CustomColorEffect::createPipeline(tgfx::GP
     return gpu->createRenderPipeline(pipelineDesc);
 }
 
-CustomColorEffectResource *CustomColorEffect::getEffectResource(tgfx::GPU *gpu) const {
-    auto resources = cache_->findCustomColorEffectResource(effectId_);
+ColorSourceEffectResource *ColorSourceEffect::getEffectResource(tgfx::GPU *gpu) const {
+    auto resources = cache_->findColorSourceEffectResource(effectId_);
     if (resources == nullptr) {
         auto pipeline = createPipeline(gpu);
         if (pipeline == nullptr) {
@@ -203,21 +203,21 @@ CustomColorEffectResource *CustomColorEffect::getEffectResource(tgfx::GPU *gpu) 
             return nullptr;
         }
 
-        auto newResources = std::make_unique<CustomColorEffectResource>();
+        auto newResources = std::make_unique<ColorSourceEffectResource>();
         newResources->pipeline = std::move(pipeline);
         newResources->uniformBuffer = std::move(buffer);
         resources = newResources.get();
-        cache_->addCustomColorEffectResource(effectId_, std::move(newResources));
+        cache_->addColorSourceEffectResource(effectId_, std::move(newResources));
     }
     assert(resources->pipeline != nullptr);
     return resources;
 }
 
-tgfx::Rect CustomColorEffect::filterBounds(const tgfx::Rect &srcRect, tgfx::MapDirection) const {
+tgfx::Rect ColorSourceEffect::filterBounds(const tgfx::Rect &srcRect, tgfx::MapDirection) const {
     return tgfx::Rect::MakeWH(sourceSize_.width, sourceSize_.height);
 }
 
-bool CustomColorEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> & /*inputTextures*/, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point & /*offset*/) const {
+bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> & /*inputTextures*/, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point & /*offset*/) const {
     if (sourceSize_.isZero() || cache_ == nullptr || uniformData_ == nullptr || outputTexture == nullptr || encoder == nullptr) {
         return false;
     }

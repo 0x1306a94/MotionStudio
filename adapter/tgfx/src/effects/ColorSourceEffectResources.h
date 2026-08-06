@@ -9,11 +9,11 @@ class GPUBuffer;
 
 namespace motion {
 
-struct CustomColorEffectResource {
+struct ColorSourceEffectResource {
     std::shared_ptr<tgfx::RenderPipeline> pipeline = nullptr;
     std::shared_ptr<tgfx::GPUBuffer> uniformBuffer = nullptr;
 
-    virtual ~CustomColorEffectResource() = default;
+    virtual ~ColorSourceEffectResource() = default;
 };
 
 };  // namespace motion

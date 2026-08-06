@@ -43,25 +43,25 @@ void RenderCache::detachFromContext() {
     context_ = nullptr;
 }
 
-CustomColorEffectResource *RenderCache::findCustomColorEffectResource(EntityId ID) {
-    auto result = customColorEffectResourceMap_.find(ID);
-    if (result != customColorEffectResourceMap_.end()) {
+ColorSourceEffectResource *RenderCache::findColorSourceEffectResource(EntityId ID) {
+    auto result = colorSourceEffectResourceMap_.find(ID);
+    if (result != colorSourceEffectResourceMap_.end()) {
         return result->second.get();
     }
     return nullptr;
 }
 
-void RenderCache::addCustomColorEffectResource(EntityId ID, std::unique_ptr<CustomColorEffectResource> resources) {
+void RenderCache::addColorSourceEffectResource(EntityId ID, std::unique_ptr<ColorSourceEffectResource> resources) {
     if (resources == nullptr) {
         return;
     }
-    customColorEffectResourceMap_[ID] = std::move(resources);
+    colorSourceEffectResourceMap_[ID] = std::move(resources);
 }
 
 void RenderCache::setMainImageSource(EntityId ID, std::string source) {
     mainImageSourceMap_[ID] = std::move(source);
     // mainImage feeds fragment compilation; drop cached pipeline for this id.
-    customColorEffectResourceMap_.erase(ID);
+    colorSourceEffectResourceMap_.erase(ID);
 }
 
 const std::string *RenderCache::findMainImageSource(EntityId ID) const {
@@ -95,7 +95,7 @@ std::shared_ptr<tgfx::GPUBuffer> RenderCache::getFullscreenVertexBuffer(tgfx::GP
 }
 
 void RenderCache::releaseAll() {
-    customColorEffectResourceMap_.clear();
+    colorSourceEffectResourceMap_.clear();
     fullscreenVertexBuffer_ = nullptr;
     contextID_ = 0;
 }

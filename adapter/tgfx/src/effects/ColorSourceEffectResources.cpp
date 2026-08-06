@@ -1,4 +1,4 @@
-#include "CustomColorEffectResources.h"
+#include "ColorSourceEffectResources.h"
 
 namespace motion {
 
