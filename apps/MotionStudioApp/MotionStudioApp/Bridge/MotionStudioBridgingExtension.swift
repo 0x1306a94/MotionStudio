@@ -344,6 +344,37 @@ struct CanvasFrameProfile: Equatable {
     }
 }
 
+extension MS_UNIFORM_FORMAT: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_UNIFORM_FORMAT] {
+        [.FLOAT, .FLOAT2, .FLOAT3, .FLOAT4]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+}
+
+extension MS_PAINT_MODE: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_PAINT_MODE] {
+        [.COLOR, .SHADER]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .COLOR:
+            "Color"
+        case .SHADER:
+            "Shader"
+        default:
+            "Invalid"
+        }
+    }
+}
+
 extension MS_PATH_EDIT: @retroactive Equatable, @retroactive Hashable {}
 
 extension MS_PATH_HANDLE: @retroactive Equatable, @retroactive Hashable {}

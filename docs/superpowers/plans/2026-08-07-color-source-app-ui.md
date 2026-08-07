@@ -134,7 +134,7 @@ bool ms_document_set_style_paint_mode(MSDocument *document, uint64_t layerId, in
 
 ### Task 2: ProjectPanel Shaders 列表 + ShaderEditorSheet
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/ProjectPanel/ProjectPanelView.swift`
@@ -146,7 +146,7 @@ bool ms_document_set_style_paint_mode(MSDocument *document, uint64_t layerId, in
 - Consumes: Task 1 的 `shaderIDs` / `addShader` / `updateShader` / `removeShader` / `shaderMainImage` / uniform getters
 - Produces: `ShaderEditorSheet(core:shaderID:onDismiss:)`；`ProjectPanelView` 增加 `onEditShader: (UInt64) -> Void`、`onNewShader: () -> Void` 等回调
 
-- [ ] **Step 1: ProjectPanel Shaders 段**
+- [x] **Step 1: ProjectPanel Shaders 段**
 
 对标 Assets：插在 Assets 与 Compositions 之间。
 
@@ -170,7 +170,7 @@ if shaders.isEmpty {
 - `onNewShader`：`perform("Add Shader") { let id = core.addShader(name: uniqueName); … }` 后打开 Sheet。
 - Delete：`if !core.removeShader(id) { show alert "Still referenced by a Fill or Stroke." }`。
 
-- [ ] **Step 2: ShaderEditorSheet（Shadertoy 布局）**
+- [x] **Step 2: ShaderEditorSheet（Shadertoy 布局）**
 
 草稿态 `@State`：`name`、`mainImage`、`uniforms: [(name, format)]`；打开时从 core 灌入。
 
@@ -204,11 +204,11 @@ Cancel：dismiss，不写 core。
 | iFrame | frame index |
 | iFrameRate | composition fps |
 
-- [ ] **Step 3: 接线 present Sheet**
+- [x] **Step 3: 接线 present Sheet**
 
 Editor 用 `.sheet` / `UIHostingController` 与现有 Inspector 嵌入方式一致；Fill 行 Edit Source（Task 3）复用同一 Sheet。
 
-- [ ] **Step 4: 手动验证 + commit**
+- [x] **Step 4: 手动验证 + commit**
 
 用 Xcode 跑 App：New Shader → 改 mainImage/加 uniform → Save → 列表名更新；删未引用成功；绑引用后删应 Alert（可先用临时 bridge 调 paintMode 测，或等 Task 3）。
 

@@ -49,7 +49,7 @@ final class MotionDocumentCore {
         self.handle = handle
     }
 
-    nonisolated init(json: Data) throws {
+    convenience nonisolated init(json: Data) throws {
         try self.init(documentJSON: json, shadersJSON: nil)
     }
 
@@ -160,6 +160,10 @@ final class MotionDocumentCore {
             changed()
         }
         return ok
+    }
+
+    func shaderIsReferenced(_ shaderID: UInt64) -> Bool {
+        ms_document_shader_is_referenced(handle, shaderID)
     }
 
     @discardableResult

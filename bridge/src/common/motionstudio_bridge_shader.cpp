@@ -200,6 +200,14 @@ bool ms_document_remove_shader(MSDocument *document, uint64_t shaderId) {
     return FindShader(*document->document, id) == nullptr;
 }
 
+bool ms_document_shader_is_referenced(MSDocument *document, uint64_t shaderId) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return false;
+    }
+    return ShaderIsReferenced(*document->document, EntityId{shaderId});
+}
+
 bool ms_document_rename_shader(MSDocument *document, uint64_t shaderId, const char *name) {
     DocumentLock lock(document);
     if (document == nullptr || name == nullptr) {

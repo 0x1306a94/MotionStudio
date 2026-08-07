@@ -24,6 +24,9 @@ extension EditorViewController {
             importImage: { [weak self] in
                 self?.presentImageImport()
             },
+            perform: { [weak self] name, edit in
+                self?.perform(name, edit: edit)
+            },
         ))
         embed(projectHost, in: projectPanel)
         projectHostingController = projectHost

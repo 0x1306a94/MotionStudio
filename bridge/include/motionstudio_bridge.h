@@ -633,6 +633,7 @@ uint64_t ms_document_add_shader(MSDocument *document, const char *name);
 bool ms_document_update_shader(MSDocument *document, uint64_t shaderId, const char *name,
                                const char *mainImage, const char *uniformsJson);
 bool ms_document_remove_shader(MSDocument *document, uint64_t shaderId);  // false if referenced
+bool ms_document_shader_is_referenced(MSDocument *document, uint64_t shaderId);
 bool ms_document_rename_shader(MSDocument *document, uint64_t shaderId, const char *name);
 
 char *ms_document_serialize_shaders(MSDocument *document);  // ms_string_free
