@@ -128,13 +128,13 @@ extension EditorViewController {
     func currentCanvasViewportInsets() -> UIEdgeInsets {
         var insets = UIEdgeInsets.zero
         if isProjectPanelVisible {
-            insets.left = projectPanel.frame.maxX
+            insets.left = projectPanel.frame.maxX + 20
         }
         if isInspectorPanelVisible {
-            insets.right = view.bounds.width - inspectorPanel.frame.minX
+            insets.right = view.bounds.width - inspectorPanel.frame.minX + 20
         }
-        insets.top = topToolbar.frame.maxY
-        insets.bottom = view.bounds.height - timelinePanel.frame.minY
+        insets.top = topToolbar.frame.maxY + 20
+        insets.bottom = 20 + Metrics.creationToolbarSpacing + Metrics.creationToolbarHeight + 20
         return insets
     }
 

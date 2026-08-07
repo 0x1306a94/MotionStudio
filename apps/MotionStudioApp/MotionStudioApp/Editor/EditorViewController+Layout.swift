@@ -15,7 +15,7 @@ extension EditorViewController {
     func configureCanvas() {
         canvasViewport.translatesAutoresizingMaskIntoConstraints = false
         canvasViewport.clipsToBounds = false
-        view.addSubview(canvasViewport)
+        view.insertSubview(canvasViewport, belowSubview: timelinePanel)
 
         let canvasController = CanvasViewController(document: document.modelDocument, editorState: editorState, playheadClock: playheadClock, clearSelection: { [weak self] in
             self?.clearSelection()
@@ -35,7 +35,7 @@ extension EditorViewController {
             canvasViewport.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             canvasViewport.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             canvasViewport.topAnchor.constraint(equalTo: view.topAnchor),
-            canvasViewport.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            canvasViewport.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor, constant: 20),
 
             canvasController.view.leadingAnchor.constraint(equalTo: canvasViewport.leadingAnchor),
             canvasController.view.trailingAnchor.constraint(equalTo: canvasViewport.trailingAnchor),

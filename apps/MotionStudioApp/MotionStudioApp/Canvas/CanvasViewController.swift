@@ -65,8 +65,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     /// Current unobscured area insets (panels/toolbar/timeline), queried each
     /// time the composition is re-fitted (initial display, double-tap reset).
     var viewportInsetsProvider: (() -> UIEdgeInsets)?
-    private var viewDidAppearOnce = false
-    private var didApplyInitialFit = false
     private var lastPinchScale: CGFloat = 1
     private var lastTouchPanTranslation: CGPoint = .zero
     private var lastScrollTranslation: CGPoint = .zero
@@ -183,8 +181,11 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        viewDidAppearOnce = true
-        applyInitialFitIfNeeded()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        resetViewTransform()
     }
 
     private func setupMetalView() {
@@ -318,14 +319,10 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         view.releaseDrawables()
-        applyInitialFitIfNeeded()
         requestDraw()
     }
 
     func draw(in view: MTKView) {
-        // First frame is held back until the initial panel-aware fit, so the
-        // composition never flashes centered on the full canvas.
-        guard didApplyInitialFit else { return }
         let drawStartTime = CACurrentMediaTime()
         let syncToDrawMilliseconds = lastSyncTime.map { (drawStartTime - $0) * 1000 }
         let requestToDrawMilliseconds = lastDrawRequestTime.map { (drawStartTime - $0) * 1000 }
@@ -468,21 +465,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     // MARK: - Canvas view transform (zoom & pan)
-
-    /// Applies the panel-aware fit once, after the view appeared with a valid drawable.
-    func applyInitialFitIfNeeded() {
-        guard !didApplyInitialFit,
-              viewDidAppearOnce,
-              view.bounds.width > 0,
-              view.bounds.height > 0,
-              metalView.drawableSize.width > 0,
-              metalView.drawableSize.height > 0
-        else {
-            return
-        }
-        didApplyInitialFit = true
-        resetViewTransform()
-    }
 
     @objc private func handleCanvasDoubleTap(_ gesture: UITapGestureRecognizer) {
         guard editorState.tool == .select else {

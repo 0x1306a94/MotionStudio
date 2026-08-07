@@ -122,9 +122,9 @@ final class EditorViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         title = document.isTemporaryDraft ? "Motion Studio" : document.saveURL.deletingPathExtension().lastPathComponent
+        configureTimeline()
         configureCanvas()
         configureTopToolbar()
-        configureTimeline()
         configureSidePanels()
         configureCreationToolbar()
         observeCreationToolChanges()
