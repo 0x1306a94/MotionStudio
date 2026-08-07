@@ -41,6 +41,10 @@ enum class CommandKind {
     SetTextFont,
     SetTextFontSize,
     SetTextSize,
+    AddShader,
+    RemoveShader,
+    UpdateShaderDefinition,
+    SetStylePaintMode,
     Composite,
 };
 

@@ -428,7 +428,7 @@ git commit -m "Serialize shader libraries without bumping document schema versio
 
 ### Task 6: Undo 命令 — shader CRUD + SetStylePaintMode
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/undo/AddShaderCommand.h` + `.cpp`
@@ -451,7 +451,7 @@ git commit -m "Serialize shader libraries without bumping document schema versio
 //   Shader ← FindShader + BindShaderPaint；找不到则跳过
 ```
 
-- [ ] **Step 1: 测试删除被引用 shader 不删除**
+- [x] **Step 1: 测试删除被引用 shader 不删除**
 
 ```cpp
 TEST(ShaderCommandTest, RemoveShaderSkippedWhenReferenced) {
@@ -467,11 +467,11 @@ TEST(ShaderCommandTest, SetPaintModeToShaderBindsDefaults) {
 }
 ```
 
-- [ ] **Step 2: 实现命令并通过**
+- [x] **Step 2: 实现命令并通过**
 
-- [ ] **Step 3: UpdateShaderDefinition 后 Realign 所有引用样式的测试**
+- [x] **Step 3: UpdateShaderDefinition 后 Realign 所有引用样式的测试**
 
-- [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 4: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add include/MotionStudio/undo/ src/undo/ tests/undo/ShaderCommandTest.cpp \
