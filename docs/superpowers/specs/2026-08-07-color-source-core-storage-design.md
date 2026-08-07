@@ -188,7 +188,7 @@ Core 不知道 tgfx；bridge / 预览管线在画 Fill/Stroke 时组装。
 
 | 文件 | 版本策略 |
 |---|---|
-| `document.json` | `schemaVersion` **升级**（例如 1→2）；旧档无 `paintMode` → 默认 `Color` |
+| `document.json` | `schemaVersion` **不升**（保持 1）；缺 `paintMode` / shader 字段 → 默认 `Color` |
 | `shader.json` | 独立 `schemaVersion`，从 1 起 |
 
 `document.json` **不**内嵌完整 shader 源码，只存引用与 values。
@@ -240,7 +240,7 @@ v1：**不**扩展 `EntityIndex`；`findShader(id)` 扫 `Document.shaders`（与
 
 ## 实现分期（建议）
 
-1. Core 模型 + `UniformFormat` 上移 + serializer（document v2 + shader.json）
+1. Core 模型 + `UniformFormat` 上移 + serializer（document schema 不升 + shader.json）
 2. undo 命令 / PropertyPath / bridge
 3. 预览：SceneEvaluator → adapter ColorSourceEffect
 4. App：包读写 `shader.json` + Inspector 最小编辑

@@ -17,7 +17,7 @@
 - **自动 commit：** 每完成一个 Task（或可独立验证的 Step 组）必须提交；**提交前先**把本 plan 对应 checkbox 改为 `[x]`、更新 `**Status:**`，再 `git add` 代码与本 plan 一并 commit（或 plan 紧随其后单独 commit）。
 - Commit 信息：英语、≤120 字符、句号结尾、句中无其他标点；侧重用户可感知变化。
 - 按本 plan 实现时：每完成一个 Step 立刻勾选；未同步 plan 视为该步未完成。
-- `document.json`：`dto::SCHEMA_VERSION` 升为 **2**；v1 缺字段 → `paintMode=Color`。
+- `document.json`：`dto::SCHEMA_VERSION` **保持 1**；缺 `paintMode` / shader 字段 → 默认 `Color`（与 VertexMirrorMode 同样策略）。
 - `shader.json`：独立 `schemaVersion = 1`。
 - 宣称 Core 完成前优先 ASan 构建：
   `cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON && cmake --build build`
@@ -40,14 +40,14 @@
 | `include/MotionStudio/model/StylePaintMode.h` | `Color` / `Shader` |
 | `include/MotionStudio/model/LayerStyle.h` | Fill/Stroke 增加 paintMode / shaderId / uniformValues |
 | `include/MotionStudio/model/Document.h` + `src/model/Document.cpp` | `shaders`；`findShader`；引用计数/删除校验辅助 |
-| `include/MotionStudio/serialization/Dto.h` | `SCHEMA_VERSION = 2`；format/kind 字符串映射 |
+| `include/MotionStudio/serialization/Dto.h` | `SCHEMA_VERSION` 保持 1；format/kind/paintMode 字符串映射 |
 | `include/MotionStudio/serialization/Serializer.h` + `Serializer.cpp` | 样式字段；`serializeShaders` / `deserializeShaders` |
-| `src/serialization/SchemaMigrator.cpp` | 允许 fromVersion 1→2（文档侧无结构性迁移动作即可） |
+| `src/serialization/SchemaMigrator.cpp` | **不改**（document schema 不升版） |
 | `include/MotionStudio/model/PropertyPath.h` + `PropertyPath.cpp` | `styles[i].uniformValues.<name>` |
 | `include/MotionStudio/undo/*`（新建命令） | Add/Remove/UpdateShader、SetStylePaintMode |
 | `tests/common/Vec3Test.cpp` | Vec3 基础 |
 | `tests/model/ShaderUniformValuesTest.cpp` | realign / defaults |
-| `tests/serialization/SerializerTest.cpp` | document v2 + shaders round-trip |
+| `tests/serialization/SerializerTest.cpp` | shaders + Fill shader 字段 round-trip；缺字段默认 Color |
 | `tests/model/PropertyPathTest.cpp` 或新建 | uniformValues 解析 |
 | `tests/undo/*` | 删引用中 shader 失败；模式切换 |
 | `docs/data-model.md` / `docs/color-source-effect.md` | 同步模型与包文件说明 |
@@ -311,20 +311,20 @@ git commit -m "Add XOR color and shader paint modes on Fill and Stroke."
 
 ---
 
-### Task 5: 序列化 `shader.json` + document schema v2
+### Task 5: 序列化 `shader.json` + document 可选 paint 字段（schema 不升）
 
 **Status:** 待开始
 
 **Files:**
-- Modify: `include/MotionStudio/serialization/Dto.h` — `SCHEMA_VERSION = 2`；增加 format/kind/paintMode 字符串映射
+- Modify: `include/MotionStudio/serialization/Dto.h` — **不改** `SCHEMA_VERSION`（保持 1）；增加 format/kind/paintMode 字符串映射
 - Modify: `include/MotionStudio/serialization/Serializer.h` — 增加：
   ```cpp
   static std::string serializeShaders(const Document &document);
   static Expected<std::vector<ShaderDefinition>, std::string> deserializeShaders(const std::string &jsonText);
   ```
   `deserialize` 文档时：校验 Shader 模式引用；可选接收已加载的 shaders（见下）
-- Modify: `Serializer.cpp` — LayerStyle 读写 `paintMode`/`shaderId`/`uniformValues`；Color 模式不写 shader 字段
-- Modify: `SchemaMigrator.cpp` — `fromVersion` 允许 1，目标 2；v1→2 无字段变换
+- Modify: `Serializer.cpp` — LayerStyle 读写 `paintMode`/`shaderId`/`uniformValues`；缺字段 → Color；Color 模式不写 shader 字段
+- Modify: `SchemaMigrator.cpp` — **不改**
 - Modify: `deserialize` 流程：先应能单独 `deserializeShaders`；文档反序列化假设 `document.shaders` 已由调用方填入 **或** `deserialize` 只还原引用、由 App 合并。  
   **本 Task 约定：**  
   1. `deserializeShaders` → `vector<ShaderDefinition>`  
@@ -389,32 +389,32 @@ TEST(SerializerTest, ShaderLibraryRoundTrip) {
     EXPECT_EQ((*loaded)[0].mainImage, shader.mainImage);
 }
 
-TEST(SerializerTest, DocumentV2ShaderPaintRoundTrip) {
+TEST(SerializerTest, DocumentShaderPaintRoundTrip) {
     // 建最小 composition+layer+Fill Shader 模式，serialize/deserialize，
-    // 合并 shaders，ValidateShaderReferences 成功，uniform 静态值一致
+    // 合并 shaders，ValidateShaderReferences 成功，uniform 静态值一致；schemaVersion 仍为 1
 }
 
-TEST(SerializerTest, DocumentV1LoadsAsColorPaint) {
-    // 手写 schemaVersion:1 且仅有 color 的旧 JSON，deserialize 后 paintMode==Color
+TEST(SerializerTest, MissingPaintModeDefaultsToColor) {
+    // 手写 schemaVersion:1 且仅有 color、无 paintMode 的 JSON，deserialize 后 paintMode==Color
 }
 ```
 
 - [ ] **Step 2: 实现至 PASS**
 
 ```bash
-./build/tests/core_tests --gtest_filter='SerializerTest.*Shader*:SerializerTest.DocumentV1*'
+./build/tests/core_tests --gtest_filter='SerializerTest.*Shader*:SerializerTest.MissingPaintMode*'
 ```
 
-- [ ] **Step 3: 更新 `docs/data-model.md` 序列化小节与 schemaVersion=2**
+- [ ] **Step 3: 更新 `docs/data-model.md`（schemaVersion 仍为 1；新增可选 paint/shader 字段说明）**
 
 - [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add include/MotionStudio/serialization/Dto.h \
   include/MotionStudio/serialization/Serializer.h src/serialization/Serializer.cpp \
-  src/serialization/SchemaMigrator.cpp tests/serialization/SerializerTest.cpp \
+  tests/serialization/SerializerTest.cpp \
   docs/data-model.md docs/superpowers/plans/2026-08-07-color-source-core-storage.md
-git commit -m "Serialize shader libraries and document schema version 2."
+git commit -m "Serialize shader libraries without bumping document schema version."
 ```
 
 ---
@@ -558,7 +558,7 @@ git commit -m "Document color-source Core storage after implementation."
 | Anim Float/2/3/Color + 可扩展 kind | 1, 3, 7 |
 | UniformFormat 上移 | 2 |
 | 删被引用失败 | 6 |
-| schema v2 / 独立 shader version | 5 |
+| document schema 不升；独立 shader.json version | 5 |
 | EntityIndex 不扩 | 3（FindShader 扫描） |
 | 导出不支持 | 后续计划 |
 | 预览 / App UI | **不在本 plan**（后续） |
