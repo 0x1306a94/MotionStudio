@@ -144,7 +144,7 @@ std::vector<EvaluatedShaderUniform> EvaluateUniformValues(const ShaderUniformVal
 }
 
 bool MakeShaderPaint(const Document &document, EntityId shaderId,
-                     const ShaderUniformValues &uniformValues, PreviewTime time, float alpha,
+                     const ShaderUniformValues &uniformValues, PreviewTime time,
                      ShaderPaint &out) {
     const ShaderDefinition *def = FindShader(document, shaderId);
     if (def == nullptr) {
@@ -154,11 +154,6 @@ bool MakeShaderPaint(const Document &document, EntityId shaderId,
     out.mainImage = def->mainImage;
     out.uniforms = def->uniforms;
     out.values = EvaluateUniformValues(uniformValues, time);
-    for (EvaluatedShaderUniform &value : out.values) {
-        if (value.kind == ShaderUniformValueKind::AnimColor) {
-            value.colorValue.a *= alpha;
-        }
-    }
     return true;
 }
 
@@ -170,17 +165,18 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
             case LayerStyleType::Fill: {
                 const auto &fill = static_cast<const FillStyle &>(*style);
                 Paint paint;
+                paint.alpha = alpha;
                 paint.fillRule = fill.fillRule;
                 paint.blendMode = fill.blendMode;
                 if (fill.paintMode == StylePaintMode::Shader) {
-                    if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time, alpha, paint.shader)) {
+                    if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time,
+                                         paint.shader)) {
                         break;
                     }
                     paint.paintMode = StylePaintMode::Shader;
                 } else {
                     paint.paintMode = StylePaintMode::Color;
                     paint.color = fill.color.evaluatePreview(time);
-                    paint.color.a *= alpha;
                 }
                 for (const ShapeGeometry &geometry : geometries) {
                     items.push_back({geometry, paint, false, {}});
@@ -190,17 +186,18 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
             case LayerStyleType::Stroke: {
                 const auto &stroke = static_cast<const StrokeStyle &>(*style);
                 Paint paint;
+                paint.alpha = alpha;
                 paint.fillRule = FillRule::NonZero;
                 paint.blendMode = stroke.blendMode;
                 if (stroke.paintMode == StylePaintMode::Shader) {
-                    if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time, alpha, paint.shader)) {
+                    if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time,
+                                         paint.shader)) {
                         break;
                     }
                     paint.paintMode = StylePaintMode::Shader;
                 } else {
                     paint.paintMode = StylePaintMode::Color;
                     paint.color = stroke.color.evaluatePreview(time);
-                    paint.color.a *= alpha;
                 }
                 const StrokeOptions options{
                     stroke.width.evaluatePreview(time),

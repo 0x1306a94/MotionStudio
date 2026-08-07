@@ -392,11 +392,12 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
             return;
         }
         tgfxPaint.setShader(*shader);
-        tgfxPaint.setAlpha(opacity_);
+        // tgfx setAlpha replaces brush color alpha (shader path has no solid color).
+        tgfxPaint.setAlpha(paint.alpha * opacity_);
     } else {
-        Color color = paint.color;
-        color.a *= opacity_;
-        tgfxPaint.setColor(ToTgfxColor(color));
+        // setColor writes RGB+A; setAlpha after it applies paint/layer multipliers.
+        tgfxPaint.setColor(ToTgfxColor(paint.color));
+        tgfxPaint.setAlpha(paint.color.a * paint.alpha * opacity_);
     }
     canvas->drawPath(path, tgfxPaint);
 }
@@ -452,11 +453,10 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
             return;
         }
         tgfxPaint.setShader(*shader);
-        tgfxPaint.setAlpha(opacity_);
+        tgfxPaint.setAlpha(paint.alpha * opacity_);
     } else {
-        Color color = paint.color;
-        color.a *= opacity_;
-        tgfxPaint.setColor(ToTgfxColor(color));
+        tgfxPaint.setColor(ToTgfxColor(paint.color));
+        tgfxPaint.setAlpha(paint.color.a * paint.alpha * opacity_);
     }
 
     if (options.position == StrokePosition::Center) {
