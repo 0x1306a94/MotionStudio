@@ -14,6 +14,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/Vec3.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
@@ -21,11 +22,14 @@
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
+#include "MotionStudio/model/ShaderDefinition.h"
+#include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/serialization/Dto.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
@@ -156,6 +160,29 @@ Expected<Vec2, std::string> Vec2FromJson(const json &node) {
         return Unexpected(y.error());
     }
     return Vec2{*x, *y};
+}
+
+json Vec3ToJson(Vec3 value) {
+    return json::array({value.x, value.y, value.z});
+}
+
+Expected<Vec3, std::string> Vec3FromJson(const json &node) {
+    if (!node.is_array() || node.size() != 3) {
+        return Unexpected(std::string("Vec3 must be a 3-element array"));
+    }
+    Expected<float, std::string> x = AsFloat(node[0]);
+    if (!x) {
+        return Unexpected(x.error());
+    }
+    Expected<float, std::string> y = AsFloat(node[1]);
+    if (!y) {
+        return Unexpected(y.error());
+    }
+    Expected<float, std::string> z = AsFloat(node[2]);
+    if (!z) {
+        return Unexpected(z.error());
+    }
+    return Vec3{*x, *y, *z};
 }
 
 uint8_t ColorChannelToByte(float value) {
@@ -424,6 +451,10 @@ Expected<Vec2, std::string> FromJson<Vec2>(const json &node) {
     return Vec2FromJson(node);
 }
 template <>
+Expected<Vec3, std::string> FromJson<Vec3>(const json &node) {
+    return Vec3FromJson(node);
+}
+template <>
 Expected<Color, std::string> FromJson<Color>(const json &node) {
     return ColorFromJson(node);
 }
@@ -587,6 +618,9 @@ json ValueToJson(float value) {
 }
 json ValueToJson(const Vec2 &value) {
     return Vec2ToJson(value);
+}
+json ValueToJson(const Vec3 &value) {
+    return Vec3ToJson(value);
 }
 json ValueToJson(const Color &value) {
     return ColorToJson(value);
@@ -972,32 +1006,314 @@ Expected<std::unique_ptr<ShapeElement>, std::string> ShapeFromJson(const json &n
     return element;
 }
 
+// ---- Layer style paint / shader uniforms ----
+
+json ShaderUniformValueToJson(const ShaderUniformValue &value) {
+    json node{{"name", value.name}, {"kind", dto::ToString(value.kind)}};
+    switch (value.kind) {
+        case ShaderUniformValueKind::AnimFloat: {
+            node["floatValue"] = AnimatableToJson(value.floatValue);
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat2: {
+            node["float2Value"] = AnimatableToJson(value.float2Value);
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat3: {
+            node["float3Value"] = AnimatableToJson(value.float3Value);
+            break;
+        }
+        case ShaderUniformValueKind::AnimColor: {
+            node["colorValue"] = AnimatableToJson(value.colorValue);
+            break;
+        }
+        case ShaderUniformValueKind::StaticInt:
+        case ShaderUniformValueKind::AnimFloat4:
+        case ShaderUniformValueKind::StaticMat3:
+        case ShaderUniformValueKind::TextureAsset: {
+            break;
+        }
+    }
+    return node;
+}
+
+Expected<ShaderUniformValue, std::string> ShaderUniformValueFromJson(const json &node) {
+    Expected<std::string, std::string> name = ParseField<std::string>(node, "name");
+    if (!name) {
+        return Unexpected(name.error());
+    }
+    Expected<std::string, std::string> kindText = ParseField<std::string>(node, "kind");
+    if (!kindText) {
+        return Unexpected(kindText.error());
+    }
+    Expected<ShaderUniformValueKind, std::string> kind =
+        dto::shaderUniformValueKindFromString(*kindText);
+    if (!kind) {
+        return Unexpected(kind.error());
+    }
+    ShaderUniformValue value;
+    value.name = std::move(*name);
+    value.kind = *kind;
+    switch (value.kind) {
+        case ShaderUniformValueKind::AnimFloat: {
+            Expected<const json *, std::string> animNode = Child(node, "floatValue");
+            if (!animNode) {
+                return Unexpected(std::string("shader uniform is missing floatValue"));
+            }
+            Expected<void, std::string> result = AnimatableFromJson(**animNode, value.floatValue);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat2: {
+            Expected<const json *, std::string> animNode = Child(node, "float2Value");
+            if (!animNode) {
+                return Unexpected(std::string("shader uniform is missing float2Value"));
+            }
+            Expected<void, std::string> result = AnimatableFromJson(**animNode, value.float2Value);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat3: {
+            Expected<const json *, std::string> animNode = Child(node, "float3Value");
+            if (!animNode) {
+                return Unexpected(std::string("shader uniform is missing float3Value"));
+            }
+            Expected<void, std::string> result = AnimatableFromJson(**animNode, value.float3Value);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimColor: {
+            Expected<const json *, std::string> animNode = Child(node, "colorValue");
+            if (!animNode) {
+                return Unexpected(std::string("shader uniform is missing colorValue"));
+            }
+            Expected<void, std::string> result = AnimatableFromJson(**animNode, value.colorValue);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+            break;
+        }
+        case ShaderUniformValueKind::StaticInt:
+        case ShaderUniformValueKind::AnimFloat4:
+        case ShaderUniformValueKind::StaticMat3:
+        case ShaderUniformValueKind::TextureAsset: {
+            return Unexpected(std::string("unsupported shader uniform value kind for v1: " +
+                                          *kindText));
+        }
+    }
+    return value;
+}
+
+json ShaderUniformValuesToJson(const ShaderUniformValues &values) {
+    json entries = json::array();
+    for (const ShaderUniformValue &entry : values.entries) {
+        entries.push_back(ShaderUniformValueToJson(entry));
+    }
+    return entries;
+}
+
+Expected<ShaderUniformValues, std::string> ShaderUniformValuesFromJson(const json &node) {
+    if (!node.is_array()) {
+        return Unexpected(std::string("uniformValues must be an array"));
+    }
+    ShaderUniformValues values;
+    for (const json &entryNode : node) {
+        Expected<ShaderUniformValue, std::string> entry = ShaderUniformValueFromJson(entryNode);
+        if (!entry) {
+            return Unexpected(entry.error());
+        }
+        values.entries.push_back(std::move(*entry));
+    }
+    return values;
+}
+
+void AppendStylePaintToJson(json &node, StylePaintMode paintMode, EntityId shaderId,
+                            const ShaderUniformValues &uniformValues) {
+    // Color mode omits paintMode/shader fields so schema-1 docs stay compact.
+    if (paintMode != StylePaintMode::Shader) {
+        return;
+    }
+    node["paintMode"] = dto::ToString(paintMode);
+    node["shaderId"] = IdToString(shaderId);
+    node["uniformValues"] = ShaderUniformValuesToJson(uniformValues);
+}
+
+Expected<void, std::string> StylePaintFromJson(const json &node, StylePaintMode &paintMode,
+                                               EntityId &shaderId,
+                                               ShaderUniformValues &uniformValues) {
+    paintMode = StylePaintMode::Color;
+    shaderId = {};
+    uniformValues = {};
+    if (const json *modeNode = FindChild(node, "paintMode")) {
+        Expected<std::string, std::string> modeText = AsString(*modeNode);
+        if (!modeText) {
+            return Unexpected(std::string("paintMode must be a string"));
+        }
+        Expected<StylePaintMode, std::string> mode = dto::stylePaintModeFromString(*modeText);
+        if (!mode) {
+            return Unexpected(mode.error());
+        }
+        paintMode = *mode;
+    }
+    if (paintMode != StylePaintMode::Shader) {
+        return {};
+    }
+    Expected<EntityId, std::string> id = IdField(node, "shaderId");
+    if (!id) {
+        return Unexpected(std::string("Shader paint mode is missing shaderId"));
+    }
+    shaderId = *id;
+    const json *valuesNode = FindChild(node, "uniformValues");
+    if (valuesNode == nullptr) {
+        return Unexpected(std::string("Shader paint mode is missing uniformValues"));
+    }
+    Expected<ShaderUniformValues, std::string> values = ShaderUniformValuesFromJson(*valuesNode);
+    if (!values) {
+        return Unexpected(values.error());
+    }
+    uniformValues = std::move(*values);
+    return {};
+}
+
+json ShaderUniformDeclToJson(const ShaderUniformDecl &decl) {
+    return {{"name", decl.name},
+            {"format", dto::ToString(decl.format)},
+            {"count", decl.count}};
+}
+
+Expected<ShaderUniformDecl, std::string> ShaderUniformDeclFromJson(const json &node) {
+    Expected<std::string, std::string> name = ParseField<std::string>(node, "name");
+    if (!name) {
+        return Unexpected(name.error());
+    }
+    Expected<std::string, std::string> formatText = ParseField<std::string>(node, "format");
+    if (!formatText) {
+        return Unexpected(formatText.error());
+    }
+    Expected<UniformFormat, std::string> format = dto::uniformFormatFromString(*formatText);
+    if (!format) {
+        return Unexpected(format.error());
+    }
+    Expected<int, std::string> count = ParseField<int>(node, "count");
+    if (!count) {
+        return Unexpected(count.error());
+    }
+    ShaderUniformDecl decl;
+    decl.name = std::move(*name);
+    decl.format = *format;
+    decl.count = *count;
+    return decl;
+}
+
+json ShaderDefinitionToJson(const ShaderDefinition &shader) {
+    json uniforms = json::array();
+    for (const ShaderUniformDecl &decl : shader.uniforms) {
+        uniforms.push_back(ShaderUniformDeclToJson(decl));
+    }
+    return {{"id", IdToString(shader.id)},
+            {"name", shader.name},
+            {"mainImage", shader.mainImage},
+            {"uniforms", std::move(uniforms)}};
+}
+
+Expected<ShaderDefinition, std::string> ShaderDefinitionFromJson(const json &node) {
+    Expected<EntityId, std::string> id = IdField(node, "id");
+    if (!id) {
+        return Unexpected(id.error());
+    }
+    Expected<std::string, std::string> name = ParseField<std::string>(node, "name");
+    if (!name) {
+        return Unexpected(name.error());
+    }
+    Expected<std::string, std::string> mainImage = ParseField<std::string>(node, "mainImage");
+    if (!mainImage) {
+        return Unexpected(mainImage.error());
+    }
+    const json *uniformsNode = FindChild(node, "uniforms");
+    if (uniformsNode == nullptr || !uniformsNode->is_array()) {
+        return Unexpected(std::string("shader is missing the uniforms array"));
+    }
+    ShaderDefinition shader;
+    shader.id = *id;
+    shader.name = std::move(*name);
+    shader.mainImage = std::move(*mainImage);
+    for (const json &declNode : *uniformsNode) {
+        Expected<ShaderUniformDecl, std::string> decl = ShaderUniformDeclFromJson(declNode);
+        if (!decl) {
+            return Unexpected(decl.error());
+        }
+        shader.uniforms.push_back(std::move(*decl));
+    }
+    return shader;
+}
+
+Expected<void, std::string> ValidateStyleShaderPaint(const Document &document,
+                                                     StylePaintMode paintMode, EntityId shaderId,
+                                                     const ShaderUniformValues &uniformValues) {
+    if (paintMode != StylePaintMode::Shader) {
+        return {};
+    }
+    const ShaderDefinition *shader = FindShader(document, shaderId);
+    if (shader == nullptr) {
+        return Unexpected(std::string("style references unknown shaderId"));
+    }
+    for (const ShaderUniformValue &entry : uniformValues.entries) {
+        const ShaderUniformDecl *decl = nullptr;
+        for (const ShaderUniformDecl &candidate : shader->uniforms) {
+            if (candidate.name == entry.name) {
+                decl = &candidate;
+                break;
+            }
+        }
+        if (decl == nullptr) {
+            return Unexpected(std::string("uniform value has no matching scheme entry: " +
+                                          entry.name));
+        }
+        Expected<void, std::string> compatible =
+            FormatSupportsAnimKind(decl->format, entry.kind);
+        if (!compatible) {
+            return Unexpected(compatible.error());
+        }
+    }
+    return {};
+}
+
 // ---- LayerContent (discriminant field "type") ----
 
 json LayerStyleToJson(const LayerStyle &style) {
     switch (style.type()) {
         case LayerStyleType::Fill: {
             const auto &fill = static_cast<const FillStyle &>(style);
-            return {{"id", IdToString(fill.id)},
-                    {"type", "fill"},
-                    {"color", AnimatableToJson(fill.color)},
-                    {"fillRule", dto::ToString(fill.fillRule)},
-                    {"blendMode", dto::ToString(fill.blendMode)}};
+            json node{{"id", IdToString(fill.id)},
+                      {"type", "fill"},
+                      {"color", AnimatableToJson(fill.color)},
+                      {"fillRule", dto::ToString(fill.fillRule)},
+                      {"blendMode", dto::ToString(fill.blendMode)}};
+            AppendStylePaintToJson(node, fill.paintMode, fill.shaderId, fill.uniformValues);
+            return node;
         }
         case LayerStyleType::Stroke: {
             const auto &stroke = static_cast<const StrokeStyle &>(style);
-            return {{"id", IdToString(stroke.id)},
-                    {"type", "stroke"},
-                    {"color", AnimatableToJson(stroke.color)},
-                    {"width", AnimatableToJson(stroke.width)},
-                    {"cap", dto::ToString(stroke.cap)},
-                    {"join", dto::ToString(stroke.join)},
-                    {"miterLimit", stroke.miterLimit},
-                    {"blendMode", dto::ToString(stroke.blendMode)},
-                    {"position", dto::ToString(stroke.position)},
-                    {"trimStart", AnimatableToJson(stroke.trimStart)},
-                    {"trimEnd", AnimatableToJson(stroke.trimEnd)},
-                    {"trimOffset", AnimatableToJson(stroke.trimOffset)}};
+            json node{{"id", IdToString(stroke.id)},
+                      {"type", "stroke"},
+                      {"color", AnimatableToJson(stroke.color)},
+                      {"width", AnimatableToJson(stroke.width)},
+                      {"cap", dto::ToString(stroke.cap)},
+                      {"join", dto::ToString(stroke.join)},
+                      {"miterLimit", stroke.miterLimit},
+                      {"blendMode", dto::ToString(stroke.blendMode)},
+                      {"position", dto::ToString(stroke.position)},
+                      {"trimStart", AnimatableToJson(stroke.trimStart)},
+                      {"trimEnd", AnimatableToJson(stroke.trimEnd)},
+                      {"trimOffset", AnimatableToJson(stroke.trimOffset)}};
+            AppendStylePaintToJson(node, stroke.paintMode, stroke.shaderId, stroke.uniformValues);
+            return node;
         }
     }
     return json::object();
@@ -1038,6 +1354,10 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
                 return Unexpected(blendMode.error());
             }
             fill->blendMode = *blendMode;
+        }
+        result = StylePaintFromJson(node, fill->paintMode, fill->shaderId, fill->uniformValues);
+        if (!result) {
+            return Unexpected(result.error());
         }
         style = std::move(fill);
     } else if (*typeText == "stroke") {
@@ -1103,6 +1423,11 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
             if (!result) {
                 return Unexpected(result.error());
             }
+        }
+        result =
+            StylePaintFromJson(node, stroke->paintMode, stroke->shaderId, stroke->uniformValues);
+        if (!result) {
+            return Unexpected(result.error());
         }
         style = std::move(stroke);
     } else {
@@ -1796,6 +2121,78 @@ Expected<std::unique_ptr<Document>, std::string> Serializer::deserialize(const s
 
     document->refreshEntityIndex();
     return document;
+}
+
+std::string Serializer::serializeShaders(const Document &document) {
+    json shaders = json::array();
+    for (const ShaderDefinition &shader : document.shaders) {
+        shaders.push_back(ShaderDefinitionToJson(shader));
+    }
+    return json{{"schemaVersion", dto::SHADER_SCHEMA_VERSION}, {"shaders", std::move(shaders)}}
+        .dump(2);
+}
+
+Expected<std::vector<ShaderDefinition>, std::string> Serializer::deserializeShaders(
+    const std::string &jsonText) {
+    const json data = json::parse(jsonText, nullptr, false);
+    if (data.is_discarded() || !data.is_object()) {
+        return Unexpected(std::string("failed to parse the shader JSON"));
+    }
+    Expected<int, std::string> version = ParseField<int>(data, "schemaVersion");
+    if (!version) {
+        return Unexpected(std::string("shader.json is missing schemaVersion"));
+    }
+    if (*version != dto::SHADER_SCHEMA_VERSION) {
+        return Unexpected(std::string("unsupported shader schemaVersion: " +
+                                      std::to_string(*version)));
+    }
+    const json *shadersNode = FindChild(data, "shaders");
+    if (shadersNode == nullptr || !shadersNode->is_array()) {
+        return Unexpected(std::string("shader.json is missing the shaders array"));
+    }
+    std::vector<ShaderDefinition> shaders;
+    for (const json &shaderNode : *shadersNode) {
+        Expected<ShaderDefinition, std::string> shader = ShaderDefinitionFromJson(shaderNode);
+        if (!shader) {
+            return Unexpected(shader.error());
+        }
+        shaders.push_back(std::move(*shader));
+    }
+    return shaders;
+}
+
+Expected<void, std::string> ValidateShaderReferences(const Document &document) {
+    for (const auto &composition : document.compositions) {
+        if (composition == nullptr) {
+            continue;
+        }
+        for (const auto &layer : composition->layers) {
+            if (layer == nullptr) {
+                continue;
+            }
+            for (const auto &style : layer->styles) {
+                if (style == nullptr) {
+                    continue;
+                }
+                Expected<void, std::string> result;
+                if (style->type() == LayerStyleType::Fill) {
+                    const auto &fill = static_cast<const FillStyle &>(*style);
+                    result = ValidateStyleShaderPaint(document, fill.paintMode, fill.shaderId,
+                                                      fill.uniformValues);
+                } else if (style->type() == LayerStyleType::Stroke) {
+                    const auto &stroke = static_cast<const StrokeStyle &>(*style);
+                    result = ValidateStyleShaderPaint(document, stroke.paintMode, stroke.shaderId,
+                                                      stroke.uniformValues);
+                } else {
+                    continue;
+                }
+                if (!result) {
+                    return Unexpected(result.error());
+                }
+            }
+        }
+    }
+    return {};
 }
 
 uint64_t DocumentFingerprint(const Document &document) {

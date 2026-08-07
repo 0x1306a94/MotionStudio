@@ -320,7 +320,7 @@ git commit -m "Add XOR color and shader paint modes on Fill and Stroke."
 
 ### Task 5: 序列化 `shader.json` + document 可选 paint 字段（schema 不升）
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/serialization/Dto.h` — **不改** `SCHEMA_VERSION`（保持 1）；增加 format/kind/paintMode 字符串映射
@@ -376,7 +376,7 @@ git commit -m "Add XOR color and shader paint modes on Fill and Stroke."
 
 Color 模式保持现有 `color` 字段；可写 `"paintMode":"color"` 或省略（默认 color）。
 
-- [ ] **Step 1: 写 SerializerTest**
+- [x] **Step 1: 写 SerializerTest**
 
 ```cpp
 TEST(SerializerTest, ShaderLibraryRoundTrip) {
@@ -406,15 +406,15 @@ TEST(SerializerTest, MissingPaintModeDefaultsToColor) {
 }
 ```
 
-- [ ] **Step 2: 实现至 PASS**
+- [x] **Step 2: 实现至 PASS**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SerializerTest.*Shader*:SerializerTest.MissingPaintMode*'
 ```
 
-- [ ] **Step 3: 更新 `docs/data-model.md`（schemaVersion 仍为 1；新增可选 paint/shader 字段说明）**
+- [x] **Step 3: 更新 `docs/data-model.md`（schemaVersion 仍为 1；新增可选 paint/shader 字段说明）**
 
-- [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 4: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add include/MotionStudio/serialization/Dto.h \

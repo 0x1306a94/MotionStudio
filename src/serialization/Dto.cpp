@@ -428,4 +428,179 @@ Expected<TextAlign, std::string> textAlignFromString(const std::string &text) {
     return Unexpected(std::string("unknown text align: " + text));
 }
 
+const char *ToString(StylePaintMode mode) {
+    switch (mode) {
+        case StylePaintMode::Color: {
+            return "color";
+        }
+        case StylePaintMode::Shader: {
+            return "shader";
+        }
+    }
+    return "unknown";
+}
+
+Expected<StylePaintMode, std::string> stylePaintModeFromString(const std::string &text) {
+    if (text == "color") {
+        return StylePaintMode::Color;
+    }
+    if (text == "shader") {
+        return StylePaintMode::Shader;
+    }
+    return Unexpected(std::string("unknown style paint mode: " + text));
+}
+
+const char *ToString(UniformFormat format) {
+    switch (format) {
+        case UniformFormat::Float: {
+            return "float";
+        }
+        case UniformFormat::Float2: {
+            return "float2";
+        }
+        case UniformFormat::Float3: {
+            return "float3";
+        }
+        case UniformFormat::Float4: {
+            return "float4";
+        }
+        case UniformFormat::Float2x2: {
+            return "float2x2";
+        }
+        case UniformFormat::Float3x3: {
+            return "float3x3";
+        }
+        case UniformFormat::Float4x4: {
+            return "float4x4";
+        }
+        case UniformFormat::Int: {
+            return "int";
+        }
+        case UniformFormat::Int2: {
+            return "int2";
+        }
+        case UniformFormat::Int3: {
+            return "int3";
+        }
+        case UniformFormat::Int4: {
+            return "int4";
+        }
+        case UniformFormat::Texture2DSampler: {
+            return "texture2DSampler";
+        }
+        case UniformFormat::TextureExternalSampler: {
+            return "textureExternalSampler";
+        }
+        case UniformFormat::Texture2DRectSampler: {
+            return "texture2DRectSampler";
+        }
+    }
+    return "unknown";
+}
+
+Expected<UniformFormat, std::string> uniformFormatFromString(const std::string &text) {
+    if (text == "float") {
+        return UniformFormat::Float;
+    }
+    if (text == "float2") {
+        return UniformFormat::Float2;
+    }
+    if (text == "float3") {
+        return UniformFormat::Float3;
+    }
+    if (text == "float4") {
+        return UniformFormat::Float4;
+    }
+    if (text == "float2x2") {
+        return UniformFormat::Float2x2;
+    }
+    if (text == "float3x3") {
+        return UniformFormat::Float3x3;
+    }
+    if (text == "float4x4") {
+        return UniformFormat::Float4x4;
+    }
+    if (text == "int") {
+        return UniformFormat::Int;
+    }
+    if (text == "int2") {
+        return UniformFormat::Int2;
+    }
+    if (text == "int3") {
+        return UniformFormat::Int3;
+    }
+    if (text == "int4") {
+        return UniformFormat::Int4;
+    }
+    if (text == "texture2DSampler") {
+        return UniformFormat::Texture2DSampler;
+    }
+    if (text == "textureExternalSampler") {
+        return UniformFormat::TextureExternalSampler;
+    }
+    if (text == "texture2DRectSampler") {
+        return UniformFormat::Texture2DRectSampler;
+    }
+    return Unexpected(std::string("unknown uniform format: " + text));
+}
+
+const char *ToString(ShaderUniformValueKind kind) {
+    switch (kind) {
+        case ShaderUniformValueKind::AnimFloat: {
+            return "animFloat";
+        }
+        case ShaderUniformValueKind::AnimFloat2: {
+            return "animFloat2";
+        }
+        case ShaderUniformValueKind::AnimFloat3: {
+            return "animFloat3";
+        }
+        case ShaderUniformValueKind::AnimColor: {
+            return "animColor";
+        }
+        case ShaderUniformValueKind::StaticInt: {
+            return "staticInt";
+        }
+        case ShaderUniformValueKind::AnimFloat4: {
+            return "animFloat4";
+        }
+        case ShaderUniformValueKind::StaticMat3: {
+            return "staticMat3";
+        }
+        case ShaderUniformValueKind::TextureAsset: {
+            return "textureAsset";
+        }
+    }
+    return "unknown";
+}
+
+Expected<ShaderUniformValueKind, std::string> shaderUniformValueKindFromString(
+    const std::string &text) {
+    if (text == "animFloat") {
+        return ShaderUniformValueKind::AnimFloat;
+    }
+    if (text == "animFloat2") {
+        return ShaderUniformValueKind::AnimFloat2;
+    }
+    if (text == "animFloat3") {
+        return ShaderUniformValueKind::AnimFloat3;
+    }
+    if (text == "animColor") {
+        return ShaderUniformValueKind::AnimColor;
+    }
+    if (text == "staticInt") {
+        return ShaderUniformValueKind::StaticInt;
+    }
+    if (text == "animFloat4") {
+        return ShaderUniformValueKind::AnimFloat4;
+    }
+    if (text == "staticMat3") {
+        return ShaderUniformValueKind::StaticMat3;
+    }
+    if (text == "textureAsset") {
+        return ShaderUniformValueKind::TextureAsset;
+    }
+    return Unexpected(std::string("unknown shader uniform value kind: " + text));
+}
+
 }  // namespace motion::dto

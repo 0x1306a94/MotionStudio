@@ -52,11 +52,13 @@ struct EntityId {
 
 ```
 Document
+ ├─ shaders[]                  （过程色定义库；包内独立 shader.json）
  └─ Composition[]              （多个合成，支持互相引用 = 预合成）
      └─ Layer[]                （有序，index 0 = 最底层，向上渲染）
          ├─ Transform          （5 个可动画属性，必有）
+         ├─ styles[]           （Fill / Stroke；color XOR shader）
          └─ LayerContent       （多态：Shape / Image / Text / Null / Precomp）
-             └─ ShapeElement[] （Shape 类型时：Path / Fill / Stroke / Group ...）
+             └─ ShapeElement[] （Shape 类型时：Path / Rect / Ellipse / TrimPath ...）
 ```
 
 **所有权是严格的树**（`unique_ptr` 持有），**引用全部走 `EntityId`**。
@@ -69,7 +71,8 @@ public:
     EntityId id;
     std::string name;
     std::vector<std::unique_ptr<Composition>> compositions;
-    std::vector<Asset> assets;                 // 图片/字体等文档级资源
+    std::vector<Asset> assets;                 // 图片等文档级资源
+    std::vector<ShaderDefinition> shaders;     // 过程色定义；不进 EntityIndex
 
     // 非持久化：打开/保存包时由 App 设为包绝对路径。Asset.path 相对此根。
     std::string projectRoot;
@@ -96,7 +99,22 @@ struct Asset {
     int width = 0;      // 源图像素宽（导入时写入）
     int height = 0;
 };
+
+struct ShaderUniformDecl {
+    std::string name;
+    UniformFormat format;
+    int count = 1;
+};
+
+struct ShaderDefinition {
+    EntityId id;
+    std::string name;
+    std::string mainImage;                 // 用户 mainImage(uv) 体
+    std::vector<ShaderUniformDecl> uniforms;
+};
 ```
+
+过程色定义由 `Serializer::serializeShaders` / `deserializeShaders` 读写包内 `shader.json`（**独立** `schemaVersion`，当前 = 1）；`document.json` **不**内嵌源码。查找用 `FindShader` 扫描 `Document.shaders`（v1 不扩展 EntityIndex）。
 
 `EntityIndex` 是 undo 机制的关键：命令只持有 `EntityId`，执行时通过索引解析到当前指针；实体已删除则命令静默跳过。
 
@@ -272,6 +290,24 @@ class ShapeTrimPath : public ShapeElement { /* start, end, offset */ };
 // 组变换 → LayerType::Group（NullContent）+ parentId
 ```
 
+**Fill / Stroke 绘制源（color XOR shader）**：
+
+```cpp
+enum class StylePaintMode : uint8_t { Color = 0, Shader = 1 };
+
+class FillStyle : public LayerStyle {
+    StylePaintMode paintMode = StylePaintMode::Color;
+    Animatable<Color> color;               // Color 模式；Shader 模式可保留但不参与绘制
+    EntityId shaderId;                     // Shader 模式；须 ∈ Document.shaders
+    ShaderUniformValues uniformValues;     // Shader 模式；按 name 对齐 scheme
+    FillRule fillRule = NonZero;
+    BlendMode blendMode = Normal;
+};
+// StrokeStyle 同构（另含 width / cap / join / trim / …）
+```
+
+`document.json` 中 `paintMode` / `shaderId` / `uniformValues` 为**可选**字段：缺省 → `Color`（与旧文档兼容）；`schemaVersion` **保持 1**。Color 模式写回时不输出 shader 字段。合并 `shader.json` 后可用 `ValidateShaderReferences` 校验引用。
+
 ## 4. Animatable\<T\>——可动画属性
 
 模型的核心抽象：任何属性要么是静态值，要么是一串关键帧。
@@ -438,7 +474,7 @@ class MoveKeyframeCommand : public Command {
 
 ```cpp
 struct DocumentDTO {
-    int schemaVersion;                        // 当前 = 1
+    int schemaVersion;                        // 当前 = 1（过程色字段为可选，不升版）
     std::string name;
     std::vector<CompositionDTO> compositions;
     std::vector<AssetDTO> assets;
@@ -451,16 +487,22 @@ struct AnimatableDTO<T> {
 
 **理由**：运行时模型可自由重构（改类名/继承）而不破坏文件格式；迁移代码只操作 JSON 不依赖模型；反序列化时可做完整性校验。
 
+工程包还可含独立的 `shader.json`（`schemaVersion` 从 1 起，与 `document.json` 分开演进），由 `Serializer::serializeShaders` / `deserializeShaders` 处理；App 打开时合并进 `Document.shaders` 后再 `ValidateShaderReferences`。
+
 ### 6.2 读写与版本迁移
 
 ```cpp
 class Serializer {
 public:
-    static std::string serialize(const Document& doc);           // 模型 → JSON
+    static std::string serialize(const Document& doc);           // document.json
     static std::unique_ptr<Document> deserialize(const std::string& json);
+    static std::string serializeShaders(const Document& doc);    // shader.json
+    static Expected<std::vector<ShaderDefinition>, std::string>
+        deserializeShaders(const std::string& json);
 };
 
 // 迁移链：v1 → v2 → ... → current，每步是纯函数 JSON → JSON
+// document schema 仍为 1 时 SchemaMigrator 无需为过程色升版
 class SchemaMigrator {
 public:
     static json migrate(json data, int fromVersion, int toVersion);

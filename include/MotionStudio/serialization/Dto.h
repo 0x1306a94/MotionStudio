@@ -3,6 +3,7 @@
 #include <string>
 
 #include "MotionStudio/common/Expected.h"
+#include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
@@ -11,8 +12,10 @@
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
 
@@ -22,6 +25,8 @@
 namespace motion::dto {
 
 inline constexpr int SCHEMA_VERSION = 1;
+// Independent version for package shader.json (not document.json).
+inline constexpr int SHADER_SCHEMA_VERSION = 1;
 
 // Enum → string always succeeds (full coverage + fallback).
 // String → enum returns an error string on unknown values.
@@ -60,5 +65,15 @@ Expected<ImageScaleMode, std::string> imageScaleModeFromString(const std::string
 
 const char *ToString(TextAlign align);
 Expected<TextAlign, std::string> textAlignFromString(const std::string &text);
+
+const char *ToString(StylePaintMode mode);
+Expected<StylePaintMode, std::string> stylePaintModeFromString(const std::string &text);
+
+const char *ToString(UniformFormat format);
+Expected<UniformFormat, std::string> uniformFormatFromString(const std::string &text);
+
+const char *ToString(ShaderUniformValueKind kind);
+Expected<ShaderUniformValueKind, std::string> shaderUniformValueKindFromString(
+    const std::string &text);
 
 }  // namespace motion::dto

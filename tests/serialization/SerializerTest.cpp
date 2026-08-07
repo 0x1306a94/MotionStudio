@@ -4,21 +4,26 @@
 #include <nlohmann/json.hpp>
 
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PrecompContent.h"
+#include "MotionStudio/model/ShaderDefinition.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
 #include "MotionStudio/model/ShapeType.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/serialization/Dto.h"
 #include "MotionStudio/serialization/SchemaMigrator.h"
 #include "MotionStudio/serialization/Serializer.h"
 
@@ -26,6 +31,7 @@ using motion::Asset;
 using motion::AssetType;
 using motion::BezierPath;
 using motion::BezierPathToVectorNetwork;
+using motion::BindShaderPaint;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -41,12 +47,17 @@ using motion::MaskMode;
 using motion::PrecompContent;
 using motion::SchemaMigrator;
 using motion::Serializer;
+using motion::ShaderDefinition;
+using motion::ShaderUniformDecl;
 using motion::ShapeContent;
 using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::ShapeTrimPath;
 using motion::ShapeType;
+using motion::StylePaintMode;
+using motion::UniformFormat;
+using motion::ValidateShaderReferences;
 using motion::Vec2;
 using motion::VectorNetwork;
 using motion::VertexMirrorMode;
@@ -827,4 +838,110 @@ TEST(SerializerTest, ImageLayerMissingFieldsUseDefaults) {
     EXPECT_FLOAT_EQ(image->size.staticValue().x, 200.0f);
     EXPECT_FLOAT_EQ(image->size.staticValue().y, 200.0f);
     EXPECT_EQ(image->scaleMode, motion::ImageScaleMode::LetterBox);
+}
+
+TEST(SerializerTest, ShaderLibraryRoundTrip) {
+    Document doc;
+    ShaderDefinition shader;
+    shader.id = motion::EntityId::Generate();
+    shader.name = "Ripple";
+    shader.mainImage = "vec4 mainImage(vec2 uv){ return vec4(1.0); }";
+    shader.uniforms.push_back(ShaderUniformDecl{"rippleCount", UniformFormat::Float, 1});
+    doc.shaders.push_back(shader);
+
+    const std::string json = Serializer::serializeShaders(doc);
+    Expected<std::vector<ShaderDefinition>, std::string> loaded =
+        Serializer::deserializeShaders(json);
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    ASSERT_EQ(loaded->size(), 1u);
+    EXPECT_EQ((*loaded)[0].id, shader.id);
+    EXPECT_EQ((*loaded)[0].name, shader.name);
+    EXPECT_EQ((*loaded)[0].mainImage, shader.mainImage);
+    ASSERT_EQ((*loaded)[0].uniforms.size(), 1u);
+    EXPECT_EQ((*loaded)[0].uniforms[0].name, "rippleCount");
+    EXPECT_EQ((*loaded)[0].uniforms[0].format, UniformFormat::Float);
+    EXPECT_EQ((*loaded)[0].uniforms[0].count, 1);
+
+    nlohmann::json root = nlohmann::json::parse(json);
+    EXPECT_EQ(root["schemaVersion"], motion::dto::SHADER_SCHEMA_VERSION);
+}
+
+TEST(SerializerTest, DocumentShaderPaintRoundTrip) {
+    Document original;
+    ShaderDefinition shader;
+    shader.name = "Ripple";
+    shader.mainImage = "vec4 mainImage(vec2 uv){ return vec4(uv,0.0,1.0); }";
+    shader.uniforms.push_back(ShaderUniformDecl{"rippleCount", UniformFormat::Float, 1});
+    original.shaders.push_back(shader);
+
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto fill = std::make_unique<FillStyle>();
+    ASSERT_TRUE(BindShaderPaint(*fill, original.shaders[0]).hasValue());
+    fill->uniformValues.entries[0].floatValue.setStaticValue(5.0f);
+    layer->styles.push_back(std::move(fill));
+    original.refreshEntityIndex();
+
+    const std::string documentJson = Serializer::serialize(original);
+    const std::string shadersJson = Serializer::serializeShaders(original);
+
+    nlohmann::json documentRoot = nlohmann::json::parse(documentJson);
+    EXPECT_EQ(documentRoot["schemaVersion"], motion::dto::SCHEMA_VERSION);
+
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(documentJson);
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    Expected<std::vector<ShaderDefinition>, std::string> shaders =
+        Serializer::deserializeShaders(shadersJson);
+    ASSERT_TRUE(shaders.hasValue()) << shaders.error();
+    (*loaded)->shaders = std::move(*shaders);
+
+    Expected<void, std::string> valid = ValidateShaderReferences(**loaded);
+    ASSERT_TRUE(valid.hasValue()) << valid.error();
+
+    ASSERT_EQ((*loaded)->shaders.size(), 1u);
+    EXPECT_EQ((*loaded)->shaders[0].id, original.shaders[0].id);
+    ASSERT_FALSE((*loaded)->compositions.empty());
+    ASSERT_FALSE((*loaded)->compositions[0]->layers.empty());
+    ASSERT_EQ((*loaded)->compositions[0]->layers[0]->styles.size(), 1u);
+    const auto *restoredFill =
+        static_cast<const FillStyle *>((*loaded)->compositions[0]->layers[0]->styles[0].get());
+    EXPECT_EQ(restoredFill->paintMode, StylePaintMode::Shader);
+    EXPECT_EQ(restoredFill->shaderId, original.shaders[0].id);
+    ASSERT_EQ(restoredFill->uniformValues.entries.size(), 1u);
+    EXPECT_FLOAT_EQ(restoredFill->uniformValues.entries[0].floatValue.staticValue(), 5.0f);
+
+    nlohmann::json styleJson = documentRoot["compositions"][0]["layers"][0]["styles"][0];
+    EXPECT_EQ(styleJson["paintMode"], "shader");
+    EXPECT_TRUE(styleJson.contains("shaderId"));
+    EXPECT_TRUE(styleJson.contains("uniformValues"));
+}
+
+TEST(SerializerTest, MissingPaintModeDefaultsToColor) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{1.0f, 0.0f, 0.0f, 1.0f});
+    layer->styles.push_back(std::move(fill));
+    original.refreshEntityIndex();
+
+    nlohmann::json root = nlohmann::json::parse(Serializer::serialize(original));
+    EXPECT_EQ(root["schemaVersion"], 1);
+    auto &style = root["compositions"][0]["layers"][0]["styles"][0];
+    style.erase("paintMode");
+    style.erase("shaderId");
+    style.erase("uniformValues");
+
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(root.dump());
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    ASSERT_EQ((*loaded)->compositions[0]->layers[0]->styles.size(), 1u);
+    const auto *restoredFill =
+        static_cast<const FillStyle *>((*loaded)->compositions[0]->layers[0]->styles[0].get());
+    EXPECT_EQ(restoredFill->paintMode, StylePaintMode::Color);
+    EXPECT_FALSE(restoredFill->shaderId.isValid());
+    EXPECT_TRUE(restoredFill->uniformValues.entries.empty());
 }
