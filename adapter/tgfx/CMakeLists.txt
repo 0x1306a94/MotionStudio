@@ -136,6 +136,10 @@ target_include_directories(tgfx_adapter
                            PRIVATE
                            "${CMAKE_CURRENT_SOURCE_DIR}/src"
                            "${TGFX_INCLUDE_DIR}"
+                           "${TGFX_SOURCE_DIR}/src"
+                           "${TGFX_SOURCE_DIR}/third_party/concurrentqueue"
+                           "${TGFX_SOURCE_DIR}/third_party/pathkit"
+                           "${TGFX_SOURCE_DIR}/third_party/highway"
                            "${PROJECT_SOURCE_DIR}/adapter/textlayout/include")
 
 target_link_libraries(tgfx_adapter

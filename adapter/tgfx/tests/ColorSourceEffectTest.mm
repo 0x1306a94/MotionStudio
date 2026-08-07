@@ -547,8 +547,6 @@ TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
         ASSERT_TRUE(env->surface()->readPixels(info, pixels.data())) << "readPixels failed for " << frame.name;
         const std::string webpPath = OutputPath(std::string("ColorSourceEffect_Xs3GWj_") + frame.name + ".webp");
         ASSERT_TRUE(SaveWebp(pixels, kWidth, kHeight, webpPath)) << "failed to save " << webpPath;
-        // readPixels syncs the GPU; rotate the UBO packet before the next encode.
-        cache.advanceUniformFrame();
     }
 
     env->unlockContext();
@@ -604,7 +602,6 @@ TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
         ASSERT_TRUE(env->surface()->readPixels(info, pixels.data())) << "readPixels failed for " << frame.name;
         const std::string webpPath = OutputPath(std::string("ColorSourceEffect_Clouds_") + frame.name + ".webp");
         ASSERT_TRUE(SaveWebp(pixels, kWidth, kHeight, webpPath)) << "failed to save " << webpPath;
-        cache.advanceUniformFrame();
     }
 
     env->unlockContext();

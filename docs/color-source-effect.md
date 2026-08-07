@@ -13,7 +13,8 @@
 | 层级 | 角色 | 生命周期 |
 |---|---|---|
 | `ColorSourceEffect` | 轻量实例：`shaderId`、`mainImage`、uniform 值、`sourceBounds`、指向 `RenderCache` | **每次绘制新建**；同帧不同参数用不同实例，可共享同一 `shaderId` |
-| `RenderCache` | 重资源：pipeline（按 `shaderId`）、UBO bump 池、全屏三角 VBO | 跟 tgfx `Context` 绑定；context 切换时 `releaseAll` |
+| `RenderCache` | 重资源：pipeline（按 `shaderId`）、全屏三角 VBO | 跟 tgfx `Context` 绑定；context 切换时 `releaseAll` |
+| tgfx `GlobalCache` | UBO bump 池（`findOrCreateUniformBuffer` / `resetUniformBuffer`） | 跟 `Context` 生命周期；`DrawingBuffer::encode` 末尾自动 `resetUniformBuffer` |
 | tgfx Runtime 包装 | `ImageFilter::Runtime` → filtered `Image` → `ImageShader` | **按次创建**，不要当参数容器长期复用 |
 
 ```
@@ -73,29 +74,27 @@ Pipeline 缓存键 = **`shaderId`（`EntityId`）**。同一 id 的多个绘制�
 - `getOrCreatePipeline`：按 `shaderId` 查找 / 编译 / 写入 `colorSourcePipelineMap_`
 - `invalidateColorSourcePipeline(shaderId)`：源码或 uniform 布局编辑后丢弃旧 pipeline，下次 draw 再编译
 
-### 4.2 Uniform buffer（triple-buffer + bump）
+### 4.2 Uniform buffer（走 tgfx `GlobalCache`）
 
-Metal Shared UBO 若每帧原地 `map` 重写同一块，而上一帧 command buffer 未完成，GPU 会读到半写数据。
+Metal Shared UBO 若每帧原地 `map` 重写同一块，而上一帧 command buffer 未完成，GPU 会读到半写数据。tgfx 已在 `GlobalCache` 内用可增长 packet 池 + `frameTime` / `completedFrameTime` 解决。
 
-本实现的 `UniformBufferPacket` **对照 tgfx `GlobalCache` 的 UBO 池**（vendored 路径相对仓库根）：
+`ColorSourceEffect::onDraw` 经 `RenderCache::acquireUniformSlice` 转发到：
 
-| 本仓库 | tgfx 对照 |
+```cpp
+context->globalCache()->findOrCreateUniformBuffer(size, &offset);
+```
+
+帧边界由 tgfx `DrawingBuffer::encode` 末尾的 `resetUniformBuffer()` 推进（`flush` / `readPixels` 等会走到这条路径）。**不必**在 App 再维护一份 UBO 池或手动推进帧。
+
+对照源码（vendored 相对仓库根）：
+
+| 能力 | 位置 |
 |---|---|
-| `adapter/tgfx/src/RenderCache.h` 内 `UniformBufferPacket` | `third_party/libpag/third_party/tgfx/src/gpu/GlobalCache.h`（约 L120–125、`uniformBufferPool` / `activePacket`） |
-| `RenderCache::acquireUniformSlice` | `GlobalCache::findOrCreateUniformBuffer`（`GlobalCache.cpp`） |
-| `RenderCache::advanceUniformFrame` | `GlobalCache::resetUniformBuffer`（同文件；由 `DrawingBuffer` 在 flush/encode 边界调用） |
-| 单包默认 `64 * 1024`、256 对齐 bump | 同文件 `MAX_UNIFORM_BUFFER_SIZE = 64 * 1024`，并用 `uboOffsetAlignment` 对齐 |
+| `UniformBufferPacket` / `uniformBufferPool` / `activePacket` | `third_party/libpag/third_party/tgfx/src/gpu/GlobalCache.h` |
+| `findOrCreateUniformBuffer` / `resetUniformBuffer` | `GlobalCache.cpp` |
+| encode 后 reset | `third_party/libpag/third_party/tgfx/src/gpu/DrawingBuffer.cpp` |
 
-策略摘要：
-
-- 多个 packet 轮转（本侧固定 3 槽；tgfx 侧为可增长 pool + `activePacket`，用 queue `frameTime` / `completedFrameTime` 挑可复用包）  
-- 当前 packet 内 bump 分配；满则在同包再挂一块大 UBO  
-- `acquireUniformSlice(gpu, size)` → `{buffer, offset}`，`onDraw` 写入并 `setUniformBuffer(..., offset, size)`  
-- **每提交完一帧**调用 `advanceUniformFrame()`，切包并 reset cursor（简化版，不读 GPU timeline）  
-
-过大请求（超过单包缓冲）走一次性专用 buffer，不进池——与 tgfx `alignedBufferSize > MAX_UNIFORM_BUFFER_SIZE` 时直接 `createBuffer` 一致。
-
-说明：tgfx 的 `GlobalCache` UBO API **不对 `RuntimeEffect` 开放**，故 ColorSourceEffect 在 `RenderCache` 自管一份同构池，而不是调用 `findOrCreateUniformBuffer`。
+`RenderCache.cpp` 为调用上述 API 包含 tgfx 私有头 `gpu/GlobalCache.h`（CMake 增加 `src/` 与必要 third_party 搜索路径）。
 
 ### 4.3 其它
 
@@ -133,27 +132,17 @@ cache.invalidateColorSourcePipeline(shaderId);
 |---|---|
 | 同 shader、不同 uniform / 尺寸 | **两个** `ColorSourceEffect` 实例，传入**同一** `shaderId`；pipeline 共享 |
 | 同一实例改两次 uniform 再画 | 同一次 flush 内会撞上 RuntimeImageFilter 按 effect 身份的缓存，**两侧结果相同**；不要这么用 |
-| 跨帧改同一实例的 uniform | 实例本就不复用；每帧 `Make` + `setData`；帧间仍应 `advanceUniformFrame()` |
-
-### 帧推进
-
-集成到预览循环时，在 `flushAndSubmit` / `presentTarget` 之后（或下一帧 encode 之前）调用：
-
-```cpp
-cache.advanceUniformFrame();
-```
-
-测试里若每帧 `readPixels`（会同步 GPU），也在读回后 `advanceUniformFrame()`。
+| 跨帧改参数 | 实例本就不复用；每帧 `Make` + `setData`；UBO 帧推进由 tgfx `flush`/`encode` 内 `resetUniformBuffer` 完成 |
 
 ## 6. 设计取舍摘要
 
-1. **实例轻、缓存重**：每次绘制新建 `ColorSourceEffect`；pipeline / GPU UBO 池跟 `RenderCache` 走，按文档 `shaderId` 共享。  
+1. **实例轻、缓存重**：每次绘制新建 `ColorSourceEffect`；pipeline / 全屏 VBO 跟 `RenderCache` 走（按 `shaderId` 共享 pipeline）；UBO 池复用 tgfx `GlobalCache`。  
 2. **始终离屏**：受 tgfx `RuntimeEffect` + `ImageFilter` 模型约束；换「直填目标」需另套 API。  
 3. **同帧多参数 = 多实例 + 同 `shaderId`**：tgfx 离屏结果按 effect 对象缓存，故参数不同必须多实例；GPU pipeline 仍可复用。  
 4. **`sourceBounds` 构造时固定**：size 定 RT，origin 定 ImageShader 放置，业务侧保持 XYWH 绘制；AABB 变化需新建实例。  
 5. **编辑 = invalidate + 新实例**：不在 effect 上提供 `setShaderSource`；源码变更后显式丢弃旧 pipeline。  
 6. **CPU `uniformBytes_` 跟实例、不进 cache**：`setData` 发生在 draw API 之前，而 `onDraw` 由 tgfx 稍后驱动，必须有一块 CPU 侧 shadow 承接参数再在 `onDraw` 里拷进 GPU slice。  
-7. **GPU UBO 仍要三缓冲**：Metal Shared 存储上存在「上一帧 GPU 未读完、CPU 又 map 重写」的竞争。
+7. **GPU UBO 交给 GlobalCache**：不自管三缓冲；与 tgfx 普通绘制共用同一 timeline 安全的 UBO 池。
 
 ## 7. 测试入口
 

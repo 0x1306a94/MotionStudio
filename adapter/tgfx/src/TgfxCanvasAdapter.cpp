@@ -179,7 +179,6 @@ void TgfxCanvasAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color back
 }
 
 void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor, float cornerRadius) {
-    renderCache_->advanceUniformFrame();
     // Release before acquireTarget: size changes may destroy the old surface/canvas.
     frameRestore_.reset();
     if (!acquireTarget(width, height) || !surface_) {

@@ -296,7 +296,7 @@ bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<
     hasPreviousTime_ = true;
     WriteShadertoyBuiltinUniforms(uniformData_.get(), sourceBounds_, frameContext_, timeDelta);
 
-    auto slice = cache_->acquireUniformSlice(gpu, uniformBytes_.size());
+    auto slice = cache_->acquireUniformSlice(uniformBytes_.size());
     if (slice.buffer == nullptr) {
         return false;
     }
