@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 Core 持久化过程色定义（`shader.json` + `Document.shaders`），Fill/Stroke 以 color XOR shader 引用，并完成序列化与基础 undo / PropertyPath；为后续预览与 App 包读写打底。
+**Goal:** 在 Core 持久化过程色定义（`shader.json` + `Document.shaders`），Fill/Stroke 以 color XOR shader 引用，并完成序列化与基础 undo / PropertyPath。本 plan **不含任何 UI**（无 App / Inspector / Swift）。
 
-**Architecture:** `ShaderDefinition` 独立于 `Asset`；`UniformFormat` 上移到 Core 供 adapter 共用；`FillStyle`/`StrokeStyle` 用 `StylePaintMode` 互斥；用户 uniform v1 仅 Float/Float2/Float3/Float4→Color 的 `Animatable<>`。文档 `schemaVersion`→2；`shader.json` 独立 version=1。
+**Architecture:** `ShaderDefinition` 独立于 `Asset`；`UniformFormat` 上移到 Core 供 adapter 共用；`FillStyle`/`StrokeStyle` 用 `StylePaintMode` 互斥；用户 uniform v1 仅 Float/Float2/Float3/Float4→Color 的 `Animatable<>`。文档 `schemaVersion` 不升；`shader.json` 独立 version=1。
 
 **Tech Stack:** C++17 Core、nlohmann/json、GoogleTest、现有 Undo/PropertyPath、adapter ColorSourceEffect（`EntityId` shaderId）。
 
@@ -13,15 +13,16 @@
 ## Global Constraints
 
 - 分支：留在当前 feature 分支（如 `feature/runtime_shader`）；未经明确要求不得往 `master` 提交。
-- **禁止自动 commit。** 除非用户明确要求提交，否则跳过所有 Commit 步骤。
-- 按本 plan 实现时：每完成一个 Step/Task 立刻把 checkbox 改为 `[x]`，并更新 `**Status:**`（即使未 commit）。
-- Commit 信息（仅当用户要求提交时）：英语、≤120 字符、句号结尾、句中无其他标点。
+- **范围：仅 Core（+ adapter 为 `UniformFormat` 上移所必需的改动）与文档/测试。禁止改 App / SwiftUI / Inspector。**
+- **自动 commit：** 每完成一个 Task（或可独立验证的 Step 组）必须提交；**提交前先**把本 plan 对应 checkbox 改为 `[x]`、更新 `**Status:**`，再 `git add` 代码与本 plan 一并 commit（或 plan 紧随其后单独 commit）。
+- Commit 信息：英语、≤120 字符、句号结尾、句中无其他标点；侧重用户可感知变化。
+- 按本 plan 实现时：每完成一个 Step 立刻勾选；未同步 plan 视为该步未完成。
 - `document.json`：`dto::SCHEMA_VERSION` 升为 **2**；v1 缺字段 → `paintMode=Color`。
 - `shader.json`：独立 `schemaVersion = 1`。
 - 宣称 Core 完成前优先 ASan 构建：
   `cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON && cmake --build build`
 - 遵守现有编码规范（禁异常、禁 `dynamic_cast`、错误用 `Expected`、禁 lambda 优先显式函数）。
-- Core **不**链接 tgfx；过程色绘制仍在 adapter（本 plan 预览接线为后续 Task，可另开会话）。
+- Core **不**链接 tgfx；过程色绘制仍在 adapter（预览接线不在本 plan）。
 
 ---
 
@@ -52,7 +53,7 @@
 | `docs/data-model.md` / `docs/color-source-effect.md` | 同步模型与包文件说明 |
 | Spec | 状态改为实现中 |
 
-**本 plan 不包含（后续计划）：** SceneEvaluator→ColorSourceEffect 接线、App `shader.json` 包读写与 Inspector UI、Lottie/PAG 导出。
+**本 plan 明确不包含：** 任何 UI、App / Swift / Inspector、`MotionProjectDocument` 包读写、SceneEvaluator→ColorSourceEffect 预览接线、Lottie/PAG 导出（均属后续计划）。
 
 ---
 
@@ -125,7 +126,17 @@ Expected: 编译失败（缺头文件）或链接失败。
 
 Expected: PASS
 
-- [ ] **Step 5: 更新 plan checkbox；用户要求时再 commit**
+- [ ] **Step 5: 先更新本 plan 状态，再自动 commit**
+
+勾选本 Task 全部 Step、`**Status:** ✅ Done`，然后：
+
+```bash
+git add include/MotionStudio/common/Vec3.h src/common/Vec3.cpp \
+  include/MotionStudio/animation/Interpolator.h src/animation/Interpolator.cpp \
+  tests/common/Vec3Test.cpp \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Add Vec3 and Interpolator support for shader uniforms."
+```
 
 ---
 
@@ -164,11 +175,14 @@ cmake --build build --target core tgfx_adapter tgfx_adapter_test -j$(sysctl -n h
 
 Expected: 成功（ASan 下 ColorSourceEffect 已知 glslang 问题可先用 `build-noasan` 跑 adapter 视觉测）。
 
-- [ ] **Step 3: 更新 plan**
+- [ ] **Step 3: 先更新本 plan 状态，再自动 commit**
 
----
-
-### Task 3: `ShaderDefinition` + `ShaderUniformValues` + `Document.shaders`
+```bash
+git add adapter/tgfx/src/effects/Uniform.h adapter/tgfx/src/effects/Uniform.cpp \
+  include/MotionStudio/common/UniformFormat.h src/common/UniformFormat.cpp \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Move UniformFormat into Core for document shader schemes."
+```
 
 **Status:** 待开始
 
@@ -240,7 +254,16 @@ TEST(ShaderUniformValuesTest, RejectsIntFormatInV1) {
 
 - [ ] **Step 3: Document 增加 `shaders`；实现 `FindShader` / `ShaderIsReferenced`（遍历所有 layer.styles）**
 
-- [ ] **Step 4: 更新 plan**
+- [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
+
+```bash
+git add include/MotionStudio/model/ShaderDefinition.h \
+  include/MotionStudio/model/ShaderUniformValues.h src/model/ShaderUniformValues.cpp \
+  include/MotionStudio/model/Document.h src/model/Document.cpp \
+  tests/model/ShaderUniformValuesTest.cpp \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Add ShaderDefinition and uniform value realignment on Document."
+```
 
 ---
 
@@ -277,7 +300,14 @@ Expected<void, std::string> BindShaderPaint(FillStyle &style, const ShaderDefini
 
 - [ ] **Step 2: 实现并通过**
 
-- [ ] **Step 3: 更新 plan**
+- [ ] **Step 3: 先更新本 plan 状态，再自动 commit**
+
+```bash
+git add include/MotionStudio/model/StylePaintMode.h include/MotionStudio/model/LayerStyle.h \
+  src/model/LayerStylePaint.cpp tests/model/LayerStylePaintModeTest.cpp \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Add XOR color and shader paint modes on Fill and Stroke."
+```
 
 ---
 
@@ -377,7 +407,15 @@ TEST(SerializerTest, DocumentV1LoadsAsColorPaint) {
 
 - [ ] **Step 3: 更新 `docs/data-model.md` 序列化小节与 schemaVersion=2**
 
-- [ ] **Step 4: 更新 plan**
+- [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
+
+```bash
+git add include/MotionStudio/serialization/Dto.h \
+  include/MotionStudio/serialization/Serializer.h src/serialization/Serializer.cpp \
+  src/serialization/SchemaMigrator.cpp tests/serialization/SerializerTest.cpp \
+  docs/data-model.md docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Serialize shader libraries and document schema version 2."
+```
 
 ---
 
@@ -426,7 +464,13 @@ TEST(ShaderCommandTest, SetPaintModeToShaderBindsDefaults) {
 
 - [ ] **Step 3: UpdateShaderDefinition 后 Realign 所有引用样式的测试**
 
-- [ ] **Step 4: 更新 plan**
+- [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
+
+```bash
+git add include/MotionStudio/undo/ src/undo/ tests/undo/ShaderCommandTest.cpp \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Add undo commands for shaders and style paint mode."
+```
 
 ---
 
@@ -456,7 +500,14 @@ TEST(PropertyPathTest, ResolvesShaderUniformFloat) {
 }
 ```
 
-- [ ] **Step 2: 更新 plan**
+- [ ] **Step 2: 先更新本 plan 状态，再自动 commit**
+
+```bash
+git add include/MotionStudio/model/PropertyPath.h src/model/PropertyPath.cpp \
+  tests/model/PropertyPathTest.cpp \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Resolve PropertyPath into shader uniform Animatable values."
+```
 
 ---
 
@@ -478,15 +529,22 @@ cmake --build build --target core_tests -j$(sysctl -n hw.ncpu)
 ctest --test-dir build -R 'Vec3Test|ShaderUniformValuesTest|SerializerTest|ShaderCommandTest|PropertyPathTest' --output-on-failure
 ```
 
-- [ ] **Step 3: 更新 plan 全部 Task 状态；用户要求时再 commit**
+- [ ] **Step 3: 先更新本 plan 全部 Task 状态，再自动 commit**
+
+```bash
+git add docs/data-model.md docs/color-source-effect.md \
+  docs/superpowers/specs/2026-08-07-color-source-core-storage-design.md \
+  docs/superpowers/plans/2026-08-07-color-source-core-storage.md
+git commit -m "Document color-source Core storage after implementation."
+```
 
 ---
 
-## 后续计划（不在本文件展开步骤）
+## 后续计划（不在本文件展开步骤；均含 UI 或预览，另开 plan）
 
 1. **预览接线：** SceneEvaluator / DrawCommand 携带 shader 快照 → adapter `ColorSourceEffect`；改定义时 invalidate。  
-2. **App 包：** `MotionProjectDocument` 读写 `shader.json`；打开时 `deserializeShaders` + `ValidateShaderReferences`。  
-3. **Inspector：** 模式切换、uniform 滑杆、源码编辑（触发 UpdateShader + invalidate）。  
+2. **App 包（非本 plan）：** `MotionProjectDocument` 读写 `shader.json`。  
+3. **Inspector UI（非本 plan）：** 模式切换、uniform 编辑、源码编辑。  
 4. **导出：** PAG/Lottie 明确跳过或栅格。
 
 ---
@@ -503,7 +561,7 @@ ctest --test-dir build -R 'Vec3Test|ShaderUniformValuesTest|SerializerTest|Shade
 | schema v2 / 独立 shader version | 5 |
 | EntityIndex 不扩 | 3（FindShader 扫描） |
 | 导出不支持 | 后续计划 |
-| 预览 / App | 后续计划 |
+| 预览 / App UI | **不在本 plan**（后续） |
 
 ## 占位符扫描
 
