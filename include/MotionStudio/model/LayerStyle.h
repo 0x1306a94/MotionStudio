@@ -7,7 +7,9 @@
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
+#include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/StylePaintMode.h"
 
 namespace motion {
 
@@ -40,7 +42,10 @@ class FillStyle : public LayerStyle {
     }
     ~FillStyle() override = default;
 
+    StylePaintMode paintMode = StylePaintMode::Color;
     Animatable<Color> color{Color{0, 0, 0, 1}};
+    EntityId shaderId{};
+    ShaderUniformValues uniformValues;
     FillRule fillRule = FillRule::NonZero;
     BlendMode blendMode = BlendMode::Normal;
 };
@@ -52,7 +57,10 @@ class StrokeStyle : public LayerStyle {
     }
     ~StrokeStyle() override = default;
 
+    StylePaintMode paintMode = StylePaintMode::Color;
     Animatable<Color> color{Color{0, 0, 0, 1}};
+    EntityId shaderId{};
+    ShaderUniformValues uniformValues;
     Animatable<float> width{2.0f};
     LineCap cap = LineCap::Butt;
     LineJoin join = LineJoin::Miter;

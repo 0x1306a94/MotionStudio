@@ -273,12 +273,15 @@ git commit -m "Add ShaderDefinition and uniform value realignment on Document."
 
 ### Task 4: `StylePaintMode` 挂到 Fill/Stroke
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/model/StylePaintMode.h`
+- Create: `include/MotionStudio/model/LayerStylePaint.h`
+- Create: `src/model/LayerStylePaint.cpp`
 - Modify: `include/MotionStudio/model/LayerStyle.h`
-- Test: 可放在 `tests/model/LayerStylePaintModeTest.cpp` 的轻量不变式辅助测试
+- Modify: `src/model/ShaderUniformValues.cpp` — `ShaderIsReferenced` 检查 Fill/Stroke `shaderId`
+- Test: `tests/model/LayerStylePaintModeTest.cpp`
 
 **Interfaces:**
 ```cpp
@@ -300,11 +303,11 @@ Expected<void, std::string> BindShaderPaint(FillStyle &style, const ShaderDefini
 
 `BindShaderPaint`：设 `paintMode=Shader`、`shaderId=shader.id`、`uniformValues=MakeDefaultUniformValues(shader.uniforms)`。
 
-- [ ] **Step 1: 改头文件 + Bind/Clear 测试**
+- [x] **Step 1: 改头文件 + Bind/Clear 测试**
 
-- [ ] **Step 2: 实现并通过**
+- [x] **Step 2: 实现并通过**
 
-- [ ] **Step 3: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 3: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add include/MotionStudio/model/StylePaintMode.h include/MotionStudio/model/LayerStyle.h \

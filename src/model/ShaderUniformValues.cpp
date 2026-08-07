@@ -1,6 +1,8 @@
 #include "MotionStudio/model/ShaderUniformValues.h"
 
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/StylePaintMode.h"
 
 namespace motion {
 
@@ -130,8 +132,6 @@ bool ShaderIsReferenced(const Document &document, EntityId shaderId) {
     if (!shaderId.isValid()) {
         return false;
     }
-    // FillStyle / StrokeStyle paintMode + shaderId arrive in a later task; until
-    // then no style can hold a shader reference.
     for (const auto &composition : document.compositions) {
         if (composition == nullptr) {
             continue;
@@ -144,7 +144,17 @@ bool ShaderIsReferenced(const Document &document, EntityId shaderId) {
                 if (style == nullptr) {
                     continue;
                 }
-                (void)style;
+                if (style->type() == LayerStyleType::Fill) {
+                    const auto &fill = static_cast<const FillStyle &>(*style);
+                    if (fill.paintMode == StylePaintMode::Shader && fill.shaderId == shaderId) {
+                        return true;
+                    }
+                } else if (style->type() == LayerStyleType::Stroke) {
+                    const auto &stroke = static_cast<const StrokeStyle &>(*style);
+                    if (stroke.paintMode == StylePaintMode::Shader && stroke.shaderId == shaderId) {
+                        return true;
+                    }
+                }
             }
         }
     }
