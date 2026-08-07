@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "MotionStudio/common/Color.h"
@@ -15,6 +16,10 @@ struct SceneState {
     int viewportHeight = 0;
     Color backgroundColor;
     float cornerRadius = 0.0f;
+    // PreviewTime is fractional frames; seconds = frames / frameRate.
+    float timeSeconds = 0.f;
+    int64_t frameIndex = 0;
+    float frameRate = 30.f;
 };
 
 }  // namespace motion

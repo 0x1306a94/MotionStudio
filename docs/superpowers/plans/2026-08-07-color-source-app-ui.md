@@ -281,7 +281,7 @@ git commit -m "Add Fill and Stroke inspector controls for shader paints."
 
 ### Task 4: `Paint` 快照 + SceneEvaluator
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/Paint.h`
@@ -333,7 +333,7 @@ struct SceneState {
 };
 ```
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SceneEvaluatorShaderPaintTest, EvaluatesShaderFillSnapshot) {
@@ -351,7 +351,7 @@ TEST(SceneEvaluatorShaderPaintTest, MissingShaderSkipsStyle) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target core_tests
@@ -360,7 +360,7 @@ cmake --build build --target core_tests
 
 Expected: FAIL（Paint 无字段或仍为纯色）。
 
-- [ ] **Step 3: 实现求值**
+- [x] **Step 3: 实现求值**
 
 在 `ApplyLayerStyles`：
 
@@ -397,7 +397,7 @@ state.frameIndex = static_cast<int64_t>(time);  // PreviewTime 以帧为单位
 state.timeSeconds = fps > 0.f ? static_cast<float>(time / fps) : 0.f;
 ```
 
-- [ ] **Step 4: 跑测试通过并 commit**
+- [x] **Step 4: 跑测试通过并 commit**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SceneEvaluatorShaderPaintTest.*'

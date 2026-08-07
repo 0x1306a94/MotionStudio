@@ -13,12 +13,15 @@
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/PrecompContent.h"
+#include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/render/FollowPathEval.h"
+#include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
 namespace motion {
@@ -112,16 +115,75 @@ void CollectGeometry(const ShapeElement &element, PreviewTime time,
     }
 }
 
-void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
+std::vector<EvaluatedShaderUniform> EvaluateUniformValues(const ShaderUniformValues &values,
+                                                          PreviewTime time) {
+    std::vector<EvaluatedShaderUniform> out;
+    out.reserve(values.entries.size());
+    for (const ShaderUniformValue &entry : values.entries) {
+        EvaluatedShaderUniform evaluated;
+        evaluated.name = entry.name;
+        evaluated.kind = entry.kind;
+        switch (entry.kind) {
+            case ShaderUniformValueKind::AnimFloat:
+                evaluated.floatValue = entry.floatValue.evaluatePreview(time);
+                break;
+            case ShaderUniformValueKind::AnimFloat2:
+                evaluated.float2Value = entry.float2Value.evaluatePreview(time);
+                break;
+            case ShaderUniformValueKind::AnimFloat3:
+                evaluated.float3Value = entry.float3Value.evaluatePreview(time);
+                break;
+            case ShaderUniformValueKind::AnimColor:
+                evaluated.colorValue = entry.colorValue.evaluatePreview(time);
+                break;
+            default:
+                break;
+        }
+        out.push_back(std::move(evaluated));
+    }
+    return out;
+}
+
+bool MakeShaderPaint(const Document &document, EntityId shaderId,
+                     const ShaderUniformValues &uniformValues, PreviewTime time, float alpha,
+                     ShaderPaint &out) {
+    const ShaderDefinition *def = FindShader(document, shaderId);
+    if (def == nullptr) {
+        return false;
+    }
+    out.shaderId = def->id;
+    out.mainImage = def->mainImage;
+    out.uniforms = def->uniforms;
+    out.values = EvaluateUniformValues(uniformValues, time);
+    for (EvaluatedShaderUniform &value : out.values) {
+        if (value.kind == ShaderUniformValueKind::AnimColor) {
+            value.colorValue.a *= alpha;
+        }
+    }
+    return true;
+}
+
+void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime time, float alpha,
                       const std::vector<ShapeGeometry> &geometries,
                       std::vector<EvaluatedShapeItem> &items) {
     for (const auto &style : layer.styles) {
         switch (style->type()) {
             case LayerStyleType::Fill: {
                 const auto &fill = static_cast<const FillStyle &>(*style);
-                Color color = fill.color.evaluatePreview(time);
-                color.a *= alpha;
-                const Paint paint{color, fill.fillRule, fill.blendMode};
+                Paint paint;
+                paint.fillRule = fill.fillRule;
+                paint.blendMode = fill.blendMode;
+                if (fill.paintMode == StylePaintMode::Shader) {
+                    if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time, alpha,
+                                         paint.shader)) {
+                        break;
+                    }
+                    paint.paintMode = StylePaintMode::Shader;
+                } else {
+                    paint.paintMode = StylePaintMode::Color;
+                    paint.color = fill.color.evaluatePreview(time);
+                    paint.color.a *= alpha;
+                }
                 for (const ShapeGeometry &geometry : geometries) {
                     items.push_back({geometry, paint, false, {}});
                 }
@@ -129,9 +191,20 @@ void ApplyLayerStyles(const Layer &layer, PreviewTime time, float alpha,
             }
             case LayerStyleType::Stroke: {
                 const auto &stroke = static_cast<const StrokeStyle &>(*style);
-                Color color = stroke.color.evaluatePreview(time);
-                color.a *= alpha;
-                const Paint paint{color, FillRule::NonZero, stroke.blendMode};
+                Paint paint;
+                paint.fillRule = FillRule::NonZero;
+                paint.blendMode = stroke.blendMode;
+                if (stroke.paintMode == StylePaintMode::Shader) {
+                    if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time,
+                                         alpha, paint.shader)) {
+                        break;
+                    }
+                    paint.paintMode = StylePaintMode::Shader;
+                } else {
+                    paint.paintMode = StylePaintMode::Color;
+                    paint.color = stroke.color.evaluatePreview(time);
+                    paint.color.a *= alpha;
+                }
                 const StrokeOptions options{stroke.width.evaluatePreview(time),
                                             stroke.cap,
                                             stroke.join,
@@ -247,6 +320,10 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         for (const auto &style : layer.styles) {
             if (style->type() == LayerStyleType::Fill) {
                 const auto &fill = static_cast<const FillStyle &>(*style);
+                // Text draw path is solid-color only in v1; skip shader paints.
+                if (fill.paintMode == StylePaintMode::Shader) {
+                    continue;
+                }
                 TextDrawStyle paint;
                 paint.color = fill.color.evaluatePreview(time);
                 paint.blendMode = fill.blendMode;
@@ -254,6 +331,9 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
                 textItem.styles.push_back(paint);
             } else if (style->type() == LayerStyleType::Stroke) {
                 const auto &stroke = static_cast<const StrokeStyle &>(*style);
+                if (stroke.paintMode == StylePaintMode::Shader) {
+                    continue;
+                }
                 const float width = stroke.width.evaluatePreview(time);
                 if (width <= 0.0f) {
                     continue;
@@ -317,7 +397,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         if (shapeContent.geometry) {
             CollectGeometry(*shapeContent.geometry, time, geometries);
         }
-        ApplyLayerStyles(layer, time, 1.0f, geometries, evaluated.shapeItems);
+        ApplyLayerStyles(document, layer, time, 1.0f, geometries, evaluated.shapeItems);
     }
     // Path networks without styles still need an evaluated layer for path edit.
     if (!evaluated.shapeItems.empty() || !evaluated.shapeNetwork.vertices.empty()) {
@@ -373,6 +453,11 @@ Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document
     state.backgroundColor = composition->backgroundColor;
     state.cornerRadius = std::clamp(composition->cornerRadius, 0.0f,
                                     static_cast<float>(std::min(composition->width, composition->height)) * 0.5f);
+    const float fps = composition->frameRate.num /
+        static_cast<float>(std::max(composition->frameRate.den, 1u));
+    state.frameRate = fps;
+    state.frameIndex = static_cast<int64_t>(time);
+    state.timeSeconds = fps > 0.f ? static_cast<float>(time / static_cast<double>(fps)) : 0.f;
     EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0,
                         state.layers);
     MarkMatteSources(state.layers);
