@@ -1,8 +1,9 @@
 # Color Source Core 存储 — 设计说明
 
 日期：2026-08-07  
-状态：Core 存储已实现（plan Tasks 1–8）；预览/App UI 后续  
+状态：Core 存储已实现（plan Tasks 1–8）  
 实现计划：`docs/superpowers/plans/2026-08-07-color-source-core-storage.md`  
+后续 UI / 预览：[Color Source App UI 与预览接线](2026-08-07-color-source-app-ui-design.md)  
 关联：[ColorSourceEffect 与 RenderCache](../../color-source-effect.md)、[数据模型](../../data-model.md)
 
 ## 目标
