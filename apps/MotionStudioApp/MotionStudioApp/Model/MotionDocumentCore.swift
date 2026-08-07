@@ -696,6 +696,14 @@ final class MotionDocumentCore {
         return CGVector(dx: CGFloat(x), dy: CGFloat(y))
     }
 
+    func staticVec3(entityID: UInt64, path: String) -> SIMD3<Float> {
+        var x: Float = 0
+        var y: Float = 0
+        var z: Float = 0
+        ms_property_static_vec3(handle, entityID, path, &x, &y, &z)
+        return SIMD3(x, y, z)
+    }
+
     func staticColor(entityID: UInt64, path: String) -> MotionColor {
         var r: Float = 0
         var g: Float = 0
@@ -740,6 +748,14 @@ final class MotionDocumentCore {
         var y: Float = 0
         ms_property_evaluate_vec2(handle, entityID, path, frame, &x, &y)
         return CGVector(dx: CGFloat(x), dy: CGFloat(y))
+    }
+
+    func evaluateVec3(entityID: UInt64, path: String, frame: Int64) -> SIMD3<Float> {
+        var x: Float = 0
+        var y: Float = 0
+        var z: Float = 0
+        ms_property_evaluate_vec3(handle, entityID, path, frame, &x, &y, &z)
+        return SIMD3(x, y, z)
     }
 
     func evaluateColor(entityID: UInt64, path: String, frame: Int64) -> MotionColor {
@@ -807,6 +823,11 @@ final class MotionDocumentCore {
         changed()
     }
 
+    func setStaticVec3(entityID: UInt64, path: String, value: SIMD3<Float>) {
+        ms_command_set_static_vec3(handle, entityID, path, value.x, value.y, value.z)
+        changed()
+    }
+
     func setStaticColor(entityID: UInt64, path: String, value: MotionColor) {
         ms_command_set_static_color(handle, entityID, path, value.r, value.g, value.b, value.a)
         changed()
@@ -851,6 +872,11 @@ final class MotionDocumentCore {
     func addKeyframeVec2(entityID: UInt64, path: String, frame: Int64, value: CGVector) {
         ms_command_add_keyframe_vec2(handle, entityID, path, frame,
                                      Float(value.dx), Float(value.dy))
+        changed()
+    }
+
+    func addKeyframeVec3(entityID: UInt64, path: String, frame: Int64, value: SIMD3<Float>) {
+        ms_command_add_keyframe_vec3(handle, entityID, path, frame, value.x, value.y, value.z)
         changed()
     }
 

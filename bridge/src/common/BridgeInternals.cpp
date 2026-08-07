@@ -40,6 +40,7 @@ using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::UndoManager;
 using motion::Vec2;
+using motion::Vec3;
 
 namespace bridge {
 
@@ -88,6 +89,13 @@ const Animatable<Vec2> *AsVec2(AnimatableBase *base) {
         return nullptr;
     }
     return static_cast<const Animatable<Vec2> *>(base);
+}
+
+const Animatable<Vec3> *AsVec3(AnimatableBase *base) {
+    if (base == nullptr || base->valueType() != AnimatableType::Vec3) {
+        return nullptr;
+    }
+    return static_cast<const Animatable<Vec3> *>(base);
 }
 
 const Animatable<Color> *AsColor(AnimatableBase *base) {

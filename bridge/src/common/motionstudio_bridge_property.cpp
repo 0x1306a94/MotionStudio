@@ -9,6 +9,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/Vec3.h"
 
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
@@ -24,6 +25,7 @@ using motion::Easing;
 using motion::FrameTime;
 using motion::Keyframe;
 using motion::Vec2;
+using motion::Vec3;
 
 namespace {
 
@@ -51,7 +53,7 @@ MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *p
         case AnimatableType::Vec2:
             return MS_VALUE_VEC2;
         case AnimatableType::Vec3:
-            return MS_VALUE_INVALID;
+            return MS_VALUE_VEC3;
         case AnimatableType::Color:
             return MS_VALUE_COLOR;
         case AnimatableType::BezierPath:
@@ -78,7 +80,7 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
             return AsVec2(property)->isAnimated();
         }
         case AnimatableType::Vec3: {
-            return false;
+            return AsVec3(property)->isAnimated();
         }
         case AnimatableType::Color: {
             return AsColor(property)->isAnimated();
@@ -114,6 +116,25 @@ void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char
     }
     if (y != nullptr) {
         *y = value.y;
+    }
+}
+
+void ms_property_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y,
+                             float *z) {
+    DocumentLock guard(document);
+    const Animatable<Vec3> *property = AsVec3(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return;
+    }
+    const Vec3 value = property->staticValue();
+    if (x != nullptr) {
+        *x = value.x;
+    }
+    if (y != nullptr) {
+        *y = value.y;
+    }
+    if (z != nullptr) {
+        *z = value.z;
     }
 }
 
@@ -182,7 +203,7 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
             return static_cast<int>(AsVec2(property)->keyframes().size());
         }
         case AnimatableType::Vec3: {
-            return 0;
+            return static_cast<int>(AsVec3(property)->keyframes().size());
         }
         case AnimatableType::Color: {
             return static_cast<int>(AsColor(property)->keyframes().size());
@@ -210,6 +231,10 @@ int64_t ms_property_keyframe_time_at(MSDocument *document, uint64_t entityId, co
     const Keyframe<Vec2> *vec2Key = KeyframeAt(AsVec2(property), index);
     if (vec2Key != nullptr) {
         return vec2Key->time;
+    }
+    const Keyframe<Vec3> *vec3Key = KeyframeAt(AsVec3(property), index);
+    if (vec3Key != nullptr) {
+        return vec3Key->time;
     }
     const Keyframe<Color> *colorKey = KeyframeAt(AsColor(property), index);
     if (colorKey != nullptr) {
@@ -253,6 +278,10 @@ MS_EASING ms_property_keyframe_easing_at(MSDocument *document, uint64_t entityId
     const Keyframe<Vec2> *vec2Key = KeyframeAt(AsVec2(property), index);
     if (vec2Key != nullptr) {
         easing = &vec2Key->easing;
+    }
+    const Keyframe<Vec3> *vec3Key = KeyframeAt(AsVec3(property), index);
+    if (vec3Key != nullptr) {
+        easing = &vec3Key->easing;
     }
     const Keyframe<Color> *colorKey = KeyframeAt(AsColor(property), index);
     if (colorKey != nullptr) {
@@ -346,6 +375,25 @@ void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const ch
     }
     if (y != nullptr) {
         *y = value.y;
+    }
+}
+
+void ms_property_evaluate_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x,
+                               float *y, float *z) {
+    DocumentLock guard(document);
+    const Animatable<Vec3> *property = AsVec3(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return;
+    }
+    const Vec3 value = property->evaluate(static_cast<FrameTime>(frame));
+    if (x != nullptr) {
+        *x = value.x;
+    }
+    if (y != nullptr) {
+        *y = value.y;
+    }
+    if (z != nullptr) {
+        *z = value.z;
     }
 }
 

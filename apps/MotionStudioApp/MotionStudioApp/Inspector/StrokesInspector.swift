@@ -42,12 +42,30 @@ struct StrokesInspector: View {
         }
         ForEach(Array(strokes.enumerated()), id: \.element) { position, styleIndex in
             let hasColorKeyframe = hasKeyframe(styleIndex: styleIndex, property: .color)
+            let paintMode = resolvedPaintMode(styleIndex: styleIndex)
             VStack(alignment: .leading, spacing: 6) {
+                StyleShaderPaintControls(core: core, layerID: layerID, styleIndex: styleIndex,
+                                         playheadFrame: playheadFrame, isEditable: isEditable,
+                                         actionPrefix: "Stroke", perform: perform)
                 HStack(spacing: 8) {
-                    ColorPicker("Stroke \(position + 1)",
-                                selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe),
-                                supportsOpacity: true)
-                        .font(.callout)
+                    if paintMode == .COLOR {
+                        ColorPicker("Stroke \(position + 1)",
+                                    selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe),
+                                    supportsOpacity: true)
+                            .font(.callout)
+                        Button {
+                            toggleColorKeyframe(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe)
+                        } label: {
+                            Image(systemName: hasColorKeyframe ? "diamond.fill" : "diamond")
+                                .foregroundStyle(hasColorKeyframe ? .yellow : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help(hasColorKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
+                    } else {
+                        Text("Stroke \(position + 1)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                     Picker("", selection: blendBinding(styleIndex: styleIndex)) {
                         ForEach(MS_BLEND.allCases) { mode in
                             Text(mode.label).tag(mode)
@@ -56,14 +74,6 @@ struct StrokesInspector: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .fixedSize()
-                    Button {
-                        toggleColorKeyframe(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe)
-                    } label: {
-                        Image(systemName: hasColorKeyframe ? "diamond.fill" : "diamond")
-                            .foregroundStyle(hasColorKeyframe ? .yellow : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(hasColorKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
                     Button(role: .destructive) {
                         removeStroke(styleIndex: styleIndex)
                     } label: {
@@ -99,6 +109,11 @@ struct StrokesInspector: View {
         (0 ..< core.styleCount(layerID: layerID)).filter { index in
             core.styleType(layerID: layerID, index: index) == .STROKE
         }
+    }
+
+    private func resolvedPaintMode(styleIndex: Int) -> MS_PAINT_MODE {
+        let mode = core.stylePaintMode(layerID: layerID, index: styleIndex)
+        return mode == .INVALID ? .COLOR : mode
     }
 
     private func stylePath(styleIndex: Int, property: StyleProperty) -> String {

@@ -221,7 +221,7 @@ git commit -m "Add shader library panel and Shadertoy style editor sheet."
 
 ### Task 3: Inspector paintMode / 绑定 / uniformValues
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/.../Inspector/FillsInspector.swift`
@@ -234,7 +234,7 @@ git commit -m "Add shader library panel and Shadertoy style editor sheet."
 - Consumes: Task 1 paintMode/bind API；Task 2 Sheet 入口
 - Produces: Inspector 可切换 Color/Shader、绑 shader、编辑/关键帧 uniforms
 
-- [ ] **Step 1: PropertyPath 辅助**
+- [x] **Step 1: PropertyPath 辅助**
 
 ```swift
 enum StyleProperty {
@@ -245,11 +245,11 @@ enum StyleProperty {
 }
 ```
 
-- [ ] **Step 2: 补齐 Vec3 bridge（若缺失）**
+- [x] **Step 2: 补齐 Vec3 bridge（若缺失）**
 
 Inspector Float3 需要：`evaluateVec3` / `setStaticVec3` / `addKeyframeVec3`。照 `Vec2` 路径复制一套；加最小 bridge 测试或依赖现有 PropertyPath core 测试。
 
-- [ ] **Step 3: 改 FillsInspector 行**
+- [x] **Step 3: 改 FillsInspector 行**
 
 每行逻辑：
 
@@ -268,7 +268,7 @@ if Shader && bound:
 
 StrokesInspector **同构**（保留 width/trim/position）。
 
-- [ ] **Step 4: 手动验证 + commit**
+- [x] **Step 4: 手动验证 + commit**
 
 切换模式、绑 shader、拖 float、打关键帧、undo。
 

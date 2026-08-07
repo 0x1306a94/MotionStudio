@@ -8,9 +8,9 @@
 import MotionStudioBridging
 import SwiftUI
 
-/// One row per fill (color with keyframe toggle, blend mode, delete) plus an
-/// add button in the section header. Fills are addressed by their index in the
-/// layer's style list, matching the "styles[N]" property paths.
+/// One row per fill (paint mode / color or shader uniforms, blend, keyframe,
+/// delete) plus an add button in the section header. Fills are addressed by
+/// their index in the layer's style list, matching the "styles[N]" property paths.
 struct FillsInspector: View {
     let core: MotionDocumentCore
     let layerID: UInt64
@@ -40,32 +40,44 @@ struct FillsInspector: View {
             .disabled(!isEditable)
         }
         ForEach(Array(fills.enumerated()), id: \.element) { position, styleIndex in
+            let paintMode = resolvedPaintMode(styleIndex: styleIndex)
             let hasKeyframe = hasKeyframe(styleIndex: styleIndex)
-            HStack(spacing: 8) {
-                ColorPicker("Fill \(position + 1)",
-                            selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasKeyframe),
-                            supportsOpacity: true)
-                    .font(.callout)
-                Picker("", selection: blendBinding(styleIndex: styleIndex)) {
-                    ForEach(MS_BLEND.allCases) { mode in
-                        Text(mode.label).tag(mode)
+            VStack(alignment: .leading, spacing: 6) {
+                StyleShaderPaintControls(core: core, layerID: layerID, styleIndex: styleIndex,
+                                         playheadFrame: playheadFrame, isEditable: isEditable,
+                                         actionPrefix: "Fill", perform: perform)
+                HStack(spacing: 8) {
+                    if paintMode == .COLOR {
+                        ColorPicker("Fill \(position + 1)",
+                                    selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasKeyframe),
+                                    supportsOpacity: true)
+                            .font(.callout)
+                        Button {
+                            toggleKeyframe(styleIndex: styleIndex, hasKeyframe: hasKeyframe)
+                        } label: {
+                            Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
+                                .foregroundStyle(hasKeyframe ? .yellow : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help(hasKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
+                    } else {
+                        Text("Fill \(position + 1)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                     }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                Button {
-                    toggleKeyframe(styleIndex: styleIndex, hasKeyframe: hasKeyframe)
-                } label: {
-                    Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
-                        .foregroundStyle(hasKeyframe ? .yellow : .secondary)
-                }
-                .buttonStyle(.plain)
-                .help(hasKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
-                Button(role: .destructive) {
-                    removeFill(styleIndex: styleIndex)
-                } label: {
-                    Image(systemName: "minus")
+                    Picker("", selection: blendBinding(styleIndex: styleIndex)) {
+                        ForEach(MS_BLEND.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    Button(role: .destructive) {
+                        removeFill(styleIndex: styleIndex)
+                    } label: {
+                        Image(systemName: "minus")
+                    }
                 }
             }
             .disabled(!isEditable)
@@ -76,6 +88,11 @@ struct FillsInspector: View {
         (0 ..< core.styleCount(layerID: layerID)).filter { index in
             core.styleType(layerID: layerID, index: index) == .FILL
         }
+    }
+
+    private func resolvedPaintMode(styleIndex: Int) -> MS_PAINT_MODE {
+        let mode = core.stylePaintMode(layerID: layerID, index: styleIndex)
+        return mode == .INVALID ? .COLOR : mode
     }
 
     private func fillColorPath(styleIndex: Int) -> String {

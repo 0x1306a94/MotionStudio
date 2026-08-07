@@ -61,7 +61,8 @@ bool ApplyStaticValueAny(AnimatableBase *target, const PropertyValue &newValue,
                                     oldValue);
         }
         case AnimatableType::Vec3: {
-            return false;
+            return ApplyStaticValue(static_cast<Animatable<Vec3> *>(target), newValue,
+                                    oldValue);
         }
         case AnimatableType::Color: {
             return ApplyStaticValue(static_cast<Animatable<Color> *>(target), newValue,
@@ -92,7 +93,7 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase *target, FrameTime ti
             return TakeKeyframeTyped(static_cast<Animatable<Vec2> *>(target), time);
         }
         case AnimatableType::Vec3: {
-            return std::nullopt;
+            return TakeKeyframeTyped(static_cast<Animatable<Vec3> *>(target), time);
         }
         case AnimatableType::Color: {
             return TakeKeyframeTyped(static_cast<Animatable<Color> *>(target), time);
@@ -111,87 +112,56 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase *target, FrameTime ti
 }
 
 void AddKeyframeAny(AnimatableBase *target, const KeyframeData &keyframe) {
-    // Variant alternative order: float / Vec2 / Color / VectorNetwork / std::string.
     // Silently skip when keyframe type does not match property type.
-    switch (keyframe.index()) {
-        case 0: {
-            if (target->valueType() == AnimatableType::Float) {
-                static_cast<Animatable<float> *>(target)->addKeyframe(std::get<0>(keyframe));
-            }
-            break;
+    if (const auto *typed = std::get_if<Keyframe<float>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::Float) {
+            static_cast<Animatable<float> *>(target)->addKeyframe(*typed);
         }
-        case 1: {
-            if (target->valueType() == AnimatableType::Vec2) {
-                static_cast<Animatable<Vec2> *>(target)->addKeyframe(std::get<1>(keyframe));
-            }
-            break;
+        return;
+    }
+    if (const auto *typed = std::get_if<Keyframe<Vec2>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::Vec2) {
+            static_cast<Animatable<Vec2> *>(target)->addKeyframe(*typed);
         }
-        case 2: {
-            if (target->valueType() == AnimatableType::Color) {
-                static_cast<Animatable<Color> *>(target)->addKeyframe(std::get<2>(keyframe));
-            }
-            break;
+        return;
+    }
+    if (const auto *typed = std::get_if<Keyframe<Vec3>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::Vec3) {
+            static_cast<Animatable<Vec3> *>(target)->addKeyframe(*typed);
         }
-        case 3: {
-            if (target->valueType() == AnimatableType::VectorNetwork) {
-                static_cast<Animatable<VectorNetwork> *>(target)->addKeyframe(
-                    std::get<3>(keyframe));
-            }
-            break;
+        return;
+    }
+    if (const auto *typed = std::get_if<Keyframe<Color>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::Color) {
+            static_cast<Animatable<Color> *>(target)->addKeyframe(*typed);
         }
-        default: {
-            if (target->valueType() == AnimatableType::String) {
-                static_cast<Animatable<std::string> *>(target)->addKeyframe(
-                    std::get<4>(keyframe));
-            }
-            break;
+        return;
+    }
+    if (const auto *typed = std::get_if<Keyframe<VectorNetwork>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::VectorNetwork) {
+            static_cast<Animatable<VectorNetwork> *>(target)->addKeyframe(*typed);
+        }
+        return;
+    }
+    if (const auto *typed = std::get_if<Keyframe<std::string>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::String) {
+            static_cast<Animatable<std::string> *>(target)->addKeyframe(*typed);
         }
     }
 }
 
 FrameTime KeyframeTime(const KeyframeData &keyframe) {
-    switch (keyframe.index()) {
-        case 0: {
-            return std::get<0>(keyframe).time;
-        }
-        case 1: {
-            return std::get<1>(keyframe).time;
-        }
-        case 2: {
-            return std::get<2>(keyframe).time;
-        }
-        case 3: {
-            return std::get<3>(keyframe).time;
-        }
-        default: {
-            return std::get<4>(keyframe).time;
-        }
-    }
+    return std::visit([](const auto &typed) {
+        return typed.time;
+    },
+                      keyframe);
 }
 
 void SetKeyframeTime(KeyframeData &keyframe, FrameTime time) {
-    switch (keyframe.index()) {
-        case 0: {
-            std::get<0>(keyframe).time = time;
-            break;
-        }
-        case 1: {
-            std::get<1>(keyframe).time = time;
-            break;
-        }
-        case 2: {
-            std::get<2>(keyframe).time = time;
-            break;
-        }
-        case 3: {
-            std::get<3>(keyframe).time = time;
-            break;
-        }
-        default: {
-            std::get<4>(keyframe).time = time;
-            break;
-        }
-    }
+    std::visit([time](auto &typed) {
+        typed.time = time;
+    },
+               keyframe);
 }
 
 bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing,
@@ -206,7 +176,8 @@ bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing
                                oldEasingOut);
         }
         case AnimatableType::Vec3: {
-            return false;
+            return ApplyEasing(static_cast<Animatable<Vec3> *>(target), time, easing,
+                               oldEasingOut);
         }
         case AnimatableType::Color: {
             return ApplyEasing(static_cast<Animatable<Color> *>(target), time, easing,

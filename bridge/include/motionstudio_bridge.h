@@ -139,6 +139,7 @@ typedef CF_CLOSED_ENUM(int, MS_VALUE) {
     MS_VALUE_COLOR = 2,
     MS_VALUE_BEZIER_PATH = 3,
     MS_VALUE_STRING = 4,
+    MS_VALUE_VEC3 = 5,
 };
 
 // Easing type tag, mirrors motion::EasingType.
@@ -431,6 +432,8 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
 // exist or the type does not match.
 float ms_property_static_float(MSDocument *document, uint64_t entityId, const char *path);
 void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y);
+void ms_property_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y,
+                             float *z);
 void ms_property_static_color(MSDocument *document, uint64_t entityId, const char *path, float *r, float *g, float *b, float *a);
 // Returns a heap-allocated path copy. Release with ms_bezier_path_free.
 // Returns NULL when the property is missing or not a BezierPath.
@@ -469,6 +472,8 @@ MSBezierPath *ms_property_build_motion_path(MSDocument *document, uint64_t entit
 // Value of the property evaluated at the given frame.
 float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y);
+void ms_property_evaluate_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x,
+                               float *y, float *z);
 void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *r, float *g, float *b, float *a);
 // Evaluated BezierPath at frame. Release with ms_bezier_path_free. NULL on miss.
 MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
@@ -482,6 +487,7 @@ MSVectorNetwork *ms_property_evaluate_vector_network(MSDocument *document, uint6
 
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value);
 void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x, float y);
+void ms_command_set_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float x, float y, float z);
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a);
 // value may be NULL (treated as empty open path).
 void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path, const MSBezierPath *value);
@@ -498,6 +504,8 @@ void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compos
 // Adds a keyframe holding the property's given value at frame.
 void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float value);
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
+void ms_command_add_keyframe_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x,
+                                  float y, float z);
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a);
 void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSBezierPath *value);
 void ms_command_add_keyframe_vector_network(MSDocument *document, uint64_t entityId, const char *path,
