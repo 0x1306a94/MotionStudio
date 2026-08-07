@@ -60,6 +60,9 @@ bool ApplyStaticValueAny(AnimatableBase *target, const PropertyValue &newValue,
             return ApplyStaticValue(static_cast<Animatable<Vec2> *>(target), newValue,
                                     oldValue);
         }
+        case AnimatableType::Vec3: {
+            return false;
+        }
         case AnimatableType::Color: {
             return ApplyStaticValue(static_cast<Animatable<Color> *>(target), newValue,
                                     oldValue);
@@ -87,6 +90,9 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase *target, FrameTime ti
         }
         case AnimatableType::Vec2: {
             return TakeKeyframeTyped(static_cast<Animatable<Vec2> *>(target), time);
+        }
+        case AnimatableType::Vec3: {
+            return std::nullopt;
         }
         case AnimatableType::Color: {
             return TakeKeyframeTyped(static_cast<Animatable<Color> *>(target), time);
@@ -198,6 +204,9 @@ bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing
         case AnimatableType::Vec2: {
             return ApplyEasing(static_cast<Animatable<Vec2> *>(target), time, easing,
                                oldEasingOut);
+        }
+        case AnimatableType::Vec3: {
+            return false;
         }
         case AnimatableType::Color: {
             return ApplyEasing(static_cast<Animatable<Color> *>(target), time, easing,

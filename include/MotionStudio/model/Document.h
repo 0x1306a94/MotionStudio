@@ -8,6 +8,7 @@
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/EntityIndex.h"
+#include "MotionStudio/model/ShaderDefinition.h"
 
 namespace motion {
 
@@ -56,6 +57,9 @@ class Document {
     std::string name;
     std::vector<std::unique_ptr<Composition>> compositions;
     std::vector<Asset> assets;  // document-level resources (images, fonts)
+    // Process-color definitions (color sources). Not registered in EntityIndex;
+    // look up via FindShader. Serialized separately as shader.json.
+    std::vector<ShaderDefinition> shaders;
     // Absolute path of the project package directory. Not serialized; set by
     // the host when opening a package so Asset.path can resolve to disk.
     std::string projectRoot;

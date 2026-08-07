@@ -184,7 +184,11 @@ git add adapter/tgfx/src/effects/Uniform.h adapter/tgfx/src/effects/Uniform.cpp 
 git commit -m "Move UniformFormat into Core for document shader schemes."
 ```
 
-**Status:** 待开始
+---
+
+### Task 3: ShaderDefinition + ShaderUniformValues + Document.shaders
+
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/model/ShaderDefinition.h`
@@ -209,7 +213,7 @@ git commit -m "Move UniformFormat into Core for document shader schemes."
 - `count != 1` → Unexpected（v1）
 - `MakeDefaultUniformValues`：跳过失败 format 不应发生；调用方先保证 decls 合法
 
-- [ ] **Step 1: 失败测试**
+- [x] **Step 1: 失败测试**
 
 ```cpp
 TEST(ShaderUniformValuesTest, MakeDefaultsForFloatAndColor) {
@@ -250,11 +254,11 @@ TEST(ShaderUniformValuesTest, RejectsIntFormatInV1) {
 
 （按项目 `Animatable` / `Expected` 实际 API 调整断言：`hasValue()` / `staticValue()` 等。）
 
-- [ ] **Step 2: 实现至测试通过**
+- [x] **Step 2: 实现至测试通过**
 
-- [ ] **Step 3: Document 增加 `shaders`；实现 `FindShader` / `ShaderIsReferenced`（遍历所有 layer.styles）**
+- [x] **Step 3: Document 增加 `shaders`；实现 `FindShader` / `ShaderIsReferenced`（遍历所有 layer.styles）**
 
-- [ ] **Step 4: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 4: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add include/MotionStudio/model/ShaderDefinition.h \

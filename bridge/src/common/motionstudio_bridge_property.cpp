@@ -50,6 +50,8 @@ MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *p
             return MS_VALUE_FLOAT;
         case AnimatableType::Vec2:
             return MS_VALUE_VEC2;
+        case AnimatableType::Vec3:
+            return MS_VALUE_INVALID;
         case AnimatableType::Color:
             return MS_VALUE_COLOR;
         case AnimatableType::BezierPath:
@@ -74,6 +76,9 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
         }
         case AnimatableType::Vec2: {
             return AsVec2(property)->isAnimated();
+        }
+        case AnimatableType::Vec3: {
+            return false;
         }
         case AnimatableType::Color: {
             return AsColor(property)->isAnimated();
@@ -175,6 +180,9 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
         }
         case AnimatableType::Vec2: {
             return static_cast<int>(AsVec2(property)->keyframes().size());
+        }
+        case AnimatableType::Vec3: {
+            return 0;
         }
         case AnimatableType::Color: {
             return static_cast<int>(AsColor(property)->keyframes().size());
