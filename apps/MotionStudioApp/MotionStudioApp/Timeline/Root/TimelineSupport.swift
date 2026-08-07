@@ -64,8 +64,9 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     return paths
 }
 
-/// Animated style tracks of a shape layer: fill colors and stroke
-/// color/width/trim, fills and strokes numbered like the inspector.
+/// Animated style tracks of a shape layer: fill/stroke color (Color mode),
+/// shader uniform values (Shader mode), and stroke width/trim.
+/// Fills and strokes are numbered like the inspector.
 func timelineStyleTracks(core: MotionDocumentCore,
                          layerID: UInt64) -> [(path: String, label: String)]
 {
@@ -74,24 +75,61 @@ func timelineStyleTracks(core: MotionDocumentCore,
     var tracks: [(path: String, label: String)] = []
     for index in 0 ..< core.styleCount(layerID: layerID) {
         let styleType = core.styleType(layerID: layerID, index: index)
-        let candidates: [(path: String, label: String)]
+        let paintMode = core.stylePaintMode(layerID: layerID, index: index)
+        let isShaderPaint = paintMode == .SHADER
         if styleType == .FILL {
             fillPosition += 1
-            let property = StyleProperty.color
-            candidates = [(property.path(at: index), "Fill \(fillPosition) \(property.actionLabel)")]
+            let name = "Fill \(fillPosition)"
+            if isShaderPaint {
+                tracks.append(contentsOf: timelineShaderUniformTracks(core: core,
+                                                                      layerID: layerID,
+                                                                      styleIndex: index,
+                                                                      styleLabel: name))
+            } else {
+                let path = StyleProperty.color.path(at: index)
+                if !core.keyframeFrames(entityID: layerID, path: path).isEmpty {
+                    tracks.append((path, "\(name) \(StyleProperty.color.actionLabel)"))
+                }
+            }
         } else if styleType == .STROKE {
             strokePosition += 1
             let name = "Stroke \(strokePosition)"
-            candidates = StyleProperty.allCases.map { property in
-                (property.path(at: index), "\(name) \(property.actionLabel)")
+            let strokeProperties: [StyleProperty] = isShaderPaint
+                ? [.width, .trimStart, .trimEnd, .trimOffset]
+                : StyleProperty.allCases
+            for property in strokeProperties {
+                let path = property.path(at: index)
+                if !core.keyframeFrames(entityID: layerID, path: path).isEmpty {
+                    tracks.append((path, "\(name) \(property.actionLabel)"))
+                }
             }
-        } else {
-            candidates = []
+            if isShaderPaint {
+                tracks.append(contentsOf: timelineShaderUniformTracks(core: core,
+                                                                      layerID: layerID,
+                                                                      styleIndex: index,
+                                                                      styleLabel: name))
+            }
         }
-        for candidate in candidates
-            where !core.keyframes(entityID: layerID, path: candidate.path).isEmpty
-        {
-            tracks.append(candidate)
+    }
+    return tracks
+}
+
+/// Animated shader uniform tracks for one Fill/Stroke in Shader paint mode.
+func timelineShaderUniformTracks(core: MotionDocumentCore,
+                                 layerID: UInt64,
+                                 styleIndex: Int,
+                                 styleLabel: String) -> [(path: String, label: String)]
+{
+    let shaderID = core.styleShaderID(layerID: layerID, index: styleIndex)
+    guard shaderID != 0 else {
+        return []
+    }
+    var tracks: [(path: String, label: String)] = []
+    for uniformIndex in 0 ..< core.shaderUniformCount(shaderID) {
+        let uniformName = core.shaderUniformName(shaderID, index: uniformIndex)
+        let path = StyleProperty.uniformValue(uniformName, styleIndex: styleIndex)
+        if !core.keyframeFrames(entityID: layerID, path: path).isEmpty {
+            tracks.append((path, "\(styleLabel) \(uniformName)"))
         }
     }
     return tracks
