@@ -56,8 +56,7 @@ void FillCommonLayerFields(const Document &document, const Layer &layer, Preview
                            const Mat3 &world, float opacity, EvaluatedLayer &evaluated) {
     evaluated.id = layer.id;
     evaluated.worldTransform = world;
-    evaluated.worldAnchor =
-        world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
+    evaluated.worldAnchor = world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
     evaluated.opacity = opacity;
     evaluated.blendMode = layer.blendMode;
     for (const Mask &mask : layer.masks) {
@@ -174,8 +173,7 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
                 paint.fillRule = fill.fillRule;
                 paint.blendMode = fill.blendMode;
                 if (fill.paintMode == StylePaintMode::Shader) {
-                    if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time, alpha,
-                                         paint.shader)) {
+                    if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time, alpha, paint.shader)) {
                         break;
                     }
                     paint.paintMode = StylePaintMode::Shader;
@@ -195,8 +193,7 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
                 paint.fillRule = FillRule::NonZero;
                 paint.blendMode = stroke.blendMode;
                 if (stroke.paintMode == StylePaintMode::Shader) {
-                    if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time,
-                                         alpha, paint.shader)) {
+                    if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time, alpha, paint.shader)) {
                         break;
                     }
                     paint.paintMode = StylePaintMode::Shader;
@@ -205,13 +202,14 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
                     paint.color = stroke.color.evaluatePreview(time);
                     paint.color.a *= alpha;
                 }
-                const StrokeOptions options{stroke.width.evaluatePreview(time),
-                                            stroke.cap,
-                                            stroke.join,
-                                            stroke.position,
-                                            stroke.trimStart.evaluatePreview(time),
-                                            stroke.trimEnd.evaluatePreview(time),
-                                            stroke.trimOffset.evaluatePreview(time)};
+                const StrokeOptions options{
+                    stroke.width.evaluatePreview(time),
+                    stroke.cap,
+                    stroke.join,
+                    stroke.position,
+                    stroke.trimStart.evaluatePreview(time),
+                    stroke.trimEnd.evaluatePreview(time),
+                    stroke.trimOffset.evaluatePreview(time)};
                 for (const ShapeGeometry &geometry : geometries) {
                     // Stroke uses strokePath when present; fill faces stay on
                     // geometry.path for Inside/Outside positioning.
@@ -275,8 +273,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
             return;
         }
         const auto &precomp = static_cast<const PrecompContent &>(*layer.content);
-        const Composition *source =
-            document.entityIndex().findComposition(precomp.compositionId);
+        const Composition *source = document.entityIndex().findComposition(precomp.compositionId);
         if (!source) {
             return;
         }
@@ -284,8 +281,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         const double inner =
             static_cast<double>(time - layer.inPoint) * layer.timeStretch +
             static_cast<double>(layer.startTime);
-        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world,
-                            opacity, depth + 1, out);
+        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world, opacity, depth + 1, out);
         return;
     }
     if (layer.content->type() == LayerType::Image) {
@@ -297,8 +293,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         imageItem.containerSize = imageContent.size.evaluatePreview(time);
         imageItem.scaleMode = imageContent.scaleMode;
         if (const Asset *asset = FindAsset(document, imageContent.assetId)) {
-            imageItem.intrinsicSize = {static_cast<float>(asset->width),
-                                       static_cast<float>(asset->height)};
+            imageItem.intrinsicSize = {static_cast<float>(asset->width), static_cast<float>(asset->height)};
             imageItem.absolutePath = JoinProjectPath(document.projectRoot, asset->path);
         }
         evaluated.imageItem = std::move(imageItem);
@@ -360,14 +355,11 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
                 if (optPath) {
                     std::vector<EntityId> pathParentVisiting;
                     std::vector<EntityId> pathFollowVisiting;
-                    const Mat3 pathWorld = FollowAwareWorldTransform(
-                        document, *pathLayer, time, contextTransform, pathParentVisiting,
-                        pathFollowVisiting);
+                    const Mat3 pathWorld = FollowAwareWorldTransform(document, *pathLayer, time, contextTransform, pathParentVisiting, pathFollowVisiting);
                     Mat3 textInverse = Mat3::Identity();
                     if (world.tryInvert(textInverse)) {
                         EvaluatedTextPath evaluatedPath;
-                        evaluatedPath.path =
-                            TransformBezierPath(*optPath, textInverse * pathWorld);
+                        evaluatedPath.path = TransformBezierPath(*optPath, textInverse * pathWorld);
                         evaluatedPath.reversed = textPath.reversed;
                         evaluatedPath.perpendicular = textPath.perpendicular;
                         evaluatedPath.forceAlignment = textPath.forceAlignment;
@@ -427,8 +419,7 @@ void EvaluateComposition(const Document &document, const Composition &compositio
                          float contextOpacity, int depth,
                          std::vector<EvaluatedLayer> &out) {
     for (const auto &layer : composition.layers) {
-        EvaluateLayer(document, *layer, time, contextTransform, contextOpacity, depth,
-                      out);
+        EvaluateLayer(document, *layer, time, contextTransform, contextOpacity, depth, out);
     }
 }
 
@@ -442,8 +433,7 @@ Expected<SceneState, std::string> SceneEvaluator::Evaluate(const Document &docum
 Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document &document,
                                                                   EntityId compositionId,
                                                                   PreviewTime time) {
-    const Composition *composition =
-        document.entityIndex().findComposition(compositionId);
+    const Composition *composition = document.entityIndex().findComposition(compositionId);
     if (!composition) {
         return Unexpected(std::string("composition not found"));
     }
@@ -451,15 +441,12 @@ Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document
     state.viewportWidth = composition->width;
     state.viewportHeight = composition->height;
     state.backgroundColor = composition->backgroundColor;
-    state.cornerRadius = std::clamp(composition->cornerRadius, 0.0f,
-                                    static_cast<float>(std::min(composition->width, composition->height)) * 0.5f);
-    const float fps = composition->frameRate.num /
-        static_cast<float>(std::max(composition->frameRate.den, 1u));
+    state.cornerRadius = std::clamp(composition->cornerRadius, 0.0f, static_cast<float>(std::min(composition->width, composition->height)) * 0.5f);
+    const float fps = composition->frameRate.num / static_cast<float>(std::max(composition->frameRate.den, 1u));
     state.frameRate = fps;
     state.frameIndex = static_cast<int64_t>(time);
     state.timeSeconds = fps > 0.f ? static_cast<float>(time / static_cast<double>(fps)) : 0.f;
-    EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0,
-                        state.layers);
+    EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0, state.layers);
     MarkMatteSources(state.layers);
     return state;
 }

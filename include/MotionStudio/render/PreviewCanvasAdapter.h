@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "MotionStudio/render/EndFrameProfile.h"
 #include "MotionStudio/render/RenderAdapter.h"
 
@@ -26,6 +28,15 @@ class PreviewCanvasAdapter : public RenderAdapter {
     // sceneWidth / sceneHeight: composition viewport size in scene pixels.
     virtual float sceneUnitsPerViewPoint(int /*sceneWidth*/, int /*sceneHeight*/) const {
         return 1.0f;
+    }
+
+    // Injects Shadertoy-style frame uniforms for ColorSourceEffect paints.
+    // Default is a no-op for adapters that do not support process colors.
+    // timeSeconds: preview time in seconds (frames / frameRate).
+    // frameIndex: integer frame index for iFrame.
+    // frameRate: composition fps for iFrameRate.
+    virtual void setColorSourceFrameContext(float /*timeSeconds*/, int64_t /*frameIndex*/,
+                                            float /*frameRate*/) {
     }
 
     // Restores the canvas to the scene transform without the composition clip.

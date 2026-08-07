@@ -346,6 +346,9 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     int viewportHeight = 0;
     motion::Color backgroundColor{};
     float cornerRadius = 0.0f;
+    float timeSeconds = 0.0f;
+    int64_t frameIndex = 0;
+    float frameRate = 30.0f;
     bool usedFrameCache = false;
 
     if (playbackMode) {
@@ -356,6 +359,9 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
             viewportHeight = cached->viewportHeight;
             backgroundColor = cached->backgroundColor;
             cornerRadius = cached->cornerRadius;
+            timeSeconds = cached->timeSeconds;
+            frameIndex = cached->frameIndex;
+            frameRate = cached->frameRate;
             profile.layerCount = cached->layerCount;
             profile.sceneEvaluateMs = 0.0;
             profile.buildCommandsMs = 0.0;
@@ -384,6 +390,9 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         viewportHeight = state.viewportHeight;
         backgroundColor = state.backgroundColor;
         cornerRadius = state.cornerRadius;
+        timeSeconds = state.timeSeconds;
+        frameIndex = state.frameIndex;
+        frameRate = state.frameRate;
 
         const auto buildStart = ProfileClock::now();
         commands = motion::BuildCommands(state);
@@ -433,6 +442,9 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
             entry.viewportHeight = viewportHeight;
             entry.backgroundColor = backgroundColor;
             entry.cornerRadius = cornerRadius;
+            entry.timeSeconds = timeSeconds;
+            entry.frameIndex = frameIndex;
+            entry.frameRate = frameRate;
             entry.layerCount = profile.layerCount;
             entry.commands = commands;
             canvas->frameCommandCache.put(cacheFrame, std::move(entry));
@@ -443,6 +455,8 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     canvas->adapter->beginFrame(viewportWidth, viewportHeight, backgroundColor, cornerRadius);
     const auto beginFrameEnd = ProfileClock::now();
     profile.beginFrameMs = Milliseconds(beginFrameStart, beginFrameEnd);
+
+    canvas->adapter->setColorSourceFrameContext(timeSeconds, frameIndex, frameRate);
 
     const auto playCommandsStart = ProfileClock::now();
     motion::PlayCommands(commands, *canvas->adapter);

@@ -15,6 +15,7 @@
 #include <tgfx/core/TileMode.h>
 #include <tgfx/gpu/Attribute.h>
 #include <tgfx/gpu/CommandEncoder.h>
+#include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/GPU.h>
 #include <tgfx/gpu/GPUBuffer.h>
 #include <tgfx/gpu/PixelFormat.h>
@@ -182,6 +183,13 @@ void ColorSourceEffect::setFrameContext(ColorSourceFrameContext frameContext) {
 
 UniformData *ColorSourceEffect::getUniformData() const {
     return uniformData_.get();
+}
+
+bool ColorSourceEffect::preparePipeline() {
+    if (cache_ == nullptr || cache_->getContext() == nullptr) {
+        return false;
+    }
+    return getOrCreatePipeline(cache_->getContext()->gpu()) != nullptr;
 }
 
 std::shared_ptr<tgfx::Shader> ColorSourceEffect::makeImageShader() {

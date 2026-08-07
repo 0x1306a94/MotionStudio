@@ -50,6 +50,10 @@ class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_
     void setFrameContext(ColorSourceFrameContext frameContext);
     UniformData *getUniformData() const;
 
+    // Compiles (or reuses) the GPU pipeline. Call after attachToContext so
+    // compile failures can skip drawing before makeImageShader.
+    bool preparePipeline();
+
     // Builds a Clamp ImageShader placed at sourceBounds origin.
     std::shared_ptr<tgfx::Shader> makeImageShader();
 

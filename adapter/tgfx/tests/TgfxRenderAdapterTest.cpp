@@ -14,6 +14,7 @@
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -50,6 +51,7 @@ using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
 using motion::ShapeRect;
+using motion::StylePaintMode;
 using motion::TgfxRenderAdapter;
 using motion::TrackMatteType;
 using motion::Vec2;
@@ -680,4 +682,82 @@ TEST(TgfxRenderAdapterTest, SceneTextPathBaselineAlignsWithPathStroke) {
     std::printf("scene textTop=%d textBottom=%d mid=%.1f pathY=60\n", textTop, textBottom, mid);
     EXPECT_LT(std::fabs(60.0f - static_cast<float>(textBottom)), std::fabs(60.0f - mid));
     EXPECT_NEAR(60.0f, static_cast<float>(textBottom), 10.0f);
+}
+
+TEST(TgfxRenderAdapterTest, ShaderFillDrawsUvGradient) {
+    auto adapter = TgfxRenderAdapter::Make(64, 64);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 64;
+    state.viewportHeight = 64;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    state.frameRate = 30.f;
+    state.frameIndex = 0;
+    state.timeSeconds = 0.f;
+
+    EvaluatedLayer layer;
+    layer.id = EntityId{1};
+    layer.worldTransform = Mat3::Identity();
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{32, 32}, Vec2{40, 40});
+    item.paint.paintMode = StylePaintMode::Shader;
+    item.paint.shader.shaderId = EntityId::Generate();
+    item.paint.shader.mainImage = "vec4 mainImage(vec2 uv) { return vec4(uv, 0.0, 1.0); }";
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->setColorSourceFrameContext(state.timeSeconds, state.frameIndex, state.frameRate);
+    adapter->beginFrame(64, 64, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    // Center of the rect should be roughly mid UV (not pure black / pure white).
+    const Pixel center = PixelAt(pixels, 64, 32, 32);
+    EXPECT_GT(center.r, 20);
+    EXPECT_GT(center.g, 20);
+    EXPECT_LT(center.r, 250);
+    EXPECT_LT(center.g, 250);
+    // Bottom-right of the fill should be greener/redder than top-left.
+    const Pixel topLeft = PixelAt(pixels, 64, 18, 18);
+    const Pixel bottomRight = PixelAt(pixels, 64, 46, 46);
+    EXPECT_GT(bottomRight.r, topLeft.r);
+    EXPECT_GT(bottomRight.g, topLeft.g);
+}
+
+TEST(TgfxRenderAdapterTest, BadShaderSourceSkipsFill) {
+    auto adapter = TgfxRenderAdapter::Make(32, 32);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 32;
+    state.viewportHeight = 32;
+    state.backgroundColor = Color{0, 0, 0, 1};
+
+    EvaluatedLayer layer;
+    layer.worldTransform = Mat3::Identity();
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{16, 16}, Vec2{20, 20});
+    item.paint.paintMode = StylePaintMode::Shader;
+    item.paint.shader.shaderId = EntityId::Generate();
+    item.paint.shader.mainImage = "this is not valid glsl {{{";
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(32, 32, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 32, 16, 16);
+    EXPECT_NEAR(center.r, 0, 8);
+    EXPECT_NEAR(center.g, 0, 8);
+    EXPECT_NEAR(center.b, 0, 8);
 }

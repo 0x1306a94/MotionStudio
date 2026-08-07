@@ -70,6 +70,18 @@ void RenderCache::invalidateColorSourcePipeline(EntityId shaderId) {
     colorSourcePipelineMap_.erase(shaderId);
 }
 
+void RenderCache::invalidateColorSourcePipelineIfSourceChanged(EntityId shaderId, const std::string &sourceKey) {
+    if (!shaderId.isValid()) {
+        return;
+    }
+    auto it = colorSourceSourceKeys_.find(shaderId);
+    if (it != colorSourceSourceKeys_.end() && it->second == sourceKey) {
+        return;
+    }
+    invalidateColorSourcePipeline(shaderId);
+    colorSourceSourceKeys_[shaderId] = sourceKey;
+}
+
 UniformBufferSlice RenderCache::acquireUniformSlice(size_t size) {
     UniformBufferSlice slice;
     if (context_ == nullptr || context_->globalCache() == nullptr || size == 0) {
@@ -103,6 +115,7 @@ std::shared_ptr<tgfx::GPUBuffer> RenderCache::getFullscreenVertexBuffer(tgfx::GP
 
 void RenderCache::releaseAll() {
     colorSourcePipelineMap_.clear();
+    colorSourceSourceKeys_.clear();
     fullscreenVertexBuffer_ = nullptr;
     contextID_ = 0;
 }

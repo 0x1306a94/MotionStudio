@@ -19,6 +19,9 @@ class FrameCommandCache {
         int viewportHeight = 0;
         motion::Color backgroundColor = {};
         float cornerRadius = 0.0f;
+        float timeSeconds = 0.0f;
+        int64_t frameIndex = 0;
+        float frameRate = 30.0f;
         size_t layerCount = 0;
         motion::DrawCommandList commands = {};
     };

@@ -62,6 +62,9 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
                    ImageScaleMode mode) override;
     void drawText(const TextDrawParams &params) override;
 
+    void setColorSourceFrameContext(float timeSeconds, int64_t frameIndex,
+                                    float frameRate) override;
+
     // Test helper: times the single-slot text-path layout cache was hit.
     size_t textPathCacheHitsForTest() const {
         return textPathCacheHits_;
@@ -104,6 +107,9 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
 
     float opacity_ = 1;
     BlendMode blendMode_ = BlendMode::Normal;
+    float colorSourceTimeSeconds_ = 0.f;
+    int64_t colorSourceFrameIndex_ = 0;
+    float colorSourceFrameRate_ = 30.f;
     std::vector<float> opacityStack_;
     std::vector<BlendMode> blendStack_;
     bool compositionClipSaved_ = false;

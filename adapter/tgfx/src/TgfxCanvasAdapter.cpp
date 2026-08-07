@@ -1,6 +1,8 @@
 #include "TgfxCanvasAdapter.h"
 
 #include <algorithm>
+#include <optional>
+#include <sstream>
 #include <utility>
 
 #include <tgfx/core/Canvas.h>
@@ -19,6 +21,7 @@
 #include <tgfx/core/Typeface.h>
 #include <tgfx/gpu/Context.h>
 
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/render/ImageScaleLayout.h"
 #include "MotionStudio/textlayout/TextLayout.h"
 #include "RenderCache.h"
@@ -31,6 +34,8 @@
 #include "TgfxProfileTiming.h"
 #include "TgfxTextTypeface.h"
 #include "TgfxTypeConvert.h"
+#include "effects/ColorSourceEffect.h"
+#include "effects/Uniform.h"
 
 namespace motion {
 
@@ -119,6 +124,76 @@ void DrawTextOnPath(tgfx::Canvas *canvas, const TextDrawParams &params, float op
     }
 }
 
+std::string BuildColorSourceSourceKey(const ShaderPaint &shader) {
+    std::ostringstream out;
+    out << shader.mainImage << '\n';
+    for (const ShaderUniformDecl &decl : shader.uniforms) {
+        out << decl.name << '\0' << static_cast<int>(decl.format) << '\0' << decl.count << '\n';
+    }
+    return out.str();
+}
+
+void WriteShaderUniformValues(UniformData *uniformData, const ShaderPaint &shader) {
+    if (uniformData == nullptr) {
+        return;
+    }
+    for (const EvaluatedShaderUniform &value : shader.values) {
+        switch (value.kind) {
+            case ShaderUniformValueKind::AnimFloat:
+                uniformData->setData(value.name, value.floatValue);
+                break;
+            case ShaderUniformValueKind::AnimFloat2: {
+                const float xy[2] = {value.float2Value.x, value.float2Value.y};
+                uniformData->setData(value.name, xy, sizeof(xy));
+                break;
+            }
+            case ShaderUniformValueKind::AnimFloat3: {
+                const float xyz[3] = {value.float3Value.x, value.float3Value.y, value.float3Value.z};
+                uniformData->setData(value.name, xyz, sizeof(xyz));
+                break;
+            }
+            case ShaderUniformValueKind::AnimColor:
+                uniformData->setData(value.name, ToTgfxColor(value.colorValue));
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+// Builds an ImageShader for Shader-mode paints. Returns:
+// - nullopt: Color mode (caller uses solid color)
+// - empty shared_ptr: Shader mode but unavailable (caller skips draw)
+// - non-null: ready shader
+std::optional<std::shared_ptr<tgfx::Shader>> MakePaintImageShader(
+    const Paint &paint, const tgfx::Rect &sourceBounds, RenderCache *renderCache,
+    const ColorSourceFrameContext &frameContext) {
+    if (paint.paintMode != StylePaintMode::Shader) {
+        return std::nullopt;
+    }
+    if (renderCache == nullptr || !paint.shader.shaderId.isValid() || paint.shader.mainImage.empty()) {
+        return std::shared_ptr<tgfx::Shader>{};
+    }
+    renderCache->invalidateColorSourcePipelineIfSourceChanged(paint.shader.shaderId,
+                                                              BuildColorSourceSourceKey(paint.shader));
+    std::vector<Uniform> decls;
+    decls.reserve(paint.shader.uniforms.size());
+    for (const ShaderUniformDecl &decl : paint.shader.uniforms) {
+        decls.emplace_back(decl.name, decl.format, decl.count);
+    }
+    auto effect = ColorSourceEffect::Make(paint.shader.shaderId, paint.shader.mainImage,
+                                          std::move(decls), sourceBounds, renderCache);
+    if (effect == nullptr) {
+        return std::shared_ptr<tgfx::Shader>{};
+    }
+    effect->setFrameContext(frameContext);
+    WriteShaderUniformValues(effect->getUniformData(), paint.shader);
+    if (!effect->preparePipeline()) {
+        return std::shared_ptr<tgfx::Shader>{};
+    }
+    return effect->makeImageShader();
+}
+
 }  // namespace
 
 TgfxCanvasAdapter::TgfxCanvasAdapter()
@@ -143,6 +218,10 @@ void TgfxCanvasAdapter::releaseGpuCaches(tgfx::Context *context) {
     }
     if (isolationStack_ != nullptr) {
         isolationStack_->layers.clear();
+    }
+    if (renderCache_ != nullptr) {
+        renderCache_->releaseAll();
+        renderCache_->detachFromContext();
     }
     surface_.reset();
     if (context != nullptr) {
@@ -183,6 +262,9 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
     frameRestore_.reset();
     if (!acquireTarget(width, height) || !surface_) {
         return;
+    }
+    if (renderCache_ != nullptr) {
+        renderCache_->attachToContext(surface_->getContext());
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
     frameRestore_ = std::make_unique<tgfx::AutoCanvasRestore>(canvas);
@@ -275,6 +357,13 @@ void TgfxCanvasAdapter::setBlendMode(BlendMode mode) {
     blendMode_ = mode;
 }
 
+void TgfxCanvasAdapter::setColorSourceFrameContext(float timeSeconds, int64_t frameIndex,
+                                                   float frameRate) {
+    colorSourceTimeSeconds_ = timeSeconds;
+    colorSourceFrameIndex_ = frameIndex;
+    colorSourceFrameRate_ = frameRate;
+}
+
 void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &paint) {
     tgfx::Canvas *canvas = drawingCanvas();
     if (canvas == nullptr || !pathCache_ || geometry.isZero()) {
@@ -293,10 +382,22 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
     tgfx::Paint tgfxPaint;
     tgfxPaint.setAntiAlias(true);
     tgfxPaint.setStyle(tgfx::PaintStyle::Fill);
-    Color color = paint.color;
-    color.a *= opacity_;
-    tgfxPaint.setColor(ToTgfxColor(color));
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
+    const ColorSourceFrameContext frameContext{colorSourceTimeSeconds_, colorSourceFrameIndex_,
+                                               colorSourceFrameRate_};
+    const std::optional<std::shared_ptr<tgfx::Shader>> shader =
+        MakePaintImageShader(paint, path.getBounds(), renderCache_.get(), frameContext);
+    if (shader.has_value()) {
+        if (*shader == nullptr) {
+            return;
+        }
+        tgfxPaint.setShader(*shader);
+        tgfxPaint.setAlpha(opacity_);
+    } else {
+        Color color = paint.color;
+        color.a *= opacity_;
+        tgfxPaint.setColor(ToTgfxColor(color));
+    }
     canvas->drawPath(path, tgfxPaint);
 }
 
@@ -339,10 +440,24 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
 
     tgfx::Paint tgfxPaint;
     tgfxPaint.setAntiAlias(true);
-    Color color = paint.color;
-    color.a *= opacity_;
-    tgfxPaint.setColor(ToTgfxColor(color));
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
+    const ColorSourceFrameContext frameContext{colorSourceTimeSeconds_, colorSourceFrameIndex_,
+                                               colorSourceFrameRate_};
+    const tgfx::Rect shaderBounds =
+        options.position == StrokePosition::Center ? bounds : fullPath.getBounds();
+    const std::optional<std::shared_ptr<tgfx::Shader>> shader =
+        MakePaintImageShader(paint, shaderBounds, renderCache_.get(), frameContext);
+    if (shader.has_value()) {
+        if (*shader == nullptr) {
+            return;
+        }
+        tgfxPaint.setShader(*shader);
+        tgfxPaint.setAlpha(opacity_);
+    } else {
+        Color color = paint.color;
+        color.a *= opacity_;
+        tgfxPaint.setColor(ToTgfxColor(color));
+    }
 
     if (options.position == StrokePosition::Center) {
         tgfxPaint.setStyle(tgfx::PaintStyle::Stroke);

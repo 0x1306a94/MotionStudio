@@ -30,7 +30,9 @@ canvas->drawRect / drawPath(world XYWH, paint)
 
 ## 1.1 Core 存储
 
-文档侧过程色定义与 Fill/Stroke 引用属 **Core**（`Document.shaders` + 包内独立 `shader.json`；`document.json` 的 `schemaVersion` 仍为 1；color XOR shader 的 `StylePaintMode`）。`UniformFormat` 在 Core，adapter 共用。预览接线（SceneEvaluator → 本 effect）与 App 包/Inspector UI **尚未**接入。
+文档侧过程色定义与 Fill/Stroke 引用属 **Core**（`Document.shaders` + 包内独立 `shader.json`；`document.json` 的 `schemaVersion` 仍为 1；color XOR shader 的 `StylePaintMode`）。`UniformFormat` 在 Core，adapter 共用。
+
+**预览已接线**：`SceneEvaluator` 把 Shader fill/stroke 求值进 `Paint.shader` 快照并填充 `SceneState` 帧字段；`TgfxCanvasAdapter` 每帧经 `setColorSourceFrameContext` 注入后，用 `ColorSourceEffect` 画 path fill/stroke（编译失败则跳过绘制）。App 包读写与 Inspector/库 UI 见 [Color Source App UI](superpowers/specs/2026-08-07-color-source-app-ui-design.md)。
 
 设计说明：[Color Source Core 存储](superpowers/specs/2026-08-07-color-source-core-storage-design.md)；数据模型摘要见 [data-model.md](data-model.md) §3 / Fill·Stroke。
 

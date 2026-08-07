@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <unordered_map>
 
 namespace tgfx {
@@ -51,6 +52,10 @@ class RenderCache {
     // uniform layout changes so the next draw recompiles.
     void invalidateColorSourcePipeline(EntityId shaderId);
 
+    // Invalidates the pipeline when mainImage/decls fingerprint changes.
+    // sourceKey: opaque fingerprint for the current shader source + layout.
+    void invalidateColorSourcePipelineIfSourceChanged(EntityId shaderId, const std::string &sourceKey);
+
     // Forwards to Context::globalCache()->findOrCreateUniformBuffer.
     // Requires attachToContext. Frame reuse is handled by tgfx DrawingBuffer::encode
     // calling resetUniformBuffer().
@@ -65,6 +70,7 @@ class RenderCache {
     uint32_t contextID_ = 0;
     tgfx::Context *context_ = nullptr;
     std::unordered_map<EntityId, std::shared_ptr<tgfx::RenderPipeline>> colorSourcePipelineMap_ = {};
+    std::unordered_map<EntityId, std::string> colorSourceSourceKeys_ = {};
     std::shared_ptr<tgfx::GPUBuffer> fullscreenVertexBuffer_ = nullptr;
 };
 };  // namespace motion

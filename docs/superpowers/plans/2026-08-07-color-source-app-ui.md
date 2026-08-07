@@ -415,7 +415,7 @@ git commit -m "Evaluate shader fill and stroke paints into SceneState snapshots.
 
 ### Task 5: TgfxCanvasAdapter ↔ ColorSourceEffect + invalidate
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/include/TgfxCanvasAdapter.h`
@@ -430,7 +430,7 @@ git commit -m "Evaluate shader fill and stroke paints into SceneState snapshots.
 - Consumes: Task 4 `Paint` / `SceneState` 帧字段；`ColorSourceEffect::Make` / `setData` / `setFrameContext` / `makeImageShader`
 - Produces: `TgfxCanvasAdapter::setColorSourceFrameContext(ColorSourceFrameContext)`；shader 模式 `drawPath`/`strokePath` 使用 ImageShader
 
-- [ ] **Step 1: Frame context 注入**
+- [x] **Step 1: Frame context 注入**
 
 ```cpp
 // TgfxCanvasAdapter.h
@@ -447,7 +447,7 @@ canvas->adapter->setColorSourceFrameContext({
 });
 ```
 
-- [ ] **Step 2: drawPath / strokePath 分支**
+- [x] **Step 2: drawPath / strokePath 分支**
 
 伪代码：
 
@@ -478,12 +478,12 @@ if (paint.paintMode == StylePaintMode::Shader) {
 
 Stroke：同样 setShader；注意 stroke 几何仍走现有 Inside/Outside 逻辑。
 
-- [ ] **Step 3: Pipeline invalidate**
+- [x] **Step 3: Pipeline invalidate**
 
 在 `RenderCache` 为每个 `shaderId` 存 `sourceKey`（例如 `mainImage + '\n' + 序列化 decls`）。`Make`/`draw` 前若 key 变化则 `invalidateColorSourcePipeline(id)` 并更新 key。  
 **不要**每帧无条件 invalidate（避免多余编译）。
 
-- [ ] **Step 4: 测试**
+- [x] **Step 4: 测试**
 
 - 扩展 adapter 测试：构造带 `ShaderPaint` 的 `Paint`，经 `TgfxCanvasAdapter::drawPath` 离屏读像素（可复用 ColorSourceEffectTest 的星形/纯色断言，阈值放宽）。
 - 手动：App 里绑默认模板 shader，画布应出现 uv 渐变；改 `iTime` 相关源码后播放应动；坏源码不崩、不画。
@@ -493,7 +493,7 @@ cmake --build build --target tgfx_adapter_test
 ctest --test-dir build -R 'ColorSource|TgfxRender' --output-on-failure
 ```
 
-- [ ] **Step 5: 文档 + commit**
+- [x] **Step 5: 文档 + commit**
 
 更新 `docs/color-source-effect.md` §1.1：预览已接线。  
 Spec 状态改为「实现中/已完成」（按实际）。  
