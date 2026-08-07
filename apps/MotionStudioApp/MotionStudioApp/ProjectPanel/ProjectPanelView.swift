@@ -103,6 +103,7 @@ struct ProjectPanelView: View {
                                         .frame(width: 16)
                                     Text(core.shaderName(shaderID))
                                         .lineLimit(1)
+                                        .id("shader-name-\(shaderID)-\(core.revision)")
                                     Spacer(minLength: 0)
                                 }
                                 .font(.subheadline)
@@ -122,6 +123,7 @@ struct ProjectPanelView: View {
                                 }
                             }
                         }
+                        .id("shader-list-\(core.revision)")
                     }
                     .frame(maxHeight: 180)
                 }

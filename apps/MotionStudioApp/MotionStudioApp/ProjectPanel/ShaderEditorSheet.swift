@@ -238,10 +238,19 @@ struct ShaderEditorSheet: View {
         else {
             return
         }
+        var didUpdate = false
         perform("Update Shader") {
-            _ = core.updateShader(id: shaderID, name: trimmedName, mainImage: mainImage, uniformsJSON: json)
+            didUpdate = core.updateShader(id: shaderID, name: trimmedName, mainImage: mainImage,
+                                          uniformsJSON: json)
         }
-        onDismiss()
+        guard didUpdate else {
+            return
+        }
+        // Dismiss on the next turn so parent panels can process the revision bump
+        // before the sheet tears down (Menu pickers / sibling hosts).
+        Task { @MainActor in
+            onDismiss()
+        }
     }
 
     private static func encodeUniformsJSON(_ uniforms: [ShaderUniformDraft]) -> String? {

@@ -44,6 +44,8 @@ struct StyleShaderPaintControls: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .disabled(!isEditable || core.shaderIDs().isEmpty)
+                    // Menu pickers cache option titles; recreate when the library changes.
+                    .id("style-shader-\(styleIndex)-\(core.revision)")
 
                     Button("Edit Source") {
                         if shaderID != 0 {
