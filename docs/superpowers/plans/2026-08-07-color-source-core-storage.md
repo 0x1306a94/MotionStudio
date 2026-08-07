@@ -142,7 +142,7 @@ git commit -m "Add Vec3 and Interpolator support for shader uniforms."
 
 ### Task 2: `UniformFormat` 上移到 Core
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/common/UniformFormat.h`
@@ -154,7 +154,7 @@ git commit -m "Add Vec3 and Interpolator support for shader uniforms."
 **Interfaces:**
 - Produces: `motion::UniformFormat` 与现 adapter enum **同序同名**；`UniformFormatGLSLTypeName`、`IsSamplerFormat`、以及原 `Uniform::size()` 依赖的 size 逻辑放在 Core 或仍由 `Uniform` 类调用 Core 辅助函数。
 
-- [ ] **Step 1: 在 Core 增加头/实现，adapter 改为转发**
+- [x] **Step 1: 在 Core 增加头/实现，adapter 改为转发**
 
 `Uniform.h`（adapter）保留：
 
@@ -167,7 +167,7 @@ class Uniform { /* 现有构造与 name/format/count/size，size 实现调 Core 
 }
 ```
 
-- [ ] **Step 2: 构建 adapter + core**
+- [x] **Step 2: 构建 adapter + core**
 
 ```bash
 cmake --build build --target core tgfx_adapter tgfx_adapter_test -j$(sysctl -n hw.ncpu)
@@ -175,7 +175,7 @@ cmake --build build --target core tgfx_adapter tgfx_adapter_test -j$(sysctl -n h
 
 Expected: 成功（ASan 下 ColorSourceEffect 已知 glslang 问题可先用 `build-noasan` 跑 adapter 视觉测）。
 
-- [ ] **Step 3: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 3: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add adapter/tgfx/src/effects/Uniform.h adapter/tgfx/src/effects/Uniform.cpp \

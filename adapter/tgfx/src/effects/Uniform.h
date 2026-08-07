@@ -1,39 +1,9 @@
 #pragma once
 
+#include "MotionStudio/common/UniformFormat.h"
 #include <string>
 
 namespace motion {
-
-/**
- * Uniform variable formats.
- */
-enum class UniformFormat {
-    Float,                   // 32-bit floating point scalar.
-    Float2,                  // 2-component vector of 32-bit floating point values.
-    Float3,                  // 3-component vector of 32-bit floating point values.
-    Float4,                  // 4-component vector of 32-bit floating point values.
-    Float2x2,                // 2x2 matrix of 32-bit floating point values.
-    Float3x3,                // 3x3 matrix of 32-bit floating point values.
-    Float4x4,                // 4x4 matrix of 32-bit floating point values.
-    Int,                     // 32-bit signed integer scalar.
-    Int2,                    // 2-component vector of 32-bit signed integer values.
-    Int3,                    // 3-component vector of 32-bit signed integer values.
-    Int4,                    // 4-component vector of 32-bit signed integer values.
-    Texture2DSampler,        // 2D texture sampler.
-    TextureExternalSampler,  // External texture sampler (e.g. for camera input).
-    Texture2DRectSampler,    // Rectangle texture sampler.
-};
-
-/**
- * Returns the GLSL type name for the given uniform format.
- * Returns an empty string for unknown formats.
- */
-const char *UniformFormatGLSLTypeName(UniformFormat format);
-
-/**
- * Returns true if the format is a texture sampler (not part of a std140 UBO).
- */
-bool IsSamplerFormat(UniformFormat format);
 
 /**
  * Represents a uniform variable in a GPU program.
