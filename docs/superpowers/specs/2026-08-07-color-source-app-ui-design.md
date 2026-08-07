@@ -172,7 +172,7 @@ Swift `MotionDocumentCore` 增补（名称示意）：
   assets/
 ```
 
-- **Load**：有 `shader.json` 则 `loadShaders`；无则空库；再加载 document。
+- **Load**：从包中同时读出 `document.json` 与 `shader.json`（缺则空库），经 **一次** Bridge/Core 加载合并进同一 `Document`（赋 `shaders` 后 `ValidateShaderReferences`）；失败则整个打开失败。不向 UI 暴露「仅有 document、尚无 shaders」的中间态。
 - **Save**：`serialize()` + `serializeShaders()` 成对写入；可写 `shaders: []`。
 - shader 变更同样 `markDirty`。
 

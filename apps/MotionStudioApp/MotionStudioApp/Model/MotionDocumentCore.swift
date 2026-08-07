@@ -50,9 +50,25 @@ final class MotionDocumentCore {
     }
 
     nonisolated init(json: Data) throws {
+        try self.init(documentJSON: json, shadersJSON: nil)
+    }
+
+    /// Loads document.json and shader.json together into one in-memory Document.
+    nonisolated init(documentJSON: Data, shadersJSON: Data?) throws {
         var error: UnsafeMutablePointer<CChar>?
-        let handle = json.withUnsafeBytes { buffer in
-            ms_document_load_json(buffer.bindMemory(to: CChar.self).baseAddress, buffer.count, &error)
+        let handle = documentJSON.withUnsafeBytes { documentBuffer -> OpaquePointer? in
+            let documentBase = documentBuffer.bindMemory(to: CChar.self).baseAddress
+            let documentCount = documentBuffer.count
+            guard let shadersJSON else {
+                return ms_document_load_json_with_shaders(documentBase, documentCount, nil, 0, &error)
+            }
+            return shadersJSON.withUnsafeBytes { shadersBuffer in
+                ms_document_load_json_with_shaders(
+                    documentBase, documentCount,
+                    shadersBuffer.bindMemory(to: CChar.self).baseAddress, shadersBuffer.count,
+                    &error,
+                )
+            }
         }
         guard let handle else {
             let message = Self.takeString(error) ?? "unknown load error"
@@ -78,6 +94,98 @@ final class MotionDocumentCore {
         }
         defer { ms_string_free(cString) }
         return Data(bytes: cString, count: strlen(cString))
+    }
+
+    nonisolated func serializeShaders() throws -> Data {
+        guard let cString = ms_document_serialize_shaders(handle) else {
+            throw NSError(domain: "MotionStudio", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "shader serialization failed"])
+        }
+        defer { ms_string_free(cString) }
+        return Data(bytes: cString, count: strlen(cString))
+    }
+
+    // MARK: - Shader library
+
+    func shaderIDs() -> [UInt64] {
+        let count = ms_document_shader_count(handle)
+        return (0 ..< Int(count)).compactMap { index in
+            let id = ms_document_shader_id_at(handle, Int32(index))
+            return id == 0 ? nil : id
+        }
+    }
+
+    func shaderName(_ shaderID: UInt64) -> String {
+        Self.takeString(ms_document_shader_name(handle, shaderID)) ?? ""
+    }
+
+    func shaderMainImage(_ shaderID: UInt64) -> String {
+        Self.takeString(ms_document_shader_main_image(handle, shaderID)) ?? ""
+    }
+
+    func shaderUniformCount(_ shaderID: UInt64) -> Int {
+        Int(ms_document_shader_uniform_count(handle, shaderID))
+    }
+
+    func shaderUniformName(_ shaderID: UInt64, index: Int) -> String {
+        Self.takeString(ms_document_shader_uniform_name_at(handle, shaderID, Int32(index))) ?? ""
+    }
+
+    func shaderUniformFormat(_ shaderID: UInt64, index: Int) -> MS_UNIFORM_FORMAT {
+        ms_document_shader_uniform_format_at(handle, shaderID, Int32(index))
+    }
+
+    @discardableResult
+    func addShader(name: String) -> UInt64 {
+        let id = ms_document_add_shader(handle, name)
+        if id != 0 {
+            changed()
+        }
+        return id
+    }
+
+    @discardableResult
+    func updateShader(id: UInt64, name: String, mainImage: String, uniformsJSON: String) -> Bool {
+        let ok = ms_document_update_shader(handle, id, name, mainImage, uniformsJSON)
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
+    @discardableResult
+    func removeShader(_ shaderID: UInt64) -> Bool {
+        let ok = ms_document_remove_shader(handle, shaderID)
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
+    @discardableResult
+    func renameShader(_ shaderID: UInt64, name: String) -> Bool {
+        let ok = ms_document_rename_shader(handle, shaderID, name)
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
+    func stylePaintMode(layerID: UInt64, index: Int) -> MS_PAINT_MODE {
+        ms_layer_style_paint_mode_at(handle, layerID, Int32(index))
+    }
+
+    func styleShaderID(layerID: UInt64, index: Int) -> UInt64 {
+        ms_layer_style_shader_id_at(handle, layerID, Int32(index))
+    }
+
+    @discardableResult
+    func setStylePaintMode(layerID: UInt64, index: Int, mode: MS_PAINT_MODE, shaderID: UInt64) -> Bool {
+        let ok = ms_document_set_style_paint_mode(handle, layerID, Int32(index), mode, shaderID)
+        if ok {
+            changed()
+        }
+        return ok
     }
 
     // MARK: - Undo / redo

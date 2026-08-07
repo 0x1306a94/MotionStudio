@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 final class MotionProjectDocument: UIDocument {
     private enum Package {
         static let documentFilename = "document.json"
+        static let shaderFilename = "shader.json"
         static let assetsDirectoryName = "assets"
     }
 
@@ -49,7 +50,8 @@ final class MotionProjectDocument: UIDocument {
 
     override func load(fromContents contents: Any, ofType _: String?) throws {
         if let data = contents as? Data {
-            modelDocument = try MotionProjectState(data: data)
+            // Flat document.json only (no shader.json) → empty shader library.
+            modelDocument = try MotionProjectState(documentJSON: data, shadersJSON: nil)
             syncProjectRoot()
             return
         }
@@ -58,7 +60,10 @@ final class MotionProjectDocument: UIDocument {
             throw CocoaError(.fileReadCorruptFile)
         }
 
-        modelDocument = try MotionProjectState(data: documentData(from: fileWrapper))
+        // document.json + shader.json are merged in one Core load before UI sees the model.
+        let documentData = try documentData(from: fileWrapper)
+        let shadersData = shaderData(from: fileWrapper)
+        modelDocument = try MotionProjectState(documentJSON: documentData, shadersJSON: shadersData)
         try materializeAssets(from: fileWrapper)
         syncProjectRoot()
     }
@@ -78,9 +83,11 @@ final class MotionProjectDocument: UIDocument {
     func packageFileWrapper() throws -> FileWrapper {
         syncProjectRoot()
         let documentData = try snapshotData()
+        let shadersData = try core.serializeShaders()
         let root = FileWrapper(directoryWithFileWrappers: [:])
         root.preferredFilename = saveURL.lastPathComponent
         root.addRegularFile(withContents: documentData, preferredFilename: Package.documentFilename)
+        root.addRegularFile(withContents: shadersData, preferredFilename: Package.shaderFilename)
 
         let assets = FileWrapper(directoryWithFileWrappers: [:])
         assets.preferredFilename = Package.assetsDirectoryName
@@ -167,5 +174,22 @@ final class MotionProjectDocument: UIDocument {
         }
 
         throw CocoaError(.fileReadCorruptFile)
+    }
+
+    /// Optional shader.json beside document.json. Missing file → nil (empty library on load).
+    private func shaderData(from fileWrapper: FileWrapper) -> Data? {
+        if fileWrapper.isDirectory,
+           let shaderWrapper = fileWrapper.fileWrappers?[Package.shaderFilename],
+           shaderWrapper.isRegularFile,
+           let data = shaderWrapper.regularFileContents
+        {
+            return data
+        }
+
+        let packageURL = fileURL.appendingPathComponent(Package.shaderFilename)
+        if FileManager.default.fileExists(atPath: packageURL.path(percentEncoded: false)) {
+            return try? Data(contentsOf: packageURL)
+        }
+        return nil
     }
 }

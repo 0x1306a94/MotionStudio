@@ -2161,6 +2161,26 @@ Expected<std::vector<ShaderDefinition>, std::string> Serializer::deserializeShad
     return shaders;
 }
 
+Expected<std::vector<ShaderUniformDecl>, std::string> Serializer::deserializeUniformDecls(
+    const std::string &jsonArrayText) {
+    if (jsonArrayText.empty()) {
+        return std::vector<ShaderUniformDecl>{};
+    }
+    const json data = json::parse(jsonArrayText, nullptr, false);
+    if (data.is_discarded() || !data.is_array()) {
+        return Unexpected(std::string("failed to parse uniform decls JSON array"));
+    }
+    std::vector<ShaderUniformDecl> decls;
+    for (const json &declNode : data) {
+        Expected<ShaderUniformDecl, std::string> decl = ShaderUniformDeclFromJson(declNode);
+        if (!decl) {
+            return Unexpected(decl.error());
+        }
+        decls.push_back(std::move(*decl));
+    }
+    return decls;
+}
+
 Expected<void, std::string> ValidateShaderReferences(const Document &document) {
     for (const auto &composition : document.compositions) {
         if (composition == nullptr) {

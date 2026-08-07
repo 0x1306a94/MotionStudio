@@ -28,6 +28,10 @@ final class MotionProjectState {
         core = try MotionDocumentCore(json: data)
     }
 
+    nonisolated init(documentJSON: Data, shadersJSON: Data?) throws {
+        core = try MotionDocumentCore(documentJSON: documentJSON, shadersJSON: shadersJSON)
+    }
+
     nonisolated func snapshot(contentType _: UTType) throws -> Data {
         try core.serialize()
     }

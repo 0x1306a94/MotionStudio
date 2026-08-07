@@ -58,7 +58,7 @@ vec4 mainImage(vec2 uv) {
 
 ### Task 1: Bridge API + 包 `shader.json`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`
@@ -107,7 +107,12 @@ bool ms_document_remove_shader(MSDocument *document, uint64_t shaderId); // fals
 bool ms_document_rename_shader(MSDocument *document, uint64_t shaderId, const char *name);
 
 char *ms_document_serialize_shaders(MSDocument *document); // ms_string_free
-bool ms_document_load_shaders_json(MSDocument *document, const char *jsonText, size_t length, char **errorOut);
+// Package open: load document.json + shader.json **together** into one Document
+// (shaders merged before the handle is returned; then ValidateShaderReferences).
+// shadersJson may be NULL / length 0 → empty library.
+MSDocument *ms_document_load_json_with_shaders(const char *documentJson, size_t documentLength,
+                                              const char *shadersJson, size_t shadersLength,
+                                              char **errorOut);
 
 MS_PAINT_MODE ms_layer_style_paint_mode_at(MSDocument *document, uint64_t layerId, int index);
 uint64_t ms_layer_style_shader_id_at(MSDocument *document, uint64_t layerId, int index);
@@ -115,105 +120,15 @@ bool ms_document_set_style_paint_mode(MSDocument *document, uint64_t layerId, in
                                      MS_PAINT_MODE mode, uint64_t shaderId);
 ```
 
-- Swift：`MotionDocumentCore` 镜像上述 API；`serializeShaders() throws -> Data`；`loadShaders(data:)`。
+- Swift：`MotionDocumentCore` 镜像上述 API；`serializeShaders() throws -> Data`；`init(documentJSON:shadersJSON:)`（或缺省空库）走 `ms_document_load_json_with_shaders`。
 - 包：`Package.shaderFilename = "shader.json"`。
+- **加载约定：** 打开工程时 `document.json` 与 `shader.json` **一次**合并进内存 `Document`（先 deserialize document，再赋 `shaders`，再 `ValidateShaderReferences`，失败则整个打开失败）。禁止「先只有 document、稍后补 shaders」的中间态暴露给 UI。保存仍写两个文件。
 
-- [ ] **Step 1: 写 Bridge 失败测试**
-
-在 `bridge/tests` 增加（示意）：
-
-```cpp
-TEST(BridgeShaderTest, AddUpdateRemoveAndSerializeRoundTrip) {
-    MSDocument *document = ms_document_create();
-    ASSERT_NE(document, nullptr);
-    EXPECT_EQ(ms_document_shader_count(document), 0);
-
-    const uint64_t id = ms_document_add_shader(document, "Ripple");
-    ASSERT_NE(id, 0u);
-    EXPECT_EQ(ms_document_shader_count(document), 1);
-
-    BridgeString name{ms_document_shader_name(document, id)};
-    EXPECT_STREQ(name.value, "Ripple");
-
-    const char *uniforms = R"([{"name":"rippleCount","format":"float","count":1}])";
-    ASSERT_TRUE(ms_document_update_shader(
-        document, id, "Ripple",
-        "vec4 mainImage(vec2 uv) { return vec4(uv,0.0,1.0); }", uniforms));
-    EXPECT_EQ(ms_document_shader_uniform_count(document, id), 1);
-
-    BridgeString json{ms_document_serialize_shaders(document)};
-    ASSERT_NE(json.value, nullptr);
-
-    // Bind to fill then remove must fail
-    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
-    // …按现有 BridgeTest 建 shape 层 + add fill…
-    // ms_document_set_style_paint_mode(..., MS_PAINT_MODE_SHADER, id);
-    // EXPECT_FALSE(ms_document_remove_shader(document, id));
-
-    ms_document_destroy(document);
-
-    MSDocument *loaded = ms_document_create();
-    char *error = nullptr;
-    ASSERT_TRUE(ms_document_load_shaders_json(loaded, json.value, strlen(json.value), &error));
-    EXPECT_EQ(error, nullptr);
-    EXPECT_EQ(ms_document_shader_count(loaded), 1);
-    ms_document_destroy(loaded);
-}
-```
-
-（建层/Fill 步骤照抄 `BridgeTest` 里已有 shape+fill 样板，保持可编译。）
-
-- [ ] **Step 2: 跑测试确认失败**
-
-```bash
-cmake --build build --target bridge_test
-./build/bridge/tests/bridge_test --gtest_filter='BridgeShaderTest.*'
-```
-
-Expected: 链接失败或未定义符号 / FAIL。
-
-- [ ] **Step 3: 实现 C Bridge + Swift facade**
-
-- `motionstudio_bridge_shader.cpp`：锁 document → 调 undo 命令 / Serializer；`update_shader` 解析 uniformsJson（复用 Core DTO 解析路径或小型 nlohmann 解析成 `vector<ShaderUniformDecl>`）。
-- `rename_shader`：可读当前 mainImage/uniforms，调 `UpdateShaderDefinitionCommand` 只改 name。
-- `remove_shader`：若 `ShaderIsReferenced` → 返回 false 且不入 undo；否则 `RemoveShaderCommand`。
-- `load_shaders_json`：deserialize 后替换 `document.shaders`（打开工程时在 load document **之前或之后**由 App 调用；**不要**在 `ms_document_load_json` 里偷偷读 shader——包层负责）。
-- Swift：`bumpRevision()` 模式与其它 mutation 一致；字符串用现有 `BridgeString`/`ms_string_free` 封装。
-
-- [ ] **Step 4: 包读写 `shader.json`**
-
-`MotionProjectDocument`：
-
-```swift
-private enum Package {
-    static let documentFilename = "document.json"
-    static let shaderFilename = "shader.json"
-    static let assetsDirectoryName = "assets"
-}
-```
-
-- `packageFileWrapper()`：在写 `document.json` 后 `root.addRegularFile(withContents: try core.serializeShaders(), preferredFilename: Package.shaderFilename)`（空库也写合法 JSON）。
-- `load(fromContents:)`：从 FileWrapper 取 `shader.json`（可选）；若有则 `core.loadShaders`；**再** `MotionProjectState(data: document.json)`。若先 load document 再 load shaders，须保证引用校验时机与 Core `ValidateShaderReferences` 约定一致——优先：**先 shaders 再 document**，或 load document 后 load shaders 再显式 validate（实现时选一种并在注释写明）。
-- 缺文件 → 空库，不报错。
-
-- [ ] **Step 5: 跑通 Bridge 测试并 commit**
-
-```bash
-cmake --build build --target bridge_test
-ctest --test-dir build -R 'BridgeShader' --output-on-failure
-```
-
-Expected: PASS。
-
-勾选本 Task steps → 更新 Status → commit（含 plan）。
-
-```bash
-git add bridge/ apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift \
-  apps/MotionStudioApp/MotionStudioApp/Document/MotionProjectDocument.swift \
-  apps/MotionStudioApp/MotionStudioApp/Bridge/PropertyPath.swift \
-  docs/superpowers/plans/2026-08-07-color-source-app-ui.md
-git commit -m "Expose shader library bridge APIs and package shader.json IO."
-```
+- [x] **Step 1: 写 Bridge 失败测试**
+- [x] **Step 2: 跑测试确认失败**
+- [x] **Step 3: 实现 C Bridge + Swift facade**
+- [x] **Step 4: 包读写 `shader.json`**
+- [x] **Step 5: 跑通 Bridge 测试并 commit**
 
 ---
 

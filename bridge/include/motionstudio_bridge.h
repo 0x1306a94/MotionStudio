@@ -599,6 +599,56 @@ int ms_asset_width(MSDocument *document, uint64_t assetId);
 int ms_asset_height(MSDocument *document, uint64_t assetId);
 int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 = image
 
+// ---- Document shader library (process color / Color Source) ----
+
+// Paint source for Fill/Stroke; mirrors motion::StylePaintMode.
+typedef CF_CLOSED_ENUM(int, MS_PAINT_MODE) {
+    MS_PAINT_MODE_INVALID = -1,
+    MS_PAINT_MODE_COLOR = 0,
+    MS_PAINT_MODE_SHADER = 1,
+};
+
+// User-editable scheme formats (v1 UI); ordinals match motion::UniformFormat.
+typedef CF_CLOSED_ENUM(int, MS_UNIFORM_FORMAT) {
+    MS_UNIFORM_FORMAT_INVALID = -1,
+    MS_UNIFORM_FORMAT_FLOAT = 0,
+    MS_UNIFORM_FORMAT_FLOAT2 = 1,
+    MS_UNIFORM_FORMAT_FLOAT3 = 2,
+    MS_UNIFORM_FORMAT_FLOAT4 = 3,
+};
+
+int ms_document_shader_count(MSDocument *document);
+uint64_t ms_document_shader_id_at(MSDocument *document, int index);
+char *ms_document_shader_name(MSDocument *document, uint64_t shaderId);        // ms_string_free
+char *ms_document_shader_main_image(MSDocument *document, uint64_t shaderId);  // ms_string_free
+int ms_document_shader_uniform_count(MSDocument *document, uint64_t shaderId);
+char *ms_document_shader_uniform_name_at(MSDocument *document, uint64_t shaderId, int index);
+MS_UNIFORM_FORMAT ms_document_shader_uniform_format_at(MSDocument *document, uint64_t shaderId,
+                                                       int index);
+
+// Adds a shader with default mainImage template and empty uniforms. name may be NULL → "Shader".
+uint64_t ms_document_add_shader(MSDocument *document, const char *name);
+// Replaces name/mainImage/uniforms in one undo step. uniformsJson is a JSON array of
+// {name,format,count} (same shape as shader.json uniforms); NULL or "[]" clears scheme.
+bool ms_document_update_shader(MSDocument *document, uint64_t shaderId, const char *name,
+                               const char *mainImage, const char *uniformsJson);
+bool ms_document_remove_shader(MSDocument *document, uint64_t shaderId);  // false if referenced
+bool ms_document_rename_shader(MSDocument *document, uint64_t shaderId, const char *name);
+
+char *ms_document_serialize_shaders(MSDocument *document);  // ms_string_free
+// Package open: deserialize document.json + shader.json into one Document (shaders assigned
+// before the handle is returned, then ValidateShaderReferences). shadersJson may be NULL
+// or shadersLength 0 for an empty library. On failure returns NULL and sets *errorOut.
+MSDocument *ms_document_load_json_with_shaders(const char *documentJson, size_t documentLength,
+                                               const char *shadersJson, size_t shadersLength,
+                                               char **errorOut);
+
+MS_PAINT_MODE ms_layer_style_paint_mode_at(MSDocument *document, uint64_t layerId, int index);
+uint64_t ms_layer_style_shader_id_at(MSDocument *document, uint64_t layerId, int index);
+// mode COLOR ignores shaderId; mode SHADER requires a library shaderId.
+bool ms_document_set_style_paint_mode(MSDocument *document, uint64_t layerId, int index,
+                                      MS_PAINT_MODE mode, uint64_t shaderId);
+
 // Adds a Text layer (400x120, boxTextMode off, PingFang SC, black fill, centered).
 uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId);
 // family / style: system CT family and style names (style may be empty for default).

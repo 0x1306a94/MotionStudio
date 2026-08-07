@@ -30,6 +30,10 @@ class Serializer {
     // jsonText: full shader.json text.
     static Expected<std::vector<ShaderDefinition>, std::string> deserializeShaders(
         const std::string &jsonText);
+    // Parses a JSON array of {name,format,count} (shader.json uniforms shape).
+    // jsonArrayText: JSON array text; empty string or "[]" yields an empty vector.
+    static Expected<std::vector<ShaderUniformDecl>, std::string> deserializeUniformDecls(
+        const std::string &jsonArrayText);
 };
 
 // Checks Shader-mode style references against document.shaders (name/kind alignment).

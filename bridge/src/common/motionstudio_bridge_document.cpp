@@ -35,18 +35,44 @@ MSDocument *ms_document_create(void) {
 }
 
 MSDocument *ms_document_load_json(const char *jsonText, size_t length, char **errorOut) {
-    if (jsonText == nullptr) {
+    return ms_document_load_json_with_shaders(jsonText, length, nullptr, 0, errorOut);
+}
+
+MSDocument *ms_document_load_json_with_shaders(const char *documentJson, size_t documentLength,
+                                               const char *shadersJson, size_t shadersLength,
+                                               char **errorOut) {
+    if (documentJson == nullptr) {
         return nullptr;
     }
-    auto result = Serializer::deserialize(std::string(jsonText, length));
+    auto result = Serializer::deserialize(std::string(documentJson, documentLength));
     if (!result.hasValue()) {
         if (errorOut != nullptr) {
             *errorOut = strdup(result.error().c_str());
         }
         return nullptr;
     }
+    std::unique_ptr<Document> document = std::move(result).value();
+    if (shadersJson != nullptr && shadersLength > 0) {
+        auto shaders = Serializer::deserializeShaders(std::string(shadersJson, shadersLength));
+        if (!shaders.hasValue()) {
+            if (errorOut != nullptr) {
+                *errorOut = strdup(shaders.error().c_str());
+            }
+            return nullptr;
+        }
+        document->shaders = std::move(shaders).value();
+    } else {
+        document->shaders.clear();
+    }
+    auto valid = motion::ValidateShaderReferences(*document);
+    if (!valid.hasValue()) {
+        if (errorOut != nullptr) {
+            *errorOut = strdup(valid.error().c_str());
+        }
+        return nullptr;
+    }
     auto *handle = new MSDocument();
-    handle->document = std::move(result).value();
+    handle->document = std::move(document);
     handle->undoManager = std::make_unique<UndoManager>();
     return handle;
 }
@@ -60,16 +86,27 @@ MSDocument *ms_document_load(const char *packagePath, char **errorOut) {
     }
     const std::filesystem::path root(packagePath);
     const std::filesystem::path documentPath = root / "document.json";
-    std::ifstream input(documentPath, std::ios::binary);
-    if (!input) {
+    std::ifstream documentInput(documentPath, std::ios::binary);
+    if (!documentInput) {
         if (errorOut != nullptr) {
             *errorOut = strdup("failed to open document.json");
         }
         return nullptr;
     }
-    const std::string json((std::istreambuf_iterator<char>(input)),
+    const std::string documentJson((std::istreambuf_iterator<char>(documentInput)),
+                                   std::istreambuf_iterator<char>());
+
+    std::string shadersJson;
+    const std::filesystem::path shadersPath = root / "shader.json";
+    std::ifstream shadersInput(shadersPath, std::ios::binary);
+    if (shadersInput) {
+        shadersJson.assign((std::istreambuf_iterator<char>(shadersInput)),
                            std::istreambuf_iterator<char>());
-    MSDocument *handle = ms_document_load_json(json.data(), json.size(), errorOut);
+    }
+
+    MSDocument *handle = ms_document_load_json_with_shaders(
+        documentJson.data(), documentJson.size(),
+        shadersJson.empty() ? nullptr : shadersJson.data(), shadersJson.size(), errorOut);
     if (handle == nullptr) {
         return nullptr;
     }

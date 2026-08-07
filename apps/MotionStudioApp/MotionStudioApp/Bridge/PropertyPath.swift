@@ -136,6 +136,10 @@ enum StyleProperty: String, CaseIterable {
         "styles[\(index)].\(rawValue)"
     }
 
+    static func uniformValue(_ name: String, styleIndex: Int) -> String {
+        "styles[\(styleIndex)].uniformValues.\(name)"
+    }
+
     var actionLabel: String {
         switch self {
         case .color:
