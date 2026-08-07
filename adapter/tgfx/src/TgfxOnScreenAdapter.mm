@@ -7,6 +7,7 @@
 
 #include "OnScreenTransform.h"
 #include "TgfxProfileTiming.h"
+#include "effects/ColorSourceEffect.h"
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/Color.h>
@@ -19,6 +20,23 @@
 #include <tgfx/gpu/metal/MetalWindow.h>
 
 namespace motion {
+
+constexpr const char *PIXEL_GRID_FRAGMENT = R"GLSL(
+vec4 mainImage(vec2 uv) {
+    vec2 pixel = uv * iResolution.xy; 
+    float cellX = floor(pixel.x / inputTileSize);
+    float cellY = floor(pixel.y / inputTileSize);
+
+    float isGray = mod(cellX + cellY, 2.0);
+
+    vec3 blackColor = vec3(0.0, 0.0, 0.0);
+    vec3 grayColor  = vec3(0.15, 0.15, 0.15);
+    
+    vec3 finalColor = mix(blackColor, grayColor, isGray);
+
+    return vec4(finalColor, 1.0);
+}
+)GLSL";
 
 struct TgfxOnScreenAdapter::Impl {
     MTKView *view = nil;
@@ -108,6 +126,11 @@ bool TgfxOnScreenAdapter::acquireTarget(int /*width*/, int /*height*/) {
     return true;
 }
 
+static EntityId &DrawPreviewBackdropShaderId() {
+    static EntityId shaderId = EntityId::Generate();
+    return shaderId;
+}
+
 void TgfxOnScreenAdapter::drawPreviewBackdrop() {
     if (!surface_) {
         return;
@@ -118,26 +141,35 @@ void TgfxOnScreenAdapter::drawPreviewBackdrop() {
         return;
     }
 
-    // Checkerboard (tgfx hello2d GridBackground style), scaled by content scale.
     const int width = surface_->width();
     const int height = surface_->height();
-    canvas->clear(tgfx::Color::White());
-    tgfx::Paint tilePaint;
-    tilePaint.setStyle(tgfx::PaintStyle::Fill);
-    tilePaint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-    int tileSize = 16 * static_cast<int>(impl_->view.layer.contentsScale);
-    if (tileSize <= 0) {
-        tileSize = 16;
-    }
-    for (int y = 0; y < height; y += tileSize) {
-        bool draw = (y / tileSize) % 2 == 1;
-        for (int x = 0; x < width; x += tileSize) {
-            if (draw) {
-                canvas->drawRect(tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y), static_cast<float>(tileSize), static_cast<float>(tileSize)), tilePaint);
-            }
-            draw = !draw;
+    auto fullBounds = tgfx::Rect::MakeWH(width, height);
+    canvas->clear();
+
+    if (!pixelGridEffect_ || pixelGridEffect_->sourceBounds() != fullBounds) {
+        float tileSize = 10.0f * static_cast<float>(impl_->view.layer.contentsScale);
+        if (tileSize <= 0) {
+            tileSize = 10.f;
         }
+        std::vector<Uniform> uniforms = {
+            {"inputTileSize", UniformFormat::Float},
+        };
+        pixelGridEffect_ = ColorSourceEffect::Make(DrawPreviewBackdropShaderId(), PIXEL_GRID_FRAGMENT, uniforms, fullBounds, renderCache_.get());
+        if (!pixelGridEffect_) {
+            return;
+        }
+
+        pixelGridEffect_->getUniformData()->setData("inputTileSize", tileSize);
     }
+
+    auto shader = pixelGridEffect_->makeImageShader();
+    if (!shader) {
+        return;
+    }
+
+    tgfx::Paint paint;
+    paint.setShader(shader);
+    canvas->drawRect(fullBounds, paint);
 }
 
 void TgfxOnScreenAdapter::onFrameReady(int sceneWidth, int sceneHeight, Color backgroundColor,

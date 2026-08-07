@@ -5,7 +5,7 @@
 #include "TgfxCanvasAdapter.h"
 
 namespace motion {
-
+class ColorSourceEffect;
 // RenderAdapter backed by tgfx on the Metal GPU backend, rendering directly
 // into an MTKView's drawable. The window surface is reused across frames and
 // recreated only when the drawable size changes; endFrame presents the
@@ -47,6 +47,7 @@ class TgfxOnScreenAdapter : public TgfxCanvasAdapter {
     struct Impl;
     std::unique_ptr<Impl> impl_;
     PreviewBackdrop previewBackdrop_ = PreviewBackdrop::Transparent;
+    std::shared_ptr<ColorSourceEffect> pixelGridEffect_ = nullptr;
     float viewZoom_ = {1};
     float viewPanX_ = {};
     float viewPanY_ = {};

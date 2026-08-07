@@ -158,8 +158,7 @@ std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(EntityId shaderId, st
     if (!shaderId.isValid()) {
         return nullptr;
     }
-    return std::shared_ptr<ColorSourceEffect>(
-        new ColorSourceEffect(shaderId, std::move(mainImage), std::move(uniforms), sourceBounds, cache));
+    return std::shared_ptr<ColorSourceEffect>(new ColorSourceEffect(shaderId, std::move(mainImage), std::move(uniforms), sourceBounds, cache));
 }
 
 ColorSourceEffect::ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms,

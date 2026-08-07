@@ -47,6 +47,10 @@ class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_
         return shaderId_;
     }
 
+    const tgfx::Rect &sourceBounds() const {
+        return sourceBounds_;
+    }
+
     void setFrameContext(ColorSourceFrameContext frameContext);
     UniformData *getUniformData() const;
 
