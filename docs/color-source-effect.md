@@ -28,6 +28,12 @@ canvas->drawRect / drawPath(world XYWH, paint)
 
 设计层：一个文档 shader（`EntityId`）可被多个填充复用，只是绘制参数不同；GPU `RenderPipeline` 按 `shaderId` 共享。源码或 uniform **布局**变更后，调用方先 `cache.invalidateColorSourcePipeline(shaderId)`，再建实例绘制。
 
+## 1.1 Core 存储
+
+文档侧过程色定义与 Fill/Stroke 引用属 **Core**（`Document.shaders` + 包内独立 `shader.json`；`document.json` 的 `schemaVersion` 仍为 1；color XOR shader 的 `StylePaintMode`）。`UniformFormat` 在 Core，adapter 共用。预览接线（SceneEvaluator → 本 effect）与 App 包/Inspector UI **尚未**接入。
+
+设计说明：[Color Source Core 存储](superpowers/specs/2026-08-07-color-source-core-storage-design.md)；数据模型摘要见 [data-model.md](data-model.md) §3 / Fill·Stroke。
+
 ## 2. 绘制路径（始终离屏）
 
 当前实现**不会**把过程 shader 直接编进目标 canvas 的 fragment：

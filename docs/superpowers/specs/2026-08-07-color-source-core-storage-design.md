@@ -1,7 +1,8 @@
 # Color Source Core 存储 — 设计说明
 
 日期：2026-08-07  
-状态：已定案（实现计划：`docs/superpowers/plans/2026-08-07-color-source-core-storage.md`）  
+状态：Core 存储已实现（plan Tasks 1–8）；预览/App UI 后续  
+实现计划：`docs/superpowers/plans/2026-08-07-color-source-core-storage.md`  
 关联：[ColorSourceEffect 与 RenderCache](../../color-source-effect.md)、[数据模型](../../data-model.md)
 
 ## 目标
@@ -252,3 +253,4 @@ v1：**不**扩展 `EntityIndex`；`findShader(id)` 扫 `Document.shaders`（与
 | 日期 | 说明 |
 |---|---|
 | 2026-08-07 | 初稿：包分离、XOR paint、可扩展 uniformValues、引用完整性 |
+| 2026-08-07 | Core 存储已实现（plan Tasks 1–8）；预览 / App 包读写 / Inspector 仍属后续 |

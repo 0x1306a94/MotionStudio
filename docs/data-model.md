@@ -308,6 +308,33 @@ class FillStyle : public LayerStyle {
 
 `document.json` 中 `paintMode` / `shaderId` / `uniformValues` 为**可选**字段：缺省 → `Color`（与旧文档兼容）；`schemaVersion` **保持 1**。Color 模式写回时不输出 shader 字段。合并 `shader.json` 后可用 `ValidateShaderReferences` 校验引用。
 
+**不变式：** Color 模式 → `shaderId` 无效且 `uniformValues` 空；Shader 模式 → `shaderId` ∈ `Document.shaders`，`uniformValues` 与 scheme 按 name 对齐。切换用 `ClearShaderPaint` / `BindShaderPaint`（或 undo `SetStylePaintModeCommand`）。
+
+**实例 uniform 值（可扩展 kind）：**
+
+```cpp
+enum class ShaderUniformValueKind : uint8_t {
+    AnimFloat = 0,   // v1 ← UniformFormat::Float
+    AnimFloat2 = 1,  // v1 ← Float2
+    AnimFloat3 = 2,  // v1 ← Float3（Animatable<Vec3>）
+    AnimColor = 3,   // v1 ← Float4（语义为 Color）
+    // StaticInt / AnimFloat4 / StaticMat3 / TextureAsset 预留
+};
+
+struct ShaderUniformValue {
+    std::string name;
+    ShaderUniformValueKind kind;
+    Animatable<float> floatValue;
+    Animatable<Vec2> float2Value;
+    Animatable<Vec3> float3Value;
+    Animatable<Color> colorValue;
+};
+
+struct ShaderUniformValues { std::vector<ShaderUniformValue> entries; };
+```
+
+辅助：`KindForFormat` / `MakeDefaultUniformValues` / `RealignUniformValues`；改 scheme 后由 `UpdateShaderDefinitionCommand` 对所有引用样式 Realign。`PropertyPath`：`styles[0].uniformValues.<name>`（仅 Shader 模式）。内置 Shadertoy uniform（`iTime` 等）不进 scheme。设计细节见 [color-source Core 存储 spec](superpowers/specs/2026-08-07-color-source-core-storage-design.md)；绘制仍在 adapter，见 [color-source-effect.md](color-source-effect.md)。
+
 ## 4. Animatable\<T\>——可动画属性
 
 模型的核心抽象：任何属性要么是静态值，要么是一串关键帧。
@@ -364,6 +391,7 @@ template<typename T> struct Interpolator { static T lerp(const T& a, const T& b,
 
 template<> struct Interpolator<float> { /* a + (b-a)*t */ };
 template<> struct Interpolator<Vec2>  { /* 逐分量 */ };
+template<> struct Interpolator<Vec3>  { /* 逐分量 */ };
 template<> struct Interpolator<Color> { /* 线性 RGB 逐通道 */ };
 template<> struct Interpolator<BezierPath> {
     // 逐顶点插值；要求两路径顶点数一致
@@ -434,7 +462,8 @@ private:
 ```cpp
 struct PropertyPath {
     EntityId entityId;      // Layer 或 ShapeElement 的 ID
-    std::string path;       // "transform.position"、"styles[0].color"、"size"
+    std::string path;       // "transform.position"、"styles[0].color"、
+                            // "styles[0].uniformValues.rippleCount"、"size"
 };
 
 class MoveKeyframeCommand : public Command {
@@ -457,6 +486,8 @@ class MoveKeyframeCommand : public Command {
 ```
 
 **M1 需要的核心命令**（8 个）：`AddLayer`、`RemoveLayer`、`MoveLayer`（改顺序）、`SetStaticValue`、`AddKeyframe`、`RemoveKeyframe`、`MoveKeyframe`、`SetEasing`。
+
+过程色相关命令：`AddShaderCommand`、`RemoveShaderCommand`（仍被引用则跳过删除）、`UpdateShaderDefinitionCommand`（改 name/mainImage/uniforms 并对引用 Realign）、`SetStylePaintModeCommand`。
 
 **删除类命令的所有权**：`RemoveLayerCommand` 执行时把 `unique_ptr<Layer>` 移入命令内部；undo 时移回文档——完整恢复子结构与关键帧。
 
@@ -487,7 +518,21 @@ struct AnimatableDTO<T> {
 
 **理由**：运行时模型可自由重构（改类名/继承）而不破坏文件格式；迁移代码只操作 JSON 不依赖模型；反序列化时可做完整性校验。
 
-工程包还可含独立的 `shader.json`（`schemaVersion` 从 1 起，与 `document.json` 分开演进），由 `Serializer::serializeShaders` / `deserializeShaders` 处理；App 打开时合并进 `Document.shaders` 后再 `ValidateShaderReferences`。
+工程包还可含独立的 `shader.json`（DTO `SHADER_SCHEMA_VERSION = 1`，与 `document.json` 分开演进），由 `Serializer::serializeShaders` / `deserializeShaders` 处理；App 打开时合并进 `Document.shaders` 后再 `ValidateShaderReferences`（包读写属后续 App 计划）。示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "shaders": [
+    {
+      "id": 123456789,
+      "name": "Ripple",
+      "mainImage": "vec4 mainImage(vec2 uv){ return vec4(uv,0.0,1.0); }",
+      "uniforms": [ { "name": "rippleCount", "format": "float", "count": 1 } ]
+    }
+  ]
+}
+```
 
 ### 6.2 读写与版本迁移
 
@@ -515,3 +560,5 @@ JSON 库使用 nlohmann/json（见 [architecture.md](architecture.md)）。
 
 - 关键帧如何求值：[timeline-evaluation.md](timeline-evaluation.md)
 - 模型如何变成画面：[rendering.md](rendering.md)
+- 过程色 Core 存储设计：[superpowers/specs/2026-08-07-color-source-core-storage-design.md](superpowers/specs/2026-08-07-color-source-core-storage-design.md)
+- adapter 过程色绘制：[color-source-effect.md](color-source-effect.md)

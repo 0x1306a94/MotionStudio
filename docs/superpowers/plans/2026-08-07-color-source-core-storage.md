@@ -520,23 +520,23 @@ git commit -m "Resolve PropertyPath into shader uniform Animatable values."
 
 ### Task 8: 文档同步 + Spec 状态
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `docs/data-model.md` — Document.shaders、Fill/Stroke paint、包内 `shader.json`
 - Modify: `docs/color-source-effect.md` — 增加「Core 存储」短节，链到 spec
-- Modify: `docs/superpowers/specs/2026-08-07-color-source-core-storage-design.md` — 状态改为「实现中 / Core 计划执行中」
+- Modify: `docs/superpowers/specs/2026-08-07-color-source-core-storage-design.md` — 状态改为「Core 存储已实现（plan Tasks 1–8）；预览/App UI 后续」
 
-- [ ] **Step 1: 按已实现 API 更新文档（无臆造未做 API）**
+- [x] **Step 1: 按已实现 API 更新文档（无臆造未做 API）**
 
-- [ ] **Step 2: 全量相关测试**
+- [x] **Step 2: 全量相关测试**
 
 ```bash
 cmake --build build --target core_tests -j$(sysctl -n hw.ncpu)
 ctest --test-dir build -R 'Vec3Test|ShaderUniformValuesTest|SerializerTest|ShaderCommandTest|PropertyPathTest' --output-on-failure
 ```
 
-- [ ] **Step 3: 先更新本 plan 全部 Task 状态，再自动 commit**
+- [x] **Step 3: 先更新本 plan 全部 Task 状态，再自动 commit**
 
 ```bash
 git add docs/data-model.md docs/color-source-effect.md \
