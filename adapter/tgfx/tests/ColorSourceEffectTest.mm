@@ -14,6 +14,8 @@
 #include "effects/ColorSourceEffect.h"
 #include "effects/Uniform.h"
 
+#include "MotionStudio/common/EntityId.h"
+
 #include <tgfx/core/Bitmap.h>
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/EncodedFormat.h>
@@ -28,6 +30,7 @@
 
 using motion::ColorSourceEffect;
 using motion::ColorSourceFrameContext;
+using motion::EntityId;
 using motion::RenderCache;
 using motion::Uniform;
 using motion::UniformFormat;
@@ -442,7 +445,8 @@ TEST(ColorSourceEffectTest, FillsStarPathWithEffect) {
     std::vector<Uniform> uniforms = {
         {"rippleCount", UniformFormat::Float},
     };
-    auto effect = ColorSourceEffect::Make(kMainImage, std::move(uniforms), star.getBounds(), &cache);
+    auto effect = ColorSourceEffect::Make(EntityId::Generate(), kMainImage, std::move(uniforms), star.getBounds(),
+                                          &cache);
     ASSERT_NE(effect, nullptr);
 
     auto *uniformData = effect->getUniformData();
@@ -505,7 +509,8 @@ TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
     std::vector<Uniform> uniforms = {
         {"aa", UniformFormat::Float},
     };
-    auto effect = ColorSourceEffect::Make(kXs3GWjMainImage, std::move(uniforms), fullFrame, &cache);
+    auto effect =
+        ColorSourceEffect::Make(EntityId::Generate(), kXs3GWjMainImage, std::move(uniforms), fullFrame, &cache);
     ASSERT_NE(effect, nullptr);
 
     auto *uniformData = effect->getUniformData();
@@ -568,7 +573,7 @@ TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
     const tgfx::Rect fullFrame = tgfx::Rect::MakeWH(static_cast<float>(kWidth), static_cast<float>(kHeight));
     tgfx::ImageInfo info = tgfx::ImageInfo::Make(kWidth, kHeight, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
 
-    auto effect = ColorSourceEffect::Make(kCloudsMainImage, {}, fullFrame, &cache);
+    auto effect = ColorSourceEffect::Make(EntityId::Generate(), kCloudsMainImage, {}, fullFrame, &cache);
     ASSERT_NE(effect, nullptr);
 
     auto fillShader = effect->makeImageShader();
@@ -620,13 +625,14 @@ TEST(ColorSourceEffectTest, SharesPipelineAcrossTwoEffectInstances) {
     RenderCache cache;
     cache.attachToContext(context);
 
-    // Same mainImage on two instances → one shared pipeline (fingerprint cache).
-    // Two ColorSourceEffect instances are required for different uniforms in one
-    // flush: RuntimeImageFilter keys its texture by the RuntimeEffect object.
+    // Same shaderId on two per-draw instances → one shared GPU pipeline. Two
+    // ColorSourceEffect objects are still required for different uniforms in
+    // one flush: RuntimeImageFilter keys its texture by the RuntimeEffect object.
+    const EntityId shaderId = EntityId::Generate();
     const tgfx::Rect leftBounds = tgfx::Rect::MakeXYWH(0.0f, 0.0f, 128.0f, 256.0f);
     const tgfx::Rect rightBounds = tgfx::Rect::MakeXYWH(128.0f, 0.0f, 128.0f, 256.0f);
-    auto leftEffect = ColorSourceEffect::Make(kCloudsMainImage, {}, leftBounds, &cache);
-    auto rightEffect = ColorSourceEffect::Make(kCloudsMainImage, {}, rightBounds, &cache);
+    auto leftEffect = ColorSourceEffect::Make(shaderId, kCloudsMainImage, {}, leftBounds, &cache);
+    auto rightEffect = ColorSourceEffect::Make(shaderId, kCloudsMainImage, {}, rightBounds, &cache);
     ASSERT_NE(leftEffect, nullptr);
     ASSERT_NE(rightEffect, nullptr);
 
@@ -653,6 +659,67 @@ TEST(ColorSourceEffectTest, SharesPipelineAcrossTwoEffectInstances) {
     std::vector<uint8_t> pixels(static_cast<size_t>(info.rowBytes() * info.height()));
     ASSERT_TRUE(env->surface()->readPixels(info, pixels.data()));
     ASSERT_TRUE(SaveWebp(pixels, kWidth, kHeight, OutputPath("ColorSourceEffect_SharedPipeline_Split.webp")));
+
+    auto shared = cache.findColorSourcePipeline(shaderId);
+    ASSERT_NE(shared, nullptr);
+
+    env->unlockContext();
+}
+
+TEST(ColorSourceEffectTest, InvalidatesPipelineAfterShaderEdit) {
+    constexpr int kWidth = 64;
+    constexpr int kHeight = 64;
+    auto env = TestEnvironment::Make(kWidth, kHeight);
+    if (!env) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    auto *context = env->lockContext();
+    ASSERT_NE(context, nullptr);
+    ASSERT_NE(context->gpu(), nullptr);
+
+    RenderCache cache;
+    cache.attachToContext(context);
+
+    const EntityId shaderId = EntityId::Generate();
+    const tgfx::Rect bounds = tgfx::Rect::MakeWH(static_cast<float>(kWidth), static_cast<float>(kHeight));
+
+    auto first = ColorSourceEffect::Make(shaderId, kCloudsMainImage, {}, bounds, &cache);
+    ASSERT_NE(first, nullptr);
+    first->setFrameContext({0.f, 0, 30.f});
+    ASSERT_NE(first->makeImageShader(), nullptr);
+
+    auto *canvas = env->surface()->getCanvas();
+    canvas->clear();
+    tgfx::Paint paint;
+    paint.setShader(first->makeImageShader());
+    canvas->drawRect(bounds, paint);
+
+    tgfx::ImageInfo info = tgfx::ImageInfo::Make(kWidth, kHeight, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+    std::vector<uint8_t> pixels(static_cast<size_t>(info.rowBytes() * info.height()));
+    ASSERT_TRUE(env->surface()->readPixels(info, pixels.data()));
+
+    auto pipelineBefore = cache.findColorSourcePipeline(shaderId);
+    ASSERT_NE(pipelineBefore, nullptr);
+
+    cache.invalidateColorSourcePipeline(shaderId);
+    ASSERT_EQ(cache.findColorSourcePipeline(shaderId), nullptr);
+
+    constexpr const char *kSolidRed = R"GLSL(
+vec4 mainImage(vec2 uv) {
+    return vec4(1.0, 0.0, 0.0, 1.0);
+}
+)GLSL";
+    auto second = ColorSourceEffect::Make(shaderId, kSolidRed, {}, bounds, &cache);
+    ASSERT_NE(second, nullptr);
+    paint.setShader(second->makeImageShader());
+    canvas->clear();
+    canvas->drawRect(bounds, paint);
+    ASSERT_TRUE(env->surface()->readPixels(info, pixels.data()));
+
+    auto pipelineAfter = cache.findColorSourcePipeline(shaderId);
+    ASSERT_NE(pipelineAfter, nullptr);
+    ASSERT_NE(pipelineAfter, pipelineBefore);
 
     env->unlockContext();
 }

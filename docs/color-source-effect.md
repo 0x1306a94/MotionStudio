@@ -12,18 +12,20 @@
 
 | 层级 | 角色 | 生命周期 |
 |---|---|---|
-| `ColorSourceEffect` | 轻量实例：`mainImage` 源码、uniform 值、`sourceBounds`、指向 `RenderCache` | 每层 / 每次填充一份；同帧不同参数用不同实例 |
-| `RenderCache` | 重资源：pipeline、UBO bump 池、全屏三角 VBO | 跟 tgfx `Context` 绑定；context 切换时 `releaseAll` |
+| `ColorSourceEffect` | 轻量实例：`shaderId`、`mainImage`、uniform 值、`sourceBounds`、指向 `RenderCache` | **每次绘制新建**；同帧不同参数用不同实例，可共享同一 `shaderId` |
+| `RenderCache` | 重资源：pipeline（按 `shaderId`）、UBO bump 池、全屏三角 VBO | 跟 tgfx `Context` 绑定；context 切换时 `releaseAll` |
 | tgfx Runtime 包装 | `ImageFilter::Runtime` → filtered `Image` → `ImageShader` | **按次创建**，不要当参数容器长期复用 |
 
 ```
-ColorSourceEffect::Make(mainImageGlsl, uniformDecls, sourceBounds, &cache)
-        │  setData(...)                // 用户 uniform
+ColorSourceEffect::Make(shaderId, mainImageGlsl, uniformDecls, sourceBounds, &cache)
+        │  setData(...)                // 用户 uniform（每实例各自一份）
         │  setFrameContext(...)        // 每帧 iTime / iFrame（动画 fill）
         │  makeImageShader()           // 内部 MakeTrans(sourceBounds.origin)
         ▼
 canvas->drawRect / drawPath(world XYWH, paint)
 ```
+
+设计层：一个文档 shader（`EntityId`）可被多个填充复用，只是绘制参数不同；GPU `RenderPipeline` 按 `shaderId` 共享。源码或 uniform **布局**变更后，调用方先 `cache.invalidateColorSourcePipeline(shaderId)`，再建实例绘制。
 
 ## 2. 绘制路径（始终离屏）
 
@@ -62,13 +64,14 @@ void main() {
 - 用户 uniform：经 `Uniform` 列表声明，`getUniformData()->setData` 更新  
 - Shadertoy 移植：入口改为 `vec4 mainImage(vec2 uv)`；`iDate` / `iChannel*` 等非动效必需项不在此注入，需要时在用户 uniform 列表自行声明
 
-Pipeline 指纹 = **uniform 布局声明 + mainImage 全文**。同源码、同布局的多个实例 **共享一个** `RenderPipeline`。
+Pipeline 缓存键 = **`shaderId`（`EntityId`）**。同一 id 的多个绘制实例共享一个 `RenderPipeline`；不同 id 各编一份（不做内容指纹去重）。
 
 ## 4. RenderCache
 
 ### 4.1 Pipeline
 
-- `getOrCreatePipeline`：按指纹查找 / 编译 / 写入 `colorSourcePipelineMap_`
+- `getOrCreatePipeline`：按 `shaderId` 查找 / 编译 / 写入 `colorSourcePipelineMap_`
+- `invalidateColorSourcePipeline(shaderId)`：源码或 uniform 布局编辑后丢弃旧 pipeline，下次 draw 再编译
 
 ### 4.2 Uniform buffer（triple-buffer + bump）
 
@@ -104,7 +107,9 @@ Metal Shared UBO 若每帧原地 `map` 重写同一块，而上一帧 command bu
 ### 基本用法
 
 ```cpp
-auto effect = ColorSourceEffect::Make(mainImageGlsl, {{"rippleCount", UniformFormat::Float}},
+const EntityId shaderId = /* 文档 shader 资产 id */ EntityId::Generate();
+
+auto effect = ColorSourceEffect::Make(shaderId, mainImageGlsl, {{"rippleCount", UniformFormat::Float}},
                                       shapeBounds, &cache);
 effect->setFrameContext({timeSeconds, frameIndex, frameRate});  // 动画 fill 每帧
 effect->getUniformData()->setData("rippleCount", 5.f);
@@ -113,15 +118,22 @@ paint.setShader(effect->makeImageShader());     // 已含 origin 矩阵
 canvas->drawRect(shapeBounds, paint);           // 或 drawPath，正常 XYWH
 ```
 
-无需调用方再 `makeWithMatrix` / `translate`。
+无需调用方再 `makeWithMatrix` / `translate`。实例不复用：下一帧再 `Make` 即可；pipeline 仍按 `shaderId` 命中。
+
+### 编辑源码后
+
+```cpp
+cache.invalidateColorSourcePipeline(shaderId);
+// 再用新 mainImage / 新 uniform 布局 Make(...) 并绘制
+```
 
 ### 同帧多个填充
 
 | 需求 | 做法 |
 |---|---|
-| 同 shader、不同 uniform / 尺寸 | **两个** `ColorSourceEffect` 实例（可传同一份 `mainImage`）；pipeline 仍按指纹共享 |
+| 同 shader、不同 uniform / 尺寸 | **两个** `ColorSourceEffect` 实例，传入**同一** `shaderId`；pipeline 共享 |
 | 同一实例改两次 uniform 再画 | 同一次 flush 内会撞上 RuntimeImageFilter 按 effect 身份的缓存，**两侧结果相同**；不要这么用 |
-| 跨帧改同一实例的 uniform | 每帧 `flush` / `readPixels` 之后再画通常会重新 encode；帧间仍应 `advanceUniformFrame()` |
+| 跨帧改同一实例的 uniform | 实例本就不复用；每帧 `Make` + `setData`；帧间仍应 `advanceUniformFrame()` |
 
 ### 帧推进
 
@@ -135,12 +147,13 @@ cache.advanceUniformFrame();
 
 ## 6. 设计取舍摘要
 
-1. **实例轻、缓存重**：`mainImage` / 参数 / bounds 跟实例走；pipeline / GPU UBO 池跟 `RenderCache` 走。无独立的 `effectId`。  
+1. **实例轻、缓存重**：每次绘制新建 `ColorSourceEffect`；pipeline / GPU UBO 池跟 `RenderCache` 走，按文档 `shaderId` 共享。  
 2. **始终离屏**：受 tgfx `RuntimeEffect` + `ImageFilter` 模型约束；换「直填目标」需另套 API。  
-3. **同帧多参数 = 多实例**：不是 pipeline 不能共享，而是 tgfx 离屏结果按 effect 对象缓存。  
+3. **同帧多参数 = 多实例 + 同 `shaderId`**：tgfx 离屏结果按 effect 对象缓存，故参数不同必须多实例；GPU pipeline 仍可复用。  
 4. **`sourceBounds` 构造时固定**：size 定 RT，origin 定 ImageShader 放置，业务侧保持 XYWH 绘制；AABB 变化需新建实例。  
-5. **CPU `uniformBytes_` 跟实例、不进 cache**：`setData` 发生在 draw API 之前，而 `onDraw` 由 tgfx 稍后驱动，必须有一块 CPU 侧 shadow 承接参数再在 `onDraw` 里拷进 GPU slice。Uniform 块通常很小，**在 `Make` 时按实例分配即可**；对 CPU shadow 再做 bump / 三缓冲是过度设计。它也不绑 GPU context，`releaseAll` 无需也不应重建它。  
-6. **GPU UBO 仍要三缓冲**：与 CPU 不同，Metal Shared 存储上存在「上一帧 GPU 未读完、CPU 又 map 重写」的竞争，这块缓存有明确收益。
+5. **编辑 = invalidate + 新实例**：不在 effect 上提供 `setShaderSource`；源码变更后显式丢弃旧 pipeline。  
+6. **CPU `uniformBytes_` 跟实例、不进 cache**：`setData` 发生在 draw API 之前，而 `onDraw` 由 tgfx 稍后驱动，必须有一块 CPU 侧 shadow 承接参数再在 `onDraw` 里拷进 GPU slice。  
+7. **GPU UBO 仍要三缓冲**：Metal Shared 存储上存在「上一帧 GPU 未读完、CPU 又 map 重写」的竞争。
 
 ## 7. 测试入口
 
@@ -148,6 +161,7 @@ cache.advanceUniformFrame();
 
 - `FillsStarPathWithEffect`：星形 path 填充  
 - `RendersShadertoyXs3GWjFrames` / `RendersShadertoyCloudsFrames`：全屏样例导出 webp  
-- `SharesPipelineAcrossTwoEffectInstances`：同 `mainImage`、两实例、同帧不同 `iTime`、左右 XYWH  
+- `SharesPipelineAcrossTwoEffectInstances`：同 `shaderId`、两实例、同帧不同 `iTime`、左右 XYWH  
+- `InvalidatesPipelineAfterShaderEdit`：`invalidate` 后同 id 新源码重建 pipeline  
 
 产物目录：`adapter/tgfx/tests/out/`（gitignore）。

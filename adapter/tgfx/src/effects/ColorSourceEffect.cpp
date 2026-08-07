@@ -151,15 +151,20 @@ static std::shared_ptr<tgfx::Image> GetPlaceholderImage() {
     return image;
 }
 
-std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(std::string mainImage, std::vector<Uniform> uniforms,
-                                                           const tgfx::Rect &sourceBounds, RenderCache *cache) {
+std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(EntityId shaderId, std::string mainImage,
+                                                           std::vector<Uniform> uniforms, const tgfx::Rect &sourceBounds,
+                                                           RenderCache *cache) {
+    if (!shaderId.isValid()) {
+        return nullptr;
+    }
     return std::shared_ptr<ColorSourceEffect>(
-        new ColorSourceEffect(std::move(mainImage), std::move(uniforms), sourceBounds, cache));
+        new ColorSourceEffect(shaderId, std::move(mainImage), std::move(uniforms), sourceBounds, cache));
 }
 
-ColorSourceEffect::ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms, tgfx::Rect sourceBounds,
-                                     RenderCache *cache)
-    : mainImage_(std::move(mainImage))
+ColorSourceEffect::ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms,
+                                     tgfx::Rect sourceBounds, RenderCache *cache)
+    : shaderId_(shaderId)
+    , mainImage_(std::move(mainImage))
     , sourceBounds_(sourceBounds)
     , cache_(cache) {
     std::vector<Uniform> finalUniforms = std::move(uniforms);
@@ -199,25 +204,6 @@ std::shared_ptr<tgfx::Shader> ColorSourceEffect::makeImageShader() {
         shader = shader->makeWithMatrix(tgfx::Matrix::MakeTrans(sourceBounds_.left, sourceBounds_.top));
     }
     return shader;
-}
-
-static std::string BuildPipelineKey(const std::string &mainImage, const std::vector<Uniform> &uniforms) {
-    std::string key;
-    key.reserve(mainImage.size() + uniforms.size() * 32);
-    for (const auto &uniform : uniforms) {
-        key += uniform.name();
-        key += ':';
-        key += UniformFormatGLSLTypeName(uniform.format());
-        if (uniform.isArray()) {
-            key += '[';
-            key += std::to_string(uniform.count());
-            key += ']';
-        }
-        key += ';';
-    }
-    key += '\n';
-    key += mainImage;
-    return key;
 }
 
 std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::createPipeline(tgfx::GPU *gpu) const {
@@ -263,12 +249,11 @@ std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::createPipeline(tgfx::GP
 }
 
 std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::getOrCreatePipeline(tgfx::GPU *gpu) const {
-    if (cache_ == nullptr || uniformData_ == nullptr || mainImage_.empty()) {
+    if (cache_ == nullptr || uniformData_ == nullptr || mainImage_.empty() || !shaderId_.isValid()) {
         return nullptr;
     }
 
-    const std::string key = BuildPipelineKey(mainImage_, uniformData_->uniforms());
-    auto pipeline = cache_->findColorSourcePipeline(key);
+    auto pipeline = cache_->findColorSourcePipeline(shaderId_);
     if (pipeline != nullptr) {
         return pipeline;
     }
@@ -277,7 +262,7 @@ std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::getOrCreatePipeline(tgf
     if (pipeline == nullptr) {
         return nullptr;
     }
-    cache_->addColorSourcePipeline(key, pipeline);
+    cache_->addColorSourcePipeline(shaderId_, pipeline);
     return pipeline;
 }
 

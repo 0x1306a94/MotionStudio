@@ -54,19 +54,29 @@ void RenderCache::detachFromContext() {
     context_ = nullptr;
 }
 
-std::shared_ptr<tgfx::RenderPipeline> RenderCache::findColorSourcePipeline(const std::string &key) const {
-    auto result = colorSourcePipelineMap_.find(key);
+std::shared_ptr<tgfx::RenderPipeline> RenderCache::findColorSourcePipeline(EntityId shaderId) const {
+    if (!shaderId.isValid()) {
+        return nullptr;
+    }
+    auto result = colorSourcePipelineMap_.find(shaderId);
     if (result != colorSourcePipelineMap_.end()) {
         return result->second;
     }
     return nullptr;
 }
 
-void RenderCache::addColorSourcePipeline(const std::string &key, std::shared_ptr<tgfx::RenderPipeline> pipeline) {
-    if (key.empty() || pipeline == nullptr) {
+void RenderCache::addColorSourcePipeline(EntityId shaderId, std::shared_ptr<tgfx::RenderPipeline> pipeline) {
+    if (!shaderId.isValid() || pipeline == nullptr) {
         return;
     }
-    colorSourcePipelineMap_[key] = std::move(pipeline);
+    colorSourcePipelineMap_[shaderId] = std::move(pipeline);
+}
+
+void RenderCache::invalidateColorSourcePipeline(EntityId shaderId) {
+    if (!shaderId.isValid()) {
+        return;
+    }
+    colorSourcePipelineMap_.erase(shaderId);
 }
 
 UniformBufferSlice RenderCache::acquireUniformSlice(tgfx::GPU *gpu, size_t size) {

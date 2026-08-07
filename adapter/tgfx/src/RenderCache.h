@@ -2,10 +2,11 @@
 
 #include "effects/ColorSourceEffectResources.h"
 
+#include "MotionStudio/common/EntityId.h"
+
 #include <array>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -19,9 +20,10 @@ class GPU;
 namespace motion {
 
 /**
- * Per-context GPU cache for ColorSourceEffect: shared pipelines keyed by shader
- * fingerprint, and a triple-buffered bump allocator for uniform uploads so
- * Metal Shared storage is not rewritten while a prior frame still reads it.
+ * Per-context GPU cache for ColorSourceEffect: shared pipelines keyed by
+ * document shader EntityId, and a triple-buffered bump allocator for uniform
+ * uploads so Metal Shared storage is not rewritten while a prior frame still
+ * reads it.
  */
 class RenderCache {
 
@@ -37,9 +39,13 @@ class RenderCache {
         return context_;
     }
 
-    std::shared_ptr<tgfx::RenderPipeline> findColorSourcePipeline(const std::string &key) const;
+    std::shared_ptr<tgfx::RenderPipeline> findColorSourcePipeline(EntityId shaderId) const;
 
-    void addColorSourcePipeline(const std::string &key, std::shared_ptr<tgfx::RenderPipeline> pipeline);
+    void addColorSourcePipeline(EntityId shaderId, std::shared_ptr<tgfx::RenderPipeline> pipeline);
+
+    // Drops the cached pipeline for shaderId. Call after the shader source or
+    // uniform layout changes so the next draw recompiles.
+    void invalidateColorSourcePipeline(EntityId shaderId);
 
     // Bump-allocates aligned space in the current uniform packet. Call
     // advanceUniformFrame() once per submitted frame before encoding the next.
@@ -64,7 +70,7 @@ class RenderCache {
 
     uint32_t contextID_ = 0;
     tgfx::Context *context_ = nullptr;
-    std::unordered_map<std::string, std::shared_ptr<tgfx::RenderPipeline>> colorSourcePipelineMap_ = {};
+    std::unordered_map<EntityId, std::shared_ptr<tgfx::RenderPipeline>> colorSourcePipelineMap_ = {};
     std::array<UniformBufferPacket, 3> uniformPackets_ = {};
     uint32_t uniformPacketIndex_ = 0;
     std::shared_ptr<tgfx::GPUBuffer> fullscreenVertexBuffer_ = nullptr;

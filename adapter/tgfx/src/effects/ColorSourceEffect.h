@@ -3,6 +3,8 @@
 #include "Uniform.h"
 #include "UniformData.h"
 
+#include "MotionStudio/common/EntityId.h"
+
 #include <tgfx/core/Rect.h>
 #include <tgfx/gpu/RuntimeEffect.h>
 
@@ -30,11 +32,20 @@ struct ColorSourceFrameContext {
 /**
  * Lightweight procedural color RuntimeEffect. User supplies a GLSL mainImage(uv)
  * plus uniforms; output is a generated color field sized to sourceBounds.
+ * Instances are created per draw; pipelines are shared via RenderCache by shaderId.
  */
 class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_from_this<ColorSourceEffect> {
   public:
-    static std::shared_ptr<ColorSourceEffect> Make(std::string mainImage, std::vector<Uniform> uniforms,
-                                                   const tgfx::Rect &sourceBounds, RenderCache *cache);
+    // shaderId identifies the document shader asset; same id → shared GPU pipeline.
+    // After editing the shader source or uniform layout, call
+    // RenderCache::invalidateColorSourcePipeline(shaderId) before the next draw.
+    static std::shared_ptr<ColorSourceEffect> Make(EntityId shaderId, std::string mainImage,
+                                                   std::vector<Uniform> uniforms, const tgfx::Rect &sourceBounds,
+                                                   RenderCache *cache);
+
+    EntityId shaderId() const {
+        return shaderId_;
+    }
 
     void setFrameContext(ColorSourceFrameContext frameContext);
     UniformData *getUniformData() const;
@@ -43,17 +54,19 @@ class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_
     std::shared_ptr<tgfx::Shader> makeImageShader();
 
   private:
-    ColorSourceEffect(std::string mainImage, std::vector<Uniform> uniforms, tgfx::Rect sourceBounds,
-                      RenderCache *cache);
+    ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms,
+                      tgfx::Rect sourceBounds, RenderCache *cache);
 
     std::shared_ptr<tgfx::RenderPipeline> createPipeline(tgfx::GPU *gpu) const;
     std::shared_ptr<tgfx::RenderPipeline> getOrCreatePipeline(tgfx::GPU *gpu) const;
 
     tgfx::Rect filterBounds(const tgfx::Rect &srcRect, tgfx::MapDirection) const override;
 
-    bool onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> &inputTextures, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point &offset) const override;
+    bool onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> &inputTextures,
+                std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point &offset) const override;
 
   private:
+    EntityId shaderId_ = {};
     std::string mainImage_ = {};
     std::unique_ptr<UniformData> uniformData_ = nullptr;
     // Written from const onDraw via UniformData; CPU shadow of the UBO.
