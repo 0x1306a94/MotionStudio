@@ -59,7 +59,7 @@
 
 ### Task 1: `Vec3` + `Interpolator<Vec3>`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/common/Vec3.h`
@@ -77,7 +77,7 @@
   template<> struct Interpolator<Vec3> { static Vec3 Lerp(const Vec3&, const Vec3&, float t); };
   ```
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/common/Vec3Test.cpp`：
 
@@ -105,7 +105,7 @@ TEST(Vec3Test, InterpolatorLerpMidpoint) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target core_tests -j$(sysctl -n hw.ncpu)
@@ -114,11 +114,11 @@ cmake --build build --target core_tests -j$(sysctl -n hw.ncpu)
 
 Expected: 编译失败（缺头文件）或链接失败。
 
-- [ ] **Step 3: 实现 Vec3 + Interpolator\<Vec3\>**
+- [x] **Step 3: 实现 Vec3 + Interpolator\<Vec3\>**
 
 镜像 `Vec2` 的 API 风格；`Lerp` 为分量线性插值。
 
-- [ ] **Step 4: 跑测试通过**
+- [x] **Step 4: 跑测试通过**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='Vec3Test.*'
@@ -126,7 +126,7 @@ Expected: 编译失败（缺头文件）或链接失败。
 
 Expected: PASS
 
-- [ ] **Step 5: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 5: 先更新本 plan 状态，再自动 commit**
 
 勾选本 Task 全部 Step、`**Status:** ✅ Done`，然后：
 

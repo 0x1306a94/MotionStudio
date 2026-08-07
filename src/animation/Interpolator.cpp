@@ -57,6 +57,10 @@ Vec2 Interpolator<Vec2>::Lerp(const Vec2 &from, const Vec2 &to, float t) {
     return from + (to - from) * t;
 }
 
+Vec3 Interpolator<Vec3>::Lerp(const Vec3 &from, const Vec3 &to, float t) {
+    return from + (to - from) * t;
+}
+
 Color Interpolator<Color>::Lerp(const Color &from, const Color &to, float t) {
     return {
         Interpolator<float>::Lerp(from.r, to.r, t),

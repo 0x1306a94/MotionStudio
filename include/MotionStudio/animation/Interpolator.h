@@ -4,6 +4,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/Vec3.h"
 #include "MotionStudio/common/VectorNetwork.h"
 
 namespace motion {
@@ -35,6 +36,14 @@ struct Interpolator<Vec2> {
     // to: end vector.
     // t: blend factor in [0,1].
     static Vec2 Lerp(const Vec2 &from, const Vec2 &to, float t);
+};
+
+template <>
+struct Interpolator<Vec3> {
+    // from: start vector.
+    // to: end vector.
+    // t: blend factor in [0,1].
+    static Vec3 Lerp(const Vec3 &from, const Vec3 &to, float t);
 };
 
 template <>
