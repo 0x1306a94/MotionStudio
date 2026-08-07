@@ -24,6 +24,7 @@
 #include <tgfx/gpu/RuntimeEffect.h>
 #include <tgfx/gpu/ShaderModule.h>
 #include <tgfx/gpu/ShaderStage.h>
+#include <tgfx/gpu/Texture.h>
 
 namespace motion {
 
@@ -51,6 +52,10 @@ void PrependShadertoyBuiltinUniforms(std::vector<Uniform> &uniforms) {
     add("iTimeDelta", UniformFormat::Float);
     add("iFrame", UniformFormat::Int);
     add("iFrameRate", UniformFormat::Float);
+    // tgfx RuntimeImageFilter may allocate a clip subset RT; these map v_uv back
+    // into the logical sourceBounds UV space (see onDraw).
+    add("iRenderOrigin", UniformFormat::Float2);
+    add("iRenderSize", UniformFormat::Float2);
 
     uniforms.insert(uniforms.begin(), builtins.begin(), builtins.end());
 }
@@ -65,6 +70,14 @@ void WriteShadertoyBuiltinUniforms(UniformData *uniformData, const tgfx::Rect &s
     const int32_t frame = static_cast<int32_t>(frameContext.frameIndex);
     uniformData->setData("iFrame", frame);
     uniformData->setData("iFrameRate", frameContext.frameRate);
+}
+
+void WriteRenderSubsetUniforms(UniformData *uniformData, const tgfx::Point &offset,
+                               const tgfx::Texture &outputTexture) {
+    const float origin[2] = {-offset.x, -offset.y};
+    const float size[2] = {static_cast<float>(outputTexture.width()), static_cast<float>(outputTexture.height())};
+    uniformData->setData("iRenderOrigin", origin, sizeof(origin));
+    uniformData->setData("iRenderSize", size, sizeof(size));
 }
 
 }  // namespace
@@ -131,9 +144,13 @@ std::string BuildFragmentShaderSource(tgfx::GPU *gpu, const std::vector<Uniform>
 
     uniformBlock += "};\n";
 
+    // Map the (possibly clipped) output RT back into full-image UV so a subset
+    // pass does not squeeze the whole mainImage into the visible strip.
     std::string footer = R"GLSL(
 void main() {
-    out_fragColor = mainImage(v_uv);
+    vec2 dims = max(iResolution.xy, vec2(1.0));
+    vec2 uv = (iRenderOrigin + v_uv * iRenderSize) / dims;
+    out_fragColor = mainImage(uv);
 }
 )GLSL";
 
@@ -277,7 +294,7 @@ tgfx::Rect ColorSourceEffect::filterBounds(const tgfx::Rect &srcRect, tgfx::MapD
     return tgfx::Rect::MakeWH(sourceBounds_.width(), sourceBounds_.height());
 }
 
-bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> & /*inputTextures*/, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point & /*offset*/) const {
+bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> & /*inputTextures*/, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point &offset) const {
     if (sourceBounds_.isEmpty() || cache_ == nullptr || uniformData_ == nullptr || outputTexture == nullptr || encoder == nullptr) {
         return false;
     }
@@ -302,6 +319,7 @@ bool ColorSourceEffect::onDraw(tgfx::CommandEncoder *encoder, const std::vector<
     lastTimeSeconds_ = frameContext_.timeSeconds;
     hasPreviousTime_ = true;
     WriteShadertoyBuiltinUniforms(uniformData_.get(), sourceBounds_, frameContext_, timeDelta);
+    WriteRenderSubsetUniforms(uniformData_.get(), offset, *outputTexture);
 
     auto slice = cache_->acquireUniformSlice(uniformBytes_.size());
     if (slice.buffer == nullptr) {

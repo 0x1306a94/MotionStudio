@@ -663,6 +663,57 @@ TEST(ColorSourceEffectTest, SharesPipelineAcrossTwoEffectInstances) {
     env->unlockContext();
 }
 
+// Vertical gradient uv.y → red. Used to detect subset-RT UV squeeze.
+constexpr const char *kVerticalGradientMainImage = R"GLSL(
+vec4 mainImage(vec2 uv) {
+    return vec4(uv.y, 0.0, 0.0, 1.0);
+}
+)GLSL";
+
+TEST(ColorSourceEffectTest, ClippedDrawKeepsLogicalUvMapping) {
+    constexpr int kWidth = 128;
+    constexpr int kHeight = 128;
+    auto env = TestEnvironment::Make(kWidth, kHeight);
+    if (!env) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    auto *context = env->lockContext();
+    ASSERT_NE(context, nullptr);
+    ASSERT_NE(context->gpu(), nullptr);
+
+    RenderCache cache;
+    cache.attachToContext(context);
+
+    const tgfx::Rect bounds = tgfx::Rect::MakeWH(static_cast<float>(kWidth), static_cast<float>(kHeight));
+    auto effect =
+        ColorSourceEffect::Make(EntityId::Generate(), kVerticalGradientMainImage, {}, bounds, &cache);
+    ASSERT_NE(effect, nullptr);
+
+    auto *canvas = env->surface()->getCanvas();
+    canvas->clear();
+    // Clip to the top half so RuntimeImageFilter allocates a subset RT. A buggy
+    // onDraw that ignores offset would squeeze uv.y∈[0,1] into that half, making
+    // the bottom edge of the clip read near 1.0 instead of ~0.5.
+    canvas->save();
+    canvas->clipRect(tgfx::Rect::MakeXYWH(0.f, 0.f, static_cast<float>(kWidth), static_cast<float>(kHeight) * 0.5f));
+    tgfx::Paint paint;
+    paint.setShader(effect->makeImageShader());
+    canvas->drawRect(bounds, paint);
+    canvas->restore();
+
+    tgfx::ImageInfo info = tgfx::ImageInfo::Make(kWidth, kHeight, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+    std::vector<uint8_t> pixels(static_cast<size_t>(info.rowBytes() * info.height()));
+    ASSERT_TRUE(env->surface()->readPixels(info, pixels.data()));
+
+    const int sampleY = kHeight / 2 - 2;
+    const size_t index = static_cast<size_t>(sampleY) * info.rowBytes() + static_cast<size_t>(kWidth / 2) * 4;
+    const float red = static_cast<float>(pixels[index]) / 255.f;
+    EXPECT_NEAR(red, 0.5f, 0.12f) << "clipped subset must keep logical uv.y≈0.5 at mid-image, not squeeze to ~1.0";
+
+    env->unlockContext();
+}
+
 TEST(ColorSourceEffectTest, InvalidatesPipelineAfterShaderEdit) {
     constexpr int kWidth = 64;
     constexpr int kHeight = 64;
