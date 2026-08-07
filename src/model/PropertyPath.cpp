@@ -6,11 +6,13 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeTrimPath.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextContent.h"
 
 namespace motion {
@@ -173,6 +175,52 @@ AnimatableBase *resolveStyleProperty(LayerStyle *style, const std::string &name)
     return nullptr;
 }
 
+AnimatableBase *resolveUniformEntry(ShaderUniformValue &entry) {
+    switch (entry.kind) {
+        case ShaderUniformValueKind::AnimFloat:
+            return &entry.floatValue;
+        case ShaderUniformValueKind::AnimFloat2:
+            return &entry.float2Value;
+        case ShaderUniformValueKind::AnimFloat3:
+            return &entry.float3Value;
+        case ShaderUniformValueKind::AnimColor:
+            return &entry.colorValue;
+        default:
+            return nullptr;
+    }
+}
+
+AnimatableBase *resolveStyleUniformProperty(LayerStyle *style, const std::string &uniformName) {
+    ShaderUniformValues *values = nullptr;
+    switch (style->type()) {
+        case LayerStyleType::Fill: {
+            auto *fill = static_cast<FillStyle *>(style);
+            if (fill->paintMode != StylePaintMode::Shader) {
+                return nullptr;
+            }
+            values = &fill->uniformValues;
+            break;
+        }
+        case LayerStyleType::Stroke: {
+            auto *stroke = static_cast<StrokeStyle *>(style);
+            if (stroke->paintMode != StylePaintMode::Shader) {
+                return nullptr;
+            }
+            values = &stroke->uniformValues;
+            break;
+        }
+    }
+    if (values == nullptr) {
+        return nullptr;
+    }
+    for (ShaderUniformValue &entry : values->entries) {
+        if (entry.name == uniformName) {
+            return resolveUniformEntry(entry);
+        }
+    }
+    return nullptr;
+}
+
 AnimatableBase *resolveShapeElementPath(ShapeElement *element,
                                         const std::vector<PathSegment> &segments) {
     if (segments.size() == 1) {
@@ -204,12 +252,18 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             }
             return nullptr;
         }
-        if (first.name == "styles" && first.index >= 0 && segments.size() == 2) {
+        if (first.name == "styles" && first.index >= 0) {
             if (first.index >= static_cast<int>(layer->styles.size())) {
                 return nullptr;
             }
-            return resolveStyleProperty(layer->styles[static_cast<size_t>(first.index)].get(),
-                                        segments[1].name);
+            LayerStyle *style = layer->styles[static_cast<size_t>(first.index)].get();
+            if (segments.size() == 2) {
+                return resolveStyleProperty(style, segments[1].name);
+            }
+            if (segments.size() == 3 && segments[1].name == "uniformValues") {
+                return resolveStyleUniformProperty(style, segments[2].name);
+            }
+            return nullptr;
         }
         if (first.name == "masks" && first.index >= 0 && segments.size() == 2) {
             if (first.index >= static_cast<int>(layer->masks.size())) {

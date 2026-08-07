@@ -3,18 +3,24 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/animation/Animatable.h"
+#include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PropertyPath.h"
+#include "MotionStudio/model/ShaderDefinition.h"
+#include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextContent.h"
 
 using motion::Animatable;
 using motion::AnimatableBase;
+using motion::BindShaderPaint;
 using motion::Composition;
 using motion::Document;
 using motion::FillStyle;
@@ -24,9 +30,15 @@ using motion::Mask;
 using motion::ParsePropertyPath;
 using motion::PropertyPath;
 using motion::ResolveAnimatable;
+using motion::ShaderDefinition;
+using motion::ShaderUniformDecl;
+using motion::ShaderUniformValue;
+using motion::ShaderUniformValueKind;
 using motion::ShapeContent;
 using motion::ShapeRect;
 using motion::StrokeStyle;
+using motion::StylePaintMode;
+using motion::UniformFormat;
 
 TEST(ParsePropertyPathTest, SimpleDottedPath) {
     auto segments = ParsePropertyPath("transform.position");
@@ -209,5 +221,65 @@ TEST(ResolveAnimatableTest, ReturnsNullForMissingOrInvalid) {
     EXPECT_EQ(ResolveAnimatable(scene.document, {scene.rect->id, "bogus"}),
               nullptr);
     EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "styles[-1].color"}),
+              nullptr);
+}
+
+TEST(PropertyPathTest, ResolvesShaderUniformFloat) {
+    ShapeScene scene;
+    ShaderDefinition shader;
+    shader.name = "Ripple";
+    shader.uniforms.push_back(ShaderUniformDecl{"rippleCount", UniformFormat::Float, 1});
+    shader.uniforms.push_back(ShaderUniformDecl{"tint", UniformFormat::Float4, 1});
+
+    auto fill = std::make_unique<FillStyle>();
+    FillStyle *fillStyle = fill.get();
+    ASSERT_TRUE(BindShaderPaint(*fillStyle, shader).hasValue());
+    fillStyle->uniformValues.entries[0].floatValue.setStaticValue(5.f);
+    scene.layer->styles.push_back(std::move(fill));
+
+    AnimatableBase *resolved =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].uniformValues.rippleCount"});
+    ASSERT_NE(resolved, nullptr);
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&fillStyle->uniformValues.entries[0].floatValue));
+
+    auto *floatAnim = static_cast<Animatable<float> *>(resolved);
+    EXPECT_FLOAT_EQ(floatAnim->staticValue(), 5.f);
+    floatAnim->setStaticValue(12.f);
+    EXPECT_FLOAT_EQ(fillStyle->uniformValues.entries[0].floatValue.staticValue(), 12.f);
+
+    AnimatableBase *tint =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].uniformValues.tint"});
+    ASSERT_NE(tint, nullptr);
+    EXPECT_EQ(tint, static_cast<AnimatableBase *>(&fillStyle->uniformValues.entries[1].colorValue));
+}
+
+TEST(PropertyPathTest, ShaderUniformRequiresShaderPaintMode) {
+    ShapeScene scene;
+    auto fill = std::make_unique<FillStyle>();
+    FillStyle *fillStyle = fill.get();
+    fillStyle->paintMode = StylePaintMode::Color;
+    ShaderUniformValue entry;
+    entry.name = "rippleCount";
+    entry.kind = ShaderUniformValueKind::AnimFloat;
+    entry.floatValue.setStaticValue(5.f);
+    fillStyle->uniformValues.entries.push_back(std::move(entry));
+    scene.layer->styles.push_back(std::move(fill));
+
+    EXPECT_EQ(ResolveAnimatable(scene.document,
+                                {scene.layer->id, "styles[0].uniformValues.rippleCount"}),
+              nullptr);
+}
+
+TEST(PropertyPathTest, MissingShaderUniformReturnsNull) {
+    ShapeScene scene;
+    ShaderDefinition shader;
+    shader.uniforms.push_back(ShaderUniformDecl{"rippleCount", UniformFormat::Float, 1});
+
+    auto fill = std::make_unique<FillStyle>();
+    ASSERT_TRUE(BindShaderPaint(*fill, shader).hasValue());
+    scene.layer->styles.push_back(std::move(fill));
+
+    EXPECT_EQ(ResolveAnimatable(scene.document,
+                                {scene.layer->id, "styles[0].uniformValues.missing"}),
               nullptr);
 }

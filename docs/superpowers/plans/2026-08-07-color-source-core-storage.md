@@ -483,7 +483,7 @@ git commit -m "Add undo commands for shaders and style paint mode."
 
 ### Task 7: PropertyPath 解析 `uniformValues.<name>`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/model/PropertyPath.cpp` — `resolveStyleProperty` 扩展：若 name 为 `uniformValues` 则需要下一段；或解析 `uniformValues.rippleCount` 为两段
@@ -497,7 +497,7 @@ git commit -m "Add undo commands for shaders and style paint mode."
 - 按 `entries` 中 `name` 找到条目，按 `kind` 返回对应 `AnimatableBase*`（`floatValue` / `float2Value` / `float3Value` / `colorValue`）
 - 找不到 → nullptr
 
-- [ ] **Step 1: 失败测试 → 实现 → PASS**
+- [x] **Step 1: 失败测试 → 实现 → PASS**
 
 ```cpp
 TEST(PropertyPathTest, ResolvesShaderUniformFloat) {
@@ -507,7 +507,7 @@ TEST(PropertyPathTest, ResolvesShaderUniformFloat) {
 }
 ```
 
-- [ ] **Step 2: 先更新本 plan 状态，再自动 commit**
+- [x] **Step 2: 先更新本 plan 状态，再自动 commit**
 
 ```bash
 git add include/MotionStudio/model/PropertyPath.h src/model/PropertyPath.cpp \
