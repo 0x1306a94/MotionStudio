@@ -1,7 +1,8 @@
 # Color Source App UI 与预览接线 — 设计说明
 
 日期：2026-08-07  
-状态：设计已确认，待写实现计划  
+状态：设计已确认；实现计划已就绪  
+实现计划：`docs/superpowers/plans/2026-08-07-color-source-app-ui.md`  
 前置：[Color Source Core 存储](2026-08-07-color-source-core-storage-design.md)（已实现）  
 关联：[ColorSourceEffect 与 RenderCache](../../color-source-effect.md)、[数据模型](../../data-model.md)
 
