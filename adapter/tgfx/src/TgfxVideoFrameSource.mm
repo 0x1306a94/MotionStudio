@@ -261,6 +261,7 @@ Expected<VideoFrame, std::string> TgfxVideoFrameSource::renderFrame(FrameTime ti
         impl_->adapter->save();
         impl_->adapter->concatTransform(Mat3::Scale(Vec2{scaleX, scaleY}));
     }
+    impl_->adapter->setColorSourceFrameContext(state->timeSeconds, state->frameIndex, state->frameRate);
     PlayCommands(BuildCommands(*state), *impl_->adapter);
     if (needsScale) {
         impl_->adapter->restore();
