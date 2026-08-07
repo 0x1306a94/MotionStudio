@@ -1,7 +1,7 @@
 # Color Source Core 存储 — 设计说明
 
 日期：2026-08-07  
-状态：已定案（待写实现计划）  
+状态：已定案（实现计划：`docs/superpowers/plans/2026-08-07-color-source-core-storage.md`）  
 关联：[ColorSourceEffect 与 RenderCache](../../color-source-effect.md)、[数据模型](../../data-model.md)
 
 ## 目标
