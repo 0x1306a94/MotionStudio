@@ -76,6 +76,7 @@ add_executable(pag_codec_test ${PAG_CODEC_TEST_SOURCES})
 add_source_group(PAG_CODEC_TEST_SOURCES ${CMAKE_CURRENT_LIST_DIR}/tests "Tests")
 disable_xcode_target_signing(pag_codec_test)
 target_link_libraries(pag_codec_test PRIVATE pag_codec GTest::gtest_main)
+motionstudio_link_asan_defaults(pag_codec_test)
 # Static pag_codec carries PUBLIC -ltgfx; the executable still needs Xcode
 # LIBRARY_SEARCH_PATHS (and PRE_BUILD) — same pattern as tgfx_adapter_test.
 motionstudio_add_tgfx_prebuild(pag_codec_test)

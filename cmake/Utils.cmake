@@ -79,6 +79,12 @@ function(disable_xcode_target_signing target_name)
   endif()
 endfunction()
 
+function(motionstudio_link_asan_defaults target_name)
+  if(TARGET motionstudio_asan_defaults)
+    target_sources(${target_name} PRIVATE $<TARGET_OBJECTS:motionstudio_asan_defaults>)
+  endif()
+endfunction()
+
 function(set_xcode_target_tgfx_prebuilt_search_paths target_name)
   if(CMAKE_GENERATOR MATCHES "Xcode")
     message(STATUS "========= configuration tgfx prebuilt search paths for ${target_name} =========")

@@ -19,5 +19,6 @@ add_executable(textlayout_tests
     tests/TextLayoutTest.cpp
 )
 target_link_libraries(textlayout_tests PRIVATE textlayout GTest::gtest_main)
+motionstudio_link_asan_defaults(textlayout_tests)
 disable_xcode_target_signing(textlayout_tests)
 gtest_discover_tests(textlayout_tests)

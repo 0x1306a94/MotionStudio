@@ -22,6 +22,10 @@ option(MOTIONSTUDIO_ENABLE_ASAN "Enable AddressSanitizer and UndefinedBehaviorSa
 if(MOTIONSTUDIO_ENABLE_ASAN)
   add_compile_options(-fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined)
   add_link_options(-fsanitize=address -fsanitize=undefined)
+
+  # Object library merged into ASAN test/benchmark executables; see cmake/asan_default_options.cpp.
+  add_library(motionstudio_asan_defaults OBJECT
+              "${CMAKE_SOURCE_DIR}/cmake/asan_default_options.cpp")
 endif()
 
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)

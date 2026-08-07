@@ -179,6 +179,7 @@ add_source_group(TGFX_ADAPTER_TEST_SOURCES ${CMAKE_CURRENT_LIST_DIR}/tests "Test
 disable_xcode_target_signing(tgfx_adapter_test)
 
 target_link_libraries(tgfx_adapter_test PRIVATE motionstudio_tgfx_adapter GTest::gtest_main)
+motionstudio_link_asan_defaults(tgfx_adapter_test)
 target_include_directories(tgfx_adapter_test
                            PRIVATE
                            "${CMAKE_CURRENT_SOURCE_DIR}/src"

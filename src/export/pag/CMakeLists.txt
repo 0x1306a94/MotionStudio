@@ -32,6 +32,7 @@ add_source_group(PAG_EXPORT_TEST_SOURCES ${PROJECT_SOURCE_DIR}/tests/export/pag 
 disable_xcode_target_signing(pag_export_tests)
 target_include_directories(pag_export_tests PRIVATE "${LIBPAG_DIR}/include")
 target_link_libraries(pag_export_tests PRIVATE pag_export GTest::gtest_main)
+motionstudio_link_asan_defaults(pag_export_tests)
 motionstudio_add_tgfx_prebuild(pag_export_tests)
 motionstudio_link_prebuilt_tgfx(pag_export_tests)
 gtest_discover_tests(pag_export_tests)

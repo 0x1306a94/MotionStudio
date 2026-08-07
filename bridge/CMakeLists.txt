@@ -57,6 +57,7 @@ disable_xcode_target_signing(bridge_test)
 
 target_include_directories(bridge_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/common")
 target_link_libraries(bridge_test PRIVATE bridge GTest::gtest_main)
+motionstudio_link_asan_defaults(bridge_test)
 if (APPLE)
   # Static pag_export/pag_codec/tgfx symbols are not re-exported by bridge.a.
   motionstudio_add_tgfx_prebuild(bridge_test)

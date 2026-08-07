@@ -49,6 +49,7 @@ target_link_libraries(avf_adapter_test PRIVATE
                       motionstudio_avf_adapter
                       motionstudio_tgfx_adapter
                       GTest::gtest_main)
+motionstudio_link_asan_defaults(avf_adapter_test)
 target_include_directories(avf_adapter_test
                            PRIVATE
                            "${CMAKE_CURRENT_SOURCE_DIR}/include"
