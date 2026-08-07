@@ -53,9 +53,11 @@ struct ShaderEditorSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 TextField("Name", text: $name)
                     .textFieldStyle(.roundedBorder)
+                    .padding(.top, 20)
 
                 inputsSection
-                    .frame(maxHeight: 220)
+                    .frame(minHeight: 180, maxHeight: 320)
+                    .layoutPriority(0)
 
                 Text("mainImage")
                     .font(.caption)
@@ -64,6 +66,8 @@ struct ShaderEditorSheet: View {
                     .font(.system(.body, design: .monospaced))
                     .scrollContentBackground(.hidden)
                     .padding(8)
+                    .frame(minHeight: 280)
+                    .layoutPriority(1)
                     .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
             }
             .padding()
@@ -71,11 +75,17 @@ struct ShaderEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onDismiss)
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button(action: save) {
+                        Image(systemName: "checkmark")
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityLabel("Save")
                 }
             }
             .sheet(isPresented: $showAddUniform) {
@@ -85,6 +95,9 @@ struct ShaderEditorSheet: View {
                 uniformEditorSheet(title: "Edit Uniform", isNew: false, existingID: draft.id)
             }
         }
+        .frame(minWidth: 720, idealWidth: 840, minHeight: 560, idealHeight: 720)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 
     private var inputsSection: some View {
@@ -174,17 +187,23 @@ struct ShaderEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button {
                         showAddUniform = false
                         editingUniformID = nil
+                    } label: {
+                        Image(systemName: "xmark")
                     }
+                    .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button {
                         applyUniformDraft(isNew: isNew, existingID: existingID)
+                    } label: {
+                        Image(systemName: "checkmark")
                     }
                     .disabled(!isValidUniformName(draftUniformName.trimmingCharacters(in: .whitespacesAndNewlines),
                                                   excluding: existingID))
+                    .accessibilityLabel("Done")
                 }
             }
         }
