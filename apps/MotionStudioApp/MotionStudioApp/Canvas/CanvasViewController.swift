@@ -155,21 +155,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         }
     }
 
-    override func loadView() {
-        let view = MTKView()
-        view.device = MTLCreateSystemDefaultDevice()
-        view.isPaused = true
-        view.enableSetNeedsDisplay = true
-        view.framebufferOnly = true
-        view.autoResizeDrawable = true
-        // Multi-touch delivery is off by default; pinch and two-finger pan
-        // never begin without it.
-        view.isMultipleTouchEnabled = true
-        view.delegate = self
-        view.clearColor = MTLClearColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
-        self.view = view
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
