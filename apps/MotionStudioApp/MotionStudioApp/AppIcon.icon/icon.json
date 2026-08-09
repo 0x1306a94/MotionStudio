@@ -1,0 +1,93 @@
+{
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "Keyframes.svg",
+          "name" : "Keyframes"
+        }
+      ],
+      "name" : "30_Keyframes",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "StartCircle.svg",
+          "name" : "StartCircle"
+        },
+        {
+          "image-name" : "MiddleSquircle.svg",
+          "name" : "MiddleSquircle"
+        },
+        {
+          "image-name" : "EndSquare.svg",
+          "name" : "EndSquare"
+        }
+      ],
+      "name" : "20_MorphFrames",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "Trail.svg",
+          "name" : "Trail"
+        },
+        {
+          "image-name" : "BezierHandles.svg",
+          "name" : "BezierHandles"
+        }
+      ],
+      "name" : "10_Motion",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "Background.svg",
+          "name" : "Background"
+        }
+      ],
+      "name" : "00_Background",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="background" cx="52%" cy="48%" r="72%">
+      <stop offset="0" stop-color="#302071"/>
+      <stop offset="0.55" stop-color="#161442"/>
+      <stop offset="1" stop-color="#080A22"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#background)"/>
+  <path d="M278 748 C500 748 386 512 520 512 C654 512 540 276 746 276"
+        fill="none" stroke="#506DFF" stroke-width="112" stroke-linecap="round"/>
+  <path d="M424 512 H616" fill="none" stroke="#CFD7FF" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="424" cy="512" r="25" fill="#CFD7FF"/>
+  <circle cx="616" cy="512" r="25" fill="#CFD7FF"/>
+  <circle cx="278" cy="748" r="142" fill="#5B8CFF"/>
+  <rect x="456" y="448" width="128" height="128" rx="46" fill="#7D68FF"/>
+  <rect x="604" y="134" width="284" height="284" rx="72" fill="#9C5CFF"/>
+  <path d="M278 694 L332 748 L278 802 L224 748 Z M278 722 L252 748 L278 774 L304 748 Z"
+        fill="#FFF7E8" fill-rule="evenodd"/>
+  <path d="M746 222 L800 276 L746 330 L692 276 Z M746 250 L720 276 L746 302 L772 276 Z"
+        fill="#FFF7E8" fill-rule="evenodd"/>
+</svg>
