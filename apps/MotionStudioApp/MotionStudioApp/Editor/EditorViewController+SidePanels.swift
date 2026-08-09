@@ -41,34 +41,21 @@ extension EditorViewController {
         inspectorHostingController = inspectorHost
 
         NSLayoutConstraint.activate([
-            projectPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor,
-                                                  constant: Metrics.sidePanelHorizontalInset),
-            projectPanel.topAnchor.constraint(equalTo: topToolbar.bottomAnchor,
-                                              constant: Metrics.sidePanelTopSpacing),
-            projectPanel.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor,
-                                                 constant: -Metrics.sidePanelBottomSpacing),
+            projectPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            projectPanel.topAnchor.constraint(equalTo: topToolbar.bottomAnchor),
+            projectPanel.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor),
             projectPanel.widthAnchor.constraint(equalToConstant: Metrics.projectPanelWidth),
 
-            inspectorPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor,
-                                                     constant: -Metrics.sidePanelHorizontalInset),
-            inspectorPanel.topAnchor.constraint(equalTo: topToolbar.bottomAnchor,
-                                                constant: Metrics.sidePanelTopSpacing),
-            inspectorPanel.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor,
-                                                   constant: -Metrics.sidePanelBottomSpacing),
+            inspectorPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            inspectorPanel.topAnchor.constraint(equalTo: topToolbar.bottomAnchor),
+            inspectorPanel.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor),
             inspectorPanel.widthAnchor.constraint(equalToConstant: Metrics.inspectorPanelWidth),
         ])
-
-        updateSidePanelVisibility(animated: false)
     }
 
     func configureSidePanelContainer(_ panel: UIView) {
         panel.translatesAutoresizingMaskIntoConstraints = false
         panel.backgroundColor = Palette.panelBackground
-        panel.layer.cornerRadius = Metrics.sidePanelCornerRadius
-        panel.layer.shadowColor = UIColor.black.cgColor
-        panel.layer.shadowOpacity = 0.12
-        panel.layer.shadowRadius = 14
-        panel.layer.shadowOffset = CGSize(width: 0, height: 5)
         panel.clipsToBounds = false
     }
 
@@ -88,58 +75,13 @@ extension EditorViewController {
         ])
     }
 
-    @objc func toggleProjectPanel() {
-        isProjectPanelVisible.toggle()
-        updateSidePanelVisibility(animated: true)
-    }
-
-    @objc func toggleInspectorPanel() {
-        isInspectorPanelVisible.toggle()
-        updateSidePanelVisibility(animated: true)
-    }
-
-    func updateSidePanelVisibility(animated: Bool) {
-        let changes = {
-            self.projectPanel.alpha = self.isProjectPanelVisible ? 1 : 0
-            self.projectPanel.transform = self.isProjectPanelVisible ? .identity : CGAffineTransform(translationX: -18, y: 0)
-            self.inspectorPanel.alpha = self.isInspectorPanelVisible ? 1 : 0
-            self.inspectorPanel.transform = self.isInspectorPanelVisible ? .identity : CGAffineTransform(translationX: 18, y: 0)
-            self.updatePanelToggleButtons()
-        }
-
-        projectPanel.isUserInteractionEnabled = isProjectPanelVisible
-        inspectorPanel.isUserInteractionEnabled = isInspectorPanelVisible
-        if animated {
-            UIView.animate(withDuration: 0.18,
-                           delay: 0,
-                           options: [.beginFromCurrentState, .curveEaseInOut],
-                           animations: changes)
-        } else {
-            changes()
-        }
-    }
-
-    func updatePanelToggleButtons() {
-        updatePanelToggleButton(projectToggleButton, isActive: isProjectPanelVisible)
-        updatePanelToggleButton(inspectorToggleButton, isActive: isInspectorPanelVisible)
-    }
-
     /// Unobscured canvas area insets from the current panel/toolbar/timeline frames.
     func currentCanvasViewportInsets() -> UIEdgeInsets {
         var insets = UIEdgeInsets.zero
-        if isProjectPanelVisible {
-            insets.left = projectPanel.frame.maxX + 20
-        }
-        if isInspectorPanelVisible {
-            insets.right = view.bounds.width - inspectorPanel.frame.minX + 20
-        }
-        insets.top = topToolbar.frame.maxY + 20
-        insets.bottom = 20 + Metrics.creationToolbarSpacing + Metrics.creationToolbarHeight + 20
+        insets.left = 20
+        insets.right = 20
+        insets.top = 20
+        insets.bottom = Metrics.creationToolbarSpacing + Metrics.creationToolbarHeight + 20
         return insets
-    }
-
-    func updatePanelToggleButton(_ button: UIButton, isActive: Bool) {
-        button.backgroundColor = isActive ? Palette.buttonBackground : .clear
-        button.tintColor = isActive ? Palette.buttonTint : .secondaryLabel
     }
 }

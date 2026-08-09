@@ -54,7 +54,7 @@ final class EditorViewController: UIViewController {
     let editorUndoManager = UndoManager()
 
     let canvasViewport = UIView()
-    let topToolbar = UIVisualEffectView(effect: nil)
+    let topToolbar = UIView()
     let saveButton = UIButton(type: .system)
     let exportButton = UIButton(type: .system)
     let undoButton = UIButton(type: .system)
@@ -62,8 +62,6 @@ final class EditorViewController: UIViewController {
     let documentStatusView = UIView()
     let documentDirtyIndicator = UIView()
     let documentStatusLabel = UILabel()
-    let projectToggleButton = UIButton(type: .system)
-    let inspectorToggleButton = UIButton(type: .system)
     let alignLeftButton = UIButton(type: .system)
     let alignHorizontalCenterButton = UIButton(type: .system)
     let alignRightButton = UIButton(type: .system)
@@ -80,7 +78,7 @@ final class EditorViewController: UIViewController {
     let addEllipseButton = UIButton(type: .system)
     let addImageButton = UIButton(type: .system)
     let addTextButton = UIButton(type: .system)
-    let timelinePanel = UIVisualEffectView(effect: nil)
+    let timelinePanel = UIView()
     let timelineHandle = TimelineGrabberView()
 
     var canvasViewController: CanvasViewController?
@@ -122,10 +120,10 @@ final class EditorViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         title = document.isTemporaryDraft ? "Motion Studio" : document.saveURL.deletingPathExtension().lastPathComponent
-        configureTimeline()
-        configureCanvas()
         configureTopToolbar()
+        configureTimeline()
         configureSidePanels()
+        configureCanvas()
         configureCreationToolbar()
         observeCreationToolChanges()
         initializeSaveStateIfNeeded()
@@ -184,8 +182,6 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "e", modifierFlags: [.command, .shift], action: #selector(addEllipseLayer)),
             UIKeyCommand(input: "i", modifierFlags: [.command, .shift], action: #selector(addImageLayer)),
             UIKeyCommand(input: "t", modifierFlags: [.command, .shift], action: #selector(addTextLayer)),
-            UIKeyCommand(input: "1", modifierFlags: [.command, .alternate], action: #selector(toggleProjectPanel)),
-            UIKeyCommand(input: "2", modifierFlags: [.command, .alternate], action: #selector(toggleInspectorPanel)),
             UIKeyCommand(input: "]", modifierFlags: [.command], action: #selector(bringLayersForward)),
             UIKeyCommand(input: "[", modifierFlags: [.command], action: #selector(sendLayersBackward)),
             UIKeyCommand(input: "]", modifierFlags: [.command, .alternate], action: #selector(bringLayersToFront)),
@@ -206,8 +202,6 @@ final class EditorViewController: UIViewController {
              #selector(addEllipseLayer),
              #selector(addImageLayer),
              #selector(addTextLayer),
-             #selector(toggleProjectPanel),
-             #selector(toggleInspectorPanel),
              #selector(renameCurrentProject),
              #selector(togglePlayback):
             true

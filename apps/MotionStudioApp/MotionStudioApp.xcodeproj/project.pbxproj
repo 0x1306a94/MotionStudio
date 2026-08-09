@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4B5E3D3D30289E9800998DDB /* LookinServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4B5E3D3C30289E9800998DDB /* LookinServer */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3C3F0206300F477900C76B6A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -81,6 +85,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4B5E3D3D30289E9800998DDB /* LookinServer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -158,6 +163,7 @@
 			);
 			name = MotionStudio;
 			packageProductDependencies = (
+				4B5E3D3C30289E9800998DDB /* LookinServer */,
 			);
 			productName = MotionStudioApp;
 			productReference = 3C3F01F5300F477800C76B6A /* MotionStudio.app */;
@@ -241,6 +247,9 @@
 			);
 			mainGroup = 3C3F01EC300F477700C76B6A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4B5E3D3B30289E9800998DDB /* XCLocalSwiftPackageReference "../../third_party/LookinServer" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3C3F01F6300F477800C76B6A /* Products */;
 			projectDirPath = "";
@@ -681,6 +690,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4B5E3D3B30289E9800998DDB /* XCLocalSwiftPackageReference "../../third_party/LookinServer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../third_party/LookinServer;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4B5E3D3C30289E9800998DDB /* LookinServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LookinServer;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3C3F01ED300F477700C76B6A /* Project object */;
 }

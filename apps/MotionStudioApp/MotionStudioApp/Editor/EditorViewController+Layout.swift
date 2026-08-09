@@ -32,10 +32,10 @@ extension EditorViewController {
         canvasViewController = canvasController
 
         NSLayoutConstraint.activate([
-            canvasViewport.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            canvasViewport.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            canvasViewport.topAnchor.constraint(equalTo: view.topAnchor),
-            canvasViewport.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor, constant: 20),
+            canvasViewport.leadingAnchor.constraint(equalTo: projectPanel.trailingAnchor),
+            canvasViewport.trailingAnchor.constraint(equalTo: inspectorPanel.leadingAnchor),
+            canvasViewport.topAnchor.constraint(equalTo: topToolbar.bottomAnchor),
+            canvasViewport.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor),
 
             canvasController.view.leadingAnchor.constraint(equalTo: canvasViewport.leadingAnchor),
             canvasController.view.trailingAnchor.constraint(equalTo: canvasViewport.trailingAnchor),
@@ -47,7 +47,6 @@ extension EditorViewController {
     func configureTopToolbar() {
         topToolbar.translatesAutoresizingMaskIntoConstraints = false
         topToolbar.backgroundColor = Palette.panelBackground
-        topToolbar.contentView.backgroundColor = Palette.panelBackground
         view.addSubview(topToolbar)
 
         let contentStack = UIStackView()
@@ -60,20 +59,12 @@ extension EditorViewController {
                                                                         leading: Metrics.topToolbarLeadingInset,
                                                                         bottom: 0,
                                                                         trailing: Metrics.topToolbarHorizontalInset)
-        topToolbar.contentView.addSubview(contentStack)
+        topToolbar.addSubview(contentStack)
 
         configureToolbarButton(saveButton,
                                systemName: "square.and.arrow.down",
                                accessibilityLabel: "Save",
                                action: #selector(saveCurrentDocument))
-        configureToolbarButton(projectToggleButton,
-                               systemName: "sidebar.left",
-                               accessibilityLabel: "Toggle Project Panel",
-                               action: #selector(toggleProjectPanel))
-        configureToolbarButton(inspectorToggleButton,
-                               systemName: "sidebar.right",
-                               accessibilityLabel: "Toggle Inspector Panel",
-                               action: #selector(toggleInspectorPanel))
         configureAlignToolbar()
 
         #if !targetEnvironment(macCatalyst)
@@ -89,27 +80,31 @@ extension EditorViewController {
         #endif
 
         #if !targetEnvironment(macCatalyst)
-            contentStack.addArrangedSubview(saveButton)
-            contentStack.addArrangedSubview(exportButton)
-        #endif
-        contentStack.addArrangedSubview(projectToggleButton)
-        #if !targetEnvironment(macCatalyst)
             contentStack.addArrangedSubview(undoButton)
             contentStack.addArrangedSubview(redoButton)
         #endif
         contentStack.addArrangedSubview(UIView())
         contentStack.addArrangedSubview(alignToolbarStack)
-        contentStack.addArrangedSubview(inspectorToggleButton)
+        #if !targetEnvironment(macCatalyst)
+            contentStack.addArrangedSubview(saveButton)
+            contentStack.addArrangedSubview(exportButton)
+        #endif
         updateExportButtonState()
         updateAlignToolbarVisibility()
 
         configureDocumentStatusView()
-        topToolbar.contentView.addSubview(documentStatusView)
+        topToolbar.addSubview(documentStatusView)
 
         let separator = UIView()
         separator.translatesAutoresizingMaskIntoConstraints = false
         separator.backgroundColor = Palette.separator
-        topToolbar.contentView.addSubview(separator)
+        topToolbar.addSubview(separator)
+
+        #if targetEnvironment(macCatalyst)
+            let contentStackTopConstraint = contentStack.topAnchor.constraint(equalTo: view.topAnchor)
+        #else
+            let contentStackTopConstraint = contentStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor)
+        #endif
 
         NSLayoutConstraint.activate([
             topToolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -117,22 +112,21 @@ extension EditorViewController {
             topToolbar.topAnchor.constraint(equalTo: view.topAnchor),
             topToolbar.bottomAnchor.constraint(equalTo: contentStack.bottomAnchor),
 
-            contentStack.leadingAnchor.constraint(equalTo: topToolbar.contentView.leadingAnchor),
-            contentStack.trailingAnchor.constraint(equalTo: topToolbar.contentView.trailingAnchor),
-            contentStack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            contentStackTopConstraint,
+            contentStack.leadingAnchor.constraint(equalTo: topToolbar.leadingAnchor),
+            contentStack.trailingAnchor.constraint(equalTo: topToolbar.trailingAnchor),
             contentStack.heightAnchor.constraint(equalToConstant: Metrics.topToolbarContentHeight),
 
-            documentStatusView.centerXAnchor.constraint(equalTo: topToolbar.contentView.centerXAnchor),
+            documentStatusView.centerXAnchor.constraint(equalTo: topToolbar.centerXAnchor),
             documentStatusView.centerYAnchor.constraint(equalTo: contentStack.centerYAnchor),
             documentStatusView.leadingAnchor.constraint(greaterThanOrEqualTo: contentStack.leadingAnchor, constant: 120),
             documentStatusView.trailingAnchor.constraint(lessThanOrEqualTo: contentStack.trailingAnchor, constant: -120),
 
-            separator.leadingAnchor.constraint(equalTo: topToolbar.contentView.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: topToolbar.contentView.trailingAnchor),
-            separator.bottomAnchor.constraint(equalTo: topToolbar.contentView.bottomAnchor),
+            separator.leadingAnchor.constraint(equalTo: topToolbar.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: topToolbar.trailingAnchor),
+            separator.bottomAnchor.constraint(equalTo: topToolbar.bottomAnchor),
             separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
         ])
-        updatePanelToggleButtons()
     }
 
     func configureDocumentStatusView() {
@@ -224,7 +218,7 @@ extension EditorViewController {
         creationToolbar.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            creationToolbar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            creationToolbar.centerXAnchor.constraint(equalTo: canvasViewport.centerXAnchor),
             creationToolbar.bottomAnchor.constraint(equalTo: timelinePanel.topAnchor,
                                                     constant: -Metrics.creationToolbarSpacing),
             creationToolbar.heightAnchor.constraint(equalToConstant: Metrics.creationToolbarHeight),
@@ -241,14 +235,10 @@ extension EditorViewController {
     func configureTimeline() {
         timelinePanel.translatesAutoresizingMaskIntoConstraints = false
         timelinePanel.backgroundColor = Palette.panelBackground
-        timelinePanel.contentView.backgroundColor = Palette.panelBackground
-        timelinePanel.clipsToBounds = true
-        timelinePanel.layer.cornerRadius = Metrics.timelineCornerRadius
-        timelinePanel.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         view.addSubview(timelinePanel)
 
         timelineHandle.translatesAutoresizingMaskIntoConstraints = false
-        timelinePanel.contentView.addSubview(timelineHandle)
+        timelinePanel.addSubview(timelineHandle)
 
         let timelineController = TimelineViewController(document: document.modelDocument,
                                                         editorState: editorState,
@@ -265,7 +255,7 @@ extension EditorViewController {
         timelineController.view.translatesAutoresizingMaskIntoConstraints = false
         timelineController.view.backgroundColor = .clear
         addChild(timelineController)
-        timelinePanel.contentView.addSubview(timelineController.view)
+        timelinePanel.addSubview(timelineController.view)
         timelineController.didMove(toParent: self)
         timelineViewController = timelineController
 
@@ -278,15 +268,15 @@ extension EditorViewController {
             timelinePanel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             timelineHeightConstraint!,
 
-            timelineHandle.leadingAnchor.constraint(equalTo: timelinePanel.contentView.leadingAnchor),
-            timelineHandle.trailingAnchor.constraint(equalTo: timelinePanel.contentView.trailingAnchor),
-            timelineHandle.topAnchor.constraint(equalTo: timelinePanel.contentView.topAnchor),
+            timelineHandle.leadingAnchor.constraint(equalTo: timelinePanel.leadingAnchor),
+            timelineHandle.trailingAnchor.constraint(equalTo: timelinePanel.trailingAnchor),
+            timelineHandle.topAnchor.constraint(equalTo: timelinePanel.topAnchor),
             timelineHandle.heightAnchor.constraint(equalToConstant: Metrics.timelineHandleHeight),
 
-            timelineController.view.leadingAnchor.constraint(equalTo: timelinePanel.contentView.leadingAnchor),
-            timelineController.view.trailingAnchor.constraint(equalTo: timelinePanel.contentView.trailingAnchor),
+            timelineController.view.leadingAnchor.constraint(equalTo: timelinePanel.leadingAnchor),
+            timelineController.view.trailingAnchor.constraint(equalTo: timelinePanel.trailingAnchor),
             timelineController.view.topAnchor.constraint(equalTo: timelineHandle.bottomAnchor),
-            timelineController.view.bottomAnchor.constraint(equalTo: timelinePanel.contentView.bottomAnchor),
+            timelineController.view.bottomAnchor.constraint(equalTo: timelinePanel.bottomAnchor),
         ])
 
         let resize = UIPanGestureRecognizer(target: self, action: #selector(handleTimelineResize(_:)))
@@ -374,8 +364,6 @@ extension EditorViewController {
 
     func updateCreationToolSelection() {
         let penActive = editorState.tool == .pen
-        updatePanelToggleButton(selectToolButton, isActive: editorState.tool == .select)
-        updatePanelToggleButton(penToolButton, isActive: penActive)
         updateCreationActionButton(addRectangleButton, enabled: !penActive)
         updateCreationActionButton(addEllipseButton, enabled: !penActive)
         updateCreationActionButton(addImageButton, enabled: !penActive)

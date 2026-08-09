@@ -19,6 +19,11 @@
         "url": "${GITHUB_BASE_URL}/nlohmann/json.git",
         "commit": "9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03",
         "dir": "third_party/json"
+      },
+      {
+        "url": "${GITHUB_BASE_URL}/QMUI/LookinServer.git",
+        "commit": "ae396132ce6494477457cf450116dc760518d8ad",
+        "dir": "third_party/LookinServer"
       }
     ]
   },
