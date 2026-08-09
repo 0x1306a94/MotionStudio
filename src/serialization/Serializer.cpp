@@ -253,31 +253,6 @@ Expected<Color, std::string> ColorFromJson(const json &node) {
     return Unexpected(std::string("Color must be a #RRGGBBAA hex string"));
 }
 
-json ContourToJson(const BezierPath::Contour &contour) {
-    json vertices = json::array();
-    for (const BezierPath::Vertex &vertex : contour.vertices) {
-        vertices.push_back({{"point", Vec2ToJson(vertex.point)},
-                            {"inTangent", Vec2ToJson(vertex.inTangent)},
-                            {"outTangent", Vec2ToJson(vertex.outTangent)}});
-    }
-    return {{"closed", contour.closed}, {"vertices", vertices}};
-}
-
-json BezierPathToJson(const BezierPath &path) {
-    // Preserve legacy single-contour shape when possible for existing documents.
-    if (path.contours.size() <= 1) {
-        if (path.contours.empty()) {
-            return {{"closed", false}, {"vertices", json::array()}};
-        }
-        return ContourToJson(path.contours.front());
-    }
-    json contours = json::array();
-    for (const BezierPath::Contour &contour : path.contours) {
-        contours.push_back(ContourToJson(contour));
-    }
-    return {{"contours", contours}};
-}
-
 Expected<BezierPath::Contour, std::string> ContourFromJson(const json &node) {
     Expected<const json *, std::string> closedNode = Child(node, "closed");
     if (!closedNode) {
