@@ -10,6 +10,8 @@ namespace motion {
 // Renders via Evaluate → BuildCommands → PlayCommands, then Surface readPixels
 // (premultiplied RGBA8). Forces cornerRadius = 0.
 // Caller must pass exact pixelWidth/pixelHeight from ComputeBitmapSize.
+// The offscreen adapter is reused across prepare/finish when size is unchanged so
+// ColorSource shader pipelines stay warm; only pixel size changes recreate it.
 class TgfxBitmapFrameSource : public BitmapFrameSource {
   public:
     TgfxBitmapFrameSource();
@@ -28,6 +30,9 @@ class TgfxBitmapFrameSource : public BitmapFrameSource {
     void finish() override;
 
   private:
+    Expected<void, std::string> ensureAdapter(int pixelWidth, int pixelHeight);
+    void resetSession();
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

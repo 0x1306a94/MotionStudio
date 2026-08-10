@@ -48,6 +48,7 @@ struct TgfxBitmapFrameSource::Impl {
     const Document *document = nullptr;
     EntityId compositionId;
     TimeRange visibleRange = {};
+    // Dimensions of the current offscreen adapter (kept across finish for reuse).
     int pixelWidth = 0;
     int pixelHeight = 0;
     std::unordered_set<uint64_t> layerIds;
@@ -61,6 +62,34 @@ TgfxBitmapFrameSource::TgfxBitmapFrameSource()
 
 TgfxBitmapFrameSource::~TgfxBitmapFrameSource() {
     finish();
+    impl_->adapter.reset();
+    impl_->pixelWidth = 0;
+    impl_->pixelHeight = 0;
+}
+
+Expected<void, std::string> TgfxBitmapFrameSource::ensureAdapter(int pixelWidth, int pixelHeight) {
+    if (pixelWidth <= 0 || pixelHeight <= 0) {
+        return Unexpected(std::string("invalid bitmap size"));
+    }
+    if (impl_->adapter != nullptr && impl_->pixelWidth == pixelWidth &&
+        impl_->pixelHeight == pixelHeight) {
+        return Expected<void, std::string>();
+    }
+    auto adapter = TgfxRenderAdapter::Make(pixelWidth, pixelHeight);
+    if (!adapter) {
+        return Unexpected(std::string("Metal unavailable for bitmap frame source"));
+    }
+    impl_->adapter = std::move(adapter);
+    impl_->pixelWidth = pixelWidth;
+    impl_->pixelHeight = pixelHeight;
+    return Expected<void, std::string>();
+}
+
+void TgfxBitmapFrameSource::resetSession() {
+    impl_->document = nullptr;
+    impl_->mode = BitmapRenderMode::None;
+    impl_->layerIds.clear();
+    impl_->pixels.clear();
 }
 
 Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &document,
@@ -68,9 +97,10 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &docum
                                                            EntityId rootLayerId,
                                                            TimeRange visibleRange, int pixelWidth,
                                                            int pixelHeight) {
-    finish();
-    if (pixelWidth <= 0 || pixelHeight <= 0) {
-        return Unexpected(std::string("invalid bitmap size"));
+    resetSession();
+    Expected<void, std::string> adapterReady = ensureAdapter(pixelWidth, pixelHeight);
+    if (!adapterReady.hasValue()) {
+        return Unexpected(adapterReady.error());
     }
     const Composition *host = document.entityIndex().findComposition(hostCompositionId);
     if (host == nullptr) {
@@ -88,18 +118,10 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &docum
     }
 
     CollectSubtreeIds(*host, rootLayerId, &impl_->layerIds);
-    auto adapter = TgfxRenderAdapter::Make(pixelWidth, pixelHeight);
-    if (!adapter) {
-        return Unexpected(std::string("Metal unavailable for bitmap frame source"));
-    }
-
     impl_->mode = BitmapRenderMode::Layer;
     impl_->document = &document;
     impl_->compositionId = hostCompositionId;
     impl_->visibleRange = visibleRange;
-    impl_->pixelWidth = pixelWidth;
-    impl_->pixelHeight = pixelHeight;
-    impl_->adapter = std::move(adapter);
     return Expected<void, std::string>();
 }
 
@@ -108,27 +130,20 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepareComposition(const Docu
                                                                       TimeRange visibleRange,
                                                                       int pixelWidth,
                                                                       int pixelHeight) {
-    finish();
-    if (pixelWidth <= 0 || pixelHeight <= 0) {
-        return Unexpected(std::string("invalid bitmap size"));
+    resetSession();
+    Expected<void, std::string> adapterReady = ensureAdapter(pixelWidth, pixelHeight);
+    if (!adapterReady.hasValue()) {
+        return Unexpected(adapterReady.error());
     }
     const Composition *composition = document.entityIndex().findComposition(compositionId);
     if (composition == nullptr) {
         return Unexpected(std::string("composition not found"));
     }
 
-    auto adapter = TgfxRenderAdapter::Make(pixelWidth, pixelHeight);
-    if (!adapter) {
-        return Unexpected(std::string("Metal unavailable for bitmap frame source"));
-    }
-
     impl_->mode = BitmapRenderMode::Composition;
     impl_->document = &document;
     impl_->compositionId = compositionId;
     impl_->visibleRange = visibleRange;
-    impl_->pixelWidth = pixelWidth;
-    impl_->pixelHeight = pixelHeight;
-    impl_->adapter = std::move(adapter);
     return Expected<void, std::string>();
 }
 
@@ -193,13 +208,9 @@ Expected<BitmapFrame, std::string> TgfxBitmapFrameSource::renderFrame(FrameTime 
 }
 
 void TgfxBitmapFrameSource::finish() {
-    impl_->adapter.reset();
-    impl_->document = nullptr;
-    impl_->mode = BitmapRenderMode::None;
-    impl_->layerIds.clear();
-    impl_->pixels.clear();
-    impl_->pixelWidth = 0;
-    impl_->pixelHeight = 0;
+    // Keep adapter + size so the next prepare with the same dimensions can reuse
+    // Metal device / ColorSource shader pipelines.
+    resetSession();
 }
 
 }  // namespace motion

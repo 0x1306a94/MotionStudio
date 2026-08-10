@@ -198,3 +198,44 @@ TEST(TgfxBitmapFrameSourceTest, HonorsPreparedPixelSizeForMaxResolutionCase) {
     EXPECT_EQ(frame->height, kPixelHeight);
     source.finish();
 }
+
+TEST(TgfxBitmapFrameSourceTest, FinishThenPrepareSameSizeStillRenders) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->width = 64;
+    composition->height = 64;
+    composition->duration = 1;
+    composition->frameRate = {30, 1};
+    composition->backgroundColor = Color{0, 0, 0, 1};
+
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    layer->outPoint = 1;
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto rect = std::make_unique<ShapeRect>();
+    rect->position.setStaticValue(Vec2{32, 32});
+    rect->size.setStaticValue(Vec2{64, 64});
+    content->geometry = std::move(rect);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0, 1, 0, 1});
+    layer->styles.push_back(std::move(fill));
+
+    TgfxBitmapFrameSource source;
+    TimeRange range{0, 1};
+    auto prepared = source.prepareComposition(document, composition->id, range, 64, 64);
+    if (!prepared.hasValue()) {
+        GTEST_SKIP() << prepared.error();
+    }
+    ASSERT_TRUE(source.renderFrame(0).hasValue());
+    source.finish();
+
+    // Same size: adapter should stay warm across finish + prepare.
+    prepared = source.prepareComposition(document, composition->id, range, 64, 64);
+    ASSERT_TRUE(prepared.hasValue()) << prepared.error();
+    auto frame = source.renderFrame(0);
+    ASSERT_TRUE(frame.hasValue()) << frame.error();
+    EXPECT_EQ(frame->width, 64);
+    EXPECT_EQ(frame->height, 64);
+    const RgbaPixel center = PixelAt(frame->rgba, frame->width, frame->rowBytes, 32, 32);
+    EXPECT_GT(center.g, 200);
+    source.finish();
+}
