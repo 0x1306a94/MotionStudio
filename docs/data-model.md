@@ -102,8 +102,14 @@ struct Asset {
 
 struct ShaderUniformDecl {
     std::string name;
-    UniformFormat format;
+    UniformFormat format;          // Float / Float2 / Float3 / Float4 / Color（Color≠Float4）
     int count = 1;
+    bool animatable = true;        // false → Realign 拍平关键帧；Inspector 无钻石
+    float defaultFloat = 0;
+    Vec2 defaultFloat2{0, 0};
+    Vec3 defaultFloat3{0, 0, 0};
+    Vec4 defaultFloat4{0, 0, 0, 0};
+    Color defaultColor{1, 1, 1, 1}; // 仅新建绑定 / Realign 新增项使用
 };
 
 struct ShaderDefinition {
@@ -316,11 +322,11 @@ class FillStyle : public LayerStyle {
 
 ```cpp
 enum class ShaderUniformValueKind : uint8_t {
-    AnimFloat = 0,   // v1 ← UniformFormat::Float
-    AnimFloat2 = 1,  // v1 ← Float2
-    AnimFloat3 = 2,  // v1 ← Float3（Animatable<Vec3>）
-    AnimColor = 3,   // v1 ← Float4（语义为 Color）
-    // StaticInt / AnimFloat4 / StaticMat3 / TextureAsset 预留
+    AnimFloat = 0,   // ← UniformFormat::Float
+    AnimFloat2 = 1,  // ← Float2
+    AnimFloat3 = 2,  // ← Float3（Animatable<Vec3>）
+    AnimColor = 3,   // ← UniformFormat::Color（Animatable<Color>）
+    AnimFloat4 = 4,  // ← UniformFormat::Float4（Animatable<Vec4>；非颜色）
 };
 
 struct ShaderUniformValue {
@@ -330,12 +336,13 @@ struct ShaderUniformValue {
     Animatable<Vec2> float2Value;
     Animatable<Vec3> float3Value;
     Animatable<Color> colorValue;
+    Animatable<Vec4> float4Value;
 };
 
 struct ShaderUniformValues { std::vector<ShaderUniformValue> entries; };
 ```
 
-辅助：`KindForFormat` / `MakeDefaultUniformValues` / `RealignUniformValues`；改 scheme 后由 `UpdateShaderDefinitionCommand` 对所有引用样式 Realign。`PropertyPath`：`styles[0].uniformValues.<name>`（仅 Shader 模式）。内置 Shadertoy uniform（`iTime` 等）不进 scheme。设计细节见 [color-source Core 存储 spec](superpowers/specs/2026-08-07-color-source-core-storage-design.md)；绘制仍在 adapter，见 [color-source-effect.md](color-source-effect.md)。
+`KindForFormat`：`Float4 → AnimFloat4`，`Color → AnimColor`（旧 `"format":"float4"` **不**自动迁移为 color）。辅助：`MakeDefaultUniformValues` / `RealignUniformValues`（`animatable==false` 时 `evaluate(0)` 后 `clearKeyframes`）；改 scheme 后由 `UpdateShaderDefinitionCommand` 对所有引用样式 Realign。`PropertyPath`：`styles[0].uniformValues.<name>`（仅 Shader 模式）。内置 Shadertoy uniform（`iTime` 等）不进 scheme。设计细节见 [color-source Core 存储 spec](superpowers/specs/2026-08-07-color-source-core-storage-design.md) 与 [shader uniform defaults design](superpowers/specs/2026-08-10-shader-uniform-defaults-animatable-design.md)；绘制仍在 adapter，见 [color-source-effect.md](color-source-effect.md)。
 
 ## 4. Animatable\<T\>——可动画属性
 
@@ -530,7 +537,10 @@ struct AnimatableDTO<T> {
       "id": 123456789,
       "name": "Ripple",
       "mainImage": "vec4 mainImage(vec2 uv){ return vec4(uv,0.0,1.0); }",
-      "uniforms": [ { "name": "rippleCount", "format": "float", "count": 1 } ]
+      "uniforms": [
+        { "name": "rippleCount", "format": "float", "count": 1, "animatable": true, "default": 4 },
+        { "name": "tint", "format": "color", "count": 1, "animatable": false, "default": "#FFFFFFFF" }
+      ]
     }
   ]
 }

@@ -13,6 +13,12 @@ struct ShaderUniformDraft: Identifiable, Equatable {
     var id = UUID()
     var name: String
     var format: MS_UNIFORM_FORMAT
+    var animatable: Bool = true
+    var defaultFloat: Float = 0
+    var defaultFloat2: SIMD2<Float> = .zero
+    var defaultFloat3: SIMD3<Float> = .zero
+    var defaultFloat4: SIMD4<Float> = .zero
+    var defaultColor: MotionColor = .init(r: 1, g: 1, b: 1, a: 1)
 }
 
 struct ShaderEditorSheet: View {
@@ -28,6 +34,12 @@ struct ShaderEditorSheet: View {
     @State private var editingUniformID: UUID?
     @State private var draftUniformName = ""
     @State private var draftUniformFormat: MS_UNIFORM_FORMAT = .FLOAT
+    @State private var draftAnimatable = true
+    @State private var draftDefaultFloat: Float = 0
+    @State private var draftDefaultFloat2: SIMD2<Float> = .zero
+    @State private var draftDefaultFloat3: SIMD3<Float> = .zero
+    @State private var draftDefaultFloat4: SIMD4<Float> = .zero
+    @State private var draftDefaultColor = MotionColor(r: 1, g: 1, b: 1, a: 1)
 
     init(core: MotionDocumentCore, shaderID: UInt64, perform: @escaping (String, () -> Void) -> Void,
          onDismiss: @escaping () -> Void)
@@ -42,8 +54,8 @@ struct ShaderEditorSheet: View {
         let count = core.shaderUniformCount(shaderID)
         for index in 0 ..< count {
             let format = core.shaderUniformFormat(shaderID, index: index)
-            drafts.append(ShaderUniformDraft(name: core.shaderUniformName(shaderID, index: index),
-                                             format: format == .INVALID ? .FLOAT : format))
+            let resolved = format == .INVALID ? .FLOAT : format
+            drafts.append(Self.makeDraft(from: core, shaderID: shaderID, index: index, format: resolved))
         }
         _uniforms = State(initialValue: drafts)
     }
@@ -127,10 +139,14 @@ struct ShaderEditorSheet: View {
                         HStack(spacing: 8) {
                             Text("\(uniform.format.glslTypeName)  \(uniform.name);")
                                 .font(.system(.caption, design: .monospaced))
+                            if !uniform.animatable {
+                                Text("static")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer(minLength: 0)
                             Button("Edit") {
-                                draftUniformName = uniform.name
-                                draftUniformFormat = uniform.format
+                                loadDraft(from: uniform)
                                 editingUniformID = uniform.id
                             }
                             .font(.caption)
@@ -145,8 +161,10 @@ struct ShaderEditorSheet: View {
                     }
 
                     Button {
+                        resetDraftDefaults(for: .FLOAT)
                         draftUniformName = ""
                         draftUniformFormat = .FLOAT
+                        draftAnimatable = true
                         showAddUniform = true
                     } label: {
                         Label("Add Uniform", systemImage: "plus")
@@ -179,9 +197,14 @@ struct ShaderEditorSheet: View {
                 TextField("Name", text: $draftUniformName)
                 Picker("Format", selection: $draftUniformFormat) {
                     ForEach(MS_UNIFORM_FORMAT.editableCases) { format in
-                        Text(format.glslTypeName).tag(format)
+                        Text(format.editorLabel).tag(format)
                     }
                 }
+                .onChange(of: draftUniformFormat) { _, newFormat in
+                    resetDraftDefaults(for: newFormat)
+                }
+                Toggle("Animatable", isOn: $draftAnimatable)
+                defaultValueSection
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
@@ -207,20 +230,118 @@ struct ShaderEditorSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private var defaultValueSection: some View {
+        switch draftUniformFormat {
+        case .FLOAT:
+            HStack {
+                Text("Default")
+                Spacer()
+                TextField("0", value: $draftDefaultFloat, format: .number)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.decimalPad)
+                    .frame(maxWidth: 120)
+            }
+        case .FLOAT2:
+            defaultAxisRow("Default X", value: float2Binding(\.x))
+            defaultAxisRow("Default Y", value: float2Binding(\.y))
+        case .FLOAT3:
+            defaultAxisRow("Default X", value: float3Binding(\.x))
+            defaultAxisRow("Default Y", value: float3Binding(\.y))
+            defaultAxisRow("Default Z", value: float3Binding(\.z))
+        case .FLOAT4:
+            defaultAxisRow("Default X", value: float4Binding(\.x))
+            defaultAxisRow("Default Y", value: float4Binding(\.y))
+            defaultAxisRow("Default Z", value: float4Binding(\.z))
+            defaultAxisRow("Default W", value: float4Binding(\.w))
+        case .COLOR:
+            ColorPicker("Default", selection: draftDefaultColorBinding, supportsOpacity: true)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func defaultAxisRow(_ title: String, value: Binding<Float>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField("0", value: value, format: .number)
+                .multilineTextAlignment(.trailing)
+                .keyboardType(.decimalPad)
+                .frame(maxWidth: 120)
+        }
+    }
+
+    private func float2Binding(_ keyPath: WritableKeyPath<SIMD2<Float>, Float>) -> Binding<Float> {
+        Binding(
+            get: { draftDefaultFloat2[keyPath: keyPath] },
+            set: { draftDefaultFloat2[keyPath: keyPath] = $0 },
+        )
+    }
+
+    private func float3Binding(_ keyPath: WritableKeyPath<SIMD3<Float>, Float>) -> Binding<Float> {
+        Binding(
+            get: { draftDefaultFloat3[keyPath: keyPath] },
+            set: { draftDefaultFloat3[keyPath: keyPath] = $0 },
+        )
+    }
+
+    private func float4Binding(_ keyPath: WritableKeyPath<SIMD4<Float>, Float>) -> Binding<Float> {
+        Binding(
+            get: { draftDefaultFloat4[keyPath: keyPath] },
+            set: { draftDefaultFloat4[keyPath: keyPath] = $0 },
+        )
+    }
+
+    private var draftDefaultColorBinding: Binding<Color> {
+        Binding {
+            draftDefaultColor.swiftUIColor
+        } set: { newValue in
+            draftDefaultColor = MotionColor(newValue).clampedChannels()
+        }
+    }
+
+    private func loadDraft(from uniform: ShaderUniformDraft) {
+        draftUniformName = uniform.name
+        draftUniformFormat = uniform.format
+        draftAnimatable = uniform.animatable
+        draftDefaultFloat = uniform.defaultFloat
+        draftDefaultFloat2 = uniform.defaultFloat2
+        draftDefaultFloat3 = uniform.defaultFloat3
+        draftDefaultFloat4 = uniform.defaultFloat4
+        draftDefaultColor = uniform.defaultColor
+    }
+
+    private func resetDraftDefaults(for format: MS_UNIFORM_FORMAT) {
+        draftDefaultFloat = 0
+        draftDefaultFloat2 = .zero
+        draftDefaultFloat3 = .zero
+        draftDefaultFloat4 = .zero
+        draftDefaultColor = MotionColor(r: 1, g: 1, b: 1, a: 1)
+        _ = format
     }
 
     private func applyUniformDraft(isNew: Bool, existingID: UUID?) {
         let trimmed = draftUniformName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isValidUniformName(trimmed, excluding: existingID) else { return }
+        var draft = ShaderUniformDraft(name: trimmed, format: draftUniformFormat)
+        draft.animatable = draftAnimatable
+        draft.defaultFloat = draftDefaultFloat
+        draft.defaultFloat2 = draftDefaultFloat2
+        draft.defaultFloat3 = draftDefaultFloat3
+        draft.defaultFloat4 = draftDefaultFloat4
+        draft.defaultColor = draftDefaultColor
         if isNew {
-            uniforms.append(ShaderUniformDraft(name: trimmed, format: draftUniformFormat))
+            uniforms.append(draft)
             showAddUniform = false
         } else if let existingID,
                   let index = uniforms.firstIndex(where: { $0.id == existingID })
         {
-            uniforms[index].name = trimmed
-            uniforms[index].format = draftUniformFormat
+            draft.id = existingID
+            uniforms[index] = draft
             editingUniformID = nil
         }
     }
@@ -253,13 +374,40 @@ struct ShaderEditorSheet: View {
         }
     }
 
+    private static func makeDraft(from core: MotionDocumentCore, shaderID: UInt64, index: Int,
+                                  format: MS_UNIFORM_FORMAT) -> ShaderUniformDraft
+    {
+        var draft = ShaderUniformDraft(name: core.shaderUniformName(shaderID, index: index),
+                                       format: format)
+        draft.animatable = core.shaderUniformAnimatable(shaderID, index: index)
+        switch format {
+        case .FLOAT:
+            draft.defaultFloat = core.shaderUniformDefaultFloat(shaderID, index: index)
+        case .FLOAT2:
+            let value = core.shaderUniformDefaultVec2(shaderID, index: index)
+            draft.defaultFloat2 = SIMD2(Float(value.dx), Float(value.dy))
+        case .FLOAT3:
+            draft.defaultFloat3 = core.shaderUniformDefaultVec3(shaderID, index: index)
+        case .FLOAT4:
+            draft.defaultFloat4 = core.shaderUniformDefaultVec4(shaderID, index: index)
+        case .COLOR:
+            draft.defaultColor = core.shaderUniformDefaultColor(shaderID, index: index)
+        default:
+            break
+        }
+        return draft
+    }
+
     private static func encodeUniformsJSON(_ uniforms: [ShaderUniformDraft]) -> String? {
         let objects: [[String: Any]] = uniforms.map { uniform in
-            [
+            var object: [String: Any] = [
                 "name": uniform.name,
                 "format": uniform.format.jsonFormatName,
                 "count": 1,
+                "animatable": uniform.animatable,
             ]
+            object["default"] = defaultJSON(for: uniform)
+            return object
         }
         guard let data = try? JSONSerialization.data(withJSONObject: objects, options: []),
               let text = String(data: data, encoding: .utf8)
@@ -267,6 +415,28 @@ struct ShaderEditorSheet: View {
             return nil
         }
         return text
+    }
+
+    private static func defaultJSON(for uniform: ShaderUniformDraft) -> Any {
+        switch uniform.format {
+        case .FLOAT:
+            uniform.defaultFloat
+        case .FLOAT2:
+            [uniform.defaultFloat2.x, uniform.defaultFloat2.y]
+        case .FLOAT3:
+            [uniform.defaultFloat3.x, uniform.defaultFloat3.y, uniform.defaultFloat3.z]
+        case .FLOAT4:
+            [uniform.defaultFloat4.x, uniform.defaultFloat4.y, uniform.defaultFloat4.z,
+             uniform.defaultFloat4.w]
+        case .COLOR:
+            String(format: "#%02X%02X%02X%02X",
+                   Int((uniform.defaultColor.r * 255).rounded()),
+                   Int((uniform.defaultColor.g * 255).rounded()),
+                   Int((uniform.defaultColor.b * 255).rounded()),
+                   Int((uniform.defaultColor.a * 255).rounded()))
+        default:
+            0
+        }
     }
 
     private static let builtInNames: Set<String> = [
@@ -285,6 +455,15 @@ struct ShaderEditorSheet: View {
 extension MS_UNIFORM_FORMAT {
     static var editableCases: [MS_UNIFORM_FORMAT] {
         [.FLOAT, .FLOAT2, .FLOAT3, .FLOAT4, .COLOR]
+    }
+
+    var editorLabel: String {
+        switch self {
+        case .COLOR:
+            "color"
+        default:
+            glslTypeName
+        }
     }
 
     var glslTypeName: String {

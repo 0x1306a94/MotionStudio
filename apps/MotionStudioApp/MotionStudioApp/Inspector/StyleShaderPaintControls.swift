@@ -123,8 +123,10 @@ struct StyleShaderPaintControls: View {
     private func uniformRow(shaderID: UInt64, uniformIndex: Int) -> some View {
         let name = core.shaderUniformName(shaderID, index: uniformIndex)
         let format = core.shaderUniformFormat(shaderID, index: uniformIndex)
+        let animatable = core.shaderUniformAnimatable(shaderID, index: uniformIndex)
         let path = StyleProperty.uniformValue(name, styleIndex: styleIndex)
-        let hasKeyframe = core.keyframeFrames(entityID: layerID, path: path).contains(playheadFrame)
+        let hasKeyframe = animatable
+            && core.keyframeFrames(entityID: layerID, path: path).contains(playheadFrame)
 
         switch format {
         case .FLOAT:
@@ -133,6 +135,7 @@ struct StyleShaderPaintControls: View {
                 value: core.evaluateFloat(entityID: layerID, path: path, frame: playheadFrame),
                 hasKeyframeAtPlayhead: hasKeyframe,
                 isEditable: isEditable,
+                showsKeyframeButton: animatable,
                 onCommit: { value in
                     writeFloat(path: path, value: value, hasKeyframe: hasKeyframe)
                 },
@@ -141,95 +144,118 @@ struct StyleShaderPaintControls: View {
                 },
             )
         case .FLOAT2:
-            HStack(spacing: 6) {
-                Text(name)
-                    .font(.callout)
-                    .frame(width: 78, alignment: .leading)
-                let value = core.evaluateVec2(entityID: layerID, path: path, frame: playheadFrame)
-                NumberPropertyRow(label: "X", value: Float(value.dx), hasKeyframeAtPlayhead: false,
-                                  isEditable: isEditable, showsKeyframeButton: false,
-                                  onCommit: { x in
-                                      writeVec2(path: path,
-                                                value: CGVector(dx: CGFloat(x), dy: value.dy),
-                                                hasKeyframe: hasKeyframe)
-                                  },
-                                  onToggleKeyframe: { _ in })
-                NumberPropertyRow(label: "Y", value: Float(value.dy), hasKeyframeAtPlayhead: hasKeyframe,
-                                  isEditable: isEditable,
-                                  onCommit: { y in
-                                      writeVec2(path: path,
-                                                value: CGVector(dx: value.dx, dy: CGFloat(y)),
-                                                hasKeyframe: hasKeyframe)
-                                  },
-                                  onToggleKeyframe: { _ in
-                                      let current = core.evaluateVec2(entityID: layerID, path: path,
-                                                                      frame: playheadFrame)
-                                      toggleVec2Keyframe(path: path, value: current,
-                                                         hasKeyframe: hasKeyframe)
-                                  })
+            let value = core.evaluateVec2(entityID: layerID, path: path, frame: playheadFrame)
+            compactVectorRow(name: name, animatable: animatable, hasKeyframe: hasKeyframe,
+                             onToggleKeyframe: {
+                                 toggleVec2Keyframe(path: path, value: value, hasKeyframe: hasKeyframe)
+                             }) {
+                CompactAxisField(label: "X", value: Float(value.dx), isEditable: isEditable) { x in
+                    writeVec2(path: path, value: CGVector(dx: CGFloat(x), dy: value.dy),
+                              hasKeyframe: hasKeyframe)
+                }
+                CompactAxisField(label: "Y", value: Float(value.dy), isEditable: isEditable) { y in
+                    writeVec2(path: path, value: CGVector(dx: value.dx, dy: CGFloat(y)),
+                              hasKeyframe: hasKeyframe)
+                }
             }
         case .FLOAT3:
             let value = core.evaluateVec3(entityID: layerID, path: path, frame: playheadFrame)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(.callout)
-                HStack {
-                    NumberPropertyRow(label: "X", value: value.x, hasKeyframeAtPlayhead: false,
-                                      isEditable: isEditable, showsKeyframeButton: false,
-                                      onCommit: { x in
-                                          writeVec3(path: path, value: SIMD3(x, value.y, value.z),
-                                                    hasKeyframe: hasKeyframe)
-                                      },
-                                      onToggleKeyframe: { _ in })
-                    NumberPropertyRow(label: "Y", value: value.y, hasKeyframeAtPlayhead: false,
-                                      isEditable: isEditable, showsKeyframeButton: false,
-                                      onCommit: { y in
-                                          writeVec3(path: path, value: SIMD3(value.x, y, value.z),
-                                                    hasKeyframe: hasKeyframe)
-                                      },
-                                      onToggleKeyframe: { _ in })
-                    NumberPropertyRow(label: "Z", value: value.z, hasKeyframeAtPlayhead: hasKeyframe,
-                                      isEditable: isEditable,
-                                      onCommit: { z in
-                                          writeVec3(path: path, value: SIMD3(value.x, value.y, z),
-                                                    hasKeyframe: hasKeyframe)
-                                      },
-                                      onToggleKeyframe: { _ in
-                                          let current = core.evaluateVec3(entityID: layerID, path: path,
-                                                                          frame: playheadFrame)
-                                          toggleVec3Keyframe(path: path, value: current,
-                                                             hasKeyframe: hasKeyframe)
-                                      })
+            compactVectorRow(name: name, animatable: animatable, hasKeyframe: hasKeyframe,
+                             onToggleKeyframe: {
+                                 toggleVec3Keyframe(path: path, value: value, hasKeyframe: hasKeyframe)
+                             }) {
+                CompactAxisField(label: "X", value: value.x, isEditable: isEditable) { x in
+                    writeVec3(path: path, value: SIMD3(x, value.y, value.z), hasKeyframe: hasKeyframe)
+                }
+                CompactAxisField(label: "Y", value: value.y, isEditable: isEditable) { y in
+                    writeVec3(path: path, value: SIMD3(value.x, y, value.z), hasKeyframe: hasKeyframe)
+                }
+                CompactAxisField(label: "Z", value: value.z, isEditable: isEditable) { z in
+                    writeVec3(path: path, value: SIMD3(value.x, value.y, z), hasKeyframe: hasKeyframe)
                 }
             }
         case .FLOAT4:
+            let value = core.evaluateVec4(entityID: layerID, path: path, frame: playheadFrame)
+            compactVectorRow(name: name, animatable: animatable, hasKeyframe: hasKeyframe,
+                             onToggleKeyframe: {
+                                 toggleVec4Keyframe(path: path, value: value, hasKeyframe: hasKeyframe)
+                             }) {
+                CompactAxisField(label: "X", value: value.x, isEditable: isEditable) { x in
+                    writeVec4(path: path, value: SIMD4(x, value.y, value.z, value.w),
+                              hasKeyframe: hasKeyframe)
+                }
+                CompactAxisField(label: "Y", value: value.y, isEditable: isEditable) { y in
+                    writeVec4(path: path, value: SIMD4(value.x, y, value.z, value.w),
+                              hasKeyframe: hasKeyframe)
+                }
+                CompactAxisField(label: "Z", value: value.z, isEditable: isEditable) { z in
+                    writeVec4(path: path, value: SIMD4(value.x, value.y, z, value.w),
+                              hasKeyframe: hasKeyframe)
+                }
+                CompactAxisField(label: "W", value: value.w, isEditable: isEditable) { w in
+                    writeVec4(path: path, value: SIMD4(value.x, value.y, value.z, w),
+                              hasKeyframe: hasKeyframe)
+                }
+            }
+        case .COLOR:
             HStack(spacing: 8) {
                 ColorPicker(name,
-                            selection: colorBinding(path: path, hasKeyframe: hasKeyframe),
+                            selection: colorBinding(path: path, hasKeyframe: hasKeyframe,
+                                                    animatable: animatable),
                             supportsOpacity: true)
                     .font(.callout)
-                Button {
-                    let value = core.evaluateColor(entityID: layerID, path: path, frame: playheadFrame)
-                    toggleColorKeyframe(path: path, value: value, hasKeyframe: hasKeyframe)
-                } label: {
-                    Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
-                        .foregroundStyle(hasKeyframe ? .yellow : .secondary)
+                if animatable {
+                    Button {
+                        let value = core.evaluateColor(entityID: layerID, path: path, frame: playheadFrame)
+                        toggleColorKeyframe(path: path, value: value, hasKeyframe: hasKeyframe)
+                    } label: {
+                        Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
+                            .foregroundStyle(hasKeyframe ? .yellow : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isEditable)
                 }
-                .buttonStyle(.plain)
-                .disabled(!isEditable)
             }
         default:
             EmptyView()
         }
     }
 
-    private func colorBinding(path: String, hasKeyframe: Bool) -> Binding<Color> {
+    private func compactVectorRow(
+        name: String,
+        animatable: Bool,
+        hasKeyframe: Bool,
+        onToggleKeyframe: @escaping () -> Void,
+        @ViewBuilder fields: () -> some View,
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(name)
+                    .font(.callout)
+                Spacer(minLength: 0)
+                if animatable {
+                    Button(action: onToggleKeyframe) {
+                        Image(systemName: hasKeyframe ? "diamond.fill" : "diamond")
+                            .foregroundStyle(hasKeyframe ? .yellow : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isEditable)
+                }
+            }
+            HStack(spacing: 6) {
+                fields()
+            }
+        }
+    }
+
+    private func colorBinding(path: String, hasKeyframe: Bool, animatable: Bool) -> Binding<Color> {
         Binding {
             core.evaluateColor(entityID: layerID, path: path, frame: playheadFrame).swiftUIColor
         } set: { newValue in
             guard isEditable else { return }
             let value = MotionColor(newValue).clampedChannels()
             perform("Set \(actionPrefix) Uniform") {
-                if hasKeyframe {
+                if animatable, hasKeyframe {
                     core.addKeyframeColor(entityID: layerID, path: path, frame: playheadFrame, value: value)
                 } else {
                     core.setStaticColor(entityID: layerID, path: path, value: value)
@@ -275,6 +301,18 @@ struct StyleShaderPaintControls: View {
         }
     }
 
+    private func writeVec4(path: String, value: SIMD4<Float>, hasKeyframe: Bool) {
+        guard isEditable else { return }
+        perform("Set \(actionPrefix) Uniform") {
+            if hasKeyframe {
+                core.addKeyframeVec4(entityID: layerID, path: path, frame: playheadFrame, value: value)
+            } else {
+                core.setStaticVec4(entityID: layerID, path: path, value: value)
+            }
+            core.endMergeGroup()
+        }
+    }
+
     private func toggleFloatKeyframe(path: String, value: Float, hasKeyframe: Bool) {
         guard isEditable else { return }
         if hasKeyframe {
@@ -314,6 +352,19 @@ struct StyleShaderPaintControls: View {
         }
     }
 
+    private func toggleVec4Keyframe(path: String, value: SIMD4<Float>, hasKeyframe: Bool) {
+        guard isEditable else { return }
+        if hasKeyframe {
+            perform("Delete Keyframe") {
+                core.removeKeyframe(entityID: layerID, path: path, frame: playheadFrame)
+            }
+        } else {
+            perform("Add Keyframe") {
+                core.addKeyframeVec4(entityID: layerID, path: path, frame: playheadFrame, value: value)
+            }
+        }
+    }
+
     private func toggleColorKeyframe(path: String, value: MotionColor, hasKeyframe: Bool) {
         guard isEditable else { return }
         if hasKeyframe {
@@ -325,6 +376,77 @@ struct StyleShaderPaintControls: View {
                 core.addKeyframeColor(entityID: layerID, path: path, frame: playheadFrame, value: value)
             }
         }
+    }
+}
+
+/// Short-label numeric field for vector axes in the narrow inspector (avoids nesting
+/// `NumberPropertyRow`, whose 78pt label squeezes out the text field).
+private struct CompactAxisField: View {
+    let label: String
+    let value: Float
+    let isEditable: Bool
+    let onCommit: (Float) -> Void
+
+    @State private var draft = ""
+    @FocusState private var isFieldFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(width: 12, alignment: .leading)
+            TextField("", text: $draft)
+                .textFieldStyle(.plain)
+                .font(.caption)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 4))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.secondary.opacity(isEditable ? 0.4 : 0.18)),
+                )
+                .onSubmit(commitDraft)
+                .disabled(!isEditable)
+                .focused($isFieldFocused)
+                .onChange(of: isFieldFocused) { _, focused in
+                    if !focused {
+                        commitDraft()
+                    }
+                }
+        }
+        .onChange(of: value, initial: true) { _, newValue in
+            if !isFieldFocused {
+                draft = formattedValue(newValue)
+            }
+        }
+    }
+
+    private func commitDraft() {
+        guard isEditable else {
+            draft = formattedValue(value)
+            return
+        }
+        let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let committed = Float(trimmed), committed.isFinite else {
+            draft = formattedValue(value)
+            return
+        }
+        draft = formattedValue(committed)
+        if committed != value {
+            onCommit(committed)
+        }
+    }
+
+    private func formattedValue(_ value: Float) -> String {
+        var formatted = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), Double(value))
+        while formatted.last == "0" {
+            formatted.removeLast()
+        }
+        if formatted.last == "." {
+            formatted.removeLast()
+        }
+        return formatted
     }
 }
 

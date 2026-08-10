@@ -371,7 +371,7 @@ git commit -m "Expose shader uniform Color animatable defaults and vec4 properti
 
 ### Task 6: App UI（Editor + Inspector）
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/ProjectPanel/ShaderEditorSheet.swift`
@@ -383,7 +383,7 @@ git commit -m "Expose shader uniform Color animatable defaults and vec4 properti
 - Consumes: Task 5 bridge
 - Produces: Editor 可编 animatable/default；Inspector 紧凑 vec 行；`animatable==false` 无钻石且只 static
 
-- [ ] **Step 1: 修 float2/3/4 布局（可先不接 animatable）**
+- [x] **Step 1: 修 float2/3/4 布局（可先不接 animatable）**
 
 `StyleShaderPaintControls`：`FLOAT2/3/4` 改为
 
@@ -408,21 +408,21 @@ VStack(alignment: .leading, spacing: 4) {
 
 `FLOAT4`：四轴；`COLOR`：ColorPicker（从原 FLOAT4 分支移出）。
 
-- [ ] **Step 2: ShaderEditorSheet 草稿字段**
+- [x] **Step 2: ShaderEditorSheet 草稿字段**
 
 `ShaderUniformDraft` 增加 `animatable: Bool`、`default`（按 format 存）。  
 Add/Edit：Toggle + default 控件。  
 Save：uniforms JSON 含 `animatable` + `default`。
 
-- [ ] **Step 3: Inspector 读 `animatable`**
+- [x] **Step 3: Inspector 读 `animatable`**
 
 钻石显隐；写入只走 `setStatic*`。
 
-- [ ] **Step 4: 手动验证**
+- [x] **Step 4: 手动验证**
 
 App：Concentric `center` float2 可输入 50/200；新建 color uniform 为 ColorPicker；float4 为四框；关 Animatable 后无钻石。
 
-- [ ] **Step 5: 更新文档 + spec 状态 + Commit**
+- [x] **Step 5: 更新文档 + spec 状态 + Commit**
 
 ```bash
 git commit -m "Add shader uniform editor defaults and fix vector inspector layout."

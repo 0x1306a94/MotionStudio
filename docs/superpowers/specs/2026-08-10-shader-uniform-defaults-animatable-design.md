@@ -1,7 +1,7 @@
 # Shader Uniform 默认值 / 可动画 + Color format — 设计说明
 
 日期：2026-08-10  
-状态：已批准，待实现  
+状态：已实现  
 范围：`ShaderUniformDecl` 元数据、Inspector float2/3/4 布局、`UniformFormat::Color`；不升 `document.json` schemaVersion
 
 相关：`docs/data-model.md`（Shader / StylePaintMode）、`docs/color-source-effect.md`、既有 color-source Core 存储 spec
