@@ -19,6 +19,44 @@ struct ShaderUniformDraft: Identifiable, Equatable {
     var defaultFloat3: SIMD3<Float> = .zero
     var defaultFloat4: SIMD4<Float> = .zero
     var defaultColor: MotionColor = .init(r: 1, g: 1, b: 1, a: 1)
+
+    /// Trailing `// …` body for the Inputs list (default + optional static).
+    var inputsComment: String {
+        var parts = ["default \(formattedDefault)"]
+        if !animatable {
+            parts.append("static")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private var formattedDefault: String {
+        switch format {
+        case .FLOAT:
+            Self.formatNumber(defaultFloat)
+        case .FLOAT2:
+            "(\(Self.formatNumber(defaultFloat2.x)), \(Self.formatNumber(defaultFloat2.y)))"
+        case .FLOAT3:
+            "(\(Self.formatNumber(defaultFloat3.x)), \(Self.formatNumber(defaultFloat3.y)), \(Self.formatNumber(defaultFloat3.z)))"
+        case .FLOAT4:
+            "(\(Self.formatNumber(defaultFloat4.x)), \(Self.formatNumber(defaultFloat4.y)), \(Self.formatNumber(defaultFloat4.z)), \(Self.formatNumber(defaultFloat4.w)))"
+        case .COLOR:
+            String(format: "#%02X%02X%02X%02X",
+                   Int((defaultColor.r * 255).rounded()),
+                   Int((defaultColor.g * 255).rounded()),
+                   Int((defaultColor.b * 255).rounded()),
+                   Int((defaultColor.a * 255).rounded()))
+        default:
+            "?"
+        }
+    }
+
+    private static func formatNumber(_ value: Float) -> String {
+        var formatted = String(format: "%.4g", locale: Locale(identifier: "en_US_POSIX"), Double(value))
+        if formatted == "-0" {
+            formatted = "0"
+        }
+        return formatted
+    }
 }
 
 struct ShaderEditorSheet: View {
@@ -137,13 +175,14 @@ struct ShaderEditorSheet: View {
 
                     ForEach(uniforms) { uniform in
                         HStack(spacing: 8) {
-                            Text("\(uniform.format.glslTypeName)  \(uniform.name);")
-                                .font(.system(.caption, design: .monospaced))
-                            if !uniform.animatable {
-                                Text("static")
-                                    .font(.caption2)
+                            HStack(spacing: 0) {
+                                Text("\(uniform.format.glslTypeName)  \(uniform.name);  ")
+                                Text("// \(uniform.inputsComment)")
                                     .foregroundStyle(.secondary)
                             }
+                            .font(.system(.caption, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                             Spacer(minLength: 0)
                             Button("Edit") {
                                 loadDraft(from: uniform)
