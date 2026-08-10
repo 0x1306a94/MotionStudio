@@ -1,7 +1,8 @@
 # PAG Export — 设计说明
 
 日期：2026-07-31  
-状态：§0 依赖已落地；PagExporter 待实现  
+修订：2026-08-10（Bitmap 仅显式 `_bmp`；序列编码对齐 AE；`PagExportError` 结构化详情含图层名/原因）  
+状态：§0 依赖已落地；矢量 `PagExporter` 已有实现；Bitmap 策略按本修订切换（破坏性）  
 范围：库层 only（Core `export/` 编排 + 链接 `pag_codec` 的 `Codec::Encode` + GoogleTest；**无导出 UI / 无 Bridge API**）
 
 参考实现：`third_party/libpag/exporter`（AE → `pag::File` → `Codec::Encode`）。  
@@ -11,7 +12,7 @@
 
 1. 将 MotionStudio `Document` 中指定合成导出为 **二进制 `.pag`**
 2. **尽量全矢量**：能映射到 `pag::*` 的字段一律保留关键帧结构与可编辑性
-3. **无 PAG 对应物 / 映射失败** 时，将最小范围降级为 `BitmapComposition`（整层或 Group 子树）
+3. **Bitmap 仅显式触发**：`Composition.name` 或 `Layer.name` 以 `_bmp` 结尾（大小写不敏感）时才光栅为 `BitmapComposition`；序列编码对齐 AE（diff 矩形 / 关键帧间隔 / maxResolution）。**无 `_bmp` 且不可映射 → 整份 `MappingFailed`**，不自动降级
 4. 编码走 **`pag::Codec::Encode`**（经 MS 侧 `adapter/pag_codec`，源码来自 `third_party/libpag`）
 5. 验收以 **`pag::File::Load` + 结构断言** 为主；不要求首版自动化像素对比
 
@@ -21,7 +22,7 @@
 | --- | --- |
 | 模型 | Shape / Text / Image / Group / Precomp；Transform KF；Mask；TrackMatte；FollowPath；Fill/Stroke styles |
 | 渲染 | `SceneEvaluator` → `BuildCommands` → `PlayCommands`；tgfx Metal 预编译 + adapter |
-| `export/` | 已有视频导出设计（`VideoExporter`）；**尚无 PAG 导出** |
+| `export/` | 已有视频导出与矢量 `PagExporter`；Bitmap 策略按 2026-08-10 修订切换为显式 `_bmp` |
 | Lottie | 架构规划「模型直转」；与 PAG 同属保留关键帧路径，实现可并行 |
 | tgfx | **唯一源码**：`third_party/libpag/third_party/tgfx`；MS 用 `cmake/BuildTgfx.cmake` 预编译 **Metal** `tgfx.a` |
 | libpag / pag_codec | DEPS 拉 `third_party/libpag`；**不** `add_subdirectory(libpag)`；`adapter/pag_codec` 只编 base+codec |
@@ -178,12 +179,13 @@ Document + PagExportOptions
          │
          ▼
 ┌──────────────────┐
-│ PagFileBuilder   │  Document → pag::File 对象图（矢量优先）
+│ PagFileBuilder   │  Document → pag::File（矢量优先；扫描 _bmp）
 └────────┬─────────┘
-         │ 不可映射层 / Group 子树
+         │ 仅当合成名/层名带 _bmp
          ▼
 ┌──────────────────┐     Evaluate → BuildCommands → PlayCommands → RGBA
-│ BitmapFallback   │◄──── 接口在 Core；实现可注入（单测用假源）
+│ BitmapExport     │◄──── 接口在 Core；实现可注入（单测用假源）
+│ (原 BitmapFallback)│    AE 风格 BitmapSequence 编码
 └────────┬─────────┘
          │
          ▼
@@ -193,8 +195,8 @@ Document + PagExportOptions
 | 组件 | 层 | 职责 |
 | --- | --- | --- |
 | `PagExporter` | Core `export/` | 公共入口；options 校验；调用 Builder + Encode；收集 warnings |
-| `PagFileBuilder` | Core `src/export/`（不进公共头） | MS → `pag::*` 映射；触发 Fallback |
-| `BitmapFrameSource` | 接口 Core；生产实现可在 adapter | 为降级层提供逐帧 RGBA |
+| `PagFileBuilder` | Core `src/export/`（不进公共头） | MS → `pag::*` 映射；识别 `_bmp`；不可映射且无后缀则失败 |
+| `BitmapFrameSource` | 接口 Core；生产实现可在 adapter | 为 `_bmp` 合成/层提供逐帧 RGBA |
 | libpag 源码 | `third_party/libpag` | 唯一 tgfx + PAG 编解码源；**不**走上游整库 CMake |
 | `pag_codec` | `adapter/pag_codec` | base+codec + Platform stub；链预编译 Metal tgfx |
 | `PagExporter` 实现 | `pag_export` 静态库 | 映射 + `Codec::Encode`；PRIVATE 链 `pag_codec` |
@@ -203,7 +205,7 @@ Document + PagExportOptions
 
 ```
 export → model + animation
-export → render               （仅 BitmapFallback 路径）
+export → render               （仅 `_bmp` Bitmap 路径）
 pag_export → core + pag_codec （pag::* 不出现在 include/MotionStudio 公共 API）
 tgfx_adapter → 预编译 tgfx.a  （源码 = libpag/.../tgfx；include 同左）
 pag_codec    → 预编译 tgfx.a  （同一份）
@@ -229,8 +231,17 @@ namespace motion {
 struct PagExportOptions {
     std::string outputPath;           // 非空则额外写入文件；空则只返回 bytes
     EntityId compositionId;           // 无效 → Document 主/第一个 Composition
-    bool allowBitmapFallback = true;  // false：遇不可映射则失败，不写残缺文件
-    float bitmapScale = 1.0f;         // >0；作用于降级位图像素尺寸
+
+    // false：禁止任何 Bitmap（含 _bmp）→ MappingFailed
+    // 取代旧名 allowBitmapFallback（实现期可暂留 deprecated 别名）
+    bool allowBitmapExport = true;
+
+    float bitmapScale = 1.0f;         // >0；与 AE compositionFactor 同类
+    int bitmapMaxResolution = 720;    // 短边上限；<=0 表示不限制
+    int bitmapKeyFrameInterval = 60;  // 最大关键帧间距（帧）；对齐 AE
+    int bitmapImageQuality = 80;      // WebP 质量 0–100
+
+    TextAscentResolver textAscentResolver;
 };
 
 struct PagExportWarning {
@@ -244,17 +255,46 @@ struct PagExportResult {
     std::vector<PagExportWarning> warnings;
 };
 
-enum class PagExportError {
+enum class PagExportErrorKind {
     InvalidComposition,
     InvalidOptions,
-    MappingFailed,      // allowBitmapFallback == false 时的不可映射
+    MappingFailed,      // 不可映射且无 _bmp；或禁止 Bitmap 却出现 _bmp；或缺 FrameSource
     EncodeFailed,
     WriteFailed,
     Cancelled,          // 预留；首版可无进度回调
 };
 
+// Export 失败时的结构化错误（取代旧版「仅 enum」）。
+// MappingFailed 必须填齐定位信息，便于 UI / 日志展示。
+struct PagExportError {
+    PagExportErrorKind kind = PagExportErrorKind::MappingFailed;
+    EntityId entityId;            // 相关层/合成；无效表示全局
+    std::string entityName;       // 层或合成的显示名（已知时必填，如 layer.name）
+    std::string code;             // 稳定机器码，与 §4 对齐（如 UnsupportedFollowPath）
+    std::string message;          // 人类可读详情，须含「谁 + 为什么」
+};
+
+// 约定 message 示例：
+//   Layer "Glow": FollowPath is not supported in vector PAG export; add "_bmp" suffix to the layer or composition name, or disable FollowPath.
+//   Composition "FX_bmp": bitmap export requires a BitmapFrameSource.
+//   Layer "Matte": blend mode SoftLight has no PAG mapping; add "_bmp" or change blend mode.
+
 }  // namespace motion
 ```
+
+**`MappingFailed` 详情要求（硬性）**
+
+| 字段 | 要求 |
+| --- | --- |
+| `kind` | `MappingFailed` |
+| `entityId` | 触发失败的层或合成；全局问题时可无效 |
+| `entityName` | 优先填 `Layer.name` / `Composition.name`；空名可用占位如 `(unnamed layer)` |
+| `code` | §4 稳定码（如 `UnsupportedFollowPath`） |
+| `message` | 必须可读：包含实体名 + 不支持原因 + 可行修复提示（加 `_bmp` / 关掉特性 / 改 blend 等） |
+
+其他 `kind`（`InvalidOptions` 等）也建议填 `message`；`entityName` 可空。
+
+比较错误时：测试用 `error().kind` / `error().code`；**不要**只依赖裸 enum（旧 `PagExportError::MappingFailed` 升级为 `PagExportErrorKind`）。
 
 ### 2.2 BitmapFrameSource
 
@@ -263,12 +303,17 @@ class BitmapFrameSource {
 public:
     virtual ~BitmapFrameSource() = default;
 
-    // 为「降级单元」准备渲染上下文（层或其子树在宿主合成时间轴上的可见区间）
+    // 层名 _bmp：层或其子树在宿主合成时间轴上的可见区间
     virtual Expected<void, std::string> prepare(
         const Document& document, EntityId hostCompositionId,
         EntityId rootLayerId, TimeRange visibleRange, float bitmapScale) = 0;
 
-    // time：宿主合成时间轴帧号；返回未预乘或预乘均可，须在文档中固定一种（推荐预乘 RGBA8）
+    // 合成名 _bmp（或 Precomp 层名强制的引用合成）：整合成离屏
+    virtual Expected<void, std::string> prepareComposition(
+        const Document& document, EntityId compositionId,
+        TimeRange visibleRange, float bitmapScale) = 0;
+
+    // time：对应 prepare 所用时间轴帧号；推荐预乘 RGBA8
     virtual Expected<BitmapFrame, std::string> renderFrame(FrameTime time) = 0;
 
     virtual void finish() = 0;
@@ -283,7 +328,7 @@ struct BitmapFrame {
 };
 ```
 
-首版单测可注入纯色/固定图案源；生产实现（后置）复用离屏 tgfx 路径，**不**纳入本里程碑交付。
+单测注入 Fake 源；生产离屏 tgfx 实现**后置**，但本修订锁定接口（含 `prepareComposition`）。
 
 ### 2.3 PagExporter
 
@@ -291,7 +336,7 @@ struct BitmapFrame {
 class PagExporter {
 public:
     // 调用期间 Document 必须不可变。
-    // frameSource：allowBitmapFallback 且确实触发降级时必需；未触发可为 nullptr。
+    // frameSource：出现任何 _bmp 且 allowBitmapExport 时必需；未触发可为 nullptr。
     static Expected<PagExportResult, PagExportError> Export(
         const Document& document, const PagExportOptions& options,
         BitmapFrameSource* frameSource = nullptr);
@@ -302,14 +347,18 @@ public:
 
 ```
 resolved = resolveComposition(document, options)
-validate(options)  // bitmapScale > 0 等
+validate(options)  // bitmapScale > 0 等；失败 → PagExportError{InvalidOptions, …, message}
 builder = PagFileBuilder(document, resolved, options, frameSource)
-file = builder.build()            // 内部收集 warnings；必要时 Fallback
-if builder.failed: return MappingFailed / …
+file = builder.build()
+// 不可映射且无 _bmp →
+//   return Unexpected(PagExportError{
+//     MappingFailed, layer.id, layer.name, "UnsupportedFollowPath",
+//     "Layer \"…\": FollowPath is not supported; add \"_bmp\" …"})
+if builder.failed: return structured PagExportError
 bytes = Codec::Encode(file)
-if bytes == null: return EncodeFailed
+if bytes == null: return PagExportError{EncodeFailed, …}
 optional write options.outputPath
-optional verify: File::Load(bytes) != null  // debug / 测试默认开；release 可关
+optional verify: File::Load(bytes) != null
 return {bytes, warnings}
 ```
 
@@ -329,8 +378,9 @@ ID：导出时分配稳定 `pag::ID`（可用递增计数器）；**不要求**�
 | `LayerType::Text` | `TextLayer` | `sourceText`；尽量进入 `editableTexts` |
 | `LayerType::Image` | `ImageLayer` + `ImageBytes` | asset 读入；尽量 `editableImages` |
 | `LayerType::Group` | `NullLayer` | 见 §3.5 |
-| `LayerType::Precomp` | `PreComposeLayer` | 引用已导出的子 `Composition`；时间映射见下 |
-| （降级产物） | `BitmapComposition` + `PreComposeLayer` | 见 §3.6 |
+| `LayerType::Precomp` | `PreComposeLayer` | 引用已导出的子 `Composition`（矢量或 Bitmap）；时间映射见下 |
+| 名带 `_bmp` 的合成 / 被强制的子合成 | `BitmapComposition` | 见 §3.6 |
+| 非 Precomp 层名带 `_bmp` | `BitmapComposition` + `PreComposeLayer` | 见 §3.6 |
 
 Precomp 时间（与现有求值一致）：
 
@@ -348,11 +398,11 @@ innerTime = (outer - inPoint) × timeStretch + startTime
 | `inPoint` / `outPoint` | `startTime` + `duration`（注意 exclusive/inclusive 边界，与 AE exporter 一致化） |
 | `visible` | `isActive`（**例外**：被用作 Track Matte 源的层必须 `isActive = false`，见 §5.1） |
 | `transform`（anchor/position/scale/rotation/opacity + KF） | `Transform2D` + `Property` / `AnimatableProperty` |
-| `blendMode` | `BlendMode` 同名子集；无对应则 warning + 近似为 Normal **或** 触发该层 Fallback（优先：无对应则 Fallback，保视觉） |
+| `blendMode` | `BlendMode` 同名子集；无对应且层/合成名**无** `_bmp` → **整份 `MappingFailed`**；有 `_bmp` 则走 Bitmap（§3.6） |
 | `masks[]` | `MaskData`：path / mode / opacity / inverted / feather / expansion |
 | `trackMatteType` + `trackMatteLayerId` | `trackMatteType` + `trackMatteLayer`（源层须紧邻目标之上且 `isActive=false`，见 §5.1） |
 | `styles`（Fill/Stroke） | Shape → shape contents；**Text → `TextDocument` 的 fill/stroke 字段**（非 ShapeElement） |
-| `followPath.enabled == true` | 优先 BitmapFallback；不可用则**跳过该层** + warning（整份导出不因单层 `MappingFailed` 中断，见 §5.1） |
+| `followPath.enabled == true` | 层名或所属强制路径带 `_bmp` → Bitmap（§3.6）；**否则整份 `MappingFailed`**（可附 warning 提示加后缀） |
 | `locked` | 忽略（PAG 无编辑锁） |
 
 **缓动**：MS 贝塞尔缓动 → PAG keyframe bezier；空间贝塞尔（position path）若 PAG 支持则映射，否则采样为多关键帧并 warning（code: `SpatialEasingApproximated`）。
@@ -392,7 +442,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 **合成背景 / 圆角**：始终在图层栈最底插入 `CompositionBackground` Shape（铺 `backgroundColor`）——多数 PAG 预览只画图层、不铺 `Composition.backgroundColor` 字段。`cornerRadius > 0` 时 backdrop 用圆角矩形，并外包一层带圆角 Mask 的 PreCompose 做整体裁剪。
 
-默认可替换：导出后若未标记不可替换，依赖 `Codec::Encode` 默认把全部 text/image 标为 editable（与 libpag codec 行为一致）；若某层 Fallback 掉则自然不在 editable 列表。
+默认可替换：导出后若未标记不可替换，依赖 `Codec::Encode` 默认把全部 text/image 标为 editable（与 libpag codec 行为一致）；若某层被光栅为 Bitmap 则自然不在 editable 列表。
 
 ### 3.5 Group → NullLayer
 
@@ -400,29 +450,72 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 - `LayerType::Group` → `pag::NullLayer`，保留 Transform / timing / masks / trackMatte
 - 子层 `parent` 指向该 NullLayer
 - 图层顺序见 §5.1（MS 底→顶构建，再反转为 PAG File 顶→底；背景层在数组末尾）
-- Group **自身**带 FollowPath 或不可映射 blend 等 → **整棵子树** 一并 Fallback（§3.6）
+- Group **自身**名带 `_bmp`，或自身不可映射但名带 `_bmp` → **整棵子树** 一并光栅（§3.6）
+- Group 不可映射且名**无** `_bmp` → **整份 `MappingFailed`**
 
-### 3.6 BitmapFallback（整层 / 最小子树）
+### 3.6 Bitmap 导出（显式 `_bmp`）
 
-**触发条件（非穷尽，实现用统一 `needsFallback(layer)`）**
+对齐 AE：`CompositionBmpSuffix = "_bmp"`（`ToLowerCase` 后 `IsEndWithSuffix`）。  
+**禁止**对 FollowPath 等做自动光栅；`needsBitmapFallback(layer)` 仅用于「无后缀 → `MappingFailed`」。
 
-- `followPath.enabled`
-- BlendMode 无 PAG 对应且选择「保视觉」策略
-- Shape/Text/Image 映射中不可恢复的错误（缺 asset、空 geometry 等可先失败或跳过；严重视觉偏离走 Fallback）
-- Group 自身触发时：子树整体降级
+#### 3.6.1 触发规则
 
-**单元形态**
+| 条件 | 行为 |
+| --- | --- |
+| `Composition.name` 以 `_bmp` 结尾 | 该合成导出为 `pag::BitmapComposition`（不导出矢量 layers） |
+| `Layer.name` 以 `_bmp` 结尾且为 **Precomp** | **强制**引用合成按 Bitmap 导出（即使合成名无后缀）；宿主侧 `PreComposeLayer` 保留该层 Transform / timing / mask / trackMatte |
+| `Layer.name` 以 `_bmp` 结尾且为 **非 Precomp** | 将该层（Group 则整棵子树）光栅为独立 `BitmapComposition`，用 `PreComposeLayer` 替换；**推荐单位 transform**，仅保留 timing |
+| 不可映射（如 `followPath.enabled`、无 PAG Blend、严重映射失败）且相关名**无** `_bmp` | **整份 `MappingFailed`**（结构化：`entityName` + `code` + 含修复提示的 `message`），不写文件 |
+| `allowBitmapExport == false` 且出现任何 `_bmp` | `MappingFailed`（`message` 说明禁止 Bitmap 导出） |
+| 出现 `_bmp` 且 `frameSource == nullptr` | `MappingFailed` 或 `InvalidOptions`（`message` 说明缺 FrameSource） |
 
-1. 离屏渲染该层（或子树）在宿主时间轴 `[in, out)` 的每一帧（乘 `bitmapScale`）
-2. 填入 `pag::BitmapComposition`（`BitmapSequence` / 帧列表，对齐 libpag 现有结构）
-3. 用 `PreComposeLayer` 替换原层（或 Group 根）：
-   - **推荐**：烘焙结果已是「世界外观」→ PreComposeLayer 使用 **单位 transform**，仅保留原层 timing（in/out/startTime）；避免双重变换
-   - 子树降级时：只保留一个 PreComposeLayer，原子层不再单独导出
-4. 追加 `PagExportWarning`（如 `UnsupportedFollowPath`）
+主合成自身名带 `_bmp`：整文件主合成为 Bitmap——合法。
 
-**`allowBitmapFallback == false`**：不调用 FrameSource；该层按 soft-fail 跳过（§5.1），不整份中断。
+#### 3.6.2 光栅尺寸（对齐 AE `GetBitmapSequence` + rescale）
 
-**首版不交付**生产 `BitmapFrameSource` 实现；测试用 Fake 源验证「警告 + Bitmap 子合成挂接 + Encode/Load」。
+对每个 Bitmap 合成：
+
+1. `factor = bitmapScale`
+2. 若被主合成 Precomp 引用：再结合该层链路 **max scale**（对齐 `GetBitmapCompositionMaxScale`），导出侧 `factor = min(factor, 1.0)`（不放大超原尺寸）
+3. 若 `bitmapMaxResolution > 0` 且短边 `min(w,h)*factor` 超限 → 等比缩小
+4. `factor > 0.99` → 钳为 `1.0`
+5. 序列宽高 = `ceil(compW * factor)` / `ceil(compH * factor)`
+
+非 Precomp 层名 `_bmp`：画布为**宿主合成**宽高 × 上述 factor；内容按该层（子树）在宿主时间轴渲染。
+
+#### 3.6.3 序列编码（对齐 AE `BitmapSequence.cpp`）
+
+对可见区间每一帧（合成：`[0, duration)`；层：`[in, out)`）：
+
+1. `BitmapFrameSource::renderFrame` → RGBA8（推荐预乘）
+2. 与上一帧算 `diffRect`
+3. **关键帧**（同 AE `IsKeyFrame`）：首帧必关键帧；`diffSize==0` 非关键帧；全变 / 大面积变且距上次关键帧足够远 / 超过 `bitmapKeyFrameInterval` → 关键帧
+4. 关键帧可裁透明边；增量帧扩 encode 区（`ExpandRectRange`）
+5. 仅 encode 矩形为 WebP（`bitmapImageQuality`）→ `BitmapRect{x,y,fileBytes}`
+6. 空 diff：仍 push `BitmapFrame`，`bitmaps` 可空
+
+实现文件可仍叫 `PagBitmapFallback.*`，语义以本节为准。
+
+#### 3.6.4 构建伪代码
+
+```
+for each composition in dependency order:
+  if name has _bmp OR forcedByPrecompLayerName:
+    if !allowBitmapExport || frameSource == null: return MappingFailed
+    build BitmapComposition via sequence encoder (prepareComposition)
+  else:
+    build VectorComposition
+    for each layer:
+      if needsBitmapFallback(layer) && not covered by ancestor bitmap:
+        return MappingFailed
+      if layer.name has _bmp && !Precomp:
+        replace with PreCompose → BitmapComposition (prepare layer)
+      if Precomp: wire to already-built child (vector or bitmap)
+
+Encode(file)
+```
+
+**本里程碑不交付**生产 `BitmapFrameSource`；测试用 Fake 验证 `_bmp` 挂接 + diff/关键帧结构 + Encode/Load。
 
 ---
 
@@ -430,8 +523,8 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 | code | 含义 |
 | --- | --- |
-| `UnsupportedFollowPath` | FollowPath 层已跳过或 Bitmap 降级 |
-| `UnsupportedBlendMode` | 混合模式无映射，已降级或近似 |
+| `UnsupportedFollowPath` | FollowPath 且未加 `_bmp` 时的失败附注（错误仍为 `MappingFailed`） |
+| `UnsupportedBlendMode` | 混合模式无映射；无 `_bmp` 时附于 `MappingFailed` |
 | `StrokePositionBaked` | Inside/Outside 已导出为平行 outline ShapeLayer |
 | `StrokePositionBakeFailed` | 轮廓烘焙失败，该描边省略 |
 | `StrokeTrimSeparated` | 带 Trim 的 Center Stroke 已拆到平行层，避免裁切 Fill |
@@ -439,13 +532,14 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | `TextFeatureApproximated` | 文本特性部分丢失但仍矢量 |
 | `TextStyleApproximated` | 多 Fill/Stroke 折叠为 TextDocument 单组 |
 | `TextPathUnresolved` | Text Path 引用无效/无几何，已退回普通点文本 |
-| `ImageAssetMissing` | 图片资源缺失，层已跳过 |
+| `ImageAssetMissing` | 图片资源缺失（策略见开放问题；默认可致 `MappingFailed`） |
 | `ImageSizeAnimationBakedAsStatic` | 容器尺寸关键帧按 inPoint 静帧烘焙 |
-| `BitmapFallback` | 通用降级（可带更具体 code 同时存在） |
-| `BitmapFallbackUnavailable` | 允许降级但无 FrameSource，层已跳过 |
-| `GroupSubtreeRasterized` | Group 子树整体光栅化 |
+| `BitmapForcedByCompositionName` | 合成名 `_bmp` → BitmapComposition |
+| `BitmapForcedByLayerName` | 层名 `_bmp` → 层光栅或强制引用合成 Bitmap |
+| `GroupSubtreeRasterized` | Group 子树因层名 `_bmp` 整体光栅化 |
 | `CompositionCornerRadiusApproximated` | 圆角用 backdrop + clip Precomp 近似 |
-| `LayerSkipped` / `SkippedParent` / `SkippedTrackMatte` | 软失败跳层或断链 |
+| `LayerSkipped` / `SkippedParent` / `SkippedTrackMatte` | 软失败跳层或断链（仅限**可恢复**的映射问题，不含 FollowPath 等硬失败） |
+| ~~`BitmapFallback`~~ / ~~`BitmapFallbackUnavailable`~~ | **废弃**：改为显式 `_bmp` + `allowBitmapExport` / 缺 FrameSource → `MappingFailed` |
 
 ---
 
@@ -455,16 +549,20 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | --- | --- |
 | `PAGExport::exportAsFile` | `PagExporter::Export` |
 | `ExportVectorComposition` + `ExportLayers` | `PagFileBuilder` |
-| `ExportBitmapComposition` / sequence | `BitmapFallback` + `BitmapFrameSource` |
-| `ExportVerify` / AlertInfo | `PagExportWarning` |
+| `ExportBitmapComposition` / `GetBitmapSequence` | `PagBitmapFallback`（序列编码）+ `BitmapFrameSource` |
+| `GetCompositionType` + `_bmp` 后缀 | `hasBmpSuffix(name)`；合成名 **与** 层名均支持（MS 比 AE 宽：非 Precomp 层名也可强制） |
+| Precomp 层名 `_bmp` 强制子合成 Bitmap | 对齐 AE「预合成 + 后缀」；MS：层名即可强制引用合成 |
+| `ExportVerify` / AlertInfo | `PagExportWarning` / `MappingFailed` |
 | `Codec::Encode` + `ValidatePAGFile` | 同；测试强制 `File::Load` |
-| Marker / 音频 / Video / BMP 后缀合成名 | **不做** |
+| Marker / 音频 / `VideoComposition` | **不做** |
 | Qt UI / 批量面板 | **不做** |
 
 可读参考（勿直接依赖 exporter 目标）：
 
-- `exporter/src/export/PAGExport.cpp`
-- `exporter/src/export/ExportComposition.cpp`
+- `exporter/src/export/PAGExport.cpp`（`exportRescaleBitmapCompositions`）
+- `exporter/src/export/ExportComposition.cpp`（`GetCompositionType`）
+- `exporter/src/export/sequence/BitmapSequence.cpp`（diff / 关键帧 / WebP）
+- `exporter/src/utils/StringHelper.cpp`（`CompositionBmpSuffix`）
 - `exporter/src/export/ExportLayer.cpp`
 - `exporter/src/export/data/Transform2D.*`、`Shape.*`、`Mask.*`
 - `src/codec/Codec.cpp`（`Encode` / `InstallReferences`）
@@ -504,9 +602,10 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 7. **Color alpha → Fill/Stroke opacity**  
    - PAG `Color` 只有 RGB；MS `#RRGGBBAA` 的 A 必须写到 `FillElement`/`StrokeElement` 的 `opacity`（`ConvertColorAlpha`）。漏映射会变成不透明实色。
 
-8. **单层 MappingFailed = soft-fail**  
-   - 跳过该层 + warning，继续导出；父层/matte 源被跳过则清链接 + warning。  
-   - 硬失败仍限：InvalidComposition / InvalidOptions / EncodeFailed / WriteFailed。
+8. **不可映射且无 `_bmp` = 硬失败**  
+   - FollowPath / 无 PAG Blend 等：整份 `MappingFailed`，不写残缺文件。  
+   - 仍可 soft-fail 的仅限**可恢复**问题（如某可选描边烘焙失败省略）——见 §4。  
+   - 其他硬失败：InvalidComposition / InvalidOptions / EncodeFailed / WriteFailed / 禁止 Bitmap 却出现 `_bmp`。
 
 ---
 
@@ -528,8 +627,15 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | Group 父子 | NullLayer + child.parent；PAG 顶→底序 |
 | 空合成 / 任意合成 | 含 `CompositionBackground`；`backgroundColor` 字段与色块一致 |
 | 圆角合成 | 外包 Precomp + mask；inner 末层为圆角 backdrop |
-| FollowPath + Fake BitmapFrameSource | warning；存在 BitmapComposition；Load 成功 |
-| FollowPath 且无 fallback | **整份仍成功**；问题层跳过 + warning |
+| 普通矢量合成，无 `_bmp` | Load 成功；无 `BitmapComposition` |
+| FollowPath 层，名无 `_bmp` | **`MappingFailed`**；`entityName`=层名；`code=UnsupportedFollowPath`；`message` 含原因与加 `_bmp` 提示 |
+| FollowPath 层，名 `xxx_bmp` + Fake FrameSource | 成功；存在 BitmapComposition；`BitmapForcedByLayerName` |
+| 合成名 `Comp_bmp` | 该合成 type=Bitmap；序列帧数=duration |
+| Precomp 层名 `_bmp`、子合成名无 | 子合成被强制 Bitmap |
+| `allowBitmapExport=false` + 任意 `_bmp` | `MappingFailed` |
+| Fake 源两帧相同 | 第二帧非关键帧或空 `bitmaps`（AE 规则） |
+| Fake 源大面积变化 | 触发关键帧；`isKeyframe==true` |
+| `bitmapMaxResolution` 约束 | 序列短边 ≤ 上限（在 scale 之后） |
 | Encode round-trip | `Encode` → `Load` → 再 `Encode` 长度/根合成类型稳定（允许非 byte-identical） |
 
 全部在 ASan 构建下跑；不引入 AE SDK。
@@ -559,15 +665,16 @@ CMake：独立 `pag_export` 私有链接 `pag_codec`；测试链 gtest；Xcode �
 1. CMake 上 `pag_export` + 最小 `Codec::Encode` 冒烟（链 `pag_codec`）
 2. Composition + Null/Shape + Transform KF
 3. Text / Image / Mask / TrackMatte / Precomp
-4. BitmapFallback 挂接 + FollowPath 触发
+4. **Bitmap 显式 `_bmp`**：去掉自动 Fallback；`prepareComposition`；AE 风格序列编码；迁移破坏性测试
 5. Warning 表与单测补全
 
-App UI / Bridge 另开 spec（类似 `mp4-video-export-ui`）。
+App UI / Bridge 另开 spec（类似 `mp4-video-export-ui`）；UI 可提示用户对不支持效果加 `_bmp`。
 
 ---
 
 ## 开放问题（实现期可定，不阻塞本 spec）
 
 1. ~~`StrokePosition::Inside/Outside`~~——**已定**：优先保证预览可见 → 平行 outline ShapeLayer（不用 LayerStyle tag 92）；带 Trim 时按 Center
-2. 缺图 asset：失败 vs 彩色占位——默认 **MappingFailed（该层）**；若 `allowBitmapFallback` 可改为占位 Bitmap
+2. 缺图 asset：失败 vs 彩色占位——默认 **整份或该层策略导致 `MappingFailed`**；**不**再因缺图自动 Bitmap（除非层/合成名已带 `_bmp`）
 3. ~~libpag CMake 整库 vs 裁剪~~——**已定**：MS `pag_codec`（base+codec），见 §0
+4. ~~自动 Bitmap vs `_bmp`~~——**已定（2026-08-10）**：仅显式 `_bmp`；无后缀不可映射 → `MappingFailed`
