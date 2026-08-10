@@ -10,6 +10,7 @@
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
@@ -62,6 +63,9 @@ MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *p
             return MS_VALUE_BEZIER_PATH;
         case AnimatableType::String:
             return MS_VALUE_STRING;
+        case AnimatableType::Vec4:
+            // Exposed as MS_VALUE_VEC4 when Task 5 adds the ABI constant.
+            return MS_VALUE_INVALID;
     }
     return MS_VALUE_INVALID;
 }
@@ -93,6 +97,9 @@ bool ms_property_is_animated(MSDocument *document, uint64_t entityId, const char
         }
         case AnimatableType::String: {
             return static_cast<const Animatable<std::string> *>(property)->isAnimated();
+        }
+        case AnimatableType::Vec4: {
+            return static_cast<const Animatable<motion::Vec4> *>(property)->isAnimated();
         }
     }
     return false;
@@ -216,6 +223,10 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
         }
         case AnimatableType::String: {
             return static_cast<int>(static_cast<const Animatable<std::string> *>(property)->keyframes().size());
+        }
+        case AnimatableType::Vec4: {
+            return static_cast<int>(
+                static_cast<const Animatable<motion::Vec4> *>(property)->keyframes().size());
         }
     }
     return 0;

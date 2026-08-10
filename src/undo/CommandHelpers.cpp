@@ -80,6 +80,10 @@ bool ApplyStaticValueAny(AnimatableBase *target, const PropertyValue &newValue,
             return ApplyStaticValue(static_cast<Animatable<std::string> *>(target),
                                     newValue, oldValue);
         }
+        case AnimatableType::Vec4: {
+            return ApplyStaticValue(static_cast<Animatable<Vec4> *>(target), newValue,
+                                    oldValue);
+        }
     }
     return false;
 }
@@ -106,6 +110,9 @@ std::optional<KeyframeData> TakeKeyframeAny(AnimatableBase *target, FrameTime ti
         }
         case AnimatableType::String: {
             return TakeKeyframeTyped(static_cast<Animatable<std::string> *>(target), time);
+        }
+        case AnimatableType::Vec4: {
+            return TakeKeyframeTyped(static_cast<Animatable<Vec4> *>(target), time);
         }
     }
     return std::nullopt;
@@ -146,6 +153,12 @@ void AddKeyframeAny(AnimatableBase *target, const KeyframeData &keyframe) {
     if (const auto *typed = std::get_if<Keyframe<std::string>>(&keyframe)) {
         if (target->valueType() == AnimatableType::String) {
             static_cast<Animatable<std::string> *>(target)->addKeyframe(*typed);
+        }
+        return;
+    }
+    if (const auto *typed = std::get_if<Keyframe<Vec4>>(&keyframe)) {
+        if (target->valueType() == AnimatableType::Vec4) {
+            static_cast<Animatable<Vec4> *>(target)->addKeyframe(*typed);
         }
     }
 }
@@ -193,6 +206,10 @@ bool ApplyEasingAny(AnimatableBase *target, FrameTime time, const Easing &easing
         case AnimatableType::String: {
             return ApplyEasing(static_cast<Animatable<std::string> *>(target), time,
                                easing, oldEasingOut);
+        }
+        case AnimatableType::Vec4: {
+            return ApplyEasing(static_cast<Animatable<Vec4> *>(target), time, easing,
+                               oldEasingOut);
         }
     }
     return false;

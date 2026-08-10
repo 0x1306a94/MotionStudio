@@ -14,7 +14,8 @@ enum class AnimatableType {
     // Animatable instances that hold compiled contours.
     BezierPath,
     VectorNetwork,
-    String
+    String,
+    Vec4
 };
 
 }  // namespace motion

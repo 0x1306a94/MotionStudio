@@ -5,6 +5,7 @@
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/common/VectorNetwork.h"
 
 namespace motion {
@@ -44,6 +45,14 @@ struct Interpolator<Vec3> {
     // to: end vector.
     // t: blend factor in [0,1].
     static Vec3 Lerp(const Vec3 &from, const Vec3 &to, float t);
+};
+
+template <>
+struct Interpolator<Vec4> {
+    // from: start vector.
+    // to: end vector.
+    // t: blend factor in [0,1].
+    static Vec4 Lerp(const Vec4 &from, const Vec4 &to, float t);
 };
 
 template <>

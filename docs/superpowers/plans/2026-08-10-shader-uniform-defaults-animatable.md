@@ -43,7 +43,7 @@
 
 ### Task 1: Vec4 + Animatable 接线
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/common/Vec4.h`, `src/common/Vec4.cpp`, `tests/common/Vec4Test.cpp`
@@ -54,7 +54,7 @@
 **Interfaces:**
 - Produces: `struct Vec4 { float x,y,z,w; }`；`AnimatableType::Vec4`；`Interpolator<Vec4>::Lerp`；`Animatable<Vec4>` 显式实例化；序列化 `[x,y,z,w]`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/common/Vec4Test.cpp`（对齐 `Vec3Test.cpp`）：
 
@@ -82,7 +82,7 @@ TEST(Vec4Test, InterpolatorLerpMidpoint) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target core_tests
@@ -91,7 +91,7 @@ cmake --build build --target core_tests
 
 预期：FAIL（头文件不存在或未注册）
 
-- [ ] **Step 3: 实现 Vec4 + Interpolator + AnimatableType + 显式实例化**
+- [x] **Step 3: 实现 Vec4 + Interpolator + AnimatableType + 显式实例化**
 
 `Vec4.h` / `Vec4.cpp` 照抄 `Vec3` 四分量。  
 `AnimatableType` 在枚举**末尾**加 `Vec4`（在 `String` 之后）。  
@@ -102,7 +102,7 @@ Serializer：`Vec4ToJson` / `Vec4FromJson`（4 元数组），挂到 `ValueToJso
 
 CommandHelpers：每个 `switch (valueType())` 为 `Vec4` 增加与 `Vec3` 相同的分支；`std::get_if<Keyframe<Vec4>>` 同理。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='Vec4Test.*'
@@ -110,7 +110,7 @@ CommandHelpers：每个 `switch (valueType())` 为 `Vec4` 增加与 `Vec3` 相�
 
 预期：PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add include/MotionStudio/common/Vec4.h src/common/Vec4.cpp tests/common/Vec4Test.cpp \
@@ -124,7 +124,7 @@ git commit -m "Add Vec4 and wire it through Animatable interpolation."
 
 ### Task 2: UniformFormat::Color + KindForFormat 拆分
 
-**Status:** Pending
+**Status:** 进行中
 
 **Files:**
 - Modify: `include/MotionStudio/common/UniformFormat.h`, `src/common/UniformFormat.cpp`

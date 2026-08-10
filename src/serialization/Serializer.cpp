@@ -15,6 +15,7 @@
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
@@ -183,6 +184,33 @@ Expected<Vec3, std::string> Vec3FromJson(const json &node) {
         return Unexpected(z.error());
     }
     return Vec3{*x, *y, *z};
+}
+
+json Vec4ToJson(Vec4 value) {
+    return json::array({value.x, value.y, value.z, value.w});
+}
+
+Expected<Vec4, std::string> Vec4FromJson(const json &node) {
+    if (!node.is_array() || node.size() != 4) {
+        return Unexpected(std::string("Vec4 must be a 4-element array"));
+    }
+    Expected<float, std::string> x = AsFloat(node[0]);
+    if (!x) {
+        return Unexpected(x.error());
+    }
+    Expected<float, std::string> y = AsFloat(node[1]);
+    if (!y) {
+        return Unexpected(y.error());
+    }
+    Expected<float, std::string> z = AsFloat(node[2]);
+    if (!z) {
+        return Unexpected(z.error());
+    }
+    Expected<float, std::string> w = AsFloat(node[3]);
+    if (!w) {
+        return Unexpected(w.error());
+    }
+    return Vec4{*x, *y, *z, *w};
 }
 
 uint8_t ColorChannelToByte(float value) {
@@ -430,6 +458,10 @@ Expected<Vec3, std::string> FromJson<Vec3>(const json &node) {
     return Vec3FromJson(node);
 }
 template <>
+Expected<Vec4, std::string> FromJson<Vec4>(const json &node) {
+    return Vec4FromJson(node);
+}
+template <>
 Expected<Color, std::string> FromJson<Color>(const json &node) {
     return ColorFromJson(node);
 }
@@ -596,6 +628,9 @@ json ValueToJson(const Vec2 &value) {
 }
 json ValueToJson(const Vec3 &value) {
     return Vec3ToJson(value);
+}
+json ValueToJson(const Vec4 &value) {
+    return Vec4ToJson(value);
 }
 json ValueToJson(const Color &value) {
     return ColorToJson(value);

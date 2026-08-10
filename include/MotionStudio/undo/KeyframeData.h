@@ -7,6 +7,7 @@
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/common/VectorNetwork.h"
 
 namespace motion {
@@ -15,6 +16,6 @@ namespace motion {
 // Animatable<T> at execution time based on the active alternative.
 using KeyframeData =
     std::variant<Keyframe<float>, Keyframe<Vec2>, Keyframe<Vec3>, Keyframe<Color>,
-                 Keyframe<VectorNetwork>, Keyframe<std::string>>;
+                 Keyframe<VectorNetwork>, Keyframe<std::string>, Keyframe<Vec4>>;
 
 }  // namespace motion
