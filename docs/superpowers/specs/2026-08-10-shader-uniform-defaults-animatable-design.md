@@ -44,13 +44,13 @@ struct ShaderUniformDecl {
     float defaultFloat = 0.f;
     Vec2 defaultFloat2{0, 0};
     Vec3 defaultFloat3{0, 0, 0};
-    // Float4 默认零向量；Color 默认不透明白（与现 colorValue 默认一致）
-    Color defaultFloat4{0, 0, 0, 0};  // 存 r,g,b,a 通道，语义随 format
-    Color defaultColor{1, 1, 1, 1};
+    Vec4 defaultFloat4{0, 0, 0, 0};   // 四通道数值，非颜色
+    Color defaultColor{1, 1, 1, 1};   // 仅 format == Color
 };
 ```
 
-实现时可把 `defaultFloat4` / `defaultColor` 收成按 format 选用的存储，对外序列化形状如下即可。
+新增 `common/Vec4`（对齐 `Vec2`/`Vec3`：`x,y,z,w`）。  
+`AnimFloat4` 实例值同步用 `Animatable<Vec4>`（`ShaderUniformValue` 增 `float4Value`），与 `AnimColor` / `Color` 分离。
 
 ### `UniformFormat::Color`
 
@@ -173,8 +173,9 @@ Realign(decl, prev):
 
 | 区域 | 文件（示意） |
 |---|---|
+| Vec4 | 新建 `include/MotionStudio/common/Vec4.h` + 实现/测试 |
 | format | `UniformFormat.h/.cpp`、`Dto`、bridge enum、Swift `editableCases` |
-| decl / defaults / realign | `ShaderDefinition.h`、`ShaderUniformValues.*`、`Serializer` |
+| decl / defaults / realign | `ShaderDefinition.h`、`ShaderUniformValues.*`（含 `float4Value`）、`Serializer` |
 | UI | `ShaderEditorSheet.swift`、`StyleShaderPaintControls.swift` |
 | 测试 | `ShaderUniformValuesTest`、序列化 / undo shader 相关 |
 
@@ -183,3 +184,4 @@ Realign(decl, prev):
 ## 修订记录
 
 - 2026-08-10：批准方案 1；关关键帧拍平；默认值仅新增；增加 `Color`；旧 float4 不迁移。
+- 2026-08-10：`defaultFloat4` / `AnimFloat4` 使用 `Vec4`，不用 `Color`。
