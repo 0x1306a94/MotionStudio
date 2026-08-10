@@ -34,11 +34,11 @@ struct ShaderUniformDraft: Identifiable, Equatable {
         case .FLOAT:
             Self.formatNumber(defaultFloat)
         case .FLOAT2:
-            "(\(Self.formatNumber(defaultFloat2.x)), \(Self.formatNumber(defaultFloat2.y)))"
+            "vec2(\(Self.formatNumber(defaultFloat2.x)), \(Self.formatNumber(defaultFloat2.y)))"
         case .FLOAT3:
-            "(\(Self.formatNumber(defaultFloat3.x)), \(Self.formatNumber(defaultFloat3.y)), \(Self.formatNumber(defaultFloat3.z)))"
+            "vec3(\(Self.formatNumber(defaultFloat3.x)), \(Self.formatNumber(defaultFloat3.y)), \(Self.formatNumber(defaultFloat3.z)))"
         case .FLOAT4:
-            "(\(Self.formatNumber(defaultFloat4.x)), \(Self.formatNumber(defaultFloat4.y)), \(Self.formatNumber(defaultFloat4.z)), \(Self.formatNumber(defaultFloat4.w)))"
+            "vec4(\(Self.formatNumber(defaultFloat4.x)), \(Self.formatNumber(defaultFloat4.y)), \(Self.formatNumber(defaultFloat4.z)), \(Self.formatNumber(defaultFloat4.w)))"
         case .COLOR:
             String(format: "#%02X%02X%02X%02X",
                    Int((defaultColor.r * 255).rounded()),
@@ -163,9 +163,8 @@ struct ShaderEditorSheet: View {
                         .foregroundStyle(.secondary)
 
                     ForEach(Self.builtInRows, id: \.name) { row in
-                        Text("\(row.glslType)  \(row.name);  // \(row.comment)")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                        inputsAlignedLine(type: row.glslType, name: row.name, comment: row.comment,
+                                          secondaryDeclaration: true)
                     }
 
                     Text("// User uniforms")
@@ -175,14 +174,9 @@ struct ShaderEditorSheet: View {
 
                     ForEach(uniforms) { uniform in
                         HStack(spacing: 8) {
-                            HStack(spacing: 0) {
-                                Text("\(uniform.format.glslTypeName)  \(uniform.name);  ")
-                                Text("// \(uniform.inputsComment)")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .font(.system(.caption, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                            inputsAlignedLine(type: uniform.format.glslTypeName, name: uniform.name,
+                                              comment: uniform.inputsComment,
+                                              secondaryDeclaration: false)
                             Spacer(minLength: 0)
                             Button("Edit") {
                                 loadDraft(from: uniform)
@@ -217,6 +211,48 @@ struct ShaderEditorSheet: View {
             .padding(8)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
         }
+    }
+
+    /// Type column width (includes trailing gap before the name).
+    private var inputsTypeColumn: Int {
+        let builtIn = Self.builtInRows.map(\.glslType.count).max() ?? 0
+        let user = uniforms.map(\.format.glslTypeName.count).max() ?? 0
+        return max(builtIn, user, 5) + 2
+    }
+
+    /// Name column width including `;` and trailing gap before `//`.
+    private var inputsNameColumn: Int {
+        let builtIn = Self.builtInRows.map { $0.name.count + 1 }.max() ?? 0
+        let user = uniforms.map { $0.name.count + 1 }.max() ?? 0
+        return max(builtIn, user, 8) + 2
+    }
+
+    private func padMonospace(_ text: String, to width: Int) -> String {
+        if text.count >= width {
+            return text + " "
+        }
+        return text + String(repeating: " ", count: width - text.count)
+    }
+
+    @ViewBuilder
+    private func inputsAlignedLine(type: String, name: String, comment: String,
+                                   secondaryDeclaration: Bool) -> some View
+    {
+        let declaration = padMonospace(type, to: inputsTypeColumn)
+            + padMonospace("\(name);", to: inputsNameColumn)
+        HStack(spacing: 0) {
+            if secondaryDeclaration {
+                Text(declaration)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(declaration)
+            }
+            Text("// \(comment)")
+                .foregroundStyle(.secondary)
+        }
+        .font(.system(.caption, design: .monospaced))
+        .lineLimit(1)
+        .truncationMode(.tail)
     }
 
     private var editingUniformBinding: Binding<ShaderUniformDraft?> {
