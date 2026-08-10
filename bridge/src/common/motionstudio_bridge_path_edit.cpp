@@ -194,6 +194,24 @@ void RecenterShapePathUnlocked(MSDocument *document, uint64_t layerId, FrameTime
 
 }  // namespace
 
+bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int64_t frame,
+                                    float localX, float localY, float *sceneX, float *sceneY) {
+    DocumentLock guard(document);
+    if (document == nullptr || document->document == nullptr || sceneX == nullptr ||
+        sceneY == nullptr) {
+        return false;
+    }
+    motion::Mat3 world = motion::Mat3::Identity();
+    if (!LayerWorldTransform(*document->document, EntityId{layerId},
+                             static_cast<FrameTime>(frame), world)) {
+        return false;
+    }
+    const Vec2 scene = world.transformPoint(Vec2{localX, localY});
+    *sceneX = scene.x;
+    *sceneY = scene.y;
+    return true;
+}
+
 void ms_command_path_edit_move_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
                                       int maskIndex, int64_t frame, size_t index, float sceneX,
                                       float sceneY, bool linkedHandles) {

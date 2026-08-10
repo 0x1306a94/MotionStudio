@@ -320,6 +320,12 @@ bool ms_layer_map_composition_delta(MSDocument *document, uint64_t compositionId
 bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
                            float *minX, float *minY, float *maxX, float *maxY);
 
+// Maps a layer-local point to composition scene space using the evaluated
+// layer worldTransform (same source as path-edit ScenePointToLocal).
+// Returns false when the layer is missing or has no evaluated world transform.
+bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int64_t frame,
+                                    float localX, float localY, float *sceneX, float *sceneY);
+
 // Selection chrome geometry in scene space for free-transform hit-testing.
 // corners / edgeMids are TL,TR,BR,BL and top,right,bottom,left respectively.
 // primaryLayerId selects the anchor owner (AE primary). Returns false when

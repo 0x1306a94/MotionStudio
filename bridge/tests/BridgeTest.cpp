@@ -926,6 +926,68 @@ TEST(BridgeVectorNetworkTest, RoundTripAndAddEdgeAfterClose) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeVectorNetworkTest, TransformLocalPointMatchesSceneAddAndMove) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_path_layer(document, compositionId);
+    ASSERT_NE(layerId, 0u);
+
+    // Translate layer so local != scene.
+    ms_command_set_static_vec2(document, layerId, "transform.position", 40.0f, 60.0f);
+
+    uint32_t vertexId = 0;
+    ms_command_network_edit_add_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, 140.0f, 160.0f,
+                                       &vertexId);
+    ASSERT_NE(vertexId, 0u);
+
+    MSVectorNetwork *network = ms_property_evaluate_vector_network(document, layerId, "path", 0);
+    ASSERT_NE(network, nullptr);
+    ASSERT_GE(network->vertexCount, 1u);
+    float localX = 0.0f;
+    float localY = 0.0f;
+    bool found = false;
+    for (size_t i = 0; i < network->vertexCount; ++i) {
+        if (network->vertices[i].id == vertexId) {
+            localX = network->vertices[i].x;
+            localY = network->vertices[i].y;
+            found = true;
+            break;
+        }
+    }
+    ms_vector_network_free(network);
+    ASSERT_TRUE(found);
+
+    float sceneX = 0.0f;
+    float sceneY = 0.0f;
+    ASSERT_TRUE(ms_layer_transform_local_point(document, layerId, 0, localX, localY, &sceneX, &sceneY));
+    EXPECT_NEAR(sceneX, 140.0f, 1e-3f);
+    EXPECT_NEAR(sceneY, 160.0f, 1e-3f);
+
+    // Move via scene API then re-read scene position.
+    ms_command_network_edit_move_vertex(document, layerId, MS_PATH_EDIT_SHAPE, 0, 0, vertexId, 200.0f,
+                                        220.0f);
+    network = ms_property_evaluate_vector_network(document, layerId, "path", 0);
+    ASSERT_NE(network, nullptr);
+    found = false;
+    for (size_t i = 0; i < network->vertexCount; ++i) {
+        if (network->vertices[i].id == vertexId) {
+            localX = network->vertices[i].x;
+            localY = network->vertices[i].y;
+            found = true;
+            break;
+        }
+    }
+    ms_vector_network_free(network);
+    ASSERT_TRUE(found);
+    ASSERT_TRUE(ms_layer_transform_local_point(document, layerId, 0, localX, localY, &sceneX, &sceneY));
+    EXPECT_NEAR(sceneX, 200.0f, 1e-3f);
+    EXPECT_NEAR(sceneY, 220.0f, 1e-3f);
+
+    EXPECT_FALSE(ms_layer_transform_local_point(document, 999999u, 0, 0.0f, 0.0f, &sceneX, &sceneY));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeVectorNetworkTest, SetMirrorModeSharedHubWritesModeWithoutGeometry) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

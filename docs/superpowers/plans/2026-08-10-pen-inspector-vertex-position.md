@@ -35,7 +35,7 @@
 
 ### Task 1: Bridge `ms_layer_transform_local_point` + 测试
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（靠近 `ms_layer_local_bounds` 声明区）
@@ -54,7 +54,7 @@ bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int6
 ```
 - Consumes: existing anonymous `LayerWorldTransform` in `motionstudio_bridge_path_edit.cpp`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 在 `BridgeTest.cpp` 的 `BridgeVectorNetworkTest` 附近追加：
 
@@ -122,7 +122,7 @@ TEST(BridgeVectorNetworkTest, TransformLocalPointMatchesSceneAddAndMove) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cmake --build build --target bridge_test
@@ -133,7 +133,7 @@ Expected: FAIL（符号未定义或链接失败）
 
 > 若 binary 路径不同，用 `find build -name bridge_test` 或 `ctest --test-dir build -R TransformLocalPoint --output-on-failure`。
 
-- [ ] **Step 3: Declare + implement**
+- [x] **Step 3: Declare + implement**
 
 `motionstudio_bridge.h`（`ms_layer_local_bounds` 后）：
 
@@ -168,7 +168,7 @@ bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int6
 
 （若 `DocumentLock` / `document->document` 空指针检查与文件内其它 API 风格不一致，对齐同文件现有写法。）
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 ```bash
 cmake --build build --target bridge_test
@@ -177,7 +177,7 @@ cmake --build build --target bridge_test
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 同步本 plan Task 1 全部 checkbox → `[x]`，`**Status:** ✅ Done`。
 
