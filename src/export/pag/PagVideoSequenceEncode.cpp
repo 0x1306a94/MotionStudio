@@ -56,8 +56,8 @@ int ClampQuality(int imageQuality) {
 int64_t EstimateBitrate(int videoWidth, int videoHeight, float frameRate, int quality) {
     const double fps = frameRate > 1.0f ? static_cast<double>(frameRate) : 30.0;
     // Side-by-side alpha already doubles encode area; keep bpp low so default quality≈80
-    // lands near ~12–15 Mbps for 1280×720@30 packed (was ~3× higher with 0.12).
-    const double bytesPerPixel = 0.04 * (static_cast<double>(quality) / 100.0);
+    // lands near ~8–10 Mbps for 1280×720@30 packed.
+    const double bytesPerPixel = 0.025 * (static_cast<double>(quality) / 100.0);
     const double bps =
         static_cast<double>(videoWidth) * static_cast<double>(videoHeight) * fps * bytesPerPixel * 8.0;
     return std::max<int64_t>(150000, static_cast<int64_t>(bps));
