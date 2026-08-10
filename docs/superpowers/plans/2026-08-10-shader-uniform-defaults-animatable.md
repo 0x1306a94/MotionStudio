@@ -137,7 +137,7 @@ git commit -m "Add Vec4 and wire it through Animatable interpolation."
 **Interfaces:**
 - Produces: `UniformFormat::Color`（枚举末尾）；GLSL `"vec4"`；JSON `"color"`；`KindForFormat(Float4)=AnimFloat4`，`KindForFormat(Color)=AnimColor`
 
-- [ ] **Step 1: 改失败测试**
+- [x] **Step 1: 改失败测试**
 
 把 `MakeDefaultsForFloatAndColor` 改为：
 
@@ -160,7 +160,7 @@ TEST(ShaderUniformValuesTest, Float4MapsToAnimFloat4) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ShaderUniformValuesTest.*'
@@ -168,14 +168,14 @@ TEST(ShaderUniformValuesTest, Float4MapsToAnimFloat4) {
 
 预期：FAIL（无 `Color`，或 Float4 仍映射 AnimColor）
 
-- [ ] **Step 3: 实现 format + KindForFormat**
+- [x] **Step 3: 实现 format + KindForFormat**
 
 `UniformFormat` 末尾追加 `Color`。  
 `UniformFormatGLSLTypeName` / `ByteSize`：与 Float4 相同；非 sampler。  
 Dto：`"color"` ↔ `UniformFormat::Color`。  
 `KindForFormat`：`Float4 → AnimFloat4`，`Color → AnimColor`。
 
-- [ ] **Step 4: 相关测试全部通过**
+- [x] **Step 4: 相关测试全部通过**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ShaderUniformValuesTest.*:ShaderCommandTest.*:PropertyPathTest.*:LayerStylePaintModeTest.*'
@@ -183,7 +183,7 @@ Dto：`"color"` ↔ `UniformFormat::Color`。
 
 预期：PASS（tint 已改为 Color）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "Add UniformFormat Color and map Float4 to AnimFloat4."
@@ -193,7 +193,7 @@ git commit -m "Add UniformFormat Color and map Float4 to AnimFloat4."
 
 ### Task 3: Decl 默认值 + animatable + Realign 拍平
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/model/ShaderDefinition.h`
@@ -206,7 +206,7 @@ git commit -m "Add UniformFormat Color and map Float4 to AnimFloat4."
 - Consumes: Task 1 `Vec4`；Task 2 `Color` / `AnimFloat4`
 - Produces: decl 字段 `animatable` + `defaultFloat*` / `defaultColor`；JSON 可选 `animatable` / `default`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(ShaderUniformValuesTest, DefaultFromDeclOnMake) {
@@ -256,13 +256,13 @@ TEST(ShaderUniformValuesTest, ChangingDefaultDoesNotTouchExisting) {
 
 （按项目 `Animatable` / `Keyframe` 真实 API 微调 `hasKeyframes` / `addKeyframe` 等调用名。）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ShaderUniformValuesTest.Default*:ShaderUniformValuesTest.Realign*:ShaderUniformValuesTest.Changing*'
 ```
 
-- [ ] **Step 3: 实现 decl 字段 + MakeDefault + Realign + JSON**
+- [x] **Step 3: 实现 decl 字段 + MakeDefault + Realign + JSON**
 
 `ShaderUniformDecl` 按 spec 加字段（默认：`animatable=true`；float/vec 为零；`defaultColor={1,1,1,1}`）。
 
@@ -272,9 +272,9 @@ TEST(ShaderUniformValuesTest, ChangingDefaultDoesNotTouchExisting) {
 `ShaderUniformDeclToJson`：写 `name/format/count`；实现上**始终写出** `animatable` 与 `default`（便于 Editor round-trip）；读取时缺省兼容。  
 `FromJson`：缺 `animatable`→true；缺 `default`→类型默认；`default` 按 format 解析（float 数字；float2/3/4 数组；color `#RRGGBBAA`）。
 
-- [ ] **Step 4: 测试通过 + JSON 往返（可加 Serializer 单测）**
+- [x] **Step 4: 测试通过 + JSON 往返（可加 Serializer 单测）**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "Add shader uniform decl defaults and animatable flatten on realign."
@@ -284,7 +284,7 @@ git commit -m "Add shader uniform decl defaults and animatable flatten on realig
 
 ### Task 4: AnimFloat4 端到端（属性路径 + GPU）
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/model/ShaderUniformValues.h`（`Animatable<Vec4> float4Value`）
@@ -298,13 +298,13 @@ git commit -m "Add shader uniform decl defaults and animatable flatten on realig
 **Interfaces:**
 - Produces: 完整 `AnimFloat4` 属性路径与绘制上传
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `PropertyPathTest`（或新建）绑定 Float4 uniform，`setStatic` / evaluate 四分量；或 Serializer round-trip `animFloat4` + `float4Value: {static:[1,2,3,4]}`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
-- [ ] **Step 3: 实现 value 字段 + resolve + evaluate + serialize + adapter**
+- [x] **Step 3: 实现 value 字段 + resolve + evaluate + serialize + adapter**
 
 ```cpp
 // EvaluateUniformValues
@@ -323,9 +323,9 @@ case ShaderUniformValueKind::AnimFloat4: {
 
 Color 仍走 `ToTgfxColor`。
 
-- [ ] **Step 4: 测试通过**
+- [x] **Step 4: 测试通过**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "Wire AnimFloat4 through property path evaluation and GPU upload."
