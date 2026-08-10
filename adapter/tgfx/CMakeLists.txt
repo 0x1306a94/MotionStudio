@@ -155,6 +155,8 @@ target_link_libraries(tgfx_adapter
                       "-framework ImageIO"
                       "-framework CoreGraphics"
                       "-framework CoreText"
+                      "-framework AVFoundation"
+                      "-framework VideoToolbox"
                       iconv)
 
 # Xcode / gen_mac: Mac destination is Catalyst (UIKit). Native mac Cocoa is Ninja-only.
