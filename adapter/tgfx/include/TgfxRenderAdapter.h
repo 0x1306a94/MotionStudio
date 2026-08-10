@@ -31,6 +31,8 @@ class TgfxRenderAdapter : public TgfxCanvasAdapter {
   protected:
     bool acquireTarget(int width, int height) override;
     void presentTarget() override;
+    // Clear to transparent so layer-_bmp frames with alpha=0 background are valid.
+    void drawPreviewBackdrop() override;
 
   private:
     TgfxRenderAdapter();

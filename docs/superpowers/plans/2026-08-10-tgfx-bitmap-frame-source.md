@@ -96,7 +96,7 @@ git commit --only include/MotionStudio/export/PagBmpSuffix.h \
 
 ### Task 2: `TgfxBitmapFrameSource` composition 模式
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `adapter/tgfx/include/TgfxBitmapFrameSource.h`
@@ -133,7 +133,7 @@ adapter->ReadPixels(impl_->pixels);
 return BitmapFrame{ w, h, pixels.data(), rowBytes, true };
 ```
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(TgfxBitmapFrameSourceTest, CompositionRendersNonEmptyPixels) {
@@ -144,21 +144,21 @@ TEST(TgfxBitmapFrameSourceTest, CompositionRendersNonEmptyPixels) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxBitmapFrameSourceTest.*'`  
 Expected: 编译失败或链接失败
 
-- [ ] **Step 3: 实现 composition 路径**
+- [x] **Step 3: 实现 composition 路径**
 
 `prepare` / 层过滤可先 stub：`prepare` 返回 `"not implemented"` 或同样走 composition 但下一 Task 补过滤——**本 Task 必须实现 `prepareComposition` + `finish`；`prepare` 可返回错误字符串 `layer mode not implemented` 仅当测试未覆盖，推荐本 Task 一并搭好 `prepare` 骨架存 ids。**
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Run: `./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxBitmapFrameSourceTest.Composition*'`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/include/TgfxBitmapFrameSource.h \
@@ -172,7 +172,7 @@ git commit --only adapter/tgfx/include/TgfxBitmapFrameSource.h \
 
 ### Task 3: 层模式过滤 + 隔离测试
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxBitmapFrameSource.mm`
@@ -204,7 +204,7 @@ filtered.cornerRadius = 0;
 beginFrame(..., Color{0,0,0,0}, 0);
 ```
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(TgfxBitmapFrameSourceTest, LayerPrepareExcludesSiblingColor) {
@@ -215,19 +215,19 @@ TEST(TgfxBitmapFrameSourceTest, LayerPrepareExcludesSiblingColor) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxBitmapFrameSourceTest.Layer*'`  
 Expected: FAIL（若 prepare 未实现过滤）
 
-- [ ] **Step 3: 实现过滤**
+- [x] **Step 3: 实现过滤**
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Run: `./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxBitmapFrameSourceTest.*'`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/src/TgfxBitmapFrameSource.mm \

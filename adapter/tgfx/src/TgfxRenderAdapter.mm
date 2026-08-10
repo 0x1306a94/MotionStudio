@@ -2,6 +2,7 @@
 
 #import <Metal/Metal.h>
 
+#include <tgfx/core/Canvas.h>
 #include <tgfx/core/ImageInfo.h>
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Backend.h>
@@ -78,6 +79,16 @@ bool TgfxRenderAdapter::acquireTarget(int width, int height) {
 
 void TgfxRenderAdapter::presentTarget() {
     device_->unlock();
+}
+
+void TgfxRenderAdapter::drawPreviewBackdrop() {
+    if (!surface_) {
+        return;
+    }
+    tgfx::Canvas *canvas = surface_->getCanvas();
+    if (canvas != nullptr) {
+        canvas->clear();
+    }
 }
 
 bool TgfxRenderAdapter::ReadPixels(std::vector<uint8_t> &pixels) {
