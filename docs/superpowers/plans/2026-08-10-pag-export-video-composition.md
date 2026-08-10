@@ -148,7 +148,7 @@ git commit --only src/export/pag/PagRgbAlphaPack.h src/export/pag/PagRgbAlphaPac
 
 ### Task 3: `PagAlmostStatic` 抽样
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `src/export/pag/PagAlmostStatic.h`
@@ -163,7 +163,7 @@ bool IsAlmostStaticSequence(BitmapFrameSource *source, FrameTime start, FrameTim
 ```
 - Consumes: 已 `prepare*` 的 FrameSource；函数内 `renderFrame` 抽样，**不** `finish`（调用方继续用）。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(PagAlmostStaticTest, SolidFakeIsStatic) { /* Fake solid, prepareComposition, EXPECT_TRUE */ }
@@ -172,9 +172,9 @@ TEST(PagAlmostStaticTest, TintChangeIsNotStatic) {
 }
 ```
 
-- [ ] **Step 2–4: 实现并跑绿**
+- [x] **Step 2–4: 实现并跑绿**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagAlmostStatic.h src/export/pag/PagAlmostStatic.cpp \
