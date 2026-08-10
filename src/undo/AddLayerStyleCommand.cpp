@@ -22,6 +22,19 @@ void AddLayerStyleCommand::execute(Document &document) {
     if (layer == nullptr) {
         return;
     }
+    // Keep disk order closer to paint order: fills before strokes.
+    if (style_->type() == LayerStyleType::Fill) {
+        size_t insertAt = layer->styles.size();
+        for (size_t i = 0; i < layer->styles.size(); ++i) {
+            if (layer->styles[i]->type() == LayerStyleType::Stroke) {
+                insertAt = i;
+                break;
+            }
+        }
+        layer->styles.insert(layer->styles.begin() + static_cast<ptrdiff_t>(insertAt),
+                             std::move(style_));
+        return;
+    }
     layer->styles.push_back(std::move(style_));
 }
 

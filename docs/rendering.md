@@ -49,7 +49,7 @@ struct EvaluatedLayer {
 };
 
 // 文本层求值只带原始字段；换行 / 缩字在 adapter/textlayout，不进入 Core。
-// Fill/Stroke 按 Layer::styles 顺序收集为 styles（各自带 blend）；缺省黑 Fill。
+// Fill/Stroke 求值为 Fill 块→Stroke 块（同类保序，各自带 blend）；缺省黑 Fill。
 struct TextDrawStyle {
     Color color;
     BlendMode blendMode;

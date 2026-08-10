@@ -9,13 +9,13 @@
 
 namespace motion {
 
-// Appends a new layer style (fill or stroke) to a layer. The command owns
-// the style between undo() and a subsequent redo so the same identity is
-// re-inserted.
+// Adds a fill or stroke to a layer. Fills insert before the first stroke;
+// strokes append. The command owns the style between undo() and a subsequent
+// redo so the same identity is re-inserted.
 class AddLayerStyleCommand : public Command {
   public:
     // layerId: target layer receiving the style.
-    // style: the style to append; the command takes ownership.
+    // style: the style to add; the command takes ownership.
     AddLayerStyleCommand(EntityId layerId, std::unique_ptr<LayerStyle> style);
 
     void execute(Document &document) override;

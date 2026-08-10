@@ -12,6 +12,7 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -204,6 +205,72 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesPositionAndTrim) {
     EXPECT_FLOAT_EQ(strokeItem.stroke.trimStart, 0.25f);
     EXPECT_FLOAT_EQ(strokeItem.stroke.trimEnd, 0.75f);
     EXPECT_FLOAT_EQ(strokeItem.stroke.trimOffset, 90.0f);
+}
+
+TEST(SceneEvaluatorTest, StrokeBeforeFillStillPaintsFillThenStroke) {
+    RectScene scene;
+    // RectScene already has one Fill at styles[0]. Prepend a Stroke so disk
+    // order is [Stroke, Fill] — the pen-then-add-fill case.
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->position = motion::StrokePosition::Inside;
+    stroke->width.setStaticValue(9.0f);
+    stroke->color.setStaticValue(Color{1, 1, 1, 1});
+    scene.layer->styles.insert(scene.layer->styles.begin(), std::move(stroke));
+    ASSERT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Stroke);
+    ASSERT_EQ(scene.layer->styles[1]->type(), motion::LayerStyleType::Fill);
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
+    EXPECT_FALSE(result->layers[0].shapeItems[0].isStroke);
+    EXPECT_TRUE(result->layers[0].shapeItems[1].isStroke);
+    EXPECT_EQ(result->layers[0].shapeItems[1].stroke.position, motion::StrokePosition::Inside);
+}
+
+TEST(SceneEvaluatorTest, InterleavedFillsKeepRelativeOrderBeforeStrokes) {
+    RectScene scene;
+    // Disk: [Fill0, Stroke, Fill1] → paint Fill0, Fill1, Stroke
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->width.setStaticValue(2.0f);
+    scene.layer->styles.push_back(std::move(stroke));
+    auto fill1 = std::make_unique<FillStyle>();
+    fill1->color.setStaticValue(Color{0, 1, 0, 1});
+    scene.layer->styles.push_back(std::move(fill1));
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 3u);
+    EXPECT_FALSE(result->layers[0].shapeItems[0].isStroke);
+    EXPECT_FLOAT_EQ(result->layers[0].shapeItems[0].paint.color.r, 1.0f);  // Fill0 red
+    EXPECT_FALSE(result->layers[0].shapeItems[1].isStroke);
+    EXPECT_FLOAT_EQ(result->layers[0].shapeItems[1].paint.color.g, 1.0f);  // Fill1 green
+    EXPECT_TRUE(result->layers[0].shapeItems[2].isStroke);
+}
+
+TEST(SceneEvaluatorTest, TextStrokeBeforeFillStillPaintsFillThenStroke) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->duration = 100;
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    layer->outPoint = 100;
+    auto *text = static_cast<motion::TextContent *>(layer->content.get());
+    text->text.setStaticValue("Hi");
+
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->width.setStaticValue(2.0f);
+    stroke->color.setStaticValue(Color{1, 1, 1, 1});
+    layer->styles.push_back(std::move(stroke));
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0, 0, 0, 1});
+    layer->styles.push_back(std::move(fill));
+
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, composition->id, 0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_TRUE(result->layers[0].textItem.has_value());
+    const auto &styles = result->layers[0].textItem->styles;
+    ASSERT_EQ(styles.size(), 2u);
+    EXPECT_FALSE(styles[0].isStroke);
+    EXPECT_TRUE(styles[1].isStroke);
 }
 
 TEST(SceneEvaluatorTest, LayerTransformStoredSeparatelyFromPath) {

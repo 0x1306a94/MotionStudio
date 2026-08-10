@@ -160,60 +160,62 @@ bool MakeShaderPaint(const Document &document, EntityId shaderId,
 void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime time, float alpha,
                       const std::vector<ShapeGeometry> &geometries,
                       std::vector<EvaluatedShapeItem> &items) {
+    // Paint order is Fill block then Stroke block (stable within each type),
+    // independent of styles[] interleaving on disk.
+    auto appendFill = [&](const FillStyle &fill) {
+        Paint paint;
+        paint.alpha = alpha;
+        paint.fillRule = fill.fillRule;
+        paint.blendMode = fill.blendMode;
+        if (fill.paintMode == StylePaintMode::Shader) {
+            if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time, paint.shader)) {
+                return;
+            }
+            paint.paintMode = StylePaintMode::Shader;
+        } else {
+            paint.paintMode = StylePaintMode::Color;
+            paint.color = fill.color.evaluatePreview(time);
+        }
+        for (const ShapeGeometry &geometry : geometries) {
+            items.push_back({geometry, paint, false, {}});
+        }
+    };
+    auto appendStroke = [&](const StrokeStyle &stroke) {
+        Paint paint;
+        paint.alpha = alpha;
+        paint.fillRule = FillRule::NonZero;
+        paint.blendMode = stroke.blendMode;
+        if (stroke.paintMode == StylePaintMode::Shader) {
+            if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time,
+                                 paint.shader)) {
+                return;
+            }
+            paint.paintMode = StylePaintMode::Shader;
+        } else {
+            paint.paintMode = StylePaintMode::Color;
+            paint.color = stroke.color.evaluatePreview(time);
+        }
+        const StrokeOptions options{stroke.width.evaluatePreview(time),
+                                    stroke.cap,
+                                    stroke.join,
+                                    stroke.position,
+                                    stroke.trimStart.evaluatePreview(time),
+                                    stroke.trimEnd.evaluatePreview(time),
+                                    stroke.trimOffset.evaluatePreview(time)};
+        for (const ShapeGeometry &geometry : geometries) {
+            // Stroke uses strokePath when present; fill faces stay on
+            // geometry.path for Inside/Outside positioning.
+            items.push_back({geometry, paint, true, options});
+        }
+    };
     for (const auto &style : layer.styles) {
-        switch (style->type()) {
-            case LayerStyleType::Fill: {
-                const auto &fill = static_cast<const FillStyle &>(*style);
-                Paint paint;
-                paint.alpha = alpha;
-                paint.fillRule = fill.fillRule;
-                paint.blendMode = fill.blendMode;
-                if (fill.paintMode == StylePaintMode::Shader) {
-                    if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time,
-                                         paint.shader)) {
-                        break;
-                    }
-                    paint.paintMode = StylePaintMode::Shader;
-                } else {
-                    paint.paintMode = StylePaintMode::Color;
-                    paint.color = fill.color.evaluatePreview(time);
-                }
-                for (const ShapeGeometry &geometry : geometries) {
-                    items.push_back({geometry, paint, false, {}});
-                }
-                break;
-            }
-            case LayerStyleType::Stroke: {
-                const auto &stroke = static_cast<const StrokeStyle &>(*style);
-                Paint paint;
-                paint.alpha = alpha;
-                paint.fillRule = FillRule::NonZero;
-                paint.blendMode = stroke.blendMode;
-                if (stroke.paintMode == StylePaintMode::Shader) {
-                    if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time,
-                                         paint.shader)) {
-                        break;
-                    }
-                    paint.paintMode = StylePaintMode::Shader;
-                } else {
-                    paint.paintMode = StylePaintMode::Color;
-                    paint.color = stroke.color.evaluatePreview(time);
-                }
-                const StrokeOptions options{
-                    stroke.width.evaluatePreview(time),
-                    stroke.cap,
-                    stroke.join,
-                    stroke.position,
-                    stroke.trimStart.evaluatePreview(time),
-                    stroke.trimEnd.evaluatePreview(time),
-                    stroke.trimOffset.evaluatePreview(time)};
-                for (const ShapeGeometry &geometry : geometries) {
-                    // Stroke uses strokePath when present; fill faces stay on
-                    // geometry.path for Inside/Outside positioning.
-                    items.push_back({geometry, paint, true, options});
-                }
-                break;
-            }
+        if (style->type() == LayerStyleType::Fill) {
+            appendFill(static_cast<const FillStyle &>(*style));
+        }
+    }
+    for (const auto &style : layer.styles) {
+        if (style->type() == LayerStyleType::Stroke) {
+            appendStroke(static_cast<const StrokeStyle &>(*style));
         }
     }
 }
@@ -310,33 +312,38 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         textItem.fontFamily = textContent.fontFamily;
         textItem.fontStyle = textContent.fontStyle;
         for (const auto &style : layer.styles) {
-            if (style->type() == LayerStyleType::Fill) {
-                const auto &fill = static_cast<const FillStyle &>(*style);
-                // Text draw path is solid-color only in v1; skip shader paints.
-                if (fill.paintMode == StylePaintMode::Shader) {
-                    continue;
-                }
-                TextDrawStyle paint;
-                paint.color = fill.color.evaluatePreview(time);
-                paint.blendMode = fill.blendMode;
-                paint.isStroke = false;
-                textItem.styles.push_back(paint);
-            } else if (style->type() == LayerStyleType::Stroke) {
-                const auto &stroke = static_cast<const StrokeStyle &>(*style);
-                if (stroke.paintMode == StylePaintMode::Shader) {
-                    continue;
-                }
-                const float width = stroke.width.evaluatePreview(time);
-                if (width <= 0.0f) {
-                    continue;
-                }
-                TextDrawStyle paint;
-                paint.color = stroke.color.evaluatePreview(time);
-                paint.blendMode = stroke.blendMode;
-                paint.isStroke = true;
-                paint.strokeWidth = width;
-                textItem.styles.push_back(paint);
+            if (style->type() != LayerStyleType::Fill) {
+                continue;
             }
+            const auto &fill = static_cast<const FillStyle &>(*style);
+            // Text draw path is solid-color only in v1; skip shader paints.
+            if (fill.paintMode == StylePaintMode::Shader) {
+                continue;
+            }
+            TextDrawStyle paint;
+            paint.color = fill.color.evaluatePreview(time);
+            paint.blendMode = fill.blendMode;
+            paint.isStroke = false;
+            textItem.styles.push_back(paint);
+        }
+        for (const auto &style : layer.styles) {
+            if (style->type() != LayerStyleType::Stroke) {
+                continue;
+            }
+            const auto &stroke = static_cast<const StrokeStyle &>(*style);
+            if (stroke.paintMode == StylePaintMode::Shader) {
+                continue;
+            }
+            const float width = stroke.width.evaluatePreview(time);
+            if (width <= 0.0f) {
+                continue;
+            }
+            TextDrawStyle paint;
+            paint.color = stroke.color.evaluatePreview(time);
+            paint.blendMode = stroke.blendMode;
+            paint.isStroke = true;
+            paint.strokeWidth = width;
+            textItem.styles.push_back(paint);
         }
         if (textItem.styles.empty()) {
             TextDrawStyle paint;

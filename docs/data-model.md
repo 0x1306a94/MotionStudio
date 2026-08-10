@@ -268,7 +268,7 @@ class PrecompContent : public LayerContent {
 
 新建空 Image 层：未绑定 asset、`size` 静态 `200×200`、`anchorPoint = (100,100)`、`position` = 合成中心。Inspector 可「重置为源尺寸」。选中框手柄一律改 `image.size`（可补偿 position/anchor）；`transform.scale` 仅属性面板可改。
 
-新建 Text 层：文案 `"Text"`，默认**点文本**（`boxTextMode = false`），`size = 400×120`（占位，点文本排版忽略），`align = Left`，`fontFamily = "PingFang SC"`，`fontStyle` 空，`anchorPoint` = 当前字形包围盒中心，`position` = 合成中心，并附带黑色 Fill。填充/描边按 `Layer.styles` 顺序全部参与绘制（各自 blend）；Stroke 的 Position / Trim 对文本无效。
+新建 Text 层：文案 `"Text"`，默认**点文本**（`boxTextMode = false`），`size = 400×120`（占位，点文本排版忽略），`align = Left`，`fontFamily = "PingFang SC"`，`fontStyle` 空，`anchorPoint` = 当前字形包围盒中心，`position` = 合成中心，并附带黑色 Fill。绘制合成固定为先全部 Fill、再全部 Stroke（同类内部按 `styles[]` 出现顺序；各自 blend）；`styles[i]` 仍索引磁盘数组。Stroke 的 Position / Trim 对文本无效。
 
 点文本：选中/hit bounds 为字形测量；无角/边 resize 手柄。框文本：bounds = `size`；Inspector/手柄可改 `size`（`anchor' = (ax·w1/w0, ay·h1/h0)`，position 可补偿）。点→框时用当前字形测量写入 `size`。
 

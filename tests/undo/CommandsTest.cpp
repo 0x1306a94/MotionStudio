@@ -533,6 +533,36 @@ TEST(SetLayerBlendModeCommandTest, ExecuteSkipsMissingLayer) {
     EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Normal);
 }
 
+TEST(AddLayerStyleCommandTest, AddFillInsertsBeforeFirstStroke) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<motion::StrokeStyle>());
+    ASSERT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Stroke);
+
+    scene.execute<AddLayerStyleCommand>(scene.layer->id, std::make_unique<FillStyle>());
+    ASSERT_EQ(scene.layer->styles.size(), 2u);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Fill);
+    EXPECT_EQ(scene.layer->styles[1]->type(), motion::LayerStyleType::Stroke);
+    const EntityId fillId = scene.layer->styles[0]->id;
+
+    scene.undo.undo(scene.document);
+    ASSERT_EQ(scene.layer->styles.size(), 1u);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Stroke);
+
+    scene.undo.redo(scene.document);
+    ASSERT_EQ(scene.layer->styles.size(), 2u);
+    EXPECT_EQ(scene.layer->styles[0]->id, fillId);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Fill);
+}
+
+TEST(AddLayerStyleCommandTest, AddFillAppendsWhenNoStroke) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+    scene.execute<AddLayerStyleCommand>(scene.layer->id, std::make_unique<FillStyle>());
+    ASSERT_EQ(scene.layer->styles.size(), 2u);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Fill);
+    EXPECT_EQ(scene.layer->styles[1]->type(), motion::LayerStyleType::Fill);
+}
+
 TEST(AddLayerStyleCommandTest, AddStrokeUndoRedo) {
     Scene scene;
 
