@@ -1,7 +1,7 @@
 # PAG Export VideoComposition — 设计说明
 
 日期：2026-08-10  
-状态：已确认，待实现  
+状态：已实现  
 范围：`_bmp` 导出可选 `VideoComposition`（Apple VideoToolbox + Alpha 侧边条）+ 导出选项 UI；依赖已落地的 [PAG export `_bmp` / Bitmap](./2026-07-31-pag-export-design.md) 与 [TgfxBitmapFrameSource](./2026-08-10-tgfx-bitmap-frame-source-design.md)
 
 相关：AE `GetCompositionType`（支持 VideoSequence 时 `_bmp` 默认 Video）；`pag::VideoComposition` / `VideoSequence`；现有 `PagBitmapFallback` / `EncodeBitmapSequence`

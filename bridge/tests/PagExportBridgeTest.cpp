@@ -1,5 +1,4 @@
 #include <filesystem>
-#include <fstream>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -83,6 +82,50 @@ TEST(PagExportBridgeTest, CompositionBmpExportsWithRealFrameSource) {
     ASSERT_TRUE(std::filesystem::exists(outputPath));
     const auto fileSize = std::filesystem::file_size(outputPath);
     EXPECT_GT(fileSize, 0u);
+
+    std::filesystem::remove(outputPath, removeError);
+    ms_document_destroy(document);
+}
+
+TEST(PagExportBridgeTest, CompositionBmpExportsVideoSequence) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    ASSERT_NE(compositionId, 0u);
+
+    {
+        DocumentLock lock(document);
+        motion::Composition *composition = bridge::FindComposition(document, compositionId);
+        ASSERT_NE(composition, nullptr);
+        composition->name = "Main_bmp";
+        composition->width = 64;
+        composition->height = 64;
+        composition->duration = 2;
+    }
+
+    ASSERT_NE(ms_command_add_rect_layer(document, compositionId), 0u);
+
+    const std::filesystem::path outputPath =
+        std::filesystem::temp_directory_path() / "ms_pag_export_video_bridge_test.pag";
+    std::error_code removeError;
+    std::filesystem::remove(outputPath, removeError);
+
+    MSPagExportOptions options{};
+    const std::string pathString = outputPath.string();
+    options.outputPath = pathString.c_str();
+    options.allowBitmapExport = true;
+    options.bitmapScale = 1.0f;
+    options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_VIDEO;
+
+    char *error = nullptr;
+    const bool ok = ms_pag_export(document, compositionId, &options, &error);
+    EXPECT_TRUE(ok) << (error != nullptr ? error : "unknown error");
+    if (error != nullptr) {
+        ms_string_free(error);
+    }
+
+    ASSERT_TRUE(std::filesystem::exists(outputPath));
+    EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 
     std::filesystem::remove(outputPath, removeError);
     ms_document_destroy(document);

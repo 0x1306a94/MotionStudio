@@ -339,17 +339,17 @@ git commit --only src/export/pag/PagVideoFallback.h src/export/pag/PagVideoFallb
 
 ### Task 6: Bridge 集成测 + 文档勾选
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/tests/PagExportBridgeTest.cpp`（`allowBitmapExport=true` + `bmpSequenceType=Video` 导出 `_bmp`，断言文件存在；可选解码查 Video）
 - Modify: `docs/superpowers/specs/2026-08-10-pag-export-video-composition-design.md` 状态 → 已实现
 
-- [ ] **Step 1: Bridge 测试传 `MS_PAG_BMP_SEQUENCE_VIDEO`**
+- [x] **Step 1: Bridge 测试传 `MS_PAG_BMP_SEQUENCE_VIDEO`**
 
-- [ ] **Step 2: 跑 bridge + pag 测**
+- [x] **Step 2: 跑 bridge + pag 测**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit --only bridge/tests/PagExportBridgeTest.cpp \
