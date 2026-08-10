@@ -375,6 +375,29 @@ extension MS_PAINT_MODE: @retroactive CaseIterable, @retroactive Identifiable {
     }
 }
 
+extension MS_PAG_BMP_SEQUENCE_TYPE: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_PAG_BMP_SEQUENCE_TYPE] {
+        [.AUTO, .VIDEO, .BITMAP]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .AUTO:
+            "Auto"
+        case .VIDEO:
+            "Video"
+        case .BITMAP:
+            "Bitmap"
+        default:
+            "Auto"
+        }
+    }
+}
+
 extension MS_PATH_EDIT: @retroactive Equatable, @retroactive Hashable {}
 
 extension MS_PATH_HANDLE: @retroactive Equatable, @retroactive Hashable {}

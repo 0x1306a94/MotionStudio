@@ -18,6 +18,7 @@ TEST(PagExportBridgeTest, NullDocumentFails) {
     options.outputPath = "/tmp/x.pag";
     options.allowBitmapExport = false;
     options.bitmapScale = 1.0f;
+    options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_AUTO;
     EXPECT_FALSE(ms_pag_export(nullptr, 0, &options, &error));
     ASSERT_NE(error, nullptr);
     EXPECT_NE(std::string(error).find("document"), std::string::npos);
@@ -32,6 +33,7 @@ TEST(PagExportBridgeTest, EmptyPathFails) {
     options.outputPath = "";
     options.allowBitmapExport = false;
     options.bitmapScale = 1.0f;
+    options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_AUTO;
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
     EXPECT_FALSE(ms_pag_export(document, compositionId, &options, &error));
     ASSERT_NE(error, nullptr);
@@ -69,6 +71,7 @@ TEST(PagExportBridgeTest, CompositionBmpExportsWithRealFrameSource) {
     options.outputPath = pathString.c_str();
     options.allowBitmapExport = true;
     options.bitmapScale = 1.0f;
+    options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_BITMAP;
 
     char *error = nullptr;
     const bool ok = ms_pag_export(document, compositionId, &options, &error);
@@ -111,6 +114,7 @@ TEST(PagExportBridgeTest, BmpWithoutAllowBitmapExportFails) {
     options.outputPath = pathString.c_str();
     options.allowBitmapExport = false;
     options.bitmapScale = 1.0f;
+    options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_AUTO;
 
     char *error = nullptr;
     EXPECT_FALSE(ms_pag_export(document, compositionId, &options, &error));

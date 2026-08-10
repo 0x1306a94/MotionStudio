@@ -12,6 +12,13 @@ namespace motion {
 using TextAscentResolver = std::function<float(const std::string &fontFamily,
                                                const std::string &fontStyle, float fontSize)>;
 
+// How _bmp units are encoded into PAG sequence compositions.
+enum class PagBmpSequenceType {
+    Auto = 0,
+    Video = 1,
+    Bitmap = 2,
+};
+
 // Options for PagExporter::Export.
 struct PagExportOptions {
     // Non-empty path additionally writes the encoded bytes to disk.
@@ -28,6 +35,8 @@ struct PagExportOptions {
     int bitmapKeyFrameInterval = 60;
     // WebP quality 0–100 for bitmap sequence rectangles.
     int bitmapImageQuality = 80;
+    // Auto prefers Video; almost-static content may use Bitmap. Wired in VideoComposition work.
+    PagBmpSequenceType bmpSequenceType = PagBmpSequenceType::Auto;
     // Optional. Prefer real font metrics so point-text baseline matches MS layout.
     TextAscentResolver textAscentResolver;
 };

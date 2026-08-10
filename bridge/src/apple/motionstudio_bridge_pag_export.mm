@@ -113,6 +113,18 @@ bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExpo
     exportOptions.compositionId = motion::EntityId{compositionId};
     exportOptions.allowBitmapExport = options->allowBitmapExport;
     exportOptions.bitmapScale = options->bitmapScale > 0.0f ? options->bitmapScale : 1.0f;
+    switch (options->bmpSequenceType) {
+        case MS_PAG_BMP_SEQUENCE_VIDEO:
+            exportOptions.bmpSequenceType = motion::PagBmpSequenceType::Video;
+            break;
+        case MS_PAG_BMP_SEQUENCE_BITMAP:
+            exportOptions.bmpSequenceType = motion::PagBmpSequenceType::Bitmap;
+            break;
+        case MS_PAG_BMP_SEQUENCE_AUTO:
+        default:
+            exportOptions.bmpSequenceType = motion::PagBmpSequenceType::Auto;
+            break;
+    }
     // Match MS TextLayout baseline (tgfx FontMetrics.ascent) instead of fontSize*0.8.
     exportOptions.textAscentResolver = [](const std::string &fontFamily,
                                           const std::string &fontStyle, float fontSize) -> float {

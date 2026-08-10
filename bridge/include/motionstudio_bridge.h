@@ -765,10 +765,17 @@ bool ms_video_export(MSDocument *document, uint64_t compositionId,
 
 /* ============================ pag export (Apple platforms) ============================ */
 
+typedef CF_CLOSED_ENUM(int, MS_PAG_BMP_SEQUENCE_TYPE) {
+    MS_PAG_BMP_SEQUENCE_AUTO = 0,
+    MS_PAG_BMP_SEQUENCE_VIDEO = 1,
+    MS_PAG_BMP_SEQUENCE_BITMAP = 2,
+};
+
 typedef struct MSPagExportOptions {
     const char *outputPath;
     bool allowBitmapExport;
     float bitmapScale;  // <=0 → 1.0
+    MS_PAG_BMP_SEQUENCE_TYPE bmpSequenceType;
 } MSPagExportOptions;
 
 // Exports composition to a binary .pag file via PagExporter.

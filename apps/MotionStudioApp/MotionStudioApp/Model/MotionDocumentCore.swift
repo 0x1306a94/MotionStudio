@@ -311,13 +311,15 @@ final class MotionDocumentCore {
 
     nonisolated func exportPAG(compositionID: UInt64,
                                outputPath: String,
-                               allowBitmapExport: Bool) throws
+                               allowBitmapExport: Bool,
+                               bmpSequenceType: MS_PAG_BMP_SEQUENCE_TYPE = .AUTO) throws
     {
         try outputPath.withCString { path in
             var options = MSPagExportOptions()
             options.outputPath = path
             options.allowBitmapExport = allowBitmapExport
             options.bitmapScale = 1.0
+            options.bmpSequenceType = bmpSequenceType
 
             var error: UnsafeMutablePointer<CChar>?
             let ok = ms_pag_export(handle, compositionID, &options, &error)

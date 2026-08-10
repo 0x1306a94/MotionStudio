@@ -79,6 +79,7 @@ extension EditorViewController {
         let core = document.core
         let outputPath = outputURL.path(percentEncoded: false)
         let allowBitmapExport = settings.allowBitmapExport
+        let bmpSequenceType = settings.bmpSequenceType
         updateExportButtonState()
         UIMenuSystem.main.setNeedsRevalidate()
 
@@ -88,7 +89,8 @@ extension EditorViewController {
                 do {
                     try core.exportPAG(compositionID: compositionID,
                                        outputPath: outputPath,
-                                       allowBitmapExport: allowBitmapExport)
+                                       allowBitmapExport: allowBitmapExport,
+                                       bmpSequenceType: bmpSequenceType)
                     await MainActor.run {
                         guard self.pagExportSession?.isDiscarded != true else { return }
                         self.finishPagExportSuccess(outputURL: outputURL, progressVC: progressVC)

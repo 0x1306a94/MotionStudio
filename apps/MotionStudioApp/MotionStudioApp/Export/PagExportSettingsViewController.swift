@@ -2,13 +2,15 @@
 //  PagExportSettingsViewController.swift
 //  MotionStudioApp
 //
-//  Settings sheet for PAG export (vector-first; optional bitmap export flag).
+//  Settings sheet for PAG export (vector-first; optional bitmap / video sequence).
 //
 
+import MotionStudioBridging
 import UIKit
 
 struct PagExportSettings {
     var allowBitmapExport: Bool
+    var bmpSequenceType: MS_PAG_BMP_SEQUENCE_TYPE
 }
 
 @MainActor
@@ -21,6 +23,8 @@ final class PagExportSettingsViewController: UIViewController {
     private let summaryLabel = UILabel()
     private let fallbackLabel = UILabel()
     private let fallbackSwitch = UISwitch()
+    private let sequenceLabel = UILabel()
+    private let sequenceControl = UISegmentedControl(items: ["Auto", "Video", "Bitmap"])
     private let exportButton = UIButton(type: .system)
 
     init(summary: String, durationFrames: Int64) {
@@ -55,11 +59,20 @@ final class PagExportSettingsViewController: UIViewController {
 
         fallbackSwitch.isOn = false
         fallbackSwitch.translatesAutoresizingMaskIntoConstraints = false
+        fallbackSwitch.addTarget(self, action: #selector(fallbackChanged), for: .valueChanged)
 
         let fallbackRow = UIStackView(arrangedSubviews: [fallbackLabel, fallbackSwitch])
         fallbackRow.axis = .horizontal
         fallbackRow.alignment = .center
         fallbackRow.distribution = .equalSpacing
+
+        sequenceLabel.text = "_bmp sequence type"
+        sequenceLabel.font = .preferredFont(forTextStyle: .body)
+        sequenceLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        sequenceControl.selectedSegmentIndex = 0
+        sequenceControl.isEnabled = false
+        sequenceControl.translatesAutoresizingMaskIntoConstraints = false
 
         var exportConfig = UIButton.Configuration.filled()
         exportConfig.title = "Export"
@@ -68,7 +81,9 @@ final class PagExportSettingsViewController: UIViewController {
         exportButton.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
         exportButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = UIStackView(arrangedSubviews: [summaryLabel, fallbackRow, exportButton])
+        let stack = UIStackView(arrangedSubviews: [
+            summaryLabel, fallbackRow, sequenceLabel, sequenceControl, exportButton,
+        ])
         stack.axis = .vertical
         stack.spacing = 20
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -80,6 +95,10 @@ final class PagExportSettingsViewController: UIViewController {
             stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
             exportButton.heightAnchor.constraint(equalToConstant: 44),
         ])
+    }
+
+    @objc private func fallbackChanged() {
+        sequenceControl.isEnabled = fallbackSwitch.isOn
     }
 
     @objc private func cancelTapped() {
@@ -95,6 +114,15 @@ final class PagExportSettingsViewController: UIViewController {
             present(alert, animated: true)
             return
         }
-        onExport?(PagExportSettings(allowBitmapExport: fallbackSwitch.isOn))
+        let sequenceType: MS_PAG_BMP_SEQUENCE_TYPE = switch sequenceControl.selectedSegmentIndex {
+        case 1:
+            .VIDEO
+        case 2:
+            .BITMAP
+        default:
+            .AUTO
+        }
+        onExport?(PagExportSettings(allowBitmapExport: fallbackSwitch.isOn,
+                                    bmpSequenceType: sequenceType))
     }
 }

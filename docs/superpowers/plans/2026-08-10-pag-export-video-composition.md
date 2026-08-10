@@ -41,7 +41,7 @@
 
 ### Task 1: `PagBmpSequenceType` + Bridge 透传（行为暂等同 Bitmap）
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/export/PagExportOptions.h`
@@ -63,19 +63,19 @@ typedef CF_CLOSED_ENUM(int, MS_PAG_BMP_SEQUENCE_TYPE) { ... };
 ```
 - **本 Task 强制**：`PagFileBuilder` 仍只走 Bitmap（忽略 type 或暂时把 Auto/Video 也当 Bitmap），避免半成品 Video 弄红 CI。Video 分流在 Task 5。
 
-- [ ] **Step 1: 加枚举与字段；Bridge/App 透传**
+- [x] **Step 1: 加枚举与字段；Bridge/App 透传**
 
 `PagExportOptions.h` 增加枚举与 `bmpSequenceType`。  
 `motionstudio_bridge.h` 增加 `MS_PAG_BMP_SEQUENCE_TYPE` 与 struct 字段。  
 `ms_pag_export`：`exportOptions.bmpSequenceType = static_cast<PagBmpSequenceType>(options->bmpSequenceType)`（非法 raw → Auto）。  
 App：`PagExportSettings` + 分段控件默认 Auto；仅 `allowBitmapExport` 开启时可交互。
 
-- [ ] **Step 2: 跑现有测**
+- [x] **Step 2: 跑现有测**
 
 Run: `./build/src/export/pag/pag_export_tests --gtest_filter='PagExporterTest.*'`  
 Expected: PASS（仍走 Bitmap）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit --only include/MotionStudio/export/PagExportOptions.h \
