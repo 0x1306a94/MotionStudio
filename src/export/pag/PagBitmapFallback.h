@@ -4,6 +4,7 @@
 
 #include "MotionStudio/common/Expected.h"
 #include "MotionStudio/export/BitmapFrameSource.h"
+#include "MotionStudio/export/PagExportOptions.h"
 #include "MotionStudio/export/PagExporter.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
@@ -25,12 +26,12 @@ class PagBitmapFallback {
     // Layer-name _bmp: host-sized frames on the host timeline [in, out).
     static Expected<BitmapFallbackResult, PagExportError> Build(
         const Document &document, const Composition &hostComposition, const Layer &rootLayer,
-        float bitmapScale, BitmapFrameSource *frameSource, pag::ID compositionId, pag::ID layerId,
-        std::vector<PagExportWarning> *warnings);
+        const PagExportOptions &options, BitmapFrameSource *frameSource, pag::ID compositionId,
+        pag::ID layerId, std::vector<PagExportWarning> *warnings);
 
     // Composition-name _bmp (or Precomp-forced): full composition timeline [0, duration).
     static Expected<pag::BitmapComposition *, PagExportError> BuildComposition(
-        const Document &document, const Composition &composition, float bitmapScale,
+        const Document &document, const Composition &composition, const PagExportOptions &options,
         BitmapFrameSource *frameSource, pag::ID compositionId,
         std::vector<PagExportWarning> *warnings);
 };

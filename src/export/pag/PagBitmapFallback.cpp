@@ -1,14 +1,10 @@
 #include "PagBitmapFallback.h"
 
-#include <cmath>
 #include <string>
-#include <vector>
 
 #include "PagAnimatableConvert.h"
+#include "PagBitmapSequenceEncode.h"
 #include "PagExportErrorUtil.h"
-#include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/Pixmap.h"
 
 namespace motion {
 namespace pag_export {
@@ -36,69 +32,13 @@ void PushWarning(std::vector<PagExportWarning> *warnings, EntityId entityId, con
     warnings->push_back(std::move(warning));
 }
 
-std::unique_ptr<pag::ByteData> EncodeFrameWebP(const BitmapFrame &frame, int quality) {
-    if (frame.rgba == nullptr || frame.width <= 0 || frame.height <= 0 || frame.rowBytes == 0) {
-        return nullptr;
-    }
-    const tgfx::ImageInfo info = tgfx::ImageInfo::Make(
-        frame.width, frame.height, tgfx::ColorType::RGBA_8888,
-        frame.premultiplied ? tgfx::AlphaType::Premultiplied : tgfx::AlphaType::Unpremultiplied,
-        frame.rowBytes);
-    const tgfx::Pixmap pixmap(info, frame.rgba);
-    const int clampedQuality = quality < 0 ? 0 : (quality > 100 ? 100 : quality);
-    std::shared_ptr<tgfx::Data> encoded =
-        tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::WEBP, clampedQuality);
-    if (encoded == nullptr || encoded->size() == 0) {
-        return nullptr;
-    }
-    return pag::ByteData::MakeCopy(encoded->data(), encoded->size());
-}
-
-Expected<void, PagExportError> FillSequenceFrames(BitmapFrameSource *frameSource,
-                                                  pag::BitmapSequence *sequence, FrameTime start,
-                                                  FrameTime end, int width, int height,
-                                                  int imageQuality) {
-    bool encodeFailed = false;
-    for (FrameTime time = start; time < end; ++time) {
-        Expected<BitmapFrame, std::string> rendered = frameSource->renderFrame(time);
-        if (!rendered.hasValue()) {
-            encodeFailed = true;
-            break;
-        }
-        const BitmapFrame &frame = rendered.value();
-        if (frame.width != width || frame.height != height) {
-            encodeFailed = true;
-            break;
-        }
-        std::unique_ptr<pag::ByteData> webp = EncodeFrameWebP(frame, imageQuality);
-        if (webp == nullptr) {
-            encodeFailed = true;
-            break;
-        }
-        auto *pagFrame = new pag::BitmapFrame();
-        pagFrame->isKeyframe = true;
-        auto *rect = new pag::BitmapRect();
-        rect->x = 0;
-        rect->y = 0;
-        rect->fileBytes = webp.release();
-        pagFrame->bitmaps.push_back(rect);
-        sequence->frames.push_back(pagFrame);
-    }
-    frameSource->finish();
-    if (encodeFailed || sequence->frames.empty()) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "PAG bitmap frame encode failed"));
-    }
-    return Expected<void, PagExportError>();
-}
-
 }  // namespace
 
 Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
     const Document &document, const Composition &hostComposition, const Layer &rootLayer,
-    float bitmapScale, BitmapFrameSource *frameSource, pag::ID compositionId, pag::ID layerId,
-    std::vector<PagExportWarning> *warnings) {
-    if (frameSource == nullptr || bitmapScale <= 0.0f) {
+    const PagExportOptions &options, BitmapFrameSource *frameSource, pag::ID compositionId,
+    pag::ID layerId, std::vector<PagExportWarning> *warnings) {
+    if (frameSource == nullptr || options.bitmapScale <= 0.0f) {
         return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
                                              "invalid PAG bitmap export options"));
     }
@@ -110,11 +50,18 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
             "Layer \"" + name + "\": visible range is empty; cannot export as bitmap"));
     }
 
+    const BitmapSize size = ComputeBitmapSize(hostComposition.width, hostComposition.height,
+                                              options.bitmapScale, options.bitmapMaxResolution);
+    if (size.width <= 0 || size.height <= 0) {
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG bitmap export size"));
+    }
+
     TimeRange visibleRange;
     visibleRange.start = rootLayer.inPoint;
     visibleRange.end = rootLayer.outPoint;
     Expected<void, std::string> prepared = frameSource->prepare(
-        document, hostComposition.id, rootLayer.id, visibleRange, bitmapScale);
+        document, hostComposition.id, rootLayer.id, visibleRange, size.factor);
     if (!prepared.hasValue()) {
         const std::string name = rootLayer.name.empty() ? "(unnamed layer)" : rootLayer.name;
         return Unexpected(MakePagExportError(
@@ -122,34 +69,24 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
             "Layer \"" + name + "\": bitmap FrameSource prepare failed: " + prepared.error()));
     }
 
-    const int width =
-        static_cast<int>(std::lround(static_cast<double>(hostComposition.width) * bitmapScale));
-    const int height =
-        static_cast<int>(std::lround(static_cast<double>(hostComposition.height) * bitmapScale));
-    if (width <= 0 || height <= 0) {
-        frameSource->finish();
-        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
-                                             "invalid PAG bitmap export size"));
-    }
-
     auto *bitmapComposition = new pag::BitmapComposition();
     bitmapComposition->id = compositionId;
-    bitmapComposition->width = width;
-    bitmapComposition->height = height;
+    bitmapComposition->width = size.width;
+    bitmapComposition->height = size.height;
     bitmapComposition->duration = duration;
     bitmapComposition->frameRate = static_cast<float>(hostComposition.frameRate.num) /
         static_cast<float>(hostComposition.frameRate.den);
 
     auto *sequence = new pag::BitmapSequence();
     sequence->composition = bitmapComposition;
-    sequence->width = width;
-    sequence->height = height;
+    sequence->width = size.width;
+    sequence->height = size.height;
     sequence->frameRate = bitmapComposition->frameRate;
     bitmapComposition->sequences.push_back(sequence);
 
-    Expected<void, PagExportError> filled =
-        FillSequenceFrames(frameSource, sequence, rootLayer.inPoint, rootLayer.outPoint, width,
-                           height, 80);
+    Expected<void, PagExportError> filled = EncodeBitmapSequence(
+        frameSource, sequence, rootLayer.inPoint, rootLayer.outPoint, size.width, size.height,
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality);
     if (!filled.hasValue()) {
         delete bitmapComposition;
         return Unexpected(filled.error());
@@ -179,10 +116,10 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
 }
 
 Expected<pag::BitmapComposition *, PagExportError> PagBitmapFallback::BuildComposition(
-    const Document &document, const Composition &composition, float bitmapScale,
+    const Document &document, const Composition &composition, const PagExportOptions &options,
     BitmapFrameSource *frameSource, pag::ID compositionId,
     std::vector<PagExportWarning> *warnings) {
-    if (frameSource == nullptr || bitmapScale <= 0.0f) {
+    if (frameSource == nullptr || options.bitmapScale <= 0.0f) {
         return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
                                              "invalid PAG bitmap export options"));
     }
@@ -194,11 +131,18 @@ Expected<pag::BitmapComposition *, PagExportError> PagBitmapFallback::BuildCompo
             "Composition \"" + name + "\": duration is empty; cannot export as bitmap"));
     }
 
+    const BitmapSize size = ComputeBitmapSize(composition.width, composition.height,
+                                              options.bitmapScale, options.bitmapMaxResolution);
+    if (size.width <= 0 || size.height <= 0) {
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG bitmap export size"));
+    }
+
     TimeRange visibleRange;
     visibleRange.start = 0;
     visibleRange.end = composition.duration;
     Expected<void, std::string> prepared =
-        frameSource->prepareComposition(document, composition.id, visibleRange, bitmapScale);
+        frameSource->prepareComposition(document, composition.id, visibleRange, size.factor);
     if (!prepared.hasValue()) {
         const std::string name =
             composition.name.empty() ? "(unnamed composition)" : composition.name;
@@ -208,20 +152,10 @@ Expected<pag::BitmapComposition *, PagExportError> PagBitmapFallback::BuildCompo
                 "\": bitmap FrameSource prepareComposition failed: " + prepared.error()));
     }
 
-    const int width =
-        static_cast<int>(std::lround(static_cast<double>(composition.width) * bitmapScale));
-    const int height =
-        static_cast<int>(std::lround(static_cast<double>(composition.height) * bitmapScale));
-    if (width <= 0 || height <= 0) {
-        frameSource->finish();
-        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
-                                             "invalid PAG bitmap export size"));
-    }
-
     auto *bitmapComposition = new pag::BitmapComposition();
     bitmapComposition->id = compositionId;
-    bitmapComposition->width = width;
-    bitmapComposition->height = height;
+    bitmapComposition->width = size.width;
+    bitmapComposition->height = size.height;
     bitmapComposition->duration = composition.duration;
     bitmapComposition->frameRate = static_cast<float>(composition.frameRate.num) /
         static_cast<float>(composition.frameRate.den);
@@ -229,13 +163,14 @@ Expected<pag::BitmapComposition *, PagExportError> PagBitmapFallback::BuildCompo
 
     auto *sequence = new pag::BitmapSequence();
     sequence->composition = bitmapComposition;
-    sequence->width = width;
-    sequence->height = height;
+    sequence->width = size.width;
+    sequence->height = size.height;
     sequence->frameRate = bitmapComposition->frameRate;
     bitmapComposition->sequences.push_back(sequence);
 
-    Expected<void, PagExportError> filled = FillSequenceFrames(
-        frameSource, sequence, 0, composition.duration, width, height, 80);
+    Expected<void, PagExportError> filled = EncodeBitmapSequence(
+        frameSource, sequence, 0, composition.duration, size.width, size.height,
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality);
     if (!filled.hasValue()) {
         delete bitmapComposition;
         return Unexpected(filled.error());

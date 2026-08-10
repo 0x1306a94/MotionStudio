@@ -528,8 +528,7 @@ Expected<pag::BitmapComposition *, PagExportError> PagFileBuilder::buildBitmapCo
                 "\": bitmap export requires a BitmapFrameSource."));
     }
     Expected<pag::BitmapComposition *, PagExportError> built = PagBitmapFallback::BuildComposition(
-        document_, composition, options_.bitmapScale, frameSource_, nextCompositionId_++,
-        &warnings_);
+        document_, composition, options_, frameSource_, nextCompositionId_++, &warnings_);
     if (!built.hasValue()) {
         return Unexpected(built.error());
     }
@@ -732,7 +731,7 @@ Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
             "Layer \"" + name + "\": bitmap export requires a BitmapFrameSource."));
     }
     Expected<BitmapFallbackResult, PagExportError> built = PagBitmapFallback::Build(
-        document_, hostComposition, layer, options_.bitmapScale, frameSource_, nextCompositionId_++,
+        document_, hostComposition, layer, options_, frameSource_, nextCompositionId_++,
         nextLayerId_++, &warnings_);
     if (!built.hasValue()) {
         return Unexpected(built.error());

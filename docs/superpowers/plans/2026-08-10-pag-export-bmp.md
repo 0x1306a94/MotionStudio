@@ -348,7 +348,7 @@ git commit --only src/export/pag/PagFileBuilder.cpp \
 
 ### Task 4: AE 风格 BitmapSequence 编码
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagBitmapFallback.cpp` / `.h`
@@ -368,7 +368,7 @@ git commit --only src/export/pag/PagFileBuilder.cpp \
 
 尺寸：spec §3.6.2（maxResolution、factor 钳制）。首版 max scale 可先用 `bitmapScale` + maxResolution；Precomp max-scale 扫描可同 Task 落地简化为 `min(bitmapScale, 1)` 再套 maxResolution。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(PagExporterTest, BitmapSequenceSkipsUnchangedFramePayload) {
@@ -382,12 +382,12 @@ TEST(PagExporterTest, BitmapMaxResolutionCapsShortSide) {
 
 扩展 Fake：`std::function<void(FrameTime, std::vector<uint8_t>&)>` 或 `setFrameTint(FrameTime, rgba)`。
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/tests/pag_export_tests --gtest_filter='PagExporterTest.BitmapSequence*'`  
 Expected: FAIL（当前每帧整幅关键帧）
 
-- [ ] **Step 3: 实现序列编码器**
+- [x] **Step 3: 实现序列编码器**
 
 在 `PagBitmapFallback`（或新文件）中：
 
@@ -397,12 +397,12 @@ Expected: FAIL（当前每帧整幅关键帧）
 4. WebP 质量用 `options.bitmapImageQuality`（替换写死 80）
 5. 填充 `pag::BitmapFrame` / `BitmapRect`
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Run: `ctest --test-dir build -R 'PagExporter' --output-on-failure`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagBitmapFallback.cpp \

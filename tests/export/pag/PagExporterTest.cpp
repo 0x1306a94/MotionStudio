@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -345,6 +346,47 @@ TEST(PagExporterTest, CompositionNameBmpExportsBitmap) {
     ASSERT_NE(file, nullptr);
     EXPECT_EQ(file->compositions.back()->type(), pag::CompositionType::Bitmap);
     EXPECT_EQ(file->compositions.back()->duration, 2);
+}
+
+TEST(PagExporterTest, BitmapSequenceSkipsUnchangedFramePayload) {
+    Document document = MakeEmptyDoc(40, 30, 3);
+    Primary(document)->name = "Main_bmp";
+    FakeBitmapFrameSource frameSource(255, 0, 0, 255);
+    frameSource.setFrameColor(0, 255, 0, 0, 255);
+    frameSource.setFrameColor(1, 255, 0, 0, 255);
+    frameSource.setFrameColor(2, 0, 255, 0, 255);
+    PagExportOptions options;
+    options.bitmapKeyFrameInterval = 60;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *bitmap = static_cast<pag::BitmapComposition *>(file->compositions.back());
+    ASSERT_FALSE(bitmap->sequences.empty());
+    ASSERT_EQ(bitmap->sequences[0]->frames.size(), 3u);
+    EXPECT_TRUE(bitmap->sequences[0]->frames[0]->isKeyframe);
+    EXPECT_FALSE(bitmap->sequences[0]->frames[0]->bitmaps.empty());
+    EXPECT_FALSE(bitmap->sequences[0]->frames[1]->isKeyframe);
+    EXPECT_TRUE(bitmap->sequences[0]->frames[1]->bitmaps.empty());
+    EXPECT_TRUE(bitmap->sequences[0]->frames[2]->isKeyframe);
+    EXPECT_FALSE(bitmap->sequences[0]->frames[2]->bitmaps.empty());
+}
+
+TEST(PagExporterTest, BitmapMaxResolutionCapsShortSide) {
+    Document document = MakeEmptyDoc(2000, 1000, 1);
+    Primary(document)->name = "Huge_bmp";
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.bitmapScale = 1.0f;
+    options.bitmapMaxResolution = 720;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *bitmap = static_cast<pag::BitmapComposition *>(file->compositions.back());
+    ASSERT_FALSE(bitmap->sequences.empty());
+    const int shortSide = std::min(bitmap->sequences[0]->width, bitmap->sequences[0]->height);
+    EXPECT_LE(shortSide, 720);
 }
 
 TEST(PagExporterTest, AllowBitmapExportFalseWithBmpFails) {
