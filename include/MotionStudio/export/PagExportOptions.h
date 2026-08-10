@@ -35,7 +35,7 @@ struct PagExportOptions {
     int bitmapKeyFrameInterval = 60;
     // WebP quality 0–100 for bitmap sequence rectangles.
     int bitmapImageQuality = 80;
-    // Auto prefers Video; almost-static content may use Bitmap. Wired in VideoComposition work.
+    // Auto prefers Video; almost-static content falls back to Bitmap.
     PagBmpSequenceType bmpSequenceType = PagBmpSequenceType::Auto;
     // Optional. Prefer real font metrics so point-text baseline matches MS layout.
     TextAscentResolver textAscentResolver;
