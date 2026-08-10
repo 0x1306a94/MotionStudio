@@ -1,34 +1,34 @@
-# Shader Uniform Defaults / Animatable / Color Format Implementation Plan
+# Shader Uniform 默认值 / 可动画 / Color Format — 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按 Task 逐步实现。步骤用 checkbox（`- [ ]`）跟踪。
 
-**Goal:** Scheme uniforms support `animatable` + typed defaults; `UniformFormat::Color` separate from `Float4` (`Vec4`); Inspector float2/3/4 inputs usable in narrow panels.
+**Goal:** Scheme uniform 支持 `animatable` + 类型化默认值；`UniformFormat::Color` 与 `Float4`（`Vec4`）分离；Inspector 窄栏下 float2/3/4 可正常输入。
 
-**Architecture:** Extend `ShaderUniformDecl` (optional JSON fields). Add `common/Vec4` and wire `AnimFloat4` through Animatable/PropertyPath/evaluate/adapter like `Vec3`. `Color` format maps to `AnimColor` + ColorPicker; `Float4` maps to `AnimFloat4` + four numeric fields. Realign flattens keyframes at frame 0 when `animatable` becomes false. Defaults apply only on new bind / Realign-added entries.
+**Architecture:** 扩展 `ShaderUniformDecl`（JSON 可选字段）。新增 `common/Vec4`，按 `Vec3` 模式把 `AnimFloat4` 接到 Animatable / PropertyPath / 求值 / adapter。`Color` → `AnimColor` + ColorPicker；`Float4` → `AnimFloat4` + 四轴数值。`animatable` 变为 false 时 Realign 用帧 0 拍平关键帧。默认值仅用于新绑定 / Realign 新增项。
 
-**Tech Stack:** C++17 core, GoogleTest, bridge C ABI, SwiftUI App
+**Tech Stack:** C++17 core、GoogleTest、bridge C ABI、SwiftUI App
 
 **Spec:** `docs/superpowers/specs/2026-08-10-shader-uniform-defaults-animatable-design.md`
 
-## Global Constraints
+## 全局约束
 
-- Do not bump `document.json` / package `schemaVersion`
-- Do not auto-migrate old `"format":"float4"` → `"color"`
-- No new Static* `ShaderUniformValueKind`; non-animatable = empty keyframes + static only
-- `UniformFormat::Color` and `AnimatableType::Vec4` append at end of their enums (do not reorder existing cases)
-- `MS_UNIFORM_FORMAT_COLOR = 4` is UI subset; map via switch (C++ `Color` ordinal is last in full enum — do not `static_cast` between them)
-- Commit steps: follow repo git-workflow; skip push
+- 不提升 `document.json` / 包 `schemaVersion`
+- 不自动把旧 `"format":"float4"` 改写成 `"color"`
+- 不新增 Static* `ShaderUniformValueKind`；不可动画 = 无关键帧 + 仅 static
+- `UniformFormat::Color` 与 `AnimatableType::Vec4` 追加在各自枚举**末尾**（不重排既有项）
+- `MS_UNIFORM_FORMAT_COLOR = 4` 为 UI 子集，用 switch 映射（C++ `Color` 在全量枚举末尾——禁止二者 `static_cast`）
+- Commit 步骤：遵循仓库 git-workflow；不 push
 
 ---
 
-## File Structure
+## 文件结构
 
 | 文件 | 职责 |
 |---|---|
 | `include/MotionStudio/common/Vec4.h`, `src/common/Vec4.cpp` | `Vec4` + `ApproxEqual` |
 | `include/MotionStudio/animation/AnimatableType.h`, `Interpolator.*`, `Animatable.cpp` | `Vec4` 动画类型 |
 | `include/MotionStudio/common/UniformFormat.h`, `src/common/UniformFormat.cpp`, `Dto.cpp` | `Color` format + 字符串 |
-| `include/MotionStudio/model/ShaderDefinition.h` | decl: `animatable` + defaults |
+| `include/MotionStudio/model/ShaderDefinition.h` | decl：`animatable` + defaults |
 | `include/MotionStudio/model/ShaderUniformValues.h`, `src/model/ShaderUniformValues.cpp` | `float4Value`、Kind、MakeDefault、Realign 拍平 |
 | `include/MotionStudio/render/ShaderPaint.h`, `SceneEvaluator.cpp` | 求值 `AnimFloat4` |
 | `src/model/PropertyPath.cpp`, `src/undo/CommandHelpers.cpp` | 解析/写 `AnimFloat4` |
@@ -37,19 +37,19 @@
 | `bridge/include/motionstudio_bridge.h` + shader/property cpp | Color、animatable/default、vec4 API |
 | `ShaderEditorSheet.swift`, `StyleShaderPaintControls.swift`, bridging extensions | Editor + Inspector UI |
 | `docs/data-model.md` | 文档同步 |
-| Tests | `Vec4Test`, `ShaderUniformValuesTest`, serializer/bridge 按需 |
+| Tests | `Vec4Test`、`ShaderUniformValuesTest`、serializer/bridge 按需 |
 
 ---
 
-### Task 1: Vec4 + Animatable wiring
+### Task 1: Vec4 + Animatable 接线
 
 **Status:** Pending
 
 **Files:**
 - Create: `include/MotionStudio/common/Vec4.h`, `src/common/Vec4.cpp`, `tests/common/Vec4Test.cpp`
 - Modify: `include/MotionStudio/animation/AnimatableType.h`, `include/MotionStudio/animation/Interpolator.h`, `src/animation/Interpolator.cpp`, `src/animation/Animatable.cpp`
-- Modify: `src/serialization/Serializer.cpp` (`Vec4ToJson` / `Vec4FromJson` / `ValueToJson` / `FromJson<Vec4>`)
-- Modify: `src/undo/CommandHelpers.cpp` (all `AnimatableType` switches + `Keyframe` variant apply — mirror `Vec3`)
+- Modify: `src/serialization/Serializer.cpp`（`Vec4ToJson` / `Vec4FromJson` / `ValueToJson` / `FromJson<Vec4>`）
+- Modify: `src/undo/CommandHelpers.cpp`（所有 `AnimatableType` switch + `Keyframe` 变体——对齐 `Vec3`）
 
 **Interfaces:**
 - Produces: `struct Vec4 { float x,y,z,w; }`；`AnimatableType::Vec4`；`Interpolator<Vec4>::Lerp`；`Animatable<Vec4>` 显式实例化；序列化 `[x,y,z,w]`
@@ -89,7 +89,7 @@ cmake --build build --target core_tests
 ./build/tests/core_tests --gtest_filter='Vec4Test.*'
 ```
 
-Expected: FAIL（头文件不存在或未注册）
+预期：FAIL（头文件不存在或未注册）
 
 - [ ] **Step 3: 实现 Vec4 + Interpolator + AnimatableType + 显式实例化**
 
@@ -98,9 +98,9 @@ Expected: FAIL（头文件不存在或未注册）
 `Interpolator<Vec4>::Lerp` 分量 lerp。  
 `Animatable.cpp`：`valueType()` → `AnimatableType::Vec4`；`template class Animatable<Vec4>;`
 
-Serializer：`Vec4ToJson` / `Vec4FromJson`（4 元数组），挂到 `ValueToJson` / `FromJson` 使 `AnimatableToJson<Vec4>` 可用。
+Serializer：`Vec4ToJson` / `Vec4FromJson`（4 元数组），挂到 `ValueToJson` / `FromJson`，使 `AnimatableToJson<Vec4>` 可用。
 
-CommandHelpers：每个 `switch (valueType())` 为 `Vec4` 增加与 `Vec3` 相同的分支；`std::get_if<Keyframe<Vec4>>` 分支同理。
+CommandHelpers：每个 `switch (valueType())` 为 `Vec4` 增加与 `Vec3` 相同的分支；`std::get_if<Keyframe<Vec4>>` 同理。
 
 - [ ] **Step 4: 跑测试确认通过**
 
@@ -108,7 +108,7 @@ CommandHelpers：每个 `switch (valueType())` 为 `Vec4` 增加与 `Vec3` 相�
 ./build/tests/core_tests --gtest_filter='Vec4Test.*'
 ```
 
-Expected: PASS
+预期：PASS
 
 - [ ] **Step 5: Commit**
 
@@ -122,16 +122,16 @@ git commit -m "Add Vec4 and wire it through Animatable interpolation."
 
 ---
 
-### Task 2: UniformFormat::Color + KindForFormat split
+### Task 2: UniformFormat::Color + KindForFormat 拆分
 
 **Status:** Pending
 
 **Files:**
 - Modify: `include/MotionStudio/common/UniformFormat.h`, `src/common/UniformFormat.cpp`
-- Modify: `src/serialization/Dto.cpp` (`ToString` / `uniformFormatFromString`)
-- Modify: `src/model/ShaderUniformValues.cpp` (`KindForFormat`)
+- Modify: `src/serialization/Dto.cpp`（`ToString` / `uniformFormatFromString`）
+- Modify: `src/model/ShaderUniformValues.cpp`（`KindForFormat`）
 - Modify: `include/MotionStudio/model/ShaderUniformValues.h`（注释：Float4→AnimFloat4，Color→AnimColor）
-- Modify: `tests/model/ShaderUniformValuesTest.cpp` 及所有 `Float4` 当颜色的测试（改为 `UniformFormat::Color`）
+- Modify: `tests/model/ShaderUniformValuesTest.cpp` 及所有把 `Float4` 当颜色的测试（改为 `UniformFormat::Color`）
 - Grep 更新：`tests/undo/ShaderCommandTest.cpp`、`tests/model/LayerStylePaintModeTest.cpp`、`tests/model/PropertyPathTest.cpp` 等 `Float4` tint 用例 → `Color`
 
 **Interfaces:**
@@ -166,7 +166,7 @@ TEST(ShaderUniformValuesTest, Float4MapsToAnimFloat4) {
 ./build/tests/core_tests --gtest_filter='ShaderUniformValuesTest.*'
 ```
 
-Expected: FAIL（无 `Color` 或 Float4 仍映射 AnimColor）
+预期：FAIL（无 `Color`，或 Float4 仍映射 AnimColor）
 
 - [ ] **Step 3: 实现 format + KindForFormat**
 
@@ -175,13 +175,13 @@ Expected: FAIL（无 `Color` 或 Float4 仍映射 AnimColor）
 Dto：`"color"` ↔ `UniformFormat::Color`。  
 `KindForFormat`：`Float4 → AnimFloat4`，`Color → AnimColor`。
 
-- [ ] **Step 4: 全量相关测试通过**
+- [ ] **Step 4: 相关测试全部通过**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ShaderUniformValuesTest.*:ShaderCommandTest.*:PropertyPathTest.*:LayerStylePaintModeTest.*'
 ```
 
-Expected: PASS（已把 tint 改为 Color）
+预期：PASS（tint 已改为 Color）
 
 - [ ] **Step 5: Commit**
 
@@ -191,7 +191,7 @@ git commit -m "Add UniformFormat Color and map Float4 to AnimFloat4."
 
 ---
 
-### Task 3: Decl defaults + animatable + Realign flatten
+### Task 3: Decl 默认值 + animatable + Realign 拍平
 
 **Status:** Pending
 
@@ -200,7 +200,7 @@ git commit -m "Add UniformFormat Color and map Float4 to AnimFloat4."
 - Modify: `src/model/ShaderUniformValues.cpp`（`MakeDefaultUniformValue(decl)` 读 default；Realign 拍平）
 - Modify: `src/serialization/Serializer.cpp`（`ShaderUniformDeclToJson` / `FromJson`）
 - Modify: `tests/model/ShaderUniformValuesTest.cpp`
-- Optional round-trip: 现有 shader serializer 测试若有则扩展
+- 可选：已有 shader serializer 测试则扩展 round-trip
 
 **Interfaces:**
 - Consumes: Task 1 `Vec4`；Task 2 `Color` / `AnimFloat4`
@@ -254,7 +254,7 @@ TEST(ShaderUniformValuesTest, ChangingDefaultDoesNotTouchExisting) {
 }
 ```
 
-（按项目 `Animatable` / `Keyframe` 真实 API 微调 `hasKeyframes` / `addKeyframe` 调用名。）
+（按项目 `Animatable` / `Keyframe` 真实 API 微调 `hasKeyframes` / `addKeyframe` 等调用名。）
 
 - [ ] **Step 2: 跑测试确认失败**
 
@@ -264,15 +264,15 @@ TEST(ShaderUniformValuesTest, ChangingDefaultDoesNotTouchExisting) {
 
 - [ ] **Step 3: 实现 decl 字段 + MakeDefault + Realign + JSON**
 
-`ShaderUniformDecl` 按 spec 加字段（默认值：`animatable=true`；float/vec 零；`defaultColor={1,1,1,1}`）。
+`ShaderUniformDecl` 按 spec 加字段（默认：`animatable=true`；float/vec 为零；`defaultColor={1,1,1,1}`）。
 
 `MakeDefaultUniformValue`：按 format `setStatic` 对应 default。  
 `Realign`：同名同 kind 保留；若 `!decl.animatable && hasKeyframes` → `setStatic(evaluate(0))` + `clearKeyframes()`。
 
-`ShaderUniformDeclToJson`：始终写 `name/format/count`；写 `animatable`；有非类型零值或调用方需要时可写 `default`（实现上**始终写出** `animatable` 与 `default`，便于 Editor round-trip；读取时缺省兼容）。  
+`ShaderUniformDeclToJson`：写 `name/format/count`；实现上**始终写出** `animatable` 与 `default`（便于 Editor round-trip）；读取时缺省兼容。  
 `FromJson`：缺 `animatable`→true；缺 `default`→类型默认；`default` 按 format 解析（float 数字；float2/3/4 数组；color `#RRGGBBAA`）。
 
-- [ ] **Step 4: 测试通过 + 手测 JSON 往返（可加 Serializer 单测）**
+- [ ] **Step 4: 测试通过 + JSON 往返（可加 Serializer 单测）**
 
 - [ ] **Step 5: Commit**
 
@@ -282,7 +282,7 @@ git commit -m "Add shader uniform decl defaults and animatable flatten on realig
 
 ---
 
-### Task 4: AnimFloat4 end-to-end (value path + GPU)
+### Task 4: AnimFloat4 端到端（属性路径 + GPU）
 
 **Status:** Pending
 
@@ -333,7 +333,7 @@ git commit -m "Wire AnimFloat4 through property path evaluation and GPU upload."
 
 ---
 
-### Task 5: Bridge APIs
+### Task 5: Bridge API
 
 **Status:** Pending
 
@@ -348,16 +348,16 @@ git commit -m "Wire AnimFloat4 through property path evaluation and GPU upload."
 - Produces:
   - `MS_UNIFORM_FORMAT_COLOR = 4`
   - `bool ms_document_shader_uniform_animatable_at(...)`
-  - default getters（或一次 JSON；推荐分 format 的 get：float / xy / xyz / xyzw / rgba）
-  - `ms_property_evaluate_vec4` / `set_static_vec4` / `add_keyframe_vec4`（及 remove 若 vec3 有对称 API）
+  - default getters（或一次 JSON；推荐按 format：float / xy / xyz / xyzw / rgba）
+  - `ms_property_evaluate_vec4` / `set_static_vec4` / `add_keyframe_vec4`（若 vec3 有对称 remove 则一并补）
   - `ToMSUniformFormat` 识别 `Color`
-  - 更新 shader 时：若 style 上对不可动画 uniform `addKeyframe*`，Bridge 改为 `setStatic` 或返回 false（推荐：**addKeyframe 前查 scheme，不可动画则 setStatic 当前值并 clear**——若查 scheme 成本高，至少 Inspector 不调用；Core Realign 已拍平）
+  - 对不可动画 uniform：Inspector 不调用 `addKeyframe*`；Core Realign 已拍平。Bridge 可选在 `addKeyframe*` 前查 scheme，不可动画则改走 setStatic（或返回 false）
 
-- [ ] **Step 1: 扩展 header + Swift wrapper 编译失败点**
+- [ ] **Step 1: 扩展 header + Swift wrapper（先暴露编译缺口）**
 
 - [ ] **Step 2: 实现 C API + ToMSUniformFormat(Color)**
 
-`editable` 注释改为：UI 子集 0–4，经 switch 映射，非 `static_cast<UniformFormat>`。
+editable 注释改为：UI 子集 0–4，经 switch 映射，禁止 `static_cast<UniformFormat>`。
 
 - [ ] **Step 3: Bridge 测试或最小 smoke**
 
@@ -369,7 +369,7 @@ git commit -m "Expose shader uniform Color animatable defaults and vec4 properti
 
 ---
 
-### Task 6: App UI (Editor + Inspector)
+### Task 6: App UI（Editor + Inspector）
 
 **Status:** Pending
 
@@ -393,36 +393,36 @@ VStack(alignment: .leading, spacing: 4) {
         Text(name).font(.callout)
         Spacer(minLength: 0)
         if animatable {
-            // single diamond for whole vector
+            // 整向量一颗钻石
         }
     }
     HStack(spacing: 6) {
         compactAxisField("X", ...)
         compactAxisField("Y", ...)
-        // Z/W as needed
+        // 需要时 Z/W
     }
 }
 ```
 
-`compactAxisField`：短标签（~12–16pt）+ `TextField`，**不要**嵌套完整 `NumberPropertyRow`（其内置 78pt label）。
+`compactAxisField`：短标签（约 12–16pt）+ `TextField`，**不要**嵌套完整 `NumberPropertyRow`（其内置 78pt label）。
 
 `FLOAT4`：四轴；`COLOR`：ColorPicker（从原 FLOAT4 分支移出）。
 
 - [ ] **Step 2: ShaderEditorSheet 草稿字段**
 
 `ShaderUniformDraft` 增加 `animatable: Bool`、`default`（按 format 存）。  
-Add/Edit sheet：Toggle + default 控件。  
+Add/Edit：Toggle + default 控件。  
 Save：uniforms JSON 含 `animatable` + `default`。
 
 - [ ] **Step 3: Inspector 读 `animatable`**
 
-`showsKeyframeButton` / 钻石显隐；写入分支只 `setStatic*`。
+钻石显隐；写入只走 `setStatic*`。
 
 - [ ] **Step 4: 手动验证**
 
 App：Concentric `center` float2 可输入 50/200；新建 color uniform 为 ColorPicker；float4 为四框；关 Animatable 后无钻石。
 
-- [ ] **Step 5: 更新 docs + spec 状态 + Commit**
+- [ ] **Step 5: 更新文档 + spec 状态 + Commit**
 
 ```bash
 git commit -m "Add shader uniform editor defaults and fix vector inspector layout."
@@ -430,21 +430,21 @@ git commit -m "Add shader uniform editor defaults and fix vector inspector layou
 
 ---
 
-## Spec coverage check
+## Spec 覆盖检查
 
 | Spec 要求 | Task |
 |---|---|
 | float2 可输入 | 6 |
-| animatable + defaults on decl | 3, 5, 6 |
+| decl 上 animatable + defaults | 3, 5, 6 |
 | Realign 拍平 evaluate(0) | 3 |
 | 默认值仅新建/新增 | 3 |
 | UniformFormat::Color | 2, 5, 6 |
 | Float4 → AnimFloat4 + Vec4 | 1, 2, 4 |
 | 旧 float4 不迁移 | 2（无改写逻辑） |
-| GPU vec4 for Color & Float4 | 2 GLSL名, 4 upload |
+| Color 与 Float4 均上传 GPU vec4 | 2（GLSL 名）、4（upload） |
 
-## Placeholder / consistency
+## 一致性备注
 
 - Bridge `MS_UNIFORM_FORMAT_COLOR = 4` 与 C++ `Color` 末尾序不同：一律 switch 映射
-- 现有测试里 `Float4` tint → 全部改为 `Color`
-- `Animatable`/`Keyframe` API 名以代码为准（Step 1 测试里按仓库实际调整）
+- 现有测试里把 `Float4` 当 tint 的 → 全部改为 `Color`
+- `Animatable` / `Keyframe` API 名以仓库代码为准（Step 1 测试按实际微调）
