@@ -136,6 +136,47 @@ final class MotionDocumentCore {
         ms_document_shader_uniform_format_at(handle, shaderID, Int32(index))
     }
 
+    func shaderUniformAnimatable(_ shaderID: UInt64, index: Int) -> Bool {
+        ms_document_shader_uniform_animatable_at(handle, shaderID, Int32(index))
+    }
+
+    func shaderUniformDefaultFloat(_ shaderID: UInt64, index: Int) -> Float {
+        ms_document_shader_uniform_default_float_at(handle, shaderID, Int32(index))
+    }
+
+    func shaderUniformDefaultVec2(_ shaderID: UInt64, index: Int) -> CGVector {
+        var x: Float = 0
+        var y: Float = 0
+        ms_document_shader_uniform_default_vec2_at(handle, shaderID, Int32(index), &x, &y)
+        return CGVector(dx: CGFloat(x), dy: CGFloat(y))
+    }
+
+    func shaderUniformDefaultVec3(_ shaderID: UInt64, index: Int) -> SIMD3<Float> {
+        var x: Float = 0
+        var y: Float = 0
+        var z: Float = 0
+        ms_document_shader_uniform_default_vec3_at(handle, shaderID, Int32(index), &x, &y, &z)
+        return SIMD3(x, y, z)
+    }
+
+    func shaderUniformDefaultVec4(_ shaderID: UInt64, index: Int) -> SIMD4<Float> {
+        var x: Float = 0
+        var y: Float = 0
+        var z: Float = 0
+        var w: Float = 0
+        ms_document_shader_uniform_default_vec4_at(handle, shaderID, Int32(index), &x, &y, &z, &w)
+        return SIMD4(x, y, z, w)
+    }
+
+    func shaderUniformDefaultColor(_ shaderID: UInt64, index: Int) -> MotionColor {
+        var r: Float = 0
+        var g: Float = 0
+        var b: Float = 0
+        var a: Float = 1
+        ms_document_shader_uniform_default_color_at(handle, shaderID, Int32(index), &r, &g, &b, &a)
+        return MotionColor(r: r, g: g, b: b, a: a)
+    }
+
     @discardableResult
     func addShader(name: String) -> UInt64 {
         let id = ms_document_add_shader(handle, name)
@@ -772,6 +813,15 @@ final class MotionDocumentCore {
         return SIMD3(x, y, z)
     }
 
+    func evaluateVec4(entityID: UInt64, path: String, frame: Int64) -> SIMD4<Float> {
+        var x: Float = 0
+        var y: Float = 0
+        var z: Float = 0
+        var w: Float = 0
+        ms_property_evaluate_vec4(handle, entityID, path, frame, &x, &y, &z, &w)
+        return SIMD4(x, y, z, w)
+    }
+
     func evaluateColor(entityID: UInt64, path: String, frame: Int64) -> MotionColor {
         var r: Float = 0
         var g: Float = 0
@@ -842,6 +892,11 @@ final class MotionDocumentCore {
         changed()
     }
 
+    func setStaticVec4(entityID: UInt64, path: String, value: SIMD4<Float>) {
+        ms_command_set_static_vec4(handle, entityID, path, value.x, value.y, value.z, value.w)
+        changed()
+    }
+
     func setStaticColor(entityID: UInt64, path: String, value: MotionColor) {
         ms_command_set_static_color(handle, entityID, path, value.r, value.g, value.b, value.a)
         changed()
@@ -891,6 +946,11 @@ final class MotionDocumentCore {
 
     func addKeyframeVec3(entityID: UInt64, path: String, frame: Int64, value: SIMD3<Float>) {
         ms_command_add_keyframe_vec3(handle, entityID, path, frame, value.x, value.y, value.z)
+        changed()
+    }
+
+    func addKeyframeVec4(entityID: UInt64, path: String, frame: Int64, value: SIMD4<Float>) {
+        ms_command_add_keyframe_vec4(handle, entityID, path, frame, value.x, value.y, value.z, value.w)
         changed()
     }
 

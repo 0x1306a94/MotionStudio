@@ -284,7 +284,7 @@ struct ShaderEditorSheet: View {
 
 extension MS_UNIFORM_FORMAT {
     static var editableCases: [MS_UNIFORM_FORMAT] {
-        [.FLOAT, .FLOAT2, .FLOAT3, .FLOAT4]
+        [.FLOAT, .FLOAT2, .FLOAT3, .FLOAT4, .COLOR]
     }
 
     var glslTypeName: String {
@@ -295,7 +295,7 @@ extension MS_UNIFORM_FORMAT {
             "vec2"
         case .FLOAT3:
             "vec3"
-        case .FLOAT4:
+        case .FLOAT4, .COLOR:
             "vec4"
         default:
             "/*unsupported*/"
@@ -312,6 +312,8 @@ extension MS_UNIFORM_FORMAT {
             "float3"
         case .FLOAT4:
             "float4"
+        case .COLOR:
+            "color"
         default:
             "float"
         }

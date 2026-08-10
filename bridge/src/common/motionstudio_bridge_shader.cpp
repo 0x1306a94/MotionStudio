@@ -61,8 +61,7 @@ MS_UNIFORM_FORMAT ToMSUniformFormat(UniformFormat format) {
         case UniformFormat::Float4:
             return MS_UNIFORM_FORMAT_FLOAT4;
         case UniformFormat::Color:
-            // MS_UNIFORM_FORMAT_COLOR added in Task 5; until then report invalid.
-            return MS_UNIFORM_FORMAT_INVALID;
+            return MS_UNIFORM_FORMAT_COLOR;
         default:
             return MS_UNIFORM_FORMAT_INVALID;
     }
@@ -154,6 +153,122 @@ MS_UNIFORM_FORMAT ms_document_shader_uniform_format_at(MSDocument *document, uin
         return MS_UNIFORM_FORMAT_INVALID;
     }
     return ToMSUniformFormat(shader->uniforms[static_cast<size_t>(index)].format);
+}
+
+bool ms_document_shader_uniform_animatable_at(MSDocument *document, uint64_t shaderId, int index) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return false;
+    }
+    const ShaderDefinition *shader = ConstFindShader(*document->document, shaderId);
+    if (shader == nullptr || index < 0 || static_cast<size_t>(index) >= shader->uniforms.size()) {
+        return false;
+    }
+    return shader->uniforms[static_cast<size_t>(index)].animatable;
+}
+
+float ms_document_shader_uniform_default_float_at(MSDocument *document, uint64_t shaderId,
+                                                  int index) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return 0.f;
+    }
+    const ShaderDefinition *shader = ConstFindShader(*document->document, shaderId);
+    if (shader == nullptr || index < 0 || static_cast<size_t>(index) >= shader->uniforms.size()) {
+        return 0.f;
+    }
+    return shader->uniforms[static_cast<size_t>(index)].defaultFloat;
+}
+
+void ms_document_shader_uniform_default_vec2_at(MSDocument *document, uint64_t shaderId, int index,
+                                                float *x, float *y) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return;
+    }
+    const ShaderDefinition *shader = ConstFindShader(*document->document, shaderId);
+    if (shader == nullptr || index < 0 || static_cast<size_t>(index) >= shader->uniforms.size()) {
+        return;
+    }
+    const motion::Vec2 &value = shader->uniforms[static_cast<size_t>(index)].defaultFloat2;
+    if (x != nullptr) {
+        *x = value.x;
+    }
+    if (y != nullptr) {
+        *y = value.y;
+    }
+}
+
+void ms_document_shader_uniform_default_vec3_at(MSDocument *document, uint64_t shaderId, int index,
+                                                float *x, float *y, float *z) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return;
+    }
+    const ShaderDefinition *shader = ConstFindShader(*document->document, shaderId);
+    if (shader == nullptr || index < 0 || static_cast<size_t>(index) >= shader->uniforms.size()) {
+        return;
+    }
+    const motion::Vec3 &value = shader->uniforms[static_cast<size_t>(index)].defaultFloat3;
+    if (x != nullptr) {
+        *x = value.x;
+    }
+    if (y != nullptr) {
+        *y = value.y;
+    }
+    if (z != nullptr) {
+        *z = value.z;
+    }
+}
+
+void ms_document_shader_uniform_default_vec4_at(MSDocument *document, uint64_t shaderId, int index,
+                                                float *x, float *y, float *z, float *w) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return;
+    }
+    const ShaderDefinition *shader = ConstFindShader(*document->document, shaderId);
+    if (shader == nullptr || index < 0 || static_cast<size_t>(index) >= shader->uniforms.size()) {
+        return;
+    }
+    const motion::Vec4 &value = shader->uniforms[static_cast<size_t>(index)].defaultFloat4;
+    if (x != nullptr) {
+        *x = value.x;
+    }
+    if (y != nullptr) {
+        *y = value.y;
+    }
+    if (z != nullptr) {
+        *z = value.z;
+    }
+    if (w != nullptr) {
+        *w = value.w;
+    }
+}
+
+void ms_document_shader_uniform_default_color_at(MSDocument *document, uint64_t shaderId, int index,
+                                                 float *r, float *g, float *b, float *a) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return;
+    }
+    const ShaderDefinition *shader = ConstFindShader(*document->document, shaderId);
+    if (shader == nullptr || index < 0 || static_cast<size_t>(index) >= shader->uniforms.size()) {
+        return;
+    }
+    const motion::Color &value = shader->uniforms[static_cast<size_t>(index)].defaultColor;
+    if (r != nullptr) {
+        *r = value.r;
+    }
+    if (g != nullptr) {
+        *g = value.g;
+    }
+    if (b != nullptr) {
+        *b = value.b;
+    }
+    if (a != nullptr) {
+        *a = value.a;
+    }
 }
 
 uint64_t ms_document_add_shader(MSDocument *document, const char *name) {

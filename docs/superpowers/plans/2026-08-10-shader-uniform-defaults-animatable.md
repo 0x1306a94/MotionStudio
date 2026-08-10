@@ -124,7 +124,7 @@ git commit -m "Add Vec4 and wire it through Animatable interpolation."
 
 ### Task 2: UniformFormat::Color + KindForFormat 拆分
 
-**Status:** 进行中
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/common/UniformFormat.h`, `src/common/UniformFormat.cpp`
@@ -335,7 +335,7 @@ git commit -m "Wire AnimFloat4 through property path evaluation and GPU upload."
 
 ### Task 5: Bridge API
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`
@@ -353,15 +353,15 @@ git commit -m "Wire AnimFloat4 through property path evaluation and GPU upload."
   - `ToMSUniformFormat` 识别 `Color`
   - 对不可动画 uniform：Inspector 不调用 `addKeyframe*`；Core Realign 已拍平。Bridge 可选在 `addKeyframe*` 前查 scheme，不可动画则改走 setStatic（或返回 false）
 
-- [ ] **Step 1: 扩展 header + Swift wrapper（先暴露编译缺口）**
+- [x] **Step 1: 扩展 header + Swift wrapper（先暴露编译缺口）**
 
-- [ ] **Step 2: 实现 C API + ToMSUniformFormat(Color)**
+- [x] **Step 2: 实现 C API + ToMSUniformFormat(Color)**
 
 editable 注释改为：UI 子集 0–4，经 switch 映射，禁止 `static_cast<UniformFormat>`。
 
-- [ ] **Step 3: Bridge 测试或最小 smoke**
+- [x] **Step 3: Bridge 测试或最小 smoke**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -m "Expose shader uniform Color animatable defaults and vec4 properties."

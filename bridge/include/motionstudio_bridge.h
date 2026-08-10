@@ -140,6 +140,7 @@ typedef CF_CLOSED_ENUM(int, MS_VALUE) {
     MS_VALUE_BEZIER_PATH = 3,
     MS_VALUE_STRING = 4,
     MS_VALUE_VEC3 = 5,
+    MS_VALUE_VEC4 = 6,
 };
 
 // Easing type tag, mirrors motion::EasingType.
@@ -480,6 +481,8 @@ float ms_property_evaluate_float(MSDocument *document, uint64_t entityId, const 
 void ms_property_evaluate_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x, float *y);
 void ms_property_evaluate_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x,
                                float *y, float *z);
+void ms_property_evaluate_vec4(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x,
+                               float *y, float *z, float *w);
 void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *r, float *g, float *b, float *a);
 // Evaluated BezierPath at frame. Release with ms_bezier_path_free. NULL on miss.
 MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame);
@@ -494,6 +497,8 @@ MSVectorNetwork *ms_property_evaluate_vector_network(MSDocument *document, uint6
 void ms_command_set_static_float(MSDocument *document, uint64_t entityId, const char *path, float value);
 void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const char *path, float x, float y);
 void ms_command_set_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float x, float y, float z);
+void ms_command_set_static_vec4(MSDocument *document, uint64_t entityId, const char *path, float x, float y, float z,
+                                float w);
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a);
 // value may be NULL (treated as empty open path).
 void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path, const MSBezierPath *value);
@@ -512,6 +517,8 @@ void ms_command_add_keyframe_float(MSDocument *document, uint64_t entityId, cons
 void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y);
 void ms_command_add_keyframe_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x,
                                   float y, float z);
+void ms_command_add_keyframe_vec4(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x,
+                                  float y, float z, float w);
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a);
 void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSBezierPath *value);
 void ms_command_add_keyframe_vector_network(MSDocument *document, uint64_t entityId, const char *path,
@@ -622,13 +629,15 @@ typedef CF_CLOSED_ENUM(int, MS_PAINT_MODE) {
     MS_PAINT_MODE_SHADER = 1,
 };
 
-// User-editable scheme formats (v1 UI); ordinals match motion::UniformFormat.
+// User-editable scheme formats (v1 UI subset). Map to motion::UniformFormat via
+// switch — do not static_cast (Color is appended at the end of the C++ enum).
 typedef CF_CLOSED_ENUM(int, MS_UNIFORM_FORMAT) {
     MS_UNIFORM_FORMAT_INVALID = -1,
     MS_UNIFORM_FORMAT_FLOAT = 0,
     MS_UNIFORM_FORMAT_FLOAT2 = 1,
     MS_UNIFORM_FORMAT_FLOAT3 = 2,
     MS_UNIFORM_FORMAT_FLOAT4 = 3,
+    MS_UNIFORM_FORMAT_COLOR = 4,
 };
 
 int ms_document_shader_count(MSDocument *document);
@@ -639,11 +648,21 @@ int ms_document_shader_uniform_count(MSDocument *document, uint64_t shaderId);
 char *ms_document_shader_uniform_name_at(MSDocument *document, uint64_t shaderId, int index);
 MS_UNIFORM_FORMAT ms_document_shader_uniform_format_at(MSDocument *document, uint64_t shaderId,
                                                        int index);
+bool ms_document_shader_uniform_animatable_at(MSDocument *document, uint64_t shaderId, int index);
+float ms_document_shader_uniform_default_float_at(MSDocument *document, uint64_t shaderId, int index);
+void ms_document_shader_uniform_default_vec2_at(MSDocument *document, uint64_t shaderId, int index,
+                                                float *x, float *y);
+void ms_document_shader_uniform_default_vec3_at(MSDocument *document, uint64_t shaderId, int index,
+                                                float *x, float *y, float *z);
+void ms_document_shader_uniform_default_vec4_at(MSDocument *document, uint64_t shaderId, int index,
+                                                float *x, float *y, float *z, float *w);
+void ms_document_shader_uniform_default_color_at(MSDocument *document, uint64_t shaderId, int index,
+                                                 float *r, float *g, float *b, float *a);
 
 // Adds a shader with default mainImage template and empty uniforms. name may be NULL → "Shader".
 uint64_t ms_document_add_shader(MSDocument *document, const char *name);
 // Replaces name/mainImage/uniforms in one undo step. uniformsJson is a JSON array of
-// {name,format,count} (same shape as shader.json uniforms); NULL or "[]" clears scheme.
+// {name,format,count,animatable?,default?} (same shape as shader.json uniforms); NULL or "[]" clears.
 bool ms_document_update_shader(MSDocument *document, uint64_t shaderId, const char *name,
                                const char *mainImage, const char *uniformsJson);
 bool ms_document_remove_shader(MSDocument *document, uint64_t shaderId);  // false if referenced

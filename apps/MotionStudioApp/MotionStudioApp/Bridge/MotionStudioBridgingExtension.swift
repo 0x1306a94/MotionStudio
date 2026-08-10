@@ -346,7 +346,7 @@ struct CanvasFrameProfile: Equatable {
 
 extension MS_UNIFORM_FORMAT: @retroactive CaseIterable, @retroactive Identifiable {
     public static var allCases: [MS_UNIFORM_FORMAT] {
-        [.FLOAT, .FLOAT2, .FLOAT3, .FLOAT4]
+        [.FLOAT, .FLOAT2, .FLOAT3, .FLOAT4, .COLOR]
     }
 
     public var id: Int32 {

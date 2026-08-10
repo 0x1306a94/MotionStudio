@@ -82,6 +82,53 @@ TEST(BridgeShaderTest, LoadWithoutShadersJsonYieldsEmptyLibrary) {
     ms_document_destroy(loaded);
 }
 
+TEST(BridgeShaderTest, UniformColorAnimatableDefaultsAndVec4Property) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t shaderId = ms_document_add_shader(document, "Tint");
+    ASSERT_NE(shaderId, 0u);
+
+    const char *uniforms =
+        R"([{"name":"tint","format":"color","count":1,"animatable":false,"default":[0.2,0.4,0.6,1]},)"
+        R"({"name":"offset","format":"float4","count":1,"animatable":true,"default":[1,2,3,4]}])";
+    ASSERT_TRUE(ms_document_update_shader(
+        document, shaderId, "Tint", "vec4 mainImage(vec2 uv) { return tint; }", uniforms));
+
+    EXPECT_EQ(ms_document_shader_uniform_format_at(document, shaderId, 0), MS_UNIFORM_FORMAT_COLOR);
+    EXPECT_FALSE(ms_document_shader_uniform_animatable_at(document, shaderId, 0));
+    float r = 0, g = 0, b = 0, a = 0;
+    ms_document_shader_uniform_default_color_at(document, shaderId, 0, &r, &g, &b, &a);
+    EXPECT_FLOAT_EQ(r, 0.2f);
+    EXPECT_FLOAT_EQ(g, 0.4f);
+    EXPECT_FLOAT_EQ(b, 0.6f);
+    EXPECT_FLOAT_EQ(a, 1.f);
+
+    EXPECT_EQ(ms_document_shader_uniform_format_at(document, shaderId, 1), MS_UNIFORM_FORMAT_FLOAT4);
+    EXPECT_TRUE(ms_document_shader_uniform_animatable_at(document, shaderId, 1));
+    float x = 0, y = 0, z = 0, w = 0;
+    ms_document_shader_uniform_default_vec4_at(document, shaderId, 1, &x, &y, &z, &w);
+    EXPECT_FLOAT_EQ(x, 1.f);
+    EXPECT_FLOAT_EQ(y, 2.f);
+    EXPECT_FLOAT_EQ(z, 3.f);
+    EXPECT_FLOAT_EQ(w, 4.f);
+
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_TRUE(ms_document_set_style_paint_mode(document, layerId, 0, MS_PAINT_MODE_SHADER, shaderId));
+    const char *offsetPath = "styles[0].uniformValues.offset";
+    EXPECT_EQ(ms_property_type(document, layerId, offsetPath), MS_VALUE_VEC4);
+    ms_command_set_static_vec4(document, layerId, offsetPath, 5, 6, 7, 8);
+    ms_property_evaluate_vec4(document, layerId, offsetPath, 0, &x, &y, &z, &w);
+    EXPECT_FLOAT_EQ(x, 5.f);
+    EXPECT_FLOAT_EQ(y, 6.f);
+    EXPECT_FLOAT_EQ(z, 7.f);
+    EXPECT_FLOAT_EQ(w, 8.f);
+    ms_command_add_keyframe_vec4(document, layerId, offsetPath, 10, 9, 8, 7, 6);
+    EXPECT_TRUE(ms_property_is_animated(document, layerId, offsetPath));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeShaderTest, RenameAndRemoveUnreferenced) {
     MSDocument *document = ms_document_create();
     ASSERT_NE(document, nullptr);

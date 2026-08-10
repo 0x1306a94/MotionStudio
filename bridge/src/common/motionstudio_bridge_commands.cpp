@@ -9,6 +9,7 @@
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
@@ -55,6 +56,7 @@ using motion::FrameTime;
 using motion::Layer;
 using motion::Vec2;
 using motion::Vec3;
+using motion::Vec4;
 
 /* ============================ commands ============================ */
 
@@ -71,6 +73,12 @@ void ms_command_set_static_vec2(MSDocument *document, uint64_t entityId, const c
 void ms_command_set_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float x, float y, float z) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Vec3{x, y, z})));
+}
+
+void ms_command_set_static_vec4(MSDocument *document, uint64_t entityId, const char *path, float x, float y, float z,
+                                float w) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Vec4{x, y, z, w})));
 }
 
 void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const char *path, float r, float g, float b, float a) {
@@ -165,6 +173,15 @@ void ms_command_add_keyframe_vec3(MSDocument *document, uint64_t entityId, const
                                   float y, float z) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec3{x, y, z}))));
+}
+
+void ms_command_add_keyframe_vec4(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x,
+                                  float y, float z, float w) {
+    DocumentLock guard(document);
+    Execute(document,
+            std::make_unique<motion::AddKeyframeCommand>(
+                MakePath(entityId, path),
+                motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec4{x, y, z, w}))));
 }
 
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a) {

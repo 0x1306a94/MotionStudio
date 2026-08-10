@@ -27,6 +27,7 @@ using motion::FrameTime;
 using motion::Keyframe;
 using motion::Vec2;
 using motion::Vec3;
+using motion::Vec4;
 
 namespace {
 
@@ -64,8 +65,7 @@ MS_VALUE ms_property_type(MSDocument *document, uint64_t entityId, const char *p
         case AnimatableType::String:
             return MS_VALUE_STRING;
         case AnimatableType::Vec4:
-            // Exposed as MS_VALUE_VEC4 when Task 5 adds the ABI constant.
-            return MS_VALUE_INVALID;
+            return MS_VALUE_VEC4;
     }
     return MS_VALUE_INVALID;
 }
@@ -405,6 +405,28 @@ void ms_property_evaluate_vec3(MSDocument *document, uint64_t entityId, const ch
     }
     if (z != nullptr) {
         *z = value.z;
+    }
+}
+
+void ms_property_evaluate_vec4(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float *x,
+                               float *y, float *z, float *w) {
+    DocumentLock guard(document);
+    const Animatable<Vec4> *property = AsVec4(FindProperty(document, entityId, path));
+    if (property == nullptr) {
+        return;
+    }
+    const Vec4 value = property->evaluate(static_cast<FrameTime>(frame));
+    if (x != nullptr) {
+        *x = value.x;
+    }
+    if (y != nullptr) {
+        *y = value.y;
+    }
+    if (z != nullptr) {
+        *z = value.z;
+    }
+    if (w != nullptr) {
+        *w = value.w;
     }
 }
 

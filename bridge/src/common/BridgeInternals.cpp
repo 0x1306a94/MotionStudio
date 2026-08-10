@@ -41,6 +41,7 @@ using motion::StrokeStyle;
 using motion::UndoManager;
 using motion::Vec2;
 using motion::Vec3;
+using motion::Vec4;
 
 namespace bridge {
 
@@ -96,6 +97,13 @@ const Animatable<Vec3> *AsVec3(AnimatableBase *base) {
         return nullptr;
     }
     return static_cast<const Animatable<Vec3> *>(base);
+}
+
+const Animatable<Vec4> *AsVec4(AnimatableBase *base) {
+    if (base == nullptr || base->valueType() != AnimatableType::Vec4) {
+        return nullptr;
+    }
+    return static_cast<const Animatable<Vec4> *>(base);
 }
 
 const Animatable<Color> *AsColor(AnimatableBase *base) {

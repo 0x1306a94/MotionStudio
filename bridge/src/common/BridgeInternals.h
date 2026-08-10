@@ -12,6 +12,7 @@
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/Composition.h"
@@ -37,6 +38,7 @@ motion::AnimatableBase *FindProperty(MSDocument *handle, uint64_t entityId, cons
 const motion::Animatable<float> *AsFloat(motion::AnimatableBase *base);
 const motion::Animatable<motion::Vec2> *AsVec2(motion::AnimatableBase *base);
 const motion::Animatable<motion::Vec3> *AsVec3(motion::AnimatableBase *base);
+const motion::Animatable<motion::Vec4> *AsVec4(motion::AnimatableBase *base);
 const motion::Animatable<motion::Color> *AsColor(motion::AnimatableBase *base);
 const motion::Animatable<motion::VectorNetwork> *AsVectorNetwork(motion::AnimatableBase *base);
 
