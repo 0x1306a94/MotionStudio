@@ -187,7 +187,7 @@ git commit --only src/export/pag/PagAlmostStatic.h src/export/pag/PagAlmostStati
 
 ### Task 4: `EncodeVideoSequence`（VideoToolbox）
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `src/export/pag/PagVideoSequenceEncode.h`
@@ -213,7 +213,7 @@ Expected<void, PagExportError> EncodeVideoSequence(
 - 回调收集 SPS/PPS 一次进 `headers`；每帧 NAL → `VideoFrame{frame, isKeyframe, fileBytes}`
 - 失败 → `EncodeFailed`
 
-- [ ] **Step 1: 写失败测试（Apple）**
+- [x] **Step 1: 写失败测试（Apple）**
 
 ```cpp
 #if defined(__APPLE__)
@@ -234,12 +234,12 @@ TEST(PagVideoSequenceEncodeTest, EncodesSideBySideAlphaHeaders) {
 #endif
 ```
 
-- [ ] **Step 2–4: 实现 VT 编码并跑绿**
+- [x] **Step 2–4: 实现 VT 编码并跑绿**
 
 Run: `./build/src/export/pag/pag_export_tests --gtest_filter='PagVideoSequenceEncodeTest.*'`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagVideoSequenceEncode.h \

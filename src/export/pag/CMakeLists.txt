@@ -21,6 +21,12 @@ target_link_libraries(pag_export PUBLIC core PRIVATE pag_codec)
 # Image → WebP re-encode uses tgfx ImageCodec (same prebuilt as pag_codec).
 motionstudio_add_tgfx_prebuild(pag_export)
 motionstudio_link_prebuilt_tgfx(pag_export)
+if(APPLE)
+    target_link_libraries(pag_export PRIVATE
+                          "-framework VideoToolbox"
+                          "-framework CoreMedia"
+                          "-framework CoreVideo")
+endif()
 target_compile_options(pag_export PRIVATE -Wall -Wextra)
 
 include(GoogleTest)
