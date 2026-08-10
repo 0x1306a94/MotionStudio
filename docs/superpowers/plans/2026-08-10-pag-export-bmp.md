@@ -164,7 +164,7 @@ git commit --only include/MotionStudio/export/PagExporter.h \
 
 ### Task 2: `HasBmpSuffix` + `BitmapFrameSource::prepareComposition`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `src/export/pag/PagBmpSuffix.h`
@@ -187,7 +187,7 @@ virtual Expected<void, std::string> prepareComposition(
 ```
 - Consumes: Task 1 Options
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(PagBmpSuffixTest, DetectsSuffixCaseInsensitive) {
@@ -200,12 +200,12 @@ TEST(PagBmpSuffixTest, DetectsSuffixCaseInsensitive) {
 
 （若测试目标未暴露内部头，把 `HasBmpSuffix` 放进 `include/MotionStudio/export/` 过重——保持 `src/export/pag/PagBmpSuffix.h`，在 `PagExporterTest.cpp` 旁加 `tests/export/pag/PagBmpSuffixTest.cpp` 并在 `tests/CMakeLists.txt` 加入源；或把函数测合并进 `PagExporterTest` 并 `#include "PagBmpSuffix.h"` 且保证测试 target include `src/export/pag`。）
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/tests/pag_export_tests --gtest_filter='PagBmpSuffixTest.*'`  
 Expected: 编译失败
 
-- [ ] **Step 3: 实现 `HasBmpSuffix` + `prepareComposition`**
+- [x] **Step 3: 实现 `HasBmpSuffix` + `prepareComposition`**
 
 ```cpp
 inline bool HasBmpSuffix(std::string_view name) {
@@ -218,12 +218,12 @@ inline bool HasBmpSuffix(std::string_view name) {
 
 `FakeBitmapFrameSource::prepareComposition`：按 `compositionId` 找合成，尺寸 = `comp.w/h * bitmapScale`，逻辑同现有 `prepare`（可抽私有 `prepareSize`）。
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Run: `./build/tests/pag_export_tests --gtest_filter='PagBmpSuffixTest.*'`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagBmpSuffix.h \

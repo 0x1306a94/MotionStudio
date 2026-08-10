@@ -26,37 +26,13 @@ class FakeBitmapFrameSource : public BitmapFrameSource {
                                         EntityId rootLayerId, TimeRange visibleRange,
                                         float bitmapScale) override {
         (void)rootLayerId;
-        if (bitmapScale <= 0.0f) {
-            return Unexpected(std::string("bitmapScale must be > 0"));
-        }
-        const Composition *host = nullptr;
-        for (const auto &composition : document.compositions) {
-            if (composition && composition->id == hostCompositionId) {
-                host = composition.get();
-                break;
-            }
-        }
-        if (host == nullptr) {
-            return Unexpected(std::string("host composition not found"));
-        }
-        width_ = static_cast<int>(
-            std::lround(static_cast<double>(host->width) * static_cast<double>(bitmapScale)));
-        height_ = static_cast<int>(
-            std::lround(static_cast<double>(host->height) * static_cast<double>(bitmapScale)));
-        if (width_ <= 0 || height_ <= 0) {
-            return Unexpected(std::string("invalid fallback size"));
-        }
-        visibleRange_ = visibleRange;
-        const size_t byteCount = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4u;
-        pixels_.assign(byteCount, 0);
-        for (size_t index = 0; index + 3 < byteCount; index += 4) {
-            pixels_[index] = red_;
-            pixels_[index + 1] = green_;
-            pixels_[index + 2] = blue_;
-            pixels_[index + 3] = alpha_;
-        }
-        prepared_ = true;
-        return Expected<void, std::string>();
+        return prepareFromComposition(document, hostCompositionId, visibleRange, bitmapScale);
+    }
+
+    Expected<void, std::string> prepareComposition(const Document &document, EntityId compositionId,
+                                                   TimeRange visibleRange,
+                                                   float bitmapScale) override {
+        return prepareFromComposition(document, compositionId, visibleRange, bitmapScale);
     }
 
     Expected<BitmapFrame, std::string> renderFrame(FrameTime time) override {
@@ -81,6 +57,42 @@ class FakeBitmapFrameSource : public BitmapFrameSource {
     }
 
   private:
+    Expected<void, std::string> prepareFromComposition(const Document &document,
+                                                       EntityId compositionId,
+                                                       TimeRange visibleRange, float bitmapScale) {
+        if (bitmapScale <= 0.0f) {
+            return Unexpected(std::string("bitmapScale must be > 0"));
+        }
+        const Composition *host = nullptr;
+        for (const auto &composition : document.compositions) {
+            if (composition && composition->id == compositionId) {
+                host = composition.get();
+                break;
+            }
+        }
+        if (host == nullptr) {
+            return Unexpected(std::string("composition not found"));
+        }
+        width_ = static_cast<int>(
+            std::lround(static_cast<double>(host->width) * static_cast<double>(bitmapScale)));
+        height_ = static_cast<int>(
+            std::lround(static_cast<double>(host->height) * static_cast<double>(bitmapScale)));
+        if (width_ <= 0 || height_ <= 0) {
+            return Unexpected(std::string("invalid bitmap size"));
+        }
+        visibleRange_ = visibleRange;
+        const size_t byteCount = static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4u;
+        pixels_.assign(byteCount, 0);
+        for (size_t index = 0; index + 3 < byteCount; index += 4) {
+            pixels_[index] = red_;
+            pixels_[index + 1] = green_;
+            pixels_[index + 2] = blue_;
+            pixels_[index + 3] = alpha_;
+        }
+        prepared_ = true;
+        return Expected<void, std::string>();
+    }
+
     uint8_t red_ = 255;
     uint8_t green_ = 0;
     uint8_t blue_ = 0;

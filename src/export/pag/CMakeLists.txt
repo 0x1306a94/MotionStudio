@@ -30,7 +30,9 @@ add_files_by_extension(PAG_EXPORT_TEST_SOURCES ".h;.cpp"
 add_executable(pag_export_tests ${PAG_EXPORT_TEST_SOURCES})
 add_source_group(PAG_EXPORT_TEST_SOURCES ${PROJECT_SOURCE_DIR}/tests/export/pag "Tests")
 disable_xcode_target_signing(pag_export_tests)
-target_include_directories(pag_export_tests PRIVATE "${LIBPAG_DIR}/include")
+target_include_directories(pag_export_tests PRIVATE
+                           "${LIBPAG_DIR}/include"
+                           "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(pag_export_tests PRIVATE pag_export GTest::gtest_main)
 motionstudio_link_asan_defaults(pag_export_tests)
 motionstudio_add_tgfx_prebuild(pag_export_tests)

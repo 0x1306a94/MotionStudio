@@ -28,7 +28,7 @@ class BitmapFrameSource {
   public:
     virtual ~BitmapFrameSource() = default;
 
-    // Prepare rendering for one fallback unit on the host composition timeline.
+    // Prepare rendering for one layer (or Group subtree) on the host composition timeline.
     // document: immutable source document for the export call.
     // hostCompositionId: composition that owns rootLayerId.
     // rootLayerId: layer or Group root being rasterized.
@@ -38,7 +38,17 @@ class BitmapFrameSource {
                                                 EntityId hostCompositionId, EntityId rootLayerId,
                                                 TimeRange visibleRange, float bitmapScale) = 0;
 
-    // time: host composition frame. Returns premultiplied RGBA8 (recommended).
+    // Prepare rendering for an entire composition (composition-name _bmp path).
+    // document: immutable source document for the export call.
+    // compositionId: composition to rasterize.
+    // visibleRange: half-open [start, end) on that composition's timeline.
+    // bitmapScale: >0 pixel scale relative to the composition size.
+    virtual Expected<void, std::string> prepareComposition(const Document &document,
+                                                           EntityId compositionId,
+                                                           TimeRange visibleRange,
+                                                           float bitmapScale) = 0;
+
+    // time: timeline frame for the active prepare. Returns premultiplied RGBA8 (recommended).
     virtual Expected<BitmapFrame, std::string> renderFrame(FrameTime time) = 0;
 
     virtual void finish() = 0;
