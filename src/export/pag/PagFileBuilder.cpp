@@ -36,10 +36,13 @@
 #include "MotionStudio/render/FollowPathEval.h"
 #include "MotionStudio/render/ImageScaleLayout.h"
 #include "MotionStudio/render/ShapeGeometry.h"
+#include "PagAlmostStatic.h"
 #include "PagAnimatableConvert.h"
 #include "PagBitmapFallback.h"
+#include "PagBitmapSequenceEncode.h"
 #include "PagExportErrorUtil.h"
 #include "PagStrokeOutline.h"
+#include "PagVideoFallback.h"
 #include "codec/utils/WebpDecoder.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
@@ -495,8 +498,7 @@ PagExportError PagFileBuilder::unsupportedWithoutBmpError(const Layer &layer) co
 Expected<pag::Composition *, PagExportError> PagFileBuilder::buildOneComposition(
     const Composition &composition) {
     if (isBitmapForcedComposition(composition.id)) {
-        Expected<pag::BitmapComposition *, PagExportError> built =
-            buildBitmapComposition(composition);
+        Expected<pag::Composition *, PagExportError> built = buildBitmapComposition(composition);
         if (!built.hasValue()) {
             return Unexpected(built.error());
         }
@@ -509,7 +511,7 @@ Expected<pag::Composition *, PagExportError> PagFileBuilder::buildOneComposition
     return built.value();
 }
 
-Expected<pag::BitmapComposition *, PagExportError> PagFileBuilder::buildBitmapComposition(
+Expected<pag::Composition *, PagExportError> PagFileBuilder::buildBitmapComposition(
     const Composition &composition) {
     if (!options_.allowBitmapExport) {
         const std::string name =
@@ -527,13 +529,53 @@ Expected<pag::BitmapComposition *, PagExportError> PagFileBuilder::buildBitmapCo
             "Composition \"" + name +
                 "\": bitmap export requires a BitmapFrameSource."));
     }
-    Expected<pag::BitmapComposition *, PagExportError> built = PagBitmapFallback::BuildComposition(
-        document_, composition, options_, frameSource_, nextCompositionId_++, &warnings_);
-    if (!built.hasValue()) {
-        return Unexpected(built.error());
+
+    const BitmapSize size = ComputeBitmapSize(composition.width, composition.height,
+                                              options_.bitmapScale, options_.bitmapMaxResolution);
+    if (size.width <= 0 || size.height <= 0) {
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG bitmap export size"));
     }
-    compositionByEntity_[composition.id.value] = built.value();
-    return built.value();
+    TimeRange visibleRange;
+    visibleRange.start = 0;
+    visibleRange.end = composition.duration;
+    Expected<void, std::string> prepared = frameSource_->prepareComposition(
+        document_, composition.id, visibleRange, size.width, size.height);
+    if (!prepared.hasValue()) {
+        const std::string name =
+            composition.name.empty() ? "(unnamed composition)" : composition.name;
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, composition.id, name, "BitmapForcedByCompositionName",
+            "Composition \"" + name +
+                "\": bitmap FrameSource prepareComposition failed: " + prepared.error()));
+    }
+
+    PagBmpSequenceType kind = options_.bmpSequenceType;
+    if (kind == PagBmpSequenceType::Auto) {
+        kind = IsAlmostStaticSequence(frameSource_, 0, composition.duration)
+            ? PagBmpSequenceType::Bitmap
+            : PagBmpSequenceType::Video;
+    }
+
+    pag::Composition *builtComposition = nullptr;
+    if (kind == PagBmpSequenceType::Bitmap) {
+        Expected<pag::BitmapComposition *, PagExportError> built =
+            PagBitmapFallback::BuildComposition(document_, composition, options_, frameSource_,
+                                                nextCompositionId_++, &warnings_);
+        if (!built.hasValue()) {
+            return Unexpected(built.error());
+        }
+        builtComposition = built.value();
+    } else {
+        Expected<pag::VideoComposition *, PagExportError> built = PagVideoFallback::BuildComposition(
+            document_, composition, options_, frameSource_, nextCompositionId_++, &warnings_);
+        if (!built.hasValue()) {
+            return Unexpected(built.error());
+        }
+        builtComposition = built.value();
+    }
+    compositionByEntity_[composition.id.value] = builtComposition;
+    return builtComposition;
 }
 
 void PagFileBuilder::collectDescendants(EntityId rootLayerId,
@@ -730,7 +772,49 @@ Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
             PagExportErrorKind::MappingFailed, layer.id, name, "BitmapForcedByLayerName",
             "Layer \"" + name + "\": bitmap export requires a BitmapFrameSource."));
     }
-    Expected<BitmapFallbackResult, PagExportError> built = PagBitmapFallback::Build(
+
+    const FrameTime duration = layer.outPoint - layer.inPoint;
+    if (duration <= 0) {
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "BitmapForcedByLayerName",
+            "Layer \"" + name + "\": visible range is empty; cannot export as bitmap"));
+    }
+    const BitmapSize size = ComputeBitmapSize(hostComposition.width, hostComposition.height,
+                                              options_.bitmapScale, options_.bitmapMaxResolution);
+    if (size.width <= 0 || size.height <= 0) {
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG bitmap export size"));
+    }
+    TimeRange visibleRange;
+    visibleRange.start = layer.inPoint;
+    visibleRange.end = layer.outPoint;
+    Expected<void, std::string> prepared = frameSource_->prepare(
+        document_, hostComposition.id, layer.id, visibleRange, size.width, size.height);
+    if (!prepared.hasValue()) {
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "BitmapForcedByLayerName",
+            "Layer \"" + name + "\": bitmap FrameSource prepare failed: " + prepared.error()));
+    }
+
+    PagBmpSequenceType kind = options_.bmpSequenceType;
+    if (kind == PagBmpSequenceType::Auto) {
+        kind = IsAlmostStaticSequence(frameSource_, layer.inPoint, layer.outPoint)
+            ? PagBmpSequenceType::Bitmap
+            : PagBmpSequenceType::Video;
+    }
+
+    if (kind == PagBmpSequenceType::Bitmap) {
+        Expected<BitmapFallbackResult, PagExportError> built = PagBitmapFallback::Build(
+            document_, hostComposition, layer, options_, frameSource_, nextCompositionId_++,
+            nextLayerId_++, &warnings_);
+        if (!built.hasValue()) {
+            return Unexpected(built.error());
+        }
+        bitmapCompositions_.push_back(built.value().composition);
+        return built.value().layer;
+    }
+
+    Expected<VideoFallbackResult, PagExportError> built = PagVideoFallback::Build(
         document_, hostComposition, layer, options_, frameSource_, nextCompositionId_++,
         nextLayerId_++, &warnings_);
     if (!built.hasValue()) {

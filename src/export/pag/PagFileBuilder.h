@@ -41,7 +41,8 @@ class PagFileBuilder {
     Expected<void, PagExportError> collectCompositionOrder(EntityId compositionId);
     void collectBitmapForcedCompositions();
     Expected<pag::Composition *, PagExportError> buildOneComposition(const Composition &composition);
-    Expected<pag::BitmapComposition *, PagExportError> buildBitmapComposition(
+    // _bmp composition path: BitmapComposition or VideoComposition per bmpSequenceType.
+    Expected<pag::Composition *, PagExportError> buildBitmapComposition(
         const Composition &composition);
     Expected<pag::VectorComposition *, PagExportError> buildComposition(
         const Composition &composition);

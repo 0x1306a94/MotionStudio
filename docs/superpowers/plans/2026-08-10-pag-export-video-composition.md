@@ -254,7 +254,7 @@ git commit --only src/export/pag/PagVideoSequenceEncode.h \
 
 ### Task 5: `PagVideoFallback` + FileBuilder 分流
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `src/export/pag/PagVideoFallback.h`
@@ -298,7 +298,7 @@ if (kind == PagBmpSequenceType::Bitmap) {
 
 层 PreCompose scale：从 `PagBitmapFallback` **抽出**共享 helper 或在 Video 路径复制同一 scale 逻辑（1920/1280 → 1.5）。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(PagExporterTest, BmpSequenceTypeVideoExportsVideoComposition) {
@@ -316,16 +316,16 @@ TEST(PagExporterTest, LayerBmpVideoMaxResolutionScalesPrecompose) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
-- [ ] **Step 3: 实现 Fallback + 分流**
+- [x] **Step 3: 实现 Fallback + 分流**
 
-- [ ] **Step 4: 全量相关测**
+- [x] **Step 4: 全量相关测**
 
 Run: `ctest --test-dir build -R 'PagExporter|PagVideo|PagAlmost|PagRgbAlpha|PagBmpSuffix|PagExportBridge' --output-on-failure`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagVideoFallback.h src/export/pag/PagVideoFallback.cpp \
