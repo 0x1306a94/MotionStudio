@@ -67,7 +67,43 @@ TEST(VectorNetworkCompileTest, ClosedTriangleYieldsOneFillFace) {
     ASSERT_EQ(fill.contours.size(), 1u);
     EXPECT_TRUE(fill.contours[0].closed);
     EXPECT_GE(fill.contours[0].vertices.size(), 3u);
-    EXPECT_EQ(CompileStrokeEdges(network).contours.size(), 3u);
+    // Degree-2 ring chains into one closed stroke so joins apply at corners.
+    const BezierPath stroke = CompileStrokeEdges(network);
+    ASSERT_EQ(stroke.contours.size(), 1u);
+    EXPECT_TRUE(stroke.contours[0].closed);
+    EXPECT_EQ(stroke.contours[0].vertices.size(), 3u);
+}
+
+TEST(VectorNetworkCompileTest, ClosedTrapezoidStrokeChainsForJoins) {
+    // Path 8 topology: closed 4-gon. One open contour per edge leaves butt gaps
+    // at corners; stroke must be a single closed contour.
+    VectorNetwork network;
+    network.vertices = {
+        {1, {-171.8f, -173.4f}},
+        {2, {174.1f, -174.5f}},
+        {3, {215.8f, 172.2f}},
+        {4, {-215.8f, 174.5f}},
+    };
+    network.edges = {
+        {1, 1, 2, {}, {}},
+        {2, 2, 3, {}, {}},
+        {3, 3, 4, {}, {}},
+        {4, 4, 1, {}, {}},
+    };
+    const BezierPath stroke = CompileStrokeEdges(network);
+    ASSERT_EQ(stroke.contours.size(), 1u);
+    EXPECT_TRUE(stroke.contours[0].closed);
+    EXPECT_EQ(stroke.contours[0].vertices.size(), 4u);
+}
+
+TEST(VectorNetworkCompileTest, OpenPolylineChainsThroughDegreeTwo) {
+    const BezierPath path =
+        MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{20, 5}, {}, {}}}, false);
+    const VectorNetwork network = BezierPathToVectorNetwork(path);
+    const BezierPath stroke = CompileStrokeEdges(network);
+    ASSERT_EQ(stroke.contours.size(), 1u);
+    EXPECT_FALSE(stroke.contours[0].closed);
+    EXPECT_EQ(stroke.contours[0].vertices.size(), 3u);
 }
 
 TEST(VectorNetworkCompileTest, StrokePreservesEdgeTangents) {

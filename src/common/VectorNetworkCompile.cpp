@@ -590,28 +590,128 @@ BezierPath CompileFillFaces(const VectorNetwork &network) {
 
 BezierPath CompileStrokeEdges(const VectorNetwork &network) {
     BezierPath result;
-    result.contours.reserve(network.edges.size());
-    for (const VectorNetwork::Edge &edge : network.edges) {
-        if (edge.start == edge.end) {
-            continue;
+    const std::vector<size_t> activeEdges = UniqueUndirectedEdgeIndices(network);
+    if (activeEdges.empty()) {
+        return result;
+    }
+
+    struct Neighbor {
+        size_t edgeIndex = 0;
+        uint32_t other = 0;
+    };
+    std::unordered_map<uint32_t, std::vector<Neighbor>> adjacency;
+    adjacency.reserve(network.vertices.size());
+    for (size_t edgeIndex : activeEdges) {
+        const VectorNetwork::Edge &edge = network.edges[edgeIndex];
+        adjacency[edge.start].push_back({edgeIndex, edge.end});
+        adjacency[edge.end].push_back({edgeIndex, edge.start});
+    }
+
+    auto degreeOf = [&](uint32_t vertexId) -> size_t {
+        const auto found = adjacency.find(vertexId);
+        return found == adjacency.end() ? 0 : found->second.size();
+    };
+
+    auto applyEdgeTangents = [&](BezierPath::Contour &contour, size_t fromIndex, size_t toIndex,
+                                 size_t edgeIndex, uint32_t fromId, uint32_t toId) {
+        const VectorNetwork::Edge &edge = network.edges[edgeIndex];
+        if (edge.start == fromId && edge.end == toId) {
+            contour.vertices[fromIndex].outTangent = edge.startTangent;
+            contour.vertices[toIndex].inTangent = edge.endTangent;
+        } else {
+            contour.vertices[fromIndex].outTangent = edge.endTangent;
+            contour.vertices[toIndex].inTangent = edge.startTangent;
         }
-        const VectorNetwork::Vertex *start = FindVertex(network, edge.start);
-        const VectorNetwork::Vertex *end = FindVertex(network, edge.end);
-        if (start == nullptr || end == nullptr) {
-            continue;
+    };
+
+    std::vector<uint8_t> used(network.edges.size(), 0);
+    result.contours.reserve(activeEdges.size());
+
+    auto emitWalk = [&](uint32_t startId, size_t firstEdgeIndex) {
+        const VectorNetwork::Vertex *startVertex = FindVertex(network, startId);
+        if (startVertex == nullptr || used[firstEdgeIndex] != 0) {
+            return;
         }
+
         BezierPath::Contour contour;
         contour.closed = false;
-        BezierPath::Vertex from;
-        from.point = start->point;
-        from.outTangent = edge.startTangent;
-        BezierPath::Vertex to;
-        to.point = end->point;
-        to.inTangent = edge.endTangent;
-        contour.vertices.push_back(from);
-        contour.vertices.push_back(to);
-        result.contours.push_back(std::move(contour));
+        contour.vertices.push_back({startVertex->point, {}, {}});
+
+        uint32_t current = startId;
+        size_t edgeIndex = firstEdgeIndex;
+        const size_t stepLimit = activeEdges.size() + 1;
+        for (size_t step = 0; step < stepLimit; ++step) {
+            if (used[edgeIndex] != 0) {
+                break;
+            }
+            used[edgeIndex] = 1;
+
+            const VectorNetwork::Edge &edge = network.edges[edgeIndex];
+            const uint32_t nextId = edge.start == current ? edge.end : edge.start;
+            const VectorNetwork::Vertex *nextVertex = FindVertex(network, nextId);
+            if (nextVertex == nullptr) {
+                break;
+            }
+
+            if (nextId == startId && contour.vertices.size() >= 2) {
+                applyEdgeTangents(contour, contour.vertices.size() - 1, 0, edgeIndex, current,
+                                  nextId);
+                contour.closed = true;
+                break;
+            }
+
+            contour.vertices.push_back({nextVertex->point, {}, {}});
+            applyEdgeTangents(contour, contour.vertices.size() - 2, contour.vertices.size() - 1,
+                              edgeIndex, current, nextId);
+            current = nextId;
+
+            if (degreeOf(current) != 2) {
+                break;
+            }
+
+            size_t nextEdge = static_cast<size_t>(-1);
+            for (const Neighbor &neighbor : adjacency[current]) {
+                if (used[neighbor.edgeIndex] == 0) {
+                    nextEdge = neighbor.edgeIndex;
+                    break;
+                }
+            }
+            if (nextEdge == static_cast<size_t>(-1)) {
+                break;
+            }
+            edgeIndex = nextEdge;
+        }
+
+        if (contour.vertices.size() >= 2) {
+            result.contours.push_back(std::move(contour));
+        }
+    };
+
+    // Open chains / branches: begin at endpoints that are not degree-2.
+    for (size_t edgeIndex : activeEdges) {
+        if (used[edgeIndex] != 0) {
+            continue;
+        }
+        const VectorNetwork::Edge &edge = network.edges[edgeIndex];
+        uint32_t startId = 0;
+        if (degreeOf(edge.start) != 2) {
+            startId = edge.start;
+        } else if (degreeOf(edge.end) != 2) {
+            startId = edge.end;
+        } else {
+            continue;
+        }
+        emitWalk(startId, edgeIndex);
     }
+
+    // Remaining pure cycles (every vertex on the component is degree-2).
+    for (size_t edgeIndex : activeEdges) {
+        if (used[edgeIndex] != 0) {
+            continue;
+        }
+        emitWalk(network.edges[edgeIndex].start, edgeIndex);
+    }
+
     return result;
 }
 
