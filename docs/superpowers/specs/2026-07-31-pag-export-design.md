@@ -31,7 +31,7 @@
 ## 非目标
 
 - App 导出 UI / Bridge `ms_pag_export_*`
-- 音频轨、`VideoComposition`、硬件编码、TimeStretch UI
+- 音频轨、TimeStretch UI（`VideoComposition` 见 [2026-08-10-pag-export-video-composition-design.md](./2026-08-10-pag-export-video-composition-design.md)）
 - PAGX（XML）导入导出
 - 完整 AE 特效 / 相机 / Solid 层（MS 模型无则不做）
 - 与 PAGViewer 的自动化像素回归（可作手工验收清单）
@@ -554,7 +554,8 @@ Encode(file)
 | Precomp 层名 `_bmp` 强制子合成 Bitmap | 对齐 AE「预合成 + 后缀」；MS：层名即可强制引用合成 |
 | `ExportVerify` / AlertInfo | `PagExportWarning` / `MappingFailed` |
 | `Codec::Encode` + `ValidatePAGFile` | 同；测试强制 `File::Load` |
-| Marker / 音频 / `VideoComposition` | **不做** |
+| Marker / 音频 | **不做** |
+| `VideoComposition` | 见 [pag-export-video-composition-design](./2026-08-10-pag-export-video-composition-design.md) |
 | Qt UI / 批量面板 | **不做** |
 
 可读参考（勿直接依赖 exporter 目标）：
