@@ -60,6 +60,9 @@ MS_UNIFORM_FORMAT ToMSUniformFormat(UniformFormat format) {
             return MS_UNIFORM_FORMAT_FLOAT3;
         case UniformFormat::Float4:
             return MS_UNIFORM_FORMAT_FLOAT4;
+        case UniformFormat::Color:
+            // MS_UNIFORM_FORMAT_COLOR added in Task 5; until then report invalid.
+            return MS_UNIFORM_FORMAT_INVALID;
         default:
             return MS_UNIFORM_FORMAT_INVALID;
     }

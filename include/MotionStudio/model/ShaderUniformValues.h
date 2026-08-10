@@ -18,7 +18,7 @@ namespace motion {
 class Document;
 
 // Storage kind for one user-editable shader uniform value.
-// v1 animates Float / Float2 / Float3 / Float4→Color; other kinds are reserved.
+// v1: Float/Float2/Float3/Float4→AnimFloat4, Color→AnimColor; other kinds reserved.
 enum class ShaderUniformValueKind : uint8_t {
     AnimFloat = 0,
     AnimFloat2 = 1,

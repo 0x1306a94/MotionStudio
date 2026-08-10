@@ -53,6 +53,9 @@ Expected<ShaderUniformValueKind, std::string> KindForFormat(UniformFormat format
             return ShaderUniformValueKind::AnimFloat3;
         }
         case UniformFormat::Float4: {
+            return ShaderUniformValueKind::AnimFloat4;
+        }
+        case UniformFormat::Color: {
             return ShaderUniformValueKind::AnimColor;
         }
         default: {

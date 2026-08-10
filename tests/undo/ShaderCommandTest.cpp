@@ -47,7 +47,7 @@ ShaderDefinition MakeRippleShader() {
     shader.name = "Ripple";
     shader.mainImage = "vec4 mainImage(vec2 uv){ return vec4(uv,0.0,1.0); }";
     shader.uniforms.push_back(ShaderUniformDecl{"rippleCount", UniformFormat::Float, 1});
-    shader.uniforms.push_back(ShaderUniformDecl{"tint", UniformFormat::Float4, 1});
+    shader.uniforms.push_back(ShaderUniformDecl{"tint", UniformFormat::Color, 1});
     return shader;
 }
 

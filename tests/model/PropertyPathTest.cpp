@@ -229,7 +229,7 @@ TEST(PropertyPathTest, ResolvesShaderUniformFloat) {
     ShaderDefinition shader;
     shader.name = "Ripple";
     shader.uniforms.push_back(ShaderUniformDecl{"rippleCount", UniformFormat::Float, 1});
-    shader.uniforms.push_back(ShaderUniformDecl{"tint", UniformFormat::Float4, 1});
+    shader.uniforms.push_back(ShaderUniformDecl{"tint", UniformFormat::Color, 1});
 
     auto fill = std::make_unique<FillStyle>();
     FillStyle *fillStyle = fill.get();

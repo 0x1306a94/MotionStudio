@@ -26,7 +26,7 @@ using motion::UniformFormat;
 TEST(ShaderUniformValuesTest, MakeDefaultsForFloatAndColor) {
     std::vector<ShaderUniformDecl> decls = {
         {"rippleCount", UniformFormat::Float, 1},
-        {"tint", UniformFormat::Float4, 1},
+        {"tint", UniformFormat::Color, 1},
     };
     auto values = MakeDefaultUniformValues(decls);
     ASSERT_EQ(values.entries.size(), 2u);
@@ -34,6 +34,12 @@ TEST(ShaderUniformValuesTest, MakeDefaultsForFloatAndColor) {
     EXPECT_EQ(values.entries[0].name, "rippleCount");
     EXPECT_EQ(values.entries[1].kind, ShaderUniformValueKind::AnimColor);
     EXPECT_EQ(values.entries[1].name, "tint");
+}
+
+TEST(ShaderUniformValuesTest, Float4MapsToAnimFloat4) {
+    auto kind = KindForFormat(UniformFormat::Float4);
+    ASSERT_TRUE(kind.hasValue());
+    EXPECT_EQ(*kind, ShaderUniformValueKind::AnimFloat4);
 }
 
 TEST(ShaderUniformValuesTest, RealignDropsRemovedAndAddsNew) {

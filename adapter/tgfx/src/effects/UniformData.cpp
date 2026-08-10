@@ -155,6 +155,7 @@ UniformData::Entry UniformData::EntryOf(UniformFormat format) {
         case UniformFormat::Float3:
             return {12, 16};  // 12 bytes, align 16 (vec3 aligns as vec4)
         case UniformFormat::Float4:
+        case UniformFormat::Color:
             return {16, 16};  // 16 bytes, align 16
         case UniformFormat::Float2x2:
             return {32, 16};  // 2x2 matrix, align 16

@@ -22,6 +22,7 @@ enum class UniformFormat {
     Texture2DSampler,        // 2D texture sampler.
     TextureExternalSampler,  // External texture sampler (e.g. for camera input).
     Texture2DRectSampler,    // Rectangle texture sampler.
+    Color,                   // RGBA color; GPU layout matches Float4 (vec4).
 };
 
 // Returns the GLSL type name for the given uniform format.

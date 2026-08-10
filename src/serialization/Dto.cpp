@@ -464,6 +464,9 @@ const char *ToString(UniformFormat format) {
         case UniformFormat::Float4: {
             return "float4";
         }
+        case UniformFormat::Color: {
+            return "color";
+        }
         case UniformFormat::Float2x2: {
             return "float2x2";
         }
@@ -510,6 +513,9 @@ Expected<UniformFormat, std::string> uniformFormatFromString(const std::string &
     }
     if (text == "float4") {
         return UniformFormat::Float4;
+    }
+    if (text == "color") {
+        return UniformFormat::Color;
     }
     if (text == "float2x2") {
         return UniformFormat::Float2x2;

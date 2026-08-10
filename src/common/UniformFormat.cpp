@@ -11,6 +11,7 @@ const char *UniformFormatGLSLTypeName(UniformFormat format) {
         case UniformFormat::Float3:
             return "vec3";
         case UniformFormat::Float4:
+        case UniformFormat::Color:
             return "vec4";
         case UniformFormat::Float2x2:
             return "mat2";
@@ -56,6 +57,7 @@ size_t UniformFormatByteSize(UniformFormat format) {
         case UniformFormat::Float3:
             return 3 * sizeof(float);
         case UniformFormat::Float4:  // fall-through
+        case UniformFormat::Color:
         case UniformFormat::Float2x2:
             return 4 * sizeof(float);
         case UniformFormat::Float3x3:
