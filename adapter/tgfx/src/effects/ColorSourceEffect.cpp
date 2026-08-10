@@ -25,6 +25,7 @@
 #include <tgfx/gpu/ShaderModule.h>
 #include <tgfx/gpu/ShaderStage.h>
 #include <tgfx/gpu/Texture.h>
+#include <tgfx/platform/Print.h>
 
 namespace motion {
 
@@ -50,8 +51,8 @@ void PrependShadertoyBuiltinUniforms(std::vector<Uniform> &uniforms) {
     add("iResolution", UniformFormat::Float3);
     add("iTime", UniformFormat::Float);
     add("iTimeDelta", UniformFormat::Float);
-    add("iFrame", UniformFormat::Int);
     add("iFrameRate", UniformFormat::Float);
+    add("iFrame", UniformFormat::Int);
     // tgfx RuntimeImageFilter may allocate a clip subset RT; these map v_uv back
     // into the logical sourceBounds UV space (see onDraw).
     add("iRenderOrigin", UniformFormat::Float2);
@@ -60,20 +61,18 @@ void PrependShadertoyBuiltinUniforms(std::vector<Uniform> &uniforms) {
     uniforms.insert(uniforms.begin(), builtins.begin(), builtins.end());
 }
 
-void WriteShadertoyBuiltinUniforms(UniformData *uniformData, const tgfx::Rect &sourceBounds,
-                                   const ColorSourceFrameContext &frameContext, float timeDelta) {
+void WriteShadertoyBuiltinUniforms(UniformData *uniformData, const tgfx::Rect &sourceBounds, const ColorSourceFrameContext &frameContext, float timeDelta) {
     const float resolution[3] = {sourceBounds.width(), sourceBounds.height(), 1.f};
     uniformData->setData("iResolution", resolution, sizeof(resolution));
     uniformData->setData("iTime", frameContext.timeSeconds);
     uniformData->setData("iTimeDelta", timeDelta);
 
     const int32_t frame = static_cast<int32_t>(frameContext.frameIndex);
-    uniformData->setData("iFrame", frame);
     uniformData->setData("iFrameRate", frameContext.frameRate);
+    uniformData->setData("iFrame", frame);
 }
 
-void WriteRenderSubsetUniforms(UniformData *uniformData, const tgfx::Point &offset,
-                               const tgfx::Texture &outputTexture) {
+void WriteRenderSubsetUniforms(UniformData *uniformData, const tgfx::Point &offset, const tgfx::Texture &outputTexture) {
     const float origin[2] = {-offset.x, -offset.y};
     const float size[2] = {static_cast<float>(outputTexture.width()), static_cast<float>(outputTexture.height())};
     uniformData->setData("iRenderOrigin", origin, sizeof(origin));
@@ -85,7 +84,7 @@ void WriteRenderSubsetUniforms(UniformData *uniformData, const tgfx::Point &offs
 // Fullscreen triangle driven by aPosition (GLES-portable). Three clip-space
 // vertices cover [-1,1]^2; uv is derived from position. Avoid gl_VertexIndex —
 // RuntimeEffect shaders are GLES-style and GL backends compile them as-is.
-constexpr const char *kVertexShader = R"GLSL(
+constexpr const char *VERTEX_SHADER = R"GLSL(
 in vec2 aPosition;
 out vec2 v_uv;
 void main() {
@@ -106,7 +105,7 @@ static bool IsDesktopGPU(tgfx::GPU *gpu) {
 }
 
 std::string BuildVertexShaderSource(tgfx::GPU *gpu) {
-    return GetVersionPrefix(gpu) + kVertexShader;
+    return GetVersionPrefix(gpu) + VERTEX_SHADER;
 }
 
 static void AppendUniformDeclaration(std::string &out, const Uniform &uniform) {
@@ -142,7 +141,7 @@ std::string BuildFragmentShaderSource(tgfx::GPU *gpu, const std::vector<Uniform>
         }
     }
 
-    uniformBlock += "};\n";
+    uniformBlock += "};\n\n";
 
     // Map the (possibly clipped) output RT back into full-image UV so a subset
     // pass does not squeeze the whole mainImage into the visible strip.
@@ -169,17 +168,14 @@ static std::shared_ptr<tgfx::Image> GetPlaceholderImage() {
     return image;
 }
 
-std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(EntityId shaderId, std::string mainImage,
-                                                           std::vector<Uniform> uniforms, const tgfx::Rect &sourceBounds,
-                                                           RenderCache *cache) {
+std::shared_ptr<ColorSourceEffect> ColorSourceEffect::Make(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms, const tgfx::Rect &sourceBounds, RenderCache *cache) {
     if (!shaderId.isValid()) {
         return nullptr;
     }
     return std::shared_ptr<ColorSourceEffect>(new ColorSourceEffect(shaderId, std::move(mainImage), std::move(uniforms), sourceBounds, cache));
 }
 
-ColorSourceEffect::ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms,
-                                     tgfx::Rect sourceBounds, RenderCache *cache)
+ColorSourceEffect::ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms, tgfx::Rect sourceBounds, RenderCache *cache)
     : shaderId_(shaderId)
     , mainImage_(std::move(mainImage))
     , sourceBounds_(sourceBounds)
@@ -253,7 +249,9 @@ std::shared_ptr<tgfx::RenderPipeline> ColorSourceEffect::createPipeline(tgfx::GP
     if (fragmentModule == nullptr) {
         return nullptr;
     }
-
+#if DEBUG
+    tgfx::PrintLog("shaderId: %llu\nvertex shader:\n%s\nfragment shader:\n%s\n", shaderId_, vertexDesc.code.c_str(), fragmentDesc.code.c_str());
+#endif
     tgfx::RenderPipelineDescriptor pipelineDesc;
     tgfx::VertexBufferLayout vertexLayout({{"aPosition", tgfx::VertexFormat::Float2}});
     pipelineDesc.vertex.bufferLayouts = {vertexLayout};

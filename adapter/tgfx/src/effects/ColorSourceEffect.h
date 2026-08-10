@@ -39,9 +39,7 @@ class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_
     // shaderId identifies the document shader asset; same id → shared GPU pipeline.
     // After editing the shader source or uniform layout, call
     // RenderCache::invalidateColorSourcePipeline(shaderId) before the next draw.
-    static std::shared_ptr<ColorSourceEffect> Make(EntityId shaderId, std::string mainImage,
-                                                   std::vector<Uniform> uniforms, const tgfx::Rect &sourceBounds,
-                                                   RenderCache *cache);
+    static std::shared_ptr<ColorSourceEffect> Make(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms, const tgfx::Rect &sourceBounds, RenderCache *cache);
 
     EntityId shaderId() const {
         return shaderId_;
@@ -62,16 +60,14 @@ class ColorSourceEffect : public tgfx::RuntimeEffect, public std::enable_shared_
     std::shared_ptr<tgfx::Shader> makeImageShader();
 
   private:
-    ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms,
-                      tgfx::Rect sourceBounds, RenderCache *cache);
+    ColorSourceEffect(EntityId shaderId, std::string mainImage, std::vector<Uniform> uniforms, tgfx::Rect sourceBounds, RenderCache *cache);
 
     std::shared_ptr<tgfx::RenderPipeline> createPipeline(tgfx::GPU *gpu) const;
     std::shared_ptr<tgfx::RenderPipeline> getOrCreatePipeline(tgfx::GPU *gpu) const;
 
     tgfx::Rect filterBounds(const tgfx::Rect &srcRect, tgfx::MapDirection) const override;
 
-    bool onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> &inputTextures,
-                std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point &offset) const override;
+    bool onDraw(tgfx::CommandEncoder *encoder, const std::vector<std::shared_ptr<tgfx::Texture>> &inputTextures, std::shared_ptr<tgfx::Texture> outputTexture, const tgfx::Point &offset) const override;
 
   private:
     EntityId shaderId_ = {};

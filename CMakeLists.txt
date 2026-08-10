@@ -28,6 +28,8 @@ if(MOTIONSTUDIO_ENABLE_ASAN)
               "${CMAKE_SOURCE_DIR}/cmake/asan_default_options.cpp")
 endif()
 
+add_compile_options($<$<CONFIG:Debug>:-DDEBUG>)
+
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
