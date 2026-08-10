@@ -11,6 +11,7 @@
 #include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/model/ShaderDefinition.h"
 
 namespace motion {
@@ -37,6 +38,7 @@ struct ShaderUniformValue {
     Animatable<float> floatValue{0.f};
     Animatable<Vec2> float2Value{Vec2{0, 0}};
     Animatable<Vec3> float3Value{Vec3{0, 0, 0}};
+    Animatable<Vec4> float4Value{Vec4{0, 0, 0, 0}};
     Animatable<Color> colorValue{Color{1, 1, 1, 1}};
 };
 

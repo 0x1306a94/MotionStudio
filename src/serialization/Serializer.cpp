@@ -1191,10 +1191,80 @@ Expected<void, std::string> StylePaintFromJson(const json &node, StylePaintMode 
     return {};
 }
 
+json ShaderUniformDeclDefaultToJson(const ShaderUniformDecl &decl) {
+    switch (decl.format) {
+        case UniformFormat::Float:
+            return decl.defaultFloat;
+        case UniformFormat::Float2:
+            return Vec2ToJson(decl.defaultFloat2);
+        case UniformFormat::Float3:
+            return Vec3ToJson(decl.defaultFloat3);
+        case UniformFormat::Float4:
+            return Vec4ToJson(decl.defaultFloat4);
+        case UniformFormat::Color:
+            return ColorToJson(decl.defaultColor);
+        default:
+            return nullptr;
+    }
+}
+
+Expected<void, std::string> ShaderUniformDeclDefaultFromJson(const json &node, ShaderUniformDecl &decl) {
+    switch (decl.format) {
+        case UniformFormat::Float: {
+            Expected<float, std::string> value = AsFloat(node);
+            if (!value) {
+                return Unexpected(value.error());
+            }
+            decl.defaultFloat = *value;
+            return {};
+        }
+        case UniformFormat::Float2: {
+            Expected<Vec2, std::string> value = Vec2FromJson(node);
+            if (!value) {
+                return Unexpected(value.error());
+            }
+            decl.defaultFloat2 = *value;
+            return {};
+        }
+        case UniformFormat::Float3: {
+            Expected<Vec3, std::string> value = Vec3FromJson(node);
+            if (!value) {
+                return Unexpected(value.error());
+            }
+            decl.defaultFloat3 = *value;
+            return {};
+        }
+        case UniformFormat::Float4: {
+            Expected<Vec4, std::string> value = Vec4FromJson(node);
+            if (!value) {
+                return Unexpected(value.error());
+            }
+            decl.defaultFloat4 = *value;
+            return {};
+        }
+        case UniformFormat::Color: {
+            Expected<Color, std::string> value = ColorFromJson(node);
+            if (!value) {
+                return Unexpected(value.error());
+            }
+            decl.defaultColor = *value;
+            return {};
+        }
+        default:
+            return Unexpected(std::string("unsupported uniform format default"));
+    }
+}
+
 json ShaderUniformDeclToJson(const ShaderUniformDecl &decl) {
-    return {{"name", decl.name},
-            {"format", dto::ToString(decl.format)},
-            {"count", decl.count}};
+    json node = {{"name", decl.name},
+                 {"format", dto::ToString(decl.format)},
+                 {"count", decl.count},
+                 {"animatable", decl.animatable}};
+    json defaultNode = ShaderUniformDeclDefaultToJson(decl);
+    if (!defaultNode.is_null()) {
+        node["default"] = std::move(defaultNode);
+    }
+    return node;
 }
 
 Expected<ShaderUniformDecl, std::string> ShaderUniformDeclFromJson(const json &node) {
@@ -1218,6 +1288,18 @@ Expected<ShaderUniformDecl, std::string> ShaderUniformDeclFromJson(const json &n
     decl.name = std::move(*name);
     decl.format = *format;
     decl.count = *count;
+    if (const json *animatableNode = FindChild(node, "animatable")) {
+        if (!animatableNode->is_boolean()) {
+            return Unexpected(std::string("animatable must be a boolean"));
+        }
+        decl.animatable = animatableNode->get<bool>();
+    }
+    if (const json *defaultNode = FindChild(node, "default")) {
+        Expected<void, std::string> parsed = ShaderUniformDeclDefaultFromJson(*defaultNode, decl);
+        if (!parsed) {
+            return Unexpected(parsed.error());
+        }
+    }
     return decl;
 }
 

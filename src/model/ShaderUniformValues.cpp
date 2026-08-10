@@ -23,10 +23,82 @@ Expected<ShaderUniformValueKind, std::string> KindForDecl(const ShaderUniformDec
     return KindForFormat(decl.format);
 }
 
-ShaderUniformValue MakeDefaultUniformValue(const std::string &name, ShaderUniformValueKind kind) {
+void FlattenIfNeeded(ShaderUniformValue &value) {
+    switch (value.kind) {
+        case ShaderUniformValueKind::AnimFloat: {
+            if (value.floatValue.isAnimated()) {
+                value.floatValue.setStaticValue(value.floatValue.evaluate(0));
+                value.floatValue.clearKeyframes();
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat2: {
+            if (value.float2Value.isAnimated()) {
+                value.float2Value.setStaticValue(value.float2Value.evaluate(0));
+                value.float2Value.clearKeyframes();
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat3: {
+            if (value.float3Value.isAnimated()) {
+                value.float3Value.setStaticValue(value.float3Value.evaluate(0));
+                value.float3Value.clearKeyframes();
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat4: {
+            if (value.float4Value.isAnimated()) {
+                value.float4Value.setStaticValue(value.float4Value.evaluate(0));
+                value.float4Value.clearKeyframes();
+            }
+            break;
+        }
+        case ShaderUniformValueKind::AnimColor: {
+            if (value.colorValue.isAnimated()) {
+                value.colorValue.setStaticValue(value.colorValue.evaluate(0));
+                value.colorValue.clearKeyframes();
+            }
+            break;
+        }
+        case ShaderUniformValueKind::StaticInt:
+        case ShaderUniformValueKind::StaticMat3:
+        case ShaderUniformValueKind::TextureAsset: {
+            break;
+        }
+    }
+}
+
+ShaderUniformValue MakeDefaultUniformValue(const ShaderUniformDecl &decl, ShaderUniformValueKind kind) {
     ShaderUniformValue value;
-    value.name = name;
+    value.name = decl.name;
     value.kind = kind;
+    switch (kind) {
+        case ShaderUniformValueKind::AnimFloat: {
+            value.floatValue.setStaticValue(decl.defaultFloat);
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat2: {
+            value.float2Value.setStaticValue(decl.defaultFloat2);
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat3: {
+            value.float3Value.setStaticValue(decl.defaultFloat3);
+            break;
+        }
+        case ShaderUniformValueKind::AnimFloat4: {
+            value.float4Value.setStaticValue(decl.defaultFloat4);
+            break;
+        }
+        case ShaderUniformValueKind::AnimColor: {
+            value.colorValue.setStaticValue(decl.defaultColor);
+            break;
+        }
+        case ShaderUniformValueKind::StaticInt:
+        case ShaderUniformValueKind::StaticMat3:
+        case ShaderUniformValueKind::TextureAsset: {
+            break;
+        }
+    }
     return value;
 }
 
@@ -83,7 +155,7 @@ ShaderUniformValues MakeDefaultUniformValues(const std::vector<ShaderUniformDecl
         if (!kind.hasValue()) {
             continue;
         }
-        values.entries.push_back(MakeDefaultUniformValue(decl.name, *kind));
+        values.entries.push_back(MakeDefaultUniformValue(decl, *kind));
     }
     return values;
 }
@@ -99,10 +171,14 @@ Expected<ShaderUniformValues, std::string> RealignUniformValues(const std::vecto
         }
         const ShaderUniformValue *previousEntry = FindPreviousEntry(previous, decl.name);
         if (previousEntry != nullptr && previousEntry->kind == *kind) {
-            values.entries.push_back(*previousEntry);
+            ShaderUniformValue kept = *previousEntry;
+            if (!decl.animatable) {
+                FlattenIfNeeded(kept);
+            }
+            values.entries.push_back(std::move(kept));
             continue;
         }
-        values.entries.push_back(MakeDefaultUniformValue(decl.name, *kind));
+        values.entries.push_back(MakeDefaultUniformValue(decl, *kind));
     }
     return values;
 }
