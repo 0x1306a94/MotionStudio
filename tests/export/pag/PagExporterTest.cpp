@@ -389,6 +389,39 @@ TEST(PagExporterTest, BitmapMaxResolutionCapsShortSide) {
     EXPECT_LE(shortSide, 720);
 }
 
+TEST(PagExporterTest, LayerBmpMaxResolutionScalesPrecomposeToHost) {
+    // 1920x1080 host + maxResolution 720 → bitmap 1280x720; PreCompose must scale 1.5×.
+    Document document = MakeEmptyDoc(1920, 1080, 2);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 100});
+    layer->name = "Rect_bmp";
+
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.allowBitmapExport = true;
+    options.bitmapScale = 1.0f;
+    options.bitmapMaxResolution = 720;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    EXPECT_EQ(main->width, 1920);
+    EXPECT_EQ(main->height, 1080);
+    ASSERT_GE(main->layers.size(), 1u);
+    ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    auto *precomp = static_cast<pag::PreComposeLayer *>(main->layers[0]);
+    ASSERT_NE(precomp->composition, nullptr);
+    EXPECT_EQ(precomp->composition->type(), pag::CompositionType::Bitmap);
+    EXPECT_EQ(precomp->composition->width, 1280);
+    EXPECT_EQ(precomp->composition->height, 720);
+    ASSERT_NE(precomp->transform, nullptr);
+    ASSERT_NE(precomp->transform->scale, nullptr);
+    EXPECT_FLOAT_EQ(precomp->transform->scale->value.x, 1.5f);
+    EXPECT_FLOAT_EQ(precomp->transform->scale->value.y, 1.5f);
+}
+
 TEST(PagExporterTest, AllowBitmapExportFalseWithBmpFails) {
     Document document = MakeEmptyDoc(40, 30, 2);
     Primary(document)->name = "Main_bmp";

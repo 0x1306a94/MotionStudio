@@ -98,7 +98,19 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
     pagLayer->startTime = rootLayer.inPoint;
     pagLayer->duration = duration;
     pagLayer->isActive = rootLayer.visible;
+    // Content is already baked in host space; keep origin at (0,0). When
+    // maxResolution shrinks the bitmap below host size, scale the PreCompose
+    // layer back up so it still fills the host composition.
     pagLayer->transform = MakeIdentityTransform();
+    const float scaleX =
+        static_cast<float>(hostComposition.width) / static_cast<float>(size.width);
+    const float scaleY =
+        static_cast<float>(hostComposition.height) / static_cast<float>(size.height);
+    if (scaleX != 1.0f || scaleY != 1.0f) {
+        delete pagLayer->transform->scale;
+        pagLayer->transform->scale =
+            new pag::Property<pag::Point>(pag::Point::Make(scaleX, scaleY));
+    }
     pagLayer->composition = bitmapComposition;
     pagLayer->compositionStartTime = 0;
 
