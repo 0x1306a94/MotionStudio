@@ -708,6 +708,8 @@ void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint6
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked);
+// name: UTF-8 layer display name. Null is treated as empty.
+void ms_command_set_layer_name(MSDocument *document, uint64_t layerId, const char *name);
 // blendMode: MS_BLEND_* tag. Sets Layer::blendMode (not fill/stroke style).
 void ms_command_set_layer_blend_mode(MSDocument *document, uint64_t layerId, MS_BLEND blendMode);
 

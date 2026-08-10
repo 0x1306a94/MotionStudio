@@ -30,6 +30,7 @@
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetFollowPathCommand.h"
 #include "MotionStudio/undo/SetLayerBlendModeCommand.h"
+#include "MotionStudio/undo/SetLayerNameCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
@@ -74,6 +75,7 @@ using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
 using motion::SetFollowPathCommand;
 using motion::SetLayerBlendModeCommand;
+using motion::SetLayerNameCommand;
 using motion::SetMaskInvertedCommand;
 using motion::SetMaskModeCommand;
 using motion::SetSpatialTangentsCommand;
@@ -513,6 +515,40 @@ TEST(SetLayerBlendModeCommandTest, SetAndUndo) {
 
     scene.undo.redo(scene.document);
     EXPECT_EQ(scene.layer->blendMode, motion::BlendMode::Multiply);
+}
+
+TEST(SetLayerNameCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->name = "Rect";
+
+    scene.execute<SetLayerNameCommand>(scene.layer->id, "Hero");
+    EXPECT_EQ(scene.layer->name, "Hero");
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->name, "Rect");
+
+    scene.undo.redo(scene.document);
+    EXPECT_EQ(scene.layer->name, "Hero");
+}
+
+TEST(SetLayerNameCommandTest, MergesSameTargetKeepsOriginalValue) {
+    Scene scene;
+    scene.layer->name = "Rect";
+
+    scene.execute<SetLayerNameCommand>(scene.layer->id, "A");
+    scene.execute<SetLayerNameCommand>(scene.layer->id, "B");
+    EXPECT_EQ(scene.layer->name, "B");
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->name, "Rect");
+}
+
+TEST(SetLayerNameCommandTest, ExecuteSkipsMissingLayer) {
+    Scene scene;
+    scene.layer->name = "Rect";
+    scene.execute<SetLayerNameCommand>(EntityId{999}, "Missing");
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->name, "Rect");
 }
 
 TEST(SetLayerBlendModeCommandTest, MergesSameTargetKeepsOriginalValue) {

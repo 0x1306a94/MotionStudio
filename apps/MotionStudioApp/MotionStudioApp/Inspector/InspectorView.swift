@@ -19,6 +19,8 @@ struct InspectorView: View {
     let perform: (String, () -> Void) -> Void
 
     @State private var keyboardFrame = CGRect.null
+    @State private var draftLayerName = ""
+    @FocusState private var layerNameFocused: Bool
 
     var body: some View {
         GeometryReader { proxy in
@@ -28,10 +30,35 @@ struct InspectorView: View {
                 let isVisible = core.layerIsVisible(layerID)
                 let isLocked = core.layerIsLocked(layerID)
                 let isEditable = isVisible && !isLocked
+                let layerName = core.layerName(layerID)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(core.layerName(layerID))
+                        TextField("Layer Name", text: $draftLayerName)
                             .font(.headline)
+                            .textFieldStyle(.roundedBorder)
+                            .focused($layerNameFocused)
+                            .onAppear {
+                                draftLayerName = layerName
+                            }
+                            .onChange(of: layerID) { _, newLayerID in
+                                draftLayerName = core.layerName(newLayerID)
+                            }
+                            .onChange(of: layerName) { _, newValue in
+                                if !layerNameFocused {
+                                    draftLayerName = newValue
+                                }
+                            }
+                            .onChange(of: layerNameFocused) { _, focused in
+                                if focused {
+                                    core.beginMergeGroup()
+                                } else {
+                                    commitLayerName(core: core, layerID: layerID)
+                                    core.endMergeGroup()
+                                }
+                            }
+                            .onSubmit {
+                                commitLayerName(core: core, layerID: layerID)
+                            }
                         LayerEditStatus(isVisible: isVisible, isLocked: isLocked)
                         if core.hasProperty(entityID: layerID, path: shapeSizePath) {
                             Text("Shape")
@@ -165,5 +192,22 @@ struct InspectorView: View {
                 keyboardFrame = inspectorKeyboardEndFrame(from: notification)
             }
         #endif
+    }
+
+    private func commitLayerName(core: MotionDocumentCore, layerID: UInt64) {
+        let trimmed = draftLayerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = core.layerName(layerID)
+        if trimmed.isEmpty {
+            draftLayerName = current
+            return
+        }
+        guard trimmed != current else {
+            draftLayerName = current
+            return
+        }
+        draftLayerName = trimmed
+        perform("Rename Layer") {
+            core.setLayerName(layerID, name: trimmed)
+        }
     }
 }

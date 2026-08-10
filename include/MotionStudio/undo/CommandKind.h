@@ -15,6 +15,7 @@ enum class CommandKind {
     SetEasing,
     SetLayerVisible,
     SetLayerLocked,
+    SetLayerName,
     SetCompositionBackgroundColor,
     SetCompositionCornerRadius,
     SetCompositionSettings,

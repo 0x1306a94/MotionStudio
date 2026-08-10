@@ -1521,6 +1521,13 @@ final class MotionDocumentCore {
         changed()
     }
 
+    func setLayerName(_ layerID: UInt64, name: String) {
+        name.withCString { cName in
+            ms_command_set_layer_name(handle, layerID, cName)
+        }
+        changed()
+    }
+
     /// Appends a default fill to the layer's style list.
     func addFillStyle(layerID: UInt64) {
         ms_command_add_fill_style(handle, layerID)
