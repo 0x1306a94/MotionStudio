@@ -75,12 +75,12 @@ public:
 
     Expected<void, std::string> prepare(const Document &document, EntityId hostCompositionId,
                                         EntityId rootLayerId, TimeRange visibleRange,
-                                        float bitmapScale) override;
+                                        int pixelWidth, int pixelHeight) override;
 
     Expected<void, std::string> prepareComposition(const Document &document,
                                                    EntityId compositionId,
                                                    TimeRange visibleRange,
-                                                   float bitmapScale) override;
+                                                   int pixelWidth, int pixelHeight) override;
 
     Expected<BitmapFrame, std::string> renderFrame(FrameTime time) override;
 
@@ -99,7 +99,7 @@ private:
 - `prepare*` 可重复调用（内部先 `finish`）
 - `renderFrame` 返回的 `rgba` 指向 `Impl` 内 buffer；至下次 `renderFrame` / `finish` 前有效
 - `premultiplied = true`
-- 像素尺寸：`ceil(compW * bitmapScale)` × `ceil(compH * bitmapScale)`（与 Fake / 编码器一致；maxResolution 仍由 `PagExportOptions` 在 Builder 侧通过传入的 `bitmapScale`/`factor` 体现——`prepare` 收到的已是有效 factor）
+- 像素尺寸：由 `ComputeBitmapSize` 算出后以 `pixelWidth`/`pixelHeight` 传入 `prepare*`；FrameSource **禁止**再按 scale 二次换算（避免 float→double `ceil` 漂移，如 1920×1080@720 → 1280×720）
 
 ### 2.2 两种模式
 
@@ -172,7 +172,7 @@ result = PagExporter::Export(document, exportOptions, source.get())
 | Evaluate 失败 | 透传 |
 | 层不在宿主合成 | `root layer not found in host composition` |
 | 未 prepare | `bitmap frame source not prepared` |
-| scale ≤ 0 | `bitmapScale must be > 0` |
+| pixelWidth/Height ≤ 0 | `invalid bitmap size` |
 
 ---
 

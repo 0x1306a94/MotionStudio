@@ -1,7 +1,6 @@
 #include "TgfxBitmapFrameSource.h"
 
 #include <algorithm>
-#include <cmath>
 #include <unordered_set>
 
 #include "MotionStudio/common/Mat3.h"
@@ -42,10 +41,6 @@ void CollectSubtreeIds(const Composition &host, EntityId root,
     }
 }
 
-int ScaledPixelSize(int compositionSize, float bitmapScale) {
-    return static_cast<int>(std::ceil(static_cast<double>(compositionSize) * static_cast<double>(bitmapScale)));
-}
-
 }  // namespace
 
 struct TgfxBitmapFrameSource::Impl {
@@ -53,7 +48,6 @@ struct TgfxBitmapFrameSource::Impl {
     const Document *document = nullptr;
     EntityId compositionId;
     TimeRange visibleRange = {};
-    float bitmapScale = 1.0f;
     int pixelWidth = 0;
     int pixelHeight = 0;
     std::unordered_set<uint64_t> layerIds;
@@ -72,11 +66,11 @@ TgfxBitmapFrameSource::~TgfxBitmapFrameSource() {
 Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &document,
                                                            EntityId hostCompositionId,
                                                            EntityId rootLayerId,
-                                                           TimeRange visibleRange,
-                                                           float bitmapScale) {
+                                                           TimeRange visibleRange, int pixelWidth,
+                                                           int pixelHeight) {
     finish();
-    if (bitmapScale <= 0.0f) {
-        return Unexpected(std::string("bitmapScale must be > 0"));
+    if (pixelWidth <= 0 || pixelHeight <= 0) {
+        return Unexpected(std::string("invalid bitmap size"));
     }
     const Composition *host = document.entityIndex().findComposition(hostCompositionId);
     if (host == nullptr) {
@@ -94,12 +88,7 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &docum
     }
 
     CollectSubtreeIds(*host, rootLayerId, &impl_->layerIds);
-    impl_->pixelWidth = ScaledPixelSize(host->width, bitmapScale);
-    impl_->pixelHeight = ScaledPixelSize(host->height, bitmapScale);
-    if (impl_->pixelWidth <= 0 || impl_->pixelHeight <= 0) {
-        return Unexpected(std::string("invalid bitmap size"));
-    }
-    auto adapter = TgfxRenderAdapter::Make(impl_->pixelWidth, impl_->pixelHeight);
+    auto adapter = TgfxRenderAdapter::Make(pixelWidth, pixelHeight);
     if (!adapter) {
         return Unexpected(std::string("Metal unavailable for bitmap frame source"));
     }
@@ -108,7 +97,8 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &docum
     impl_->document = &document;
     impl_->compositionId = hostCompositionId;
     impl_->visibleRange = visibleRange;
-    impl_->bitmapScale = bitmapScale;
+    impl_->pixelWidth = pixelWidth;
+    impl_->pixelHeight = pixelHeight;
     impl_->adapter = std::move(adapter);
     return Expected<void, std::string>();
 }
@@ -116,22 +106,18 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepare(const Document &docum
 Expected<void, std::string> TgfxBitmapFrameSource::prepareComposition(const Document &document,
                                                                       EntityId compositionId,
                                                                       TimeRange visibleRange,
-                                                                      float bitmapScale) {
+                                                                      int pixelWidth,
+                                                                      int pixelHeight) {
     finish();
-    if (bitmapScale <= 0.0f) {
-        return Unexpected(std::string("bitmapScale must be > 0"));
+    if (pixelWidth <= 0 || pixelHeight <= 0) {
+        return Unexpected(std::string("invalid bitmap size"));
     }
     const Composition *composition = document.entityIndex().findComposition(compositionId);
     if (composition == nullptr) {
         return Unexpected(std::string("composition not found"));
     }
 
-    impl_->pixelWidth = ScaledPixelSize(composition->width, bitmapScale);
-    impl_->pixelHeight = ScaledPixelSize(composition->height, bitmapScale);
-    if (impl_->pixelWidth <= 0 || impl_->pixelHeight <= 0) {
-        return Unexpected(std::string("invalid bitmap size"));
-    }
-    auto adapter = TgfxRenderAdapter::Make(impl_->pixelWidth, impl_->pixelHeight);
+    auto adapter = TgfxRenderAdapter::Make(pixelWidth, pixelHeight);
     if (!adapter) {
         return Unexpected(std::string("Metal unavailable for bitmap frame source"));
     }
@@ -140,7 +126,8 @@ Expected<void, std::string> TgfxBitmapFrameSource::prepareComposition(const Docu
     impl_->document = &document;
     impl_->compositionId = compositionId;
     impl_->visibleRange = visibleRange;
-    impl_->bitmapScale = bitmapScale;
+    impl_->pixelWidth = pixelWidth;
+    impl_->pixelHeight = pixelHeight;
     impl_->adapter = std::move(adapter);
     return Expected<void, std::string>();
 }

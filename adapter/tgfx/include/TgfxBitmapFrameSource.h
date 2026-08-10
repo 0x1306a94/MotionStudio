@@ -9,6 +9,7 @@ namespace motion {
 // Offscreen tgfx BitmapFrameSource for PAG _bmp export.
 // Renders via Evaluate → BuildCommands → PlayCommands, then Surface readPixels
 // (premultiplied RGBA8). Forces cornerRadius = 0.
+// Caller must pass exact pixelWidth/pixelHeight from ComputeBitmapSize.
 class TgfxBitmapFrameSource : public BitmapFrameSource {
   public:
     TgfxBitmapFrameSource();
@@ -16,11 +17,11 @@ class TgfxBitmapFrameSource : public BitmapFrameSource {
 
     Expected<void, std::string> prepare(const Document &document, EntityId hostCompositionId,
                                         EntityId rootLayerId, TimeRange visibleRange,
-                                        float bitmapScale) override;
+                                        int pixelWidth, int pixelHeight) override;
 
     Expected<void, std::string> prepareComposition(const Document &document, EntityId compositionId,
-                                                   TimeRange visibleRange,
-                                                   float bitmapScale) override;
+                                                   TimeRange visibleRange, int pixelWidth,
+                                                   int pixelHeight) override;
 
     Expected<BitmapFrame, std::string> renderFrame(FrameTime time) override;
 

@@ -61,7 +61,7 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
     visibleRange.start = rootLayer.inPoint;
     visibleRange.end = rootLayer.outPoint;
     Expected<void, std::string> prepared = frameSource->prepare(
-        document, hostComposition.id, rootLayer.id, visibleRange, size.factor);
+        document, hostComposition.id, rootLayer.id, visibleRange, size.width, size.height);
     if (!prepared.hasValue()) {
         const std::string name = rootLayer.name.empty() ? "(unnamed layer)" : rootLayer.name;
         return Unexpected(MakePagExportError(
@@ -141,8 +141,8 @@ Expected<pag::BitmapComposition *, PagExportError> PagBitmapFallback::BuildCompo
     TimeRange visibleRange;
     visibleRange.start = 0;
     visibleRange.end = composition.duration;
-    Expected<void, std::string> prepared =
-        frameSource->prepareComposition(document, composition.id, visibleRange, size.factor);
+    Expected<void, std::string> prepared = frameSource->prepareComposition(
+        document, composition.id, visibleRange, size.width, size.height);
     if (!prepared.hasValue()) {
         const std::string name =
             composition.name.empty() ? "(unnamed composition)" : composition.name;

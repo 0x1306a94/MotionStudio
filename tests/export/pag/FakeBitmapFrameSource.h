@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cmath>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -35,15 +34,15 @@ class FakeBitmapFrameSource : public BitmapFrameSource {
 
     Expected<void, std::string> prepare(const Document &document, EntityId hostCompositionId,
                                         EntityId rootLayerId, TimeRange visibleRange,
-                                        float bitmapScale) override {
+                                        int pixelWidth, int pixelHeight) override {
         (void)rootLayerId;
-        return prepareFromComposition(document, hostCompositionId, visibleRange, bitmapScale);
+        return prepareFromSize(document, hostCompositionId, visibleRange, pixelWidth, pixelHeight);
     }
 
     Expected<void, std::string> prepareComposition(const Document &document, EntityId compositionId,
-                                                   TimeRange visibleRange,
-                                                   float bitmapScale) override {
-        return prepareFromComposition(document, compositionId, visibleRange, bitmapScale);
+                                                   TimeRange visibleRange, int pixelWidth,
+                                                   int pixelHeight) override {
+        return prepareFromSize(document, compositionId, visibleRange, pixelWidth, pixelHeight);
     }
 
     Expected<BitmapFrame, std::string> renderFrame(FrameTime time) override {
@@ -101,11 +100,11 @@ class FakeBitmapFrameSource : public BitmapFrameSource {
         uint8_t alpha = 255;
     };
 
-    Expected<void, std::string> prepareFromComposition(const Document &document,
-                                                       EntityId compositionId,
-                                                       TimeRange visibleRange, float bitmapScale) {
-        if (bitmapScale <= 0.0f) {
-            return Unexpected(std::string("bitmapScale must be > 0"));
+    Expected<void, std::string> prepareFromSize(const Document &document, EntityId compositionId,
+                                                TimeRange visibleRange, int pixelWidth,
+                                                int pixelHeight) {
+        if (pixelWidth <= 0 || pixelHeight <= 0) {
+            return Unexpected(std::string("invalid bitmap size"));
         }
         const Composition *host = nullptr;
         for (const auto &composition : document.compositions) {
@@ -117,13 +116,9 @@ class FakeBitmapFrameSource : public BitmapFrameSource {
         if (host == nullptr) {
             return Unexpected(std::string("composition not found"));
         }
-        width_ = static_cast<int>(
-            std::lround(static_cast<double>(host->width) * static_cast<double>(bitmapScale)));
-        height_ = static_cast<int>(
-            std::lround(static_cast<double>(host->height) * static_cast<double>(bitmapScale)));
-        if (width_ <= 0 || height_ <= 0) {
-            return Unexpected(std::string("invalid bitmap size"));
-        }
+        (void)host;
+        width_ = pixelWidth;
+        height_ = pixelHeight;
         visibleRange_ = visibleRange;
         prepared_ = true;
         return Expected<void, std::string>();

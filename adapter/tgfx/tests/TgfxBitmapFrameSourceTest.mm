@@ -66,7 +66,9 @@ TEST(TgfxBitmapFrameSourceTest, CompositionRendersNonEmptyPixels) {
     TimeRange range;
     range.start = 0;
     range.end = 1;
-    const auto prepared = source.prepareComposition(document, composition->id, range, 1.0f);
+    const auto prepared =
+        source.prepareComposition(document, composition->id, range, composition->width,
+                                  composition->height);
     if (!prepared.hasValue()) {
         GTEST_SKIP() << prepared.error();
     }
@@ -131,7 +133,8 @@ TEST(TgfxBitmapFrameSourceTest, LayerPrepareExcludesSiblingColor) {
     TimeRange range;
     range.start = 0;
     range.end = 1;
-    const auto prepared = source.prepare(document, composition->id, layerA->id, range, 1.0f);
+    const auto prepared = source.prepare(document, composition->id, layerA->id, range,
+                                         composition->width, composition->height);
     if (!prepared.hasValue()) {
         GTEST_SKIP() << prepared.error();
     }
@@ -153,5 +156,45 @@ TEST(TgfxBitmapFrameSourceTest, LayerPrepareExcludesSiblingColor) {
     EXPECT_LT(right.g, 40);
     EXPECT_LT(right.a, 40);
 
+    source.finish();
+}
+
+TEST(TgfxBitmapFrameSourceTest, HonorsPreparedPixelSizeForMaxResolutionCase) {
+    // Reproduces 1920x1080 + maxResolution=720 → 1280x720 without float ceil drift.
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->width = 1920;
+    composition->height = 1080;
+    composition->duration = 1;
+    composition->frameRate = {30, 1};
+    composition->backgroundColor = Color{0, 0, 0, 1};
+
+    Layer *layer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    layer->outPoint = 1;
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    auto rect = std::make_unique<ShapeRect>();
+    rect->position.setStaticValue(Vec2{960, 540});
+    rect->size.setStaticValue(Vec2{100, 100});
+    content->geometry = std::move(rect);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{1, 0, 0, 1});
+    layer->styles.push_back(std::move(fill));
+
+    constexpr int kPixelWidth = 1280;
+    constexpr int kPixelHeight = 720;
+    TgfxBitmapFrameSource source;
+    TimeRange range;
+    range.start = 0;
+    range.end = 1;
+    const auto prepared =
+        source.prepare(document, composition->id, layer->id, range, kPixelWidth, kPixelHeight);
+    if (!prepared.hasValue()) {
+        GTEST_SKIP() << prepared.error();
+    }
+
+    auto frame = source.renderFrame(0);
+    ASSERT_TRUE(frame.hasValue()) << frame.error();
+    EXPECT_EQ(frame->width, kPixelWidth);
+    EXPECT_EQ(frame->height, kPixelHeight);
     source.finish();
 }
