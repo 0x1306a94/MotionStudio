@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "PagBmpSuffix.h"
+#include "MotionStudio/export/PagBmpSuffix.h"
 
-using motion::pag_export::HasBmpSuffix;
+using motion::HasBmpSuffix;
 
 TEST(PagBmpSuffixTest, DetectsSuffixCaseInsensitive) {
     EXPECT_TRUE(HasBmpSuffix("Comp_bmp"));
