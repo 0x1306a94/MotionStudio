@@ -257,7 +257,7 @@ git commit --only \
 
 ### Task 3: TransformInspector Position 条件切换
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/TransformInspector.swift`
@@ -268,7 +268,7 @@ git commit --only \
 - Consumes: `pathEditVertexScenePosition`, `networkEditMoveVertex`, `PathEditTarget`
 - Produces: Position 行在有选中点时绑顶点场景坐标并隐藏关键帧按钮
 
-- [ ] **Step 1: 扩展 `TransformInspector` 入参与 Position 分支**
+- [x] **Step 1: 扩展 `TransformInspector` 入参与 Position 分支**
 
 在 `TransformInspector` 增加：
 
@@ -340,7 +340,7 @@ NumberPropertyRow(label: TransformField.positionX.label,
 
 注意：`NumberPropertyRow` 已有 `showsKeyframeButton`（默认 `true`），选中点时传 `false`。
 
-- [ ] **Step 2: `InspectorView` 传入 target**
+- [x] **Step 2: `InspectorView` 传入 target**
 
 替换现有 `TransformInspector(...)` 调用：
 
@@ -361,7 +361,7 @@ TransformInspector(core: core,
                    perform: perform)
 ```
 
-- [ ] **Step 3: Build App（Xcode MCP 优先）**
+- [x] **Step 3: Build App（Xcode MCP 优先）**
 
 探测 `user-xcode` → `XcodeListWindows` → `BuildProject`。  
 MCP 不可用时：
@@ -373,14 +373,16 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 
 Expected: BUILD SUCCEEDED
 
-- [ ] **Step 4: 手动验证清单（实现者勾选）**
+- [x] **Step 4: 手动验证清单（实现者勾选）**
 
 1. 钢笔选点 → Position ≈ 画布该点场景位置  
 2. 改 Position X/Y → 点移动，不是整层包围盒平移意图  
 3. 画布拖点 → Inspector 同步  
 4. 取消选点 → Position 回到包围盒，关键帧按钮恢复  
 
-- [ ] **Step 5: Commit**
+> 构建已通过；交互项留给用户跑通确认。
+
+- [x] **Step 5: Commit**
 
 同步 plan Task 3。
 

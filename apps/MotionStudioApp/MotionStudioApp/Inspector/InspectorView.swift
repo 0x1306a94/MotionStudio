@@ -82,6 +82,15 @@ struct InspectorView: View {
                         TransformInspector(core: core,
                                            compositionID: core.firstCompositionID,
                                            layerID: layerID,
+                                           pathEditTarget: {
+                                               guard editorState.tool == .pen,
+                                                     let target = editorState.pathEditTarget,
+                                                     target.layerID == layerID
+                                               else {
+                                                   return nil
+                                               }
+                                               return target
+                                           }(),
                                            isEditable: isEditable,
                                            perform: perform)
 

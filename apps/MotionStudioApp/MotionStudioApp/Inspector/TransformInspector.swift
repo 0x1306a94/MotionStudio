@@ -9,6 +9,7 @@ struct TransformInspector: View {
     let core: MotionDocumentCore
     let compositionID: UInt64
     let layerID: UInt64
+    let pathEditTarget: PathEditTarget?
     @Environment(PlayheadClock.self) private var clock
     let isEditable: Bool
 
@@ -28,12 +29,27 @@ struct TransformInspector: View {
         let anchor = core.evaluateVec2(entityID: layerID,
                                        path: TransformProperty.anchorPoint.path,
                                        frame: playheadFrame)
-        let position = core.evaluateLayoutPosition(compositionID: compositionID,
-                                                   layerID: layerID,
-                                                   frame: playheadFrame)
+        let layoutPosition = core.evaluateLayoutPosition(compositionID: compositionID,
+                                                         layerID: layerID,
+                                                         frame: playheadFrame)
         let scale = core.evaluateVec2(entityID: layerID,
                                       path: TransformProperty.scale.path,
                                       frame: playheadFrame)
+        let editingVertex = pathEditTarget.map { target in
+            target.layerID == layerID && target.activeVertexId != 0
+        } ?? false
+        let vertexScene: CGPoint? = {
+            guard editingVertex, let target = pathEditTarget else { return nil }
+            return core.pathEditVertexScenePosition(layerID: target.layerID,
+                                                    path: target.propertyPath,
+                                                    frame: playheadFrame,
+                                                    vertexId: target.activeVertexId)
+        }()
+        let useVertexPosition = vertexScene != nil
+        let displayX = vertexScene.map { Float($0.x) } ?? Float(layoutPosition.dx)
+        let displayY = vertexScene.map { Float($0.y) } ?? Float(layoutPosition.dy)
+        let positionShowsKeyframe = vertexScene == nil
+        let positionRowEditable = vertexScene != nil ? isEditable : positionEditable
 
         if let localBounds = core.layerLocalBounds(compositionID: compositionID,
                                                    layerID: layerID,
@@ -69,24 +85,48 @@ struct TransformInspector: View {
         }
 
         NumberPropertyRow(label: TransformField.positionX.label,
-                          value: Float(position.dx),
-                          hasKeyframeAtPlayhead: hasKeyframe(.position),
-                          isEditable: positionEditable,
+                          value: displayX,
+                          hasKeyframeAtPlayhead: positionShowsKeyframe ? hasKeyframe(.position) : false,
+                          isEditable: positionRowEditable,
+                          showsKeyframeButton: positionShowsKeyframe,
                           showsStepButtons: true)
         { newValue in
-            setLayoutPosition(CGVector(dx: CGFloat(newValue), dy: position.dy))
+            if useVertexPosition, let target = pathEditTarget, let vertexScene {
+                perform("Move Vertex") {
+                    core.networkEditMoveVertex(layerID: target.layerID, kind: target.kind,
+                                               maskIndex: target.maskIndex, frame: playheadFrame,
+                                               vertexId: target.activeVertexId,
+                                               scenePoint: CGPoint(x: CGFloat(newValue),
+                                                                   y: vertexScene.y))
+                }
+            } else {
+                setLayoutPosition(CGVector(dx: CGFloat(newValue), dy: CGFloat(displayY)))
+            }
         } onToggleKeyframe: { _ in
+            guard positionShowsKeyframe else { return }
             toggleVec2Keyframe(.position)
         }
 
         NumberPropertyRow(label: TransformField.positionY.label,
-                          value: Float(position.dy),
-                          hasKeyframeAtPlayhead: hasKeyframe(.position),
-                          isEditable: positionEditable,
+                          value: displayY,
+                          hasKeyframeAtPlayhead: positionShowsKeyframe ? hasKeyframe(.position) : false,
+                          isEditable: positionRowEditable,
+                          showsKeyframeButton: positionShowsKeyframe,
                           showsStepButtons: true)
         { newValue in
-            setLayoutPosition(CGVector(dx: position.dx, dy: CGFloat(newValue)))
+            if useVertexPosition, let target = pathEditTarget, let vertexScene {
+                perform("Move Vertex") {
+                    core.networkEditMoveVertex(layerID: target.layerID, kind: target.kind,
+                                               maskIndex: target.maskIndex, frame: playheadFrame,
+                                               vertexId: target.activeVertexId,
+                                               scenePoint: CGPoint(x: vertexScene.x,
+                                                                   y: CGFloat(newValue)))
+                }
+            } else {
+                setLayoutPosition(CGVector(dx: CGFloat(displayX), dy: CGFloat(newValue)))
+            }
         } onToggleKeyframe: { _ in
+            guard positionShowsKeyframe else { return }
             toggleVec2Keyframe(.position)
         }
 
