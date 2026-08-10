@@ -1434,6 +1434,26 @@ final class MotionDocumentCore {
         return captured.vertices.isEmpty ? nil : captured
     }
 
+    /// Scene-space position of a path vertex; nil when missing.
+    func pathEditVertexScenePosition(layerID: UInt64, path: String, frame: Int64,
+                                     vertexId: UInt32) -> CGPoint?
+    {
+        guard vertexId != 0,
+              let network = evaluateVectorNetwork(entityID: layerID, path: path, frame: frame),
+              let vertex = network.vertices.first(where: { $0.id == vertexId })
+        else {
+            return nil
+        }
+        var sceneX: Float = 0
+        var sceneY: Float = 0
+        guard ms_layer_transform_local_point(handle, layerID, frame, vertex.x, vertex.y, &sceneX,
+                                             &sceneY)
+        else {
+            return nil
+        }
+        return CGPoint(x: CGFloat(sceneX), y: CGFloat(sceneY))
+    }
+
     func writeBezierPathAtPlayhead(entityID: UInt64, path: String, frame: Int64,
                                    value: CapturedBezierPath)
     {

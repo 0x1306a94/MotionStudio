@@ -194,7 +194,7 @@ git commit --only \
 
 ### Task 2: `MotionDocumentCore.pathEditVertexScenePosition`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`（靠近 `evaluateVectorNetwork` / path-edit API）
@@ -209,7 +209,7 @@ func pathEditVertexScenePosition(layerID: UInt64, path: String, frame: Int64,
                                  vertexId: UInt32) -> CGPoint?
 ```
 
-- [ ] **Step 1: Add Swift wrapper**
+- [x] **Step 1: Add Swift wrapper**
 
 ```swift
 func pathEditVertexScenePosition(layerID: UInt64, path: String, frame: Int64,
@@ -231,7 +231,7 @@ func pathEditVertexScenePosition(layerID: UInt64, path: String, frame: Int64,
 }
 ```
 
-- [ ] **Step 2: Smoke-build App libraries if gen_xcode 已就绪**
+- [x] **Step 2: Smoke-build App libraries if gen_xcode 已就绪**
 
 优先 Xcode MCP `BuildProject`；否则：
 
@@ -242,7 +242,7 @@ apps/gen_mac
 
 若环境无 Xcode，至少确保 Task 1 bridge 测已过，本步以代码审查为准。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 同步 plan Task 2。
 
