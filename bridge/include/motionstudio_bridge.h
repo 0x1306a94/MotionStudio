@@ -771,8 +771,9 @@ typedef struct MSPagExportOptions {
     float bitmapScale;  // <=0 → 1.0
 } MSPagExportOptions;
 
-// Exports composition to a binary .pag file via PagExporter (no FrameSource).
-// On failure *errorOut is malloc'd (ms_string_free).
+// Exports composition to a binary .pag file via PagExporter.
+// When allowBitmapExport and the export tree uses a _bmp name, injects
+// TgfxBitmapFrameSource automatically. On failure *errorOut is malloc'd (ms_string_free).
 bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExportOptions *options,
                    char **errorOut);
 #endif

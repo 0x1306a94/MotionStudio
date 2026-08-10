@@ -4,10 +4,18 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/export/PagBmpSuffix.h"
 #include "MotionStudio/export/PagExporter.h"
+#include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerType.h"
+#include "MotionStudio/model/PrecompContent.h"
+#include "TgfxBitmapFrameSource.h"
 #include "TgfxGlyphMetrics.h"
 #include "TgfxTextTypeface.h"
 #include "common/DocumentLock.h"
@@ -39,6 +47,43 @@ std::string MessageForError(const motion::PagExportError &error) {
             return "failed to write PAG file";
     }
     return "PAG export failed";
+}
+
+bool ExportTreeHasBmpSuffix(const motion::Document &document, motion::EntityId rootCompositionId) {
+    std::unordered_set<uint64_t> visited;
+    std::vector<motion::EntityId> stack;
+    stack.push_back(rootCompositionId);
+    while (!stack.empty()) {
+        const motion::EntityId compositionId = stack.back();
+        stack.pop_back();
+        if (!visited.insert(compositionId.value).second) {
+            continue;
+        }
+        const motion::Composition *composition =
+            document.entityIndex().findComposition(compositionId);
+        if (composition == nullptr) {
+            continue;
+        }
+        if (motion::HasBmpSuffix(composition->name)) {
+            return true;
+        }
+        for (const auto &layerPtr : composition->layers) {
+            if (layerPtr == nullptr) {
+                continue;
+            }
+            if (motion::HasBmpSuffix(layerPtr->name)) {
+                return true;
+            }
+            if (layerPtr->type() != motion::LayerType::Precomp || layerPtr->content == nullptr) {
+                continue;
+            }
+            const auto &content = static_cast<const motion::PrecompContent &>(*layerPtr->content);
+            if (content.compositionId.isValid()) {
+                stack.push_back(content.compositionId);
+            }
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -80,8 +125,20 @@ bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExpo
         return glyphMetrics.metrics(fontSize).ascent;
     };
 
+    motion::EntityId rootCompositionId = exportOptions.compositionId;
+    if (!rootCompositionId.isValid() && !document->document->compositions.empty() &&
+        document->document->compositions.front() != nullptr) {
+        rootCompositionId = document->document->compositions.front()->id;
+    }
+
+    std::unique_ptr<motion::TgfxBitmapFrameSource> bitmapSource;
+    if (exportOptions.allowBitmapExport &&
+        ExportTreeHasBmpSuffix(*document->document, rootCompositionId)) {
+        bitmapSource = std::make_unique<motion::TgfxBitmapFrameSource>();
+    }
+
     const auto result =
-        motion::PagExporter::Export(*document->document, exportOptions, nullptr);
+        motion::PagExporter::Export(*document->document, exportOptions, bitmapSource.get());
     if (!result.hasValue()) {
         SetError(errorOut, MessageForError(result.error()));
         return false;

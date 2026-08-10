@@ -240,7 +240,7 @@ git commit --only adapter/tgfx/src/TgfxBitmapFrameSource.mm \
 
 ### Task 4: Bridge 自动注入
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/src/apple/motionstudio_bridge_pag_export.mm`
@@ -264,7 +264,7 @@ if (exportOptions.allowBitmapExport &&
 auto result = PagExporter::Export(..., bitmapSource.get());
 ```
 
-- [ ] **Step 1: 写 Bridge 测试**
+- [x] **Step 1: 写 Bridge 测试**
 
 ```cpp
 TEST(PagExportBridgeTest, CompositionBmpExportsWithRealFrameSource) {
@@ -277,19 +277,19 @@ TEST(PagExportBridgeTest, CompositionBmpExportsWithRealFrameSource) {
 
 若 bridge 测试难建完整 Document，可改为：仅断言「有 `_bmp` 时不再因缺 FrameSource 失败」（需能从 bridge 建层——查现有 bridge_test 模式）。
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/bridge/bridge_test --gtest_filter='PagExportBridgeTest.*'`  
 Expected: FAIL 或导出 MappingFailed（缺 FrameSource）
 
-- [ ] **Step 3: 实现自动注入**
+- [x] **Step 3: 实现自动注入**
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Run: `ctest --test-dir build -R 'TgfxBitmapFrameSource|PagExportBridge|PagBmpSuffix|PagExporter' --output-on-failure`  
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only bridge/src/apple/motionstudio_bridge_pag_export.mm \
