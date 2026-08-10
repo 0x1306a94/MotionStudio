@@ -1,7 +1,7 @@
 # Tgfx BitmapFrameSource — 设计说明
 
 日期：2026-08-10  
-状态：已确认，待实现  
+状态：已实现  
 范围：生产级 `BitmapFrameSource`（tgfx Metal 离屏 + `readPixels`）+ Bridge 自动注入；依赖已落地的 [PAG export `_bmp` 策略](./2026-07-31-pag-export-design.md)
 
 相关：`TgfxVideoFrameSource`（视频离屏）、`PagExporter` / `PagBitmapFallback`（消费 RGBA）
