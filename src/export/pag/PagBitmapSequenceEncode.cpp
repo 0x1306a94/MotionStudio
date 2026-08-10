@@ -56,10 +56,8 @@ void GetImageDiffRect(ImageRect *rect, const uint8_t *preImage, const uint8_t *c
     int maxX = 0;
     int maxY = 0;
     for (int y = 0; y < height; ++y) {
-        const auto *preData =
-            reinterpret_cast<const uint32_t *>(static_cast<const void *>(preImage + y * stride));
-        const auto *curData =
-            reinterpret_cast<const uint32_t *>(static_cast<const void *>(curImage + y * stride));
+        const auto *preData = reinterpret_cast<const uint32_t *>(static_cast<const void *>(preImage + y * stride));
+        const auto *curData = reinterpret_cast<const uint32_t *>(static_cast<const void *>(curImage + y * stride));
         for (int x = 0; x < width; ++x) {
             if (preData[x] == curData[x]) {
                 continue;
@@ -153,12 +151,10 @@ std::unique_ptr<pag::ByteData> EncodeRectWebP(const uint8_t *rgba, int width, in
     if (rgba == nullptr || width <= 0 || height <= 0 || rowBytes <= 0) {
         return nullptr;
     }
-    const tgfx::ImageInfo info = tgfx::ImageInfo::Make(
-        width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied, rowBytes);
+    const tgfx::ImageInfo info = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied, rowBytes);
     const tgfx::Pixmap pixmap(info, rgba);
     const int clampedQuality = quality < 0 ? 0 : (quality > 100 ? 100 : quality);
-    std::shared_ptr<tgfx::Data> encoded =
-        tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::WEBP, clampedQuality);
+    std::shared_ptr<tgfx::Data> encoded = tgfx::ImageCodec::Encode(pixmap, tgfx::EncodedFormat::WEBP, clampedQuality);
     if (encoded == nullptr || encoded->size() == 0) {
         return nullptr;
     }
@@ -175,8 +171,7 @@ BitmapSize ComputeBitmapSize(int compositionWidth, int compositionHeight, float 
         factor = 1.0f;
     }
     if (bitmapMaxResolution > 0) {
-        const int shorterSide =
-            static_cast<int>(std::min(compositionWidth, compositionHeight) * factor);
+        const int shorterSide = static_cast<int>(std::min(compositionWidth, compositionHeight) * factor);
         if (shorterSide > bitmapMaxResolution) {
             factor *= static_cast<float>(bitmapMaxResolution) / static_cast<float>(shorterSide);
         }
@@ -196,9 +191,9 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
                                                     int keyFrameInterval, int imageQuality,
                                                     const volatile int *cancelFlag) {
     if (frameSource == nullptr || sequence == nullptr || width <= 0 || height <= 0 || end <= start) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
-                                             "invalid PAG bitmap sequence options"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG bitmap sequence options"));
     }
+
     if (IsPagExportCancelled(cancelFlag)) {
         frameSource->finish();
         return Unexpected(MakeCancelledPagExportError());
@@ -229,9 +224,7 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
             break;
         }
         for (int y = 0; y < height; ++y) {
-            std::memcpy(current.data() + static_cast<size_t>(y) * stride,
-                        frame.rgba + static_cast<size_t>(y) * frame.rowBytes,
-                        static_cast<size_t>(stride));
+            std::memcpy(current.data() + static_cast<size_t>(y) * stride, frame.rgba + static_cast<size_t>(y) * frame.rowBytes, static_cast<size_t>(stride));
         }
 
         auto *pagFrame = new pag::BitmapFrame();
@@ -247,8 +240,7 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
 
         ImageRect encodeRect{0, 0, width, height};
         const int diffSize = diffRect.width * diffRect.height;
-        const bool isKeyFrame =
-            IsKeyFrame(localFrame, lastKeyFrame, diffSize, fullSize, keyFrameInterval);
+        const bool isKeyFrame = IsKeyFrame(localFrame, lastKeyFrame, diffSize, fullSize, keyFrameInterval);
         if (isKeyFrame) {
             diffRect = {0, 0, width, height};
             lastKeyFrame = localFrame;
@@ -260,12 +252,9 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
             encodeRect = {0, 0, 0, 0};
         }
 
-        if (diffRect.width > 0 && diffRect.height > 0 && encodeRect.width > 0 &&
-            encodeRect.height > 0) {
-            const uint8_t *data =
-                current.data() + encodeRect.yPos * stride + encodeRect.xPos * 4;
-            std::unique_ptr<pag::ByteData> webp =
-                EncodeRectWebP(data, encodeRect.width, encodeRect.height, stride, imageQuality);
+        if (diffRect.width > 0 && diffRect.height > 0 && encodeRect.width > 0 && encodeRect.height > 0) {
+            const uint8_t *data = current.data() + encodeRect.yPos * stride + encodeRect.xPos * 4;
+            std::unique_ptr<pag::ByteData> webp = EncodeRectWebP(data, encodeRect.width, encodeRect.height, stride, imageQuality);
             if (webp == nullptr) {
                 encodeFailed = true;
                 break;
@@ -286,8 +275,7 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
         return Unexpected(MakeCancelledPagExportError());
     }
     if (encodeFailed || sequence->frames.empty()) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "PAG bitmap frame encode failed"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG bitmap frame encode failed"));
     }
     return Expected<void, PagExportError>();
 }

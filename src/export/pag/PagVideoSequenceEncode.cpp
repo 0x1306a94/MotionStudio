@@ -71,8 +71,7 @@ int64_t EstimateBitrate(int videoWidth, int videoHeight, float frameRate, int qu
     // Side-by-side alpha already doubles encode area; keep bpp low so default quality≈80
     // lands near ~8–10 Mbps for 1280×720@30 packed.
     const double bytesPerPixel = 0.025 * (static_cast<double>(quality) / 100.0);
-    const double bps =
-        static_cast<double>(videoWidth) * static_cast<double>(videoHeight) * fps * bytesPerPixel * 8.0;
+    const double bps = static_cast<double>(videoWidth) * static_cast<double>(videoHeight) * fps * bytesPerPixel * 8.0;
     return std::max<int64_t>(150000, static_cast<int64_t>(bps));
 }
 
@@ -102,8 +101,7 @@ bool ExtractHeaders(CMFormatDescriptionRef format, std::vector<std::vector<uint8
     }
     size_t parameterSetCount = 0;
     int nalUnitHeaderLength = 0;
-    OSStatus status = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-        format, 0, nullptr, nullptr, &parameterSetCount, &nalUnitHeaderLength);
+    OSStatus status = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(format, 0, nullptr, nullptr, &parameterSetCount, &nalUnitHeaderLength);
     if (status != noErr || parameterSetCount < 2) {
         return false;
     }
@@ -111,8 +109,7 @@ bool ExtractHeaders(CMFormatDescriptionRef format, std::vector<std::vector<uint8
     for (size_t index = 0; index < parameterSetCount; ++index) {
         const uint8_t *parameterSet = nullptr;
         size_t parameterSetSize = 0;
-        status = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
-            format, index, &parameterSet, &parameterSetSize, nullptr, nullptr);
+        status = CMVideoFormatDescriptionGetH264ParameterSetAtIndex(format, index, &parameterSet, &parameterSetSize, nullptr, nullptr);
         if (status != noErr || parameterSet == nullptr || parameterSetSize == 0) {
             return false;
         }
@@ -124,8 +121,7 @@ bool ExtractHeaders(CMFormatDescriptionRef format, std::vector<std::vector<uint8
     return headers->size() >= 2;
 }
 
-bool CopyPackedRgbaToBgra(const uint8_t *rgba, int width, int height, size_t rowBytes,
-                          CVPixelBufferRef buffer) {
+bool CopyPackedRgbaToBgra(const uint8_t *rgba, int width, int height, size_t rowBytes, CVPixelBufferRef buffer) {
     if (CVPixelBufferLockBaseAddress(buffer, 0) != kCVReturnSuccess) {
         return false;
     }
@@ -192,9 +188,7 @@ void CompressionOutputCallback(void *outputCallbackRefCon, void *sourceFrameRefC
     size_t lengthAtOffset = 0;
     size_t totalLength = 0;
     char *dataPointer = nullptr;
-    if (CMBlockBufferGetDataPointer(block, 0, &lengthAtOffset, &totalLength, &dataPointer) !=
-            kCMBlockBufferNoErr ||
-        dataPointer == nullptr || totalLength == 0) {
+    if (CMBlockBufferGetDataPointer(block, 0, &lengthAtOffset, &totalLength, &dataPointer) != kCMBlockBufferNoErr || dataPointer == nullptr || totalLength == 0) {
         state->failed = true;
         --state->pending;
         state->cv.notify_all();
@@ -204,8 +198,7 @@ void CompressionOutputCallback(void *outputCallbackRefCon, void *sourceFrameRefC
     EncodedSample sample;
     sample.index = frameIndex;
     sample.keyframe = isKeyframe;
-    if (!AppendAnnexBFromAvcc(reinterpret_cast<const uint8_t *>(dataPointer), totalLength,
-                              &sample.annexB)) {
+    if (!AppendAnnexBFromAvcc(reinterpret_cast<const uint8_t *>(dataPointer), totalLength, &sample.annexB)) {
         state->failed = true;
         --state->pending;
         state->cv.notify_all();
@@ -230,28 +223,20 @@ bool CreateVtResources(int videoWidth, int videoHeight, int interval, int qualit
         return false;
     }
 
-    CFMutableDictionaryRef encoderSpec = CFDictionaryCreateMutable(
-        kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CFDictionarySetValue(encoderSpec, kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder,
-                         kCFBooleanTrue);
+    CFMutableDictionaryRef encoderSpec = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(encoderSpec, kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder, kCFBooleanTrue);
 
-    CFMutableDictionaryRef sourceAttrs = CFDictionaryCreateMutable(
-        kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFMutableDictionaryRef sourceAttrs = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     OSType pixelFormat = kCVPixelFormatType_32BGRA;
-    CFNumberRef pixelFormatNumber =
-        CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &pixelFormat);
+    CFNumberRef pixelFormatNumber = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &pixelFormat);
     CFDictionarySetValue(sourceAttrs, kCVPixelBufferPixelFormatTypeKey, pixelFormatNumber);
     CFRelease(pixelFormatNumber);
-    CFDictionaryRef emptyIOSurface = CFDictionaryCreate(
-        kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks);
+    CFDictionaryRef emptyIOSurface = CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue(sourceAttrs, kCVPixelBufferIOSurfacePropertiesKey, emptyIOSurface);
     CFRelease(emptyIOSurface);
 
     VTCompressionSessionRef session = nullptr;
-    OSStatus status = VTCompressionSessionCreate(
-        kCFAllocatorDefault, videoWidth, videoHeight, kCMVideoCodecType_H264, encoderSpec,
-        sourceAttrs, nullptr, CompressionOutputCallback, state, &session);
+    OSStatus status = VTCompressionSessionCreate(kCFAllocatorDefault, videoWidth, videoHeight, kCMVideoCodecType_H264, encoderSpec, sourceAttrs, nullptr, CompressionOutputCallback, state, &session);
     CFRelease(encoderSpec);
     CFRelease(sourceAttrs);
     if (status != noErr || session == nullptr) {
@@ -263,10 +248,8 @@ bool CreateVtResources(int videoWidth, int videoHeight, int interval, int qualit
 
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime, kCFBooleanFalse);
     VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse);
-    VTSessionSetProperty(session, kVTCompressionPropertyKey_ProfileLevel,
-                         kVTProfileLevel_H264_Main_AutoLevel);
-    CFNumberRef maxKeyFrameInterval =
-        CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &interval);
+    VTSessionSetProperty(session, kVTCompressionPropertyKey_ProfileLevel, kVTProfileLevel_H264_Main_AutoLevel);
+    CFNumberRef maxKeyFrameInterval = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &interval);
     VTSessionSetProperty(session, kVTCompressionPropertyKey_MaxKeyFrameInterval, maxKeyFrameInterval);
     CFRelease(maxKeyFrameInterval);
 
@@ -285,18 +268,12 @@ bool CreateVtResources(int videoWidth, int videoHeight, int interval, int qualit
         return false;
     }
 
-    CFMutableDictionaryRef pixelBufferAttrs = CFDictionaryCreateMutable(
-        kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CFDictionaryRef emptyIOSurfaceProps = CFDictionaryCreate(
-        kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
-        &kCFTypeDictionaryValueCallBacks);
-    CFDictionarySetValue(pixelBufferAttrs, kCVPixelBufferIOSurfacePropertiesKey,
-                         emptyIOSurfaceProps);
+    CFMutableDictionaryRef pixelBufferAttrs = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionaryRef emptyIOSurfaceProps = CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(pixelBufferAttrs, kCVPixelBufferIOSurfacePropertiesKey, emptyIOSurfaceProps);
     CFRelease(emptyIOSurfaceProps);
     CVPixelBufferRef pixelBuffer = nullptr;
-    const CVReturn bufferStatus = CVPixelBufferCreate(
-        kCFAllocatorDefault, static_cast<size_t>(videoWidth), static_cast<size_t>(videoHeight),
-        kCVPixelFormatType_32BGRA, pixelBufferAttrs, &pixelBuffer);
+    const CVReturn bufferStatus = CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(videoWidth), static_cast<size_t>(videoHeight), kCVPixelFormatType_32BGRA, pixelBufferAttrs, &pixelBuffer);
     CFRelease(pixelBufferAttrs);
     if (bufferStatus != kCVReturnSuccess || pixelBuffer == nullptr) {
         VTCompressionSessionInvalidate(session);
@@ -359,8 +336,7 @@ struct PagVideoEncodeSession::Impl {
             return true;
         }
         destroyResources();
-        if (!CreateVtResources(nextVideoWidth, nextVideoHeight, nextInterval, nextQuality,
-                               nextFrameRate, &state, &session, &pixelBuffer, errorMessage)) {
+        if (!CreateVtResources(nextVideoWidth, nextVideoHeight, nextInterval, nextQuality, nextFrameRate, &state, &session, &pixelBuffer, errorMessage)) {
             destroyResources();
             return false;
         }
@@ -397,8 +373,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         if (frameSource != nullptr) {
             frameSource->finish();
         }
-        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
-                                             "invalid PAG video sequence options"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG video sequence options"));
     }
 
 #if !defined(__APPLE__)
@@ -407,8 +382,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     (void)cancelFlag;
     (void)encodeSession;
     frameSource->finish();
-    return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                         "PAG video sequence encode requires Apple VideoToolbox"));
+    return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG video sequence encode requires Apple VideoToolbox"));
 #else
 
     if (IsPagExportCancelled(cancelFlag)) {
@@ -427,12 +401,9 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     const int videoHeight = EvenAlign(height);
 
     std::string ensureError;
-    if (!session->impl_->ensureReady(videoWidth, videoHeight, interval, quality, frameRate,
-                                     &ensureError)) {
+    if (!session->impl_->ensureReady(videoWidth, videoHeight, interval, quality, frameRate, &ensureError)) {
         frameSource->finish();
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             ensureError.empty() ? "VideoToolbox session failed"
-                                                                 : ensureError));
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", ensureError.empty() ? "VideoToolbox session failed" : ensureError));
     }
 
     CompressionState &state = session->impl_->state;
@@ -463,14 +434,11 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         std::vector<uint8_t> packed;
         int packedWidth = 0;
         int packedHeight = 0;
-        if (!PackRgbAlphaSideBySide(frame.rgba, width, height, frame.rowBytes, &packed, &packedWidth,
-                                    &packedHeight) ||
-            packedWidth != videoWidth || packedHeight != videoHeight) {
+        if (!PackRgbAlphaSideBySide(frame.rgba, width, height, frame.rowBytes, &packed, &packedWidth, &packedHeight) || packedWidth != videoWidth || packedHeight != videoHeight) {
             encodeFailed = true;
             break;
         }
-        if (!CopyPackedRgbaToBgra(packed.data(), packedWidth, packedHeight,
-                                  static_cast<size_t>(packedWidth) * 4u, pixelBuffer)) {
+        if (!CopyPackedRgbaToBgra(packed.data(), packedWidth, packedHeight, static_cast<size_t>(packedWidth) * 4u, pixelBuffer)) {
             encodeFailed = true;
             break;
         }
@@ -481,20 +449,17 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         CFMutableDictionaryRef forceKeyFrameProps = nullptr;
         if (localIndex == 0) {
             // Independent PAG sequences need a sync frame at the start after session reuse.
-            forceKeyFrameProps = CFDictionaryCreateMutable(kCFAllocatorDefault, 1,
-                                                           &kCFTypeDictionaryKeyCallBacks,
-                                                           &kCFTypeDictionaryValueCallBacks);
-            CFDictionarySetValue(forceKeyFrameProps, kVTEncodeFrameOptionKey_ForceKeyFrame,
-                                 kCFBooleanTrue);
+            forceKeyFrameProps = CFDictionaryCreateMutable(kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+            CFDictionarySetValue(forceKeyFrameProps, kVTEncodeFrameOptionKey_ForceKeyFrame, kCFBooleanTrue);
             frameProperties = forceKeyFrameProps;
         }
+
         {
             std::lock_guard<std::mutex> lock(state.mutex);
             ++state.pending;
         }
-        const OSStatus status = VTCompressionSessionEncodeFrame(
-            vtSession, pixelBuffer, pts, duration, frameProperties,
-            reinterpret_cast<void *>(static_cast<intptr_t>(localIndex)), nullptr);
+
+        const OSStatus status = VTCompressionSessionEncodeFrame(vtSession, pixelBuffer, pts, duration, frameProperties, reinterpret_cast<void *>(static_cast<intptr_t>(localIndex)), nullptr);
         if (forceKeyFrameProps != nullptr) {
             CFRelease(forceKeyFrameProps);
         }
@@ -536,8 +501,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         if (sharedSession) {
             session->impl_->destroyResources();
         }
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "PAG video frame encode failed"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG video frame encode failed"));
     }
 
     std::sort(state.samples.begin(), state.samples.end(), EncodedSampleIndexLess);
@@ -549,8 +513,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         auto *videoFrame = new pag::VideoFrame();
         videoFrame->frame = static_cast<pag::Frame>(sample.index);
         videoFrame->isKeyframe = sample.keyframe;
-        videoFrame->fileBytes =
-            pag::ByteData::MakeCopy(sample.annexB.data(), sample.annexB.size()).release();
+        videoFrame->fileBytes = pag::ByteData::MakeCopy(sample.annexB.data(), sample.annexB.size()).release();
         sequence->frames.push_back(videoFrame);
     }
 
@@ -563,8 +526,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         if (sharedSession) {
             session->impl_->destroyResources();
         }
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "PAG video frame count mismatch"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG video frame count mismatch"));
     }
     return Expected<void, PagExportError>();
 #endif
