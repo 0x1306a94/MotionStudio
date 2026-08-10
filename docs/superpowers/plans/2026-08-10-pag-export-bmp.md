@@ -420,23 +420,23 @@ git commit --only src/export/pag/PagBitmapFallback.cpp \
 
 ### Task 5: 回归扫尾 + 旧 plan 指针
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-31-pag-export.md`（文首注明 Bitmap 策略以 2026-08-10 plan/spec 为准）
 - Modify: 任何仍引用 `allowBitmapFallback` / 旧 enum 的文件（`rg` 清零）
 
-- [ ] **Step 1: 全量搜索残留**
+- [x] **Step 1: 全量搜索残留**
 
 Run: `rg 'allowBitmapFallback|BitmapFallbackUnavailable|PagExportError::' --glob '!third_party/**' --glob '!docs/superpowers/specs/**'`  
 Expected: 无实现/测试命中（docs 历史除外）
 
-- [ ] **Step 2: ASan 全量相关测试**
+- [x] **Step 2: ASan 全量相关测试**
 
 Run: `ctest --test-dir build -R 'pag_export|PagExporter|PagCodec' --output-on-failure`  
 Expected: PASS
 
-- [ ] **Step 3: 更新旧 plan 指针 + Commit**
+- [x] **Step 3: 更新旧 plan 指针 + Commit**
 
 ```bash
 git commit --only docs/superpowers/plans/2026-07-31-pag-export.md \

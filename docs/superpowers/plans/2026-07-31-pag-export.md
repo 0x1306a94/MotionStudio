@@ -1,5 +1,7 @@
 # PAG Export Implementation Plan
 
+> **Bitmap 策略（2026-08-10）：** 自动 Fallback 已废弃。显式 `_bmp`、结构化 `MappingFailed`、AE 风格序列编码见 [2026-08-10-pag-export-bmp.md](./2026-08-10-pag-export-bmp.md) 与修订后的 [spec](../specs/2026-07-31-pag-export-design.md)。本文件保留矢量 Phase 0/1a 历史任务勾选。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 库层 `PagExporter`（Document → `.pag`）；先矢量可编辑子集，Bitmap 降级后置。
