@@ -13,6 +13,7 @@ using motion::Document;
 using motion::FakeBitmapFrameSource;
 using motion::TimeRange;
 using motion::pag_export::EncodeVideoSequence;
+using motion::pag_export::PagVideoEncodeSession;
 
 namespace {
 
@@ -94,6 +95,51 @@ TEST(PagVideoSequenceEncodeTest, CancelFlagAbortsWithCancelledMessage) {
     EXPECT_EQ(encoded.error().message, "cancelled");
 
     delete composition;
+}
+
+TEST(PagVideoSequenceEncodeTest, SharedSessionEncodesTwoSequences) {
+    Document document = MakeDoc(64, 64, 4);
+    FakeBitmapFrameSource source;
+    TimeRange range{0, 4};
+    ASSERT_TRUE(source.prepareComposition(document, document.compositions[0]->id, range, 64, 64)
+                    .hasValue());
+
+    PagVideoEncodeSession encodeSession;
+
+    auto *compositionA = new pag::VideoComposition();
+    auto *sequenceA = new pag::VideoSequence();
+    sequenceA->width = 64;
+    sequenceA->height = 64;
+    sequenceA->frameRate = 30;
+    sequenceA->composition = compositionA;
+    compositionA->sequences.push_back(sequenceA);
+
+    auto encodedA =
+        EncodeVideoSequence(&source, sequenceA, 0, 2, 64, 64, 60, 80, nullptr, &encodeSession);
+    ASSERT_TRUE(encodedA.hasValue()) << encodedA.error().message;
+    ASSERT_EQ(sequenceA->frames.size(), 2u);
+    EXPECT_TRUE(sequenceA->frames[0]->isKeyframe);
+
+    ASSERT_TRUE(source.prepareComposition(document, document.compositions[0]->id, range, 64, 64)
+                    .hasValue());
+
+    auto *compositionB = new pag::VideoComposition();
+    auto *sequenceB = new pag::VideoSequence();
+    sequenceB->width = 64;
+    sequenceB->height = 64;
+    sequenceB->frameRate = 30;
+    sequenceB->composition = compositionB;
+    compositionB->sequences.push_back(sequenceB);
+
+    auto encodedB =
+        EncodeVideoSequence(&source, sequenceB, 2, 4, 64, 64, 60, 80, nullptr, &encodeSession);
+    ASSERT_TRUE(encodedB.hasValue()) << encodedB.error().message;
+    ASSERT_EQ(sequenceB->frames.size(), 2u);
+    EXPECT_TRUE(sequenceB->frames[0]->isKeyframe);
+    EXPECT_EQ(sequenceB->alphaStartX, 64);
+
+    delete compositionA;
+    delete compositionB;
 }
 
 #endif

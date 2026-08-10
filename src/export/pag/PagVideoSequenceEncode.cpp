@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include "PagExportErrorUtil.h"
@@ -38,6 +39,18 @@ struct CompressionState {
     std::vector<std::vector<uint8_t>> headers;
     std::vector<EncodedSample> samples;
 };
+
+void ResetCompressionState(CompressionState *state) {
+    if (state == nullptr) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(state->mutex);
+    state->pending = 0;
+    state->failed = false;
+    state->headersReady = false;
+    state->headers.clear();
+    state->samples.clear();
+}
 
 int EvenAlign(int value) {
     return value + (value & 1);
@@ -203,60 +216,19 @@ void CompressionOutputCallback(void *outputCallbackRefCon, void *sourceFrameRefC
     state->cv.notify_all();
 }
 
-#endif  // __APPLE__
+bool EncodedSampleIndexLess(const EncodedSample &a, const EncodedSample &b) {
+    return a.index < b.index;
+}
 
-}  // namespace
-
-Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSource,
-                                                   pag::VideoSequence *sequence, FrameTime start,
-                                                   FrameTime end, int width, int height,
-                                                   int keyFrameInterval, int imageQuality,
-                                                   const volatile int *cancelFlag) {
-    if (frameSource == nullptr || sequence == nullptr || width <= 0 || height <= 0 || end <= start) {
-        if (frameSource != nullptr) {
-            frameSource->finish();
+bool CreateVtResources(int videoWidth, int videoHeight, int interval, int quality, float frameRate,
+                       CompressionState *state, VTCompressionSessionRef *sessionOut,
+                       CVPixelBufferRef *pixelBufferOut, std::string *errorMessage) {
+    if (state == nullptr || sessionOut == nullptr || pixelBufferOut == nullptr) {
+        if (errorMessage != nullptr) {
+            *errorMessage = "invalid VideoToolbox session arguments";
         }
-        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
-                                             "invalid PAG video sequence options"));
+        return false;
     }
-
-#if !defined(__APPLE__)
-    frameSource->finish();
-    return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                         "PAG video sequence encode requires Apple VideoToolbox"));
-#else
-
-    if (IsPagExportCancelled(cancelFlag)) {
-        frameSource->finish();
-        return Unexpected(MakeCancelledPagExportError());
-    }
-
-    const int quality = ClampQuality(imageQuality);
-    const int interval = keyFrameInterval > 0 ? keyFrameInterval : 60;
-    const float frameRate = sequence->frameRate > 0.0f ? sequence->frameRate : 30.0f;
-
-    CompressionState state;
-    VTCompressionSessionRef session = nullptr;
-    CVPixelBufferRef pixelBuffer = nullptr;
-    bool encodeFailed = false;
-    bool cancelled = false;
-
-    auto cleanup = [&]() {
-        if (pixelBuffer != nullptr) {
-            CVPixelBufferRelease(pixelBuffer);
-            pixelBuffer = nullptr;
-        }
-        if (session != nullptr) {
-            VTCompressionSessionInvalidate(session);
-            CFRelease(session);
-            session = nullptr;
-        }
-        frameSource->finish();
-    };
-
-    // Probe first frame size via pack dimensions from logical size.
-    const int videoWidth = EvenAlign(width * 2);
-    const int videoHeight = EvenAlign(height);
 
     CFMutableDictionaryRef encoderSpec = CFDictionaryCreateMutable(
         kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
@@ -276,15 +248,17 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     CFDictionarySetValue(sourceAttrs, kCVPixelBufferIOSurfacePropertiesKey, emptyIOSurface);
     CFRelease(emptyIOSurface);
 
+    VTCompressionSessionRef session = nullptr;
     OSStatus status = VTCompressionSessionCreate(
         kCFAllocatorDefault, videoWidth, videoHeight, kCMVideoCodecType_H264, encoderSpec,
-        sourceAttrs, nullptr, CompressionOutputCallback, &state, &session);
+        sourceAttrs, nullptr, CompressionOutputCallback, state, &session);
     CFRelease(encoderSpec);
     CFRelease(sourceAttrs);
     if (status != noErr || session == nullptr) {
-        cleanup();
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "failed to create VideoToolbox compression session"));
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to create VideoToolbox compression session";
+        }
+        return false;
     }
 
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime, kCFBooleanFalse);
@@ -303,9 +277,12 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
 
     status = VTCompressionSessionPrepareToEncodeFrames(session);
     if (status != noErr) {
-        cleanup();
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "VideoToolbox prepare failed"));
+        VTCompressionSessionInvalidate(session);
+        CFRelease(session);
+        if (errorMessage != nullptr) {
+            *errorMessage = "VideoToolbox prepare failed";
+        }
+        return false;
     }
 
     CFMutableDictionaryRef pixelBufferAttrs = CFDictionaryCreateMutable(
@@ -316,15 +293,153 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     CFDictionarySetValue(pixelBufferAttrs, kCVPixelBufferIOSurfacePropertiesKey,
                          emptyIOSurfaceProps);
     CFRelease(emptyIOSurfaceProps);
+    CVPixelBufferRef pixelBuffer = nullptr;
     const CVReturn bufferStatus = CVPixelBufferCreate(
         kCFAllocatorDefault, static_cast<size_t>(videoWidth), static_cast<size_t>(videoHeight),
         kCVPixelFormatType_32BGRA, pixelBufferAttrs, &pixelBuffer);
     CFRelease(pixelBufferAttrs);
     if (bufferStatus != kCVReturnSuccess || pixelBuffer == nullptr) {
-        cleanup();
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
-                                             "failed to create encode pixel buffer"));
+        VTCompressionSessionInvalidate(session);
+        CFRelease(session);
+        if (errorMessage != nullptr) {
+            *errorMessage = "failed to create encode pixel buffer";
+        }
+        return false;
     }
+
+    *sessionOut = session;
+    *pixelBufferOut = pixelBuffer;
+    return true;
+}
+
+#endif  // __APPLE__
+
+}  // namespace
+
+struct PagVideoEncodeSession::Impl {
+#if defined(__APPLE__)
+    CompressionState state = {};
+    VTCompressionSessionRef session = nullptr;
+    CVPixelBufferRef pixelBuffer = nullptr;
+    int videoWidth = 0;
+    int videoHeight = 0;
+    int interval = 0;
+    int quality = 0;
+    float frameRate = 0.0f;
+
+    void destroyResources() {
+        if (pixelBuffer != nullptr) {
+            CVPixelBufferRelease(pixelBuffer);
+            pixelBuffer = nullptr;
+        }
+        if (session != nullptr) {
+            VTCompressionSessionInvalidate(session);
+            CFRelease(session);
+            session = nullptr;
+        }
+        videoWidth = 0;
+        videoHeight = 0;
+        interval = 0;
+        quality = 0;
+        frameRate = 0.0f;
+        ResetCompressionState(&state);
+    }
+
+    bool matches(int nextVideoWidth, int nextVideoHeight, int nextInterval, int nextQuality,
+                 float nextFrameRate) const {
+        return session != nullptr && pixelBuffer != nullptr && videoWidth == nextVideoWidth &&
+            videoHeight == nextVideoHeight && interval == nextInterval && quality == nextQuality &&
+            frameRate == nextFrameRate;
+    }
+
+    bool ensureReady(int nextVideoWidth, int nextVideoHeight, int nextInterval, int nextQuality,
+                     float nextFrameRate, std::string *errorMessage) {
+        if (matches(nextVideoWidth, nextVideoHeight, nextInterval, nextQuality, nextFrameRate)) {
+            ResetCompressionState(&state);
+            return true;
+        }
+        destroyResources();
+        if (!CreateVtResources(nextVideoWidth, nextVideoHeight, nextInterval, nextQuality,
+                               nextFrameRate, &state, &session, &pixelBuffer, errorMessage)) {
+            destroyResources();
+            return false;
+        }
+        videoWidth = nextVideoWidth;
+        videoHeight = nextVideoHeight;
+        interval = nextInterval;
+        quality = nextQuality;
+        frameRate = nextFrameRate;
+        ResetCompressionState(&state);
+        return true;
+    }
+#endif
+};
+
+PagVideoEncodeSession::PagVideoEncodeSession()
+    : impl_(std::make_unique<Impl>()) {
+}
+
+PagVideoEncodeSession::~PagVideoEncodeSession() {
+#if defined(__APPLE__)
+    if (impl_ != nullptr) {
+        impl_->destroyResources();
+    }
+#endif
+}
+
+Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSource,
+                                                   pag::VideoSequence *sequence, FrameTime start,
+                                                   FrameTime end, int width, int height,
+                                                   int keyFrameInterval, int imageQuality,
+                                                   const volatile int *cancelFlag,
+                                                   PagVideoEncodeSession *encodeSession) {
+    if (frameSource == nullptr || sequence == nullptr || width <= 0 || height <= 0 || end <= start) {
+        if (frameSource != nullptr) {
+            frameSource->finish();
+        }
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG video sequence options"));
+    }
+
+#if !defined(__APPLE__)
+    (void)keyFrameInterval;
+    (void)imageQuality;
+    (void)cancelFlag;
+    (void)encodeSession;
+    frameSource->finish();
+    return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
+                                         "PAG video sequence encode requires Apple VideoToolbox"));
+#else
+
+    if (IsPagExportCancelled(cancelFlag)) {
+        frameSource->finish();
+        return Unexpected(MakeCancelledPagExportError());
+    }
+
+    PagVideoEncodeSession localSession;
+    PagVideoEncodeSession *session = encodeSession != nullptr ? encodeSession : &localSession;
+    const bool sharedSession = encodeSession != nullptr;
+
+    const int quality = ClampQuality(imageQuality);
+    const int interval = keyFrameInterval > 0 ? keyFrameInterval : 60;
+    const float frameRate = sequence->frameRate > 0.0f ? sequence->frameRate : 30.0f;
+    const int videoWidth = EvenAlign(width * 2);
+    const int videoHeight = EvenAlign(height);
+
+    std::string ensureError;
+    if (!session->impl_->ensureReady(videoWidth, videoHeight, interval, quality, frameRate,
+                                     &ensureError)) {
+        frameSource->finish();
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
+                                             ensureError.empty() ? "VideoToolbox session failed"
+                                                                 : ensureError));
+    }
+
+    CompressionState &state = session->impl_->state;
+    VTCompressionSessionRef vtSession = session->impl_->session;
+    CVPixelBufferRef pixelBuffer = session->impl_->pixelBuffer;
+    bool encodeFailed = false;
+    bool cancelled = false;
 
     const int64_t frameDuration = static_cast<int64_t>(1000.0f / frameRate);
     const CMTime duration = CMTimeMake(std::max<int64_t>(1, frameDuration), 1000);
@@ -362,13 +477,27 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
 
         const int64_t localIndex = static_cast<int64_t>(time - start);
         const CMTime pts = CMTimeMake(localIndex * std::max<int64_t>(1, frameDuration), 1000);
+        CFDictionaryRef frameProperties = nullptr;
+        CFMutableDictionaryRef forceKeyFrameProps = nullptr;
+        if (localIndex == 0) {
+            // Independent PAG sequences need a sync frame at the start after session reuse.
+            forceKeyFrameProps = CFDictionaryCreateMutable(kCFAllocatorDefault, 1,
+                                                           &kCFTypeDictionaryKeyCallBacks,
+                                                           &kCFTypeDictionaryValueCallBacks);
+            CFDictionarySetValue(forceKeyFrameProps, kVTEncodeFrameOptionKey_ForceKeyFrame,
+                                 kCFBooleanTrue);
+            frameProperties = forceKeyFrameProps;
+        }
         {
             std::lock_guard<std::mutex> lock(state.mutex);
             ++state.pending;
         }
-        status = VTCompressionSessionEncodeFrame(
-            session, pixelBuffer, pts, duration, nullptr,
+        const OSStatus status = VTCompressionSessionEncodeFrame(
+            vtSession, pixelBuffer, pts, duration, frameProperties,
             reinterpret_cast<void *>(static_cast<intptr_t>(localIndex)), nullptr);
+        if (forceKeyFrameProps != nullptr) {
+            CFRelease(forceKeyFrameProps);
+        }
         if (status != noErr) {
             std::lock_guard<std::mutex> lock(state.mutex);
             --state.pending;
@@ -378,7 +507,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     }
 
     if (!encodeFailed && !cancelled) {
-        status = VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
+        const OSStatus status = VTCompressionSessionCompleteFrames(vtSession, kCMTimeInvalid);
         if (status != noErr) {
             encodeFailed = true;
         }
@@ -386,29 +515,32 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
 
     {
         std::unique_lock<std::mutex> lock(state.mutex);
-        state.cv.wait(lock, [&]() {
-            return state.pending == 0;
-        });
+        while (state.pending != 0) {
+            state.cv.wait(lock);
+        }
         if (state.failed) {
             encodeFailed = true;
         }
     }
 
+    frameSource->finish();
+
     if (cancelled) {
-        cleanup();
+        if (sharedSession) {
+            session->impl_->destroyResources();
+        }
         return Unexpected(MakeCancelledPagExportError());
     }
 
     if (encodeFailed || state.samples.empty() || !state.headersReady || state.headers.size() < 2) {
-        cleanup();
+        if (sharedSession) {
+            session->impl_->destroyResources();
+        }
         return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
                                              "PAG video frame encode failed"));
     }
 
-    std::sort(state.samples.begin(), state.samples.end(),
-              [](const EncodedSample &a, const EncodedSample &b) {
-                  return a.index < b.index;
-              });
+    std::sort(state.samples.begin(), state.samples.end(), EncodedSampleIndexLess);
 
     for (const std::vector<uint8_t> &header : state.headers) {
         sequence->headers.push_back(pag::ByteData::MakeCopy(header.data(), header.size()).release());
@@ -427,8 +559,10 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     sequence->alphaStartX = width;
     sequence->alphaStartY = 0;
 
-    cleanup();
     if (sequence->frames.size() != static_cast<size_t>(end - start)) {
+        if (sharedSession) {
+            session->impl_->destroyResources();
+        }
         return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
                                              "PAG video frame count mismatch"));
     }

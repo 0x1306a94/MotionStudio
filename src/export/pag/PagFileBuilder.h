@@ -22,6 +22,8 @@
 
 #include "pag/file.h"
 
+#include "PagVideoSequenceEncode.h"
+
 namespace motion {
 namespace pag_export {
 
@@ -69,6 +71,7 @@ class PagFileBuilder {
                                                     const Layer &layer);
     bool needsBitmapFallback(const Layer &layer) const;
     bool isBitmapForcedComposition(EntityId compositionId) const;
+    PagVideoEncodeSession *videoEncodeSession();
     PagExportError unsupportedWithoutBmpError(const Layer &layer) const;
     void collectDescendants(EntityId rootLayerId, std::unordered_set<uint64_t> *out) const;
     void skipLayerWithWarning(const Layer &layer, const char *code, const char *message,
@@ -115,6 +118,8 @@ class PagFileBuilder {
     pag::ID nextCompositionId_ = 1;
     pag::ID nextImageId_ = 1;
     pag::ID nextMaskId_ = 1;
+    // Shared across VideoComposition fallbacks in one Export (same packed size/quality/fps).
+    std::unique_ptr<PagVideoEncodeSession> videoEncodeSession_;
 };
 
 }  // namespace pag_export

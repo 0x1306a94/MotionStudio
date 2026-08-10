@@ -356,6 +356,13 @@ PagFileBuilder::PagFileBuilder(const Document &document, const Composition &comp
     , frameSource_(frameSource) {
 }
 
+PagVideoEncodeSession *PagFileBuilder::videoEncodeSession() {
+    if (videoEncodeSession_ == nullptr) {
+        videoEncodeSession_ = std::make_unique<PagVideoEncodeSession>();
+    }
+    return videoEncodeSession_.get();
+}
+
 Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
     if (options_.bitmapScale <= 0.0f) {
         return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
@@ -571,7 +578,8 @@ Expected<pag::Composition *, PagExportError> PagFileBuilder::buildBitmapComposit
         builtComposition = built.value();
     } else {
         Expected<pag::VideoComposition *, PagExportError> built = PagVideoFallback::BuildComposition(
-            document_, composition, options_, frameSource_, nextCompositionId_++, &warnings_);
+            document_, composition, options_, frameSource_, nextCompositionId_++, &warnings_,
+            videoEncodeSession());
         if (!built.hasValue()) {
             return Unexpected(built.error());
         }
@@ -823,7 +831,7 @@ Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
 
     Expected<VideoFallbackResult, PagExportError> built = PagVideoFallback::Build(
         document_, hostComposition, layer, options_, frameSource_, nextCompositionId_++,
-        nextLayerId_++, &warnings_);
+        nextLayerId_++, &warnings_, videoEncodeSession());
     if (!built.hasValue()) {
         return Unexpected(built.error());
     }

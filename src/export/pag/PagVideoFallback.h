@@ -21,17 +21,20 @@ struct VideoFallbackResult {
 };
 
 // Rasterizes layers / compositions marked with _bmp into VideoComposition.
+class PagVideoEncodeSession;
+
 class PagVideoFallback {
   public:
     static Expected<VideoFallbackResult, PagExportError> Build(
         const Document &document, const Composition &hostComposition, const Layer &rootLayer,
         const PagExportOptions &options, BitmapFrameSource *frameSource, pag::ID compositionId,
-        pag::ID layerId, std::vector<PagExportWarning> *warnings);
+        pag::ID layerId, std::vector<PagExportWarning> *warnings,
+        PagVideoEncodeSession *encodeSession = nullptr);
 
     static Expected<pag::VideoComposition *, PagExportError> BuildComposition(
         const Document &document, const Composition &composition, const PagExportOptions &options,
         BitmapFrameSource *frameSource, pag::ID compositionId,
-        std::vector<PagExportWarning> *warnings);
+        std::vector<PagExportWarning> *warnings, PagVideoEncodeSession *encodeSession = nullptr);
 };
 
 }  // namespace pag_export

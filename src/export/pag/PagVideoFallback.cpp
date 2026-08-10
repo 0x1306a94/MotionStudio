@@ -53,7 +53,8 @@ void ApplyHostScale(pag::PreComposeLayer *pagLayer, int hostWidth, int hostHeigh
 Expected<VideoFallbackResult, PagExportError> PagVideoFallback::Build(
     const Document &document, const Composition &hostComposition, const Layer &rootLayer,
     const PagExportOptions &options, BitmapFrameSource *frameSource, pag::ID compositionId,
-    pag::ID layerId, std::vector<PagExportWarning> *warnings) {
+    pag::ID layerId, std::vector<PagExportWarning> *warnings,
+    PagVideoEncodeSession *encodeSession) {
     if (frameSource == nullptr || options.bitmapScale <= 0.0f) {
         return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
                                              "invalid PAG video export options"));
@@ -102,7 +103,8 @@ Expected<VideoFallbackResult, PagExportError> PagVideoFallback::Build(
 
     Expected<void, PagExportError> filled = EncodeVideoSequence(
         frameSource, sequence, rootLayer.inPoint, rootLayer.outPoint, size.width, size.height,
-        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag);
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag,
+        encodeSession);
     if (!filled.hasValue()) {
         delete videoComposition;
         return Unexpected(filled.error());
@@ -136,7 +138,7 @@ Expected<VideoFallbackResult, PagExportError> PagVideoFallback::Build(
 Expected<pag::VideoComposition *, PagExportError> PagVideoFallback::BuildComposition(
     const Document &document, const Composition &composition, const PagExportOptions &options,
     BitmapFrameSource *frameSource, pag::ID compositionId,
-    std::vector<PagExportWarning> *warnings) {
+    std::vector<PagExportWarning> *warnings, PagVideoEncodeSession *encodeSession) {
     if (frameSource == nullptr || options.bitmapScale <= 0.0f) {
         return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
                                              "invalid PAG video export options"));
@@ -188,7 +190,8 @@ Expected<pag::VideoComposition *, PagExportError> PagVideoFallback::BuildComposi
 
     Expected<void, PagExportError> filled = EncodeVideoSequence(
         frameSource, sequence, 0, composition.duration, size.width, size.height,
-        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag);
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag,
+        encodeSession);
     if (!filled.hasValue()) {
         delete videoComposition;
         return Unexpected(filled.error());
