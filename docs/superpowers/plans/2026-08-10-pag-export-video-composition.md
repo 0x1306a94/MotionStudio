@@ -94,7 +94,7 @@ git commit --only include/MotionStudio/export/PagExportOptions.h \
 
 ### Task 2: `PackRgbAlphaSideBySide`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `src/export/pag/PagRgbAlphaPack.h`
@@ -114,7 +114,7 @@ bool PackRgbAlphaSideBySide(const uint8_t *rgba, int width, int height, size_t r
 }
 ```
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(PagRgbAlphaPackTest, SideBySideAlphaAtRight) {
@@ -124,18 +124,18 @@ TEST(PagRgbAlphaPackTest, SideBySideAlphaAtRight) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/src/export/pag/pag_export_tests --gtest_filter='PagRgbAlphaPackTest.*'`  
 Expected: 编译失败
 
-- [ ] **Step 3: 实现 pack**
+- [x] **Step 3: 实现 pack**
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagRgbAlphaPack.h src/export/pag/PagRgbAlphaPack.cpp \
