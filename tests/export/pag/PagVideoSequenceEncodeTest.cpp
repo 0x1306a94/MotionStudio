@@ -73,4 +73,27 @@ TEST(PagVideoSequenceEncodeTest, EncodesSideBySideAlphaHeaders) {
     delete composition;
 }
 
+TEST(PagVideoSequenceEncodeTest, CancelFlagAbortsWithCancelledMessage) {
+    Document document = MakeDoc(64, 64, 4);
+    FakeBitmapFrameSource source;
+    TimeRange range{0, 4};
+    ASSERT_TRUE(source.prepareComposition(document, document.compositions[0]->id, range, 64, 64)
+                    .hasValue());
+
+    auto *composition = new pag::VideoComposition();
+    auto *sequence = new pag::VideoSequence();
+    sequence->width = 64;
+    sequence->height = 64;
+    sequence->frameRate = 30;
+    sequence->composition = composition;
+    composition->sequences.push_back(sequence);
+
+    volatile int cancelFlag = 1;
+    auto encoded = EncodeVideoSequence(&source, sequence, 0, 4, 64, 64, 60, 80, &cancelFlag);
+    ASSERT_FALSE(encoded.hasValue());
+    EXPECT_EQ(encoded.error().message, "cancelled");
+
+    delete composition;
+}
+
 #endif

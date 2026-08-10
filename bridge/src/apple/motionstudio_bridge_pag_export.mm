@@ -89,7 +89,7 @@ bool ExportTreeHasBmpSuffix(const motion::Document &document, motion::EntityId r
 }  // namespace
 
 bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExportOptions *options,
-                   char **errorOut) {
+                   const volatile int *cancelFlag, char **errorOut) {
     if (errorOut != nullptr) {
         *errorOut = nullptr;
     }
@@ -113,6 +113,7 @@ bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExpo
     exportOptions.compositionId = motion::EntityId{compositionId};
     exportOptions.allowBitmapExport = options->allowBitmapExport;
     exportOptions.bitmapScale = options->bitmapScale > 0.0f ? options->bitmapScale : 1.0f;
+    exportOptions.cancelFlag = cancelFlag;
     switch (options->bmpSequenceType) {
         case MS_PAG_BMP_SEQUENCE_VIDEO:
             exportOptions.bmpSequenceType = motion::PagBmpSequenceType::Video;

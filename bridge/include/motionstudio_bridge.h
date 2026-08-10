@@ -780,9 +780,10 @@ typedef struct MSPagExportOptions {
 
 // Exports composition to a binary .pag file via PagExporter.
 // When allowBitmapExport and the export tree uses a _bmp name, injects
-// TgfxBitmapFrameSource automatically. On failure *errorOut is malloc'd (ms_string_free).
+// TgfxBitmapFrameSource automatically. cancelFlag non-null and non-zero aborts between
+// frames (error message "cancelled"). On failure *errorOut is malloc'd (ms_string_free).
 bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExportOptions *options,
-                   char **errorOut);
+                   const volatile int *cancelFlag, char **errorOut);
 #endif
 
 void ms_canvas_destroy(MSCanvas *canvas);

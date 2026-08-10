@@ -193,10 +193,15 @@ BitmapSize ComputeBitmapSize(int compositionWidth, int compositionHeight, float 
 Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSource,
                                                     pag::BitmapSequence *sequence, FrameTime start,
                                                     FrameTime end, int width, int height,
-                                                    int keyFrameInterval, int imageQuality) {
+                                                    int keyFrameInterval, int imageQuality,
+                                                    const volatile int *cancelFlag) {
     if (frameSource == nullptr || sequence == nullptr || width <= 0 || height <= 0 || end <= start) {
         return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
                                              "invalid PAG bitmap sequence options"));
+    }
+    if (IsPagExportCancelled(cancelFlag)) {
+        frameSource->finish();
+        return Unexpected(MakeCancelledPagExportError());
     }
 
     const int stride = width * 4;
@@ -206,8 +211,13 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
     ImageRect lastKeyFrameDiffRect{0, 0, width, height};
     pag::Frame lastKeyFrame = 0;
     bool encodeFailed = false;
+    bool cancelled = false;
 
     for (FrameTime time = start; time < end; ++time) {
+        if (IsPagExportCancelled(cancelFlag)) {
+            cancelled = true;
+            break;
+        }
         Expected<BitmapFrame, std::string> rendered = frameSource->renderFrame(time);
         if (!rendered.hasValue()) {
             encodeFailed = true;
@@ -272,6 +282,9 @@ Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSour
     }
 
     frameSource->finish();
+    if (cancelled) {
+        return Unexpected(MakeCancelledPagExportError());
+    }
     if (encodeFailed || sequence->frames.empty()) {
         return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
                                              "PAG bitmap frame encode failed"));

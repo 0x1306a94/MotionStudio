@@ -24,10 +24,12 @@ BitmapSize ComputeBitmapSize(int compositionWidth, int compositionHeight, float 
                              int bitmapMaxResolution);
 
 // Fills sequence->frames using AE-style diff / keyframe / WebP rectangle encoding.
+// cancelFlag non-null and non-zero aborts between frames with message "cancelled".
 Expected<void, PagExportError> EncodeBitmapSequence(BitmapFrameSource *frameSource,
                                                     pag::BitmapSequence *sequence, FrameTime start,
                                                     FrameTime end, int width, int height,
-                                                    int keyFrameInterval, int imageQuality);
+                                                    int keyFrameInterval, int imageQuality,
+                                                    const volatile int *cancelFlag = nullptr);
 
 }  // namespace pag_export
 }  // namespace motion

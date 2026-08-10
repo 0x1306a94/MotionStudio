@@ -68,8 +68,12 @@ std::vector<FrameTime> SampleTimes(FrameTime start, FrameTime end) {
 
 }  // namespace
 
-bool IsAlmostStaticSequence(BitmapFrameSource *source, FrameTime start, FrameTime end) {
+bool IsAlmostStaticSequence(BitmapFrameSource *source, FrameTime start, FrameTime end,
+                            const volatile int *cancelFlag) {
     if (source == nullptr || end <= start) {
+        return false;
+    }
+    if (cancelFlag != nullptr && *cancelFlag != 0) {
         return false;
     }
     const std::vector<FrameTime> times = SampleTimes(start, end);
@@ -95,6 +99,9 @@ bool IsAlmostStaticSequence(BitmapFrameSource *source, FrameTime start, FrameTim
     }
 
     for (size_t index = 1; index < times.size(); ++index) {
+        if (cancelFlag != nullptr && *cancelFlag != 0) {
+            return false;
+        }
         Expected<BitmapFrame, std::string> rendered = source->renderFrame(times[index]);
         if (!rendered.hasValue()) {
             return false;

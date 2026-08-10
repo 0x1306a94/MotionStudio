@@ -86,7 +86,7 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
 
     Expected<void, PagExportError> filled = EncodeBitmapSequence(
         frameSource, sequence, rootLayer.inPoint, rootLayer.outPoint, size.width, size.height,
-        options.bitmapKeyFrameInterval, options.bitmapImageQuality);
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag);
     if (!filled.hasValue()) {
         delete bitmapComposition;
         return Unexpected(filled.error());
@@ -182,7 +182,7 @@ Expected<pag::BitmapComposition *, PagExportError> PagBitmapFallback::BuildCompo
 
     Expected<void, PagExportError> filled = EncodeBitmapSequence(
         frameSource, sequence, 0, composition.duration, size.width, size.height,
-        options.bitmapKeyFrameInterval, options.bitmapImageQuality);
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag);
     if (!filled.hasValue()) {
         delete bitmapComposition;
         return Unexpected(filled.error());

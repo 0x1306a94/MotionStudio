@@ -210,7 +210,8 @@ void CompressionOutputCallback(void *outputCallbackRefCon, void *sourceFrameRefC
 Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSource,
                                                    pag::VideoSequence *sequence, FrameTime start,
                                                    FrameTime end, int width, int height,
-                                                   int keyFrameInterval, int imageQuality) {
+                                                   int keyFrameInterval, int imageQuality,
+                                                   const volatile int *cancelFlag) {
     if (frameSource == nullptr || sequence == nullptr || width <= 0 || height <= 0 || end <= start) {
         if (frameSource != nullptr) {
             frameSource->finish();
@@ -225,6 +226,11 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
                                          "PAG video sequence encode requires Apple VideoToolbox"));
 #else
 
+    if (IsPagExportCancelled(cancelFlag)) {
+        frameSource->finish();
+        return Unexpected(MakeCancelledPagExportError());
+    }
+
     const int quality = ClampQuality(imageQuality);
     const int interval = keyFrameInterval > 0 ? keyFrameInterval : 60;
     const float frameRate = sequence->frameRate > 0.0f ? sequence->frameRate : 30.0f;
@@ -233,6 +239,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     VTCompressionSessionRef session = nullptr;
     CVPixelBufferRef pixelBuffer = nullptr;
     bool encodeFailed = false;
+    bool cancelled = false;
 
     auto cleanup = [&]() {
         if (pixelBuffer != nullptr) {
@@ -323,6 +330,10 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
     const CMTime duration = CMTimeMake(std::max<int64_t>(1, frameDuration), 1000);
 
     for (FrameTime time = start; time < end; ++time) {
+        if (IsPagExportCancelled(cancelFlag)) {
+            cancelled = true;
+            break;
+        }
         Expected<BitmapFrame, std::string> rendered = frameSource->renderFrame(time);
         if (!rendered.hasValue()) {
             encodeFailed = true;
@@ -366,7 +377,7 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         }
     }
 
-    if (!encodeFailed) {
+    if (!encodeFailed && !cancelled) {
         status = VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
         if (status != noErr) {
             encodeFailed = true;
@@ -381,6 +392,11 @@ Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSourc
         if (state.failed) {
             encodeFailed = true;
         }
+    }
+
+    if (cancelled) {
+        cleanup();
+        return Unexpected(MakeCancelledPagExportError());
     }
 
     if (encodeFailed || state.samples.empty() || !state.headersReady || state.headers.size() < 2) {

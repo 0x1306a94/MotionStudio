@@ -20,4 +20,12 @@ inline PagExportError MakePagExportError(PagExportErrorKind kind, EntityId entit
     return error;
 }
 
+inline bool IsPagExportCancelled(const volatile int *cancelFlag) {
+    return cancelFlag != nullptr && *cancelFlag != 0;
+}
+
+inline PagExportError MakeCancelledPagExportError() {
+    return MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "cancelled");
+}
+
 }  // namespace motion

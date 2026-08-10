@@ -18,7 +18,7 @@ TEST(PagExportBridgeTest, NullDocumentFails) {
     options.allowBitmapExport = false;
     options.bitmapScale = 1.0f;
     options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_AUTO;
-    EXPECT_FALSE(ms_pag_export(nullptr, 0, &options, &error));
+    EXPECT_FALSE(ms_pag_export(nullptr, 0, &options, nullptr, &error));
     ASSERT_NE(error, nullptr);
     EXPECT_NE(std::string(error).find("document"), std::string::npos);
     ms_string_free(error);
@@ -34,7 +34,7 @@ TEST(PagExportBridgeTest, EmptyPathFails) {
     options.bitmapScale = 1.0f;
     options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_AUTO;
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
-    EXPECT_FALSE(ms_pag_export(document, compositionId, &options, &error));
+    EXPECT_FALSE(ms_pag_export(document, compositionId, &options, nullptr, &error));
     ASSERT_NE(error, nullptr);
     EXPECT_NE(std::string(error).find("path"), std::string::npos);
     ms_string_free(error);
@@ -73,7 +73,7 @@ TEST(PagExportBridgeTest, CompositionBmpExportsWithRealFrameSource) {
     options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_BITMAP;
 
     char *error = nullptr;
-    const bool ok = ms_pag_export(document, compositionId, &options, &error);
+    const bool ok = ms_pag_export(document, compositionId, &options, nullptr, &error);
     EXPECT_TRUE(ok) << (error != nullptr ? error : "unknown error");
     if (error != nullptr) {
         ms_string_free(error);
@@ -118,7 +118,7 @@ TEST(PagExportBridgeTest, CompositionBmpExportsVideoSequence) {
     options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_VIDEO;
 
     char *error = nullptr;
-    const bool ok = ms_pag_export(document, compositionId, &options, &error);
+    const bool ok = ms_pag_export(document, compositionId, &options, nullptr, &error);
     EXPECT_TRUE(ok) << (error != nullptr ? error : "unknown error");
     if (error != nullptr) {
         ms_string_free(error);
@@ -160,10 +160,49 @@ TEST(PagExportBridgeTest, BmpWithoutAllowBitmapExportFails) {
     options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_AUTO;
 
     char *error = nullptr;
-    EXPECT_FALSE(ms_pag_export(document, compositionId, &options, &error));
+    EXPECT_FALSE(ms_pag_export(document, compositionId, &options, nullptr, &error));
     ASSERT_NE(error, nullptr);
     ms_string_free(error);
 
+    ms_document_destroy(document);
+}
+
+TEST(PagExportBridgeTest, CancelFlagAbortsWithCancelledMessage) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+
+    {
+        DocumentLock lock(document);
+        motion::Composition *composition = bridge::FindComposition(document, compositionId);
+        ASSERT_NE(composition, nullptr);
+        composition->name = "Main_bmp";
+        composition->width = 64;
+        composition->height = 64;
+        composition->duration = 4;
+    }
+    ASSERT_NE(ms_command_add_rect_layer(document, compositionId), 0u);
+
+    const std::filesystem::path outputPath =
+        std::filesystem::temp_directory_path() / "ms_pag_export_cancel_bridge_test.pag";
+    std::error_code removeError;
+    std::filesystem::remove(outputPath, removeError);
+
+    MSPagExportOptions options{};
+    const std::string pathString = outputPath.string();
+    options.outputPath = pathString.c_str();
+    options.allowBitmapExport = true;
+    options.bitmapScale = 1.0f;
+    options.bmpSequenceType = MS_PAG_BMP_SEQUENCE_BITMAP;
+
+    volatile int cancelFlag = 1;
+    char *error = nullptr;
+    EXPECT_FALSE(ms_pag_export(document, compositionId, &options, &cancelFlag, &error));
+    ASSERT_NE(error, nullptr);
+    EXPECT_EQ(std::string(error), "cancelled");
+    ms_string_free(error);
+
+    EXPECT_FALSE(std::filesystem::exists(outputPath));
     ms_document_destroy(document);
 }
 

@@ -70,13 +70,12 @@ extension EditorViewController {
 
         let progressVC = PagExportProgressViewController()
         progressVC.modalPresentationStyle = .formSheet
-        // PAG encode is synchronous and usually fast; Cancel only helps before Task starts.
-        progressVC.onCancel = { [weak self] in
-            self?.pagExportSession?.markDiscarded()
-            self?.finishPagExportCancelled(progressVC: progressVC)
+        progressVC.onCancel = { [weak session] in
+            session?.requestCancel()
         }
 
         let core = document.core
+        let cancelState = session.cancelState
         let outputPath = outputURL.path(percentEncoded: false)
         let allowBitmapExport = settings.allowBitmapExport
         let bmpSequenceType = settings.bmpSequenceType
@@ -90,19 +89,21 @@ extension EditorViewController {
                     try core.exportPAG(compositionID: compositionID,
                                        outputPath: outputPath,
                                        allowBitmapExport: allowBitmapExport,
-                                       bmpSequenceType: bmpSequenceType)
+                                       bmpSequenceType: bmpSequenceType,
+                                       cancelState: cancelState)
                     await MainActor.run {
-                        guard self.pagExportSession?.isDiscarded != true else { return }
                         self.finishPagExportSuccess(outputURL: outputURL, progressVC: progressVC)
+                    }
+                } catch PagExportError.cancelled {
+                    await MainActor.run {
+                        self.finishPagExportCancelled(progressVC: progressVC)
                     }
                 } catch let PagExportError.failed(message) {
                     await MainActor.run {
-                        guard self.pagExportSession?.isDiscarded != true else { return }
                         self.finishPagExportFailed(message: message, progressVC: progressVC)
                     }
                 } catch {
                     await MainActor.run {
-                        guard self.pagExportSession?.isDiscarded != true else { return }
                         self.finishPagExportFailed(message: error.localizedDescription, progressVC: progressVC)
                     }
                 }

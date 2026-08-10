@@ -39,6 +39,8 @@ struct PagExportOptions {
     PagBmpSequenceType bmpSequenceType = PagBmpSequenceType::Auto;
     // Optional. Prefer real font metrics so point-text baseline matches MS layout.
     TextAscentResolver textAscentResolver;
+    // Non-null and non-zero aborts export between frames (message "cancelled").
+    const volatile int *cancelFlag = nullptr;
 };
 
 }  // namespace motion

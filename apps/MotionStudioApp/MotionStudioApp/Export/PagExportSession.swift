@@ -2,7 +2,7 @@
 //  PagExportSession.swift
 //  MotionStudioApp
 //
-//  Temporary output path for one PAG export.
+//  Temporary output path and cancel flag for one PAG export.
 //
 
 import Foundation
@@ -11,12 +11,10 @@ import Foundation
 final class PagExportSession {
     private(set) var temporaryDirectoryURL: URL?
     private(set) var outputURL: URL?
-    /// Set when the user dismisses progress before encode finishes.
-    private(set) var isDiscarded = false
+    let cancelState = VideoExportCancelState()
 
     func prepareOutputURL(projectName: String) throws -> URL {
         cleanup()
-        isDiscarded = false
 
         let temporaryDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("MotionStudioExport-\(UUID().uuidString)", isDirectory: true)
@@ -31,8 +29,8 @@ final class PagExportSession {
         return outputURL
     }
 
-    func markDiscarded() {
-        isDiscarded = true
+    func requestCancel() {
+        cancelState.requestCancel()
     }
 
     func cleanup() {

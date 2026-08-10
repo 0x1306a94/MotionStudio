@@ -102,7 +102,7 @@ Expected<VideoFallbackResult, PagExportError> PagVideoFallback::Build(
 
     Expected<void, PagExportError> filled = EncodeVideoSequence(
         frameSource, sequence, rootLayer.inPoint, rootLayer.outPoint, size.width, size.height,
-        options.bitmapKeyFrameInterval, options.bitmapImageQuality);
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag);
     if (!filled.hasValue()) {
         delete videoComposition;
         return Unexpected(filled.error());
@@ -186,9 +186,9 @@ Expected<pag::VideoComposition *, PagExportError> PagVideoFallback::BuildComposi
     sequence->frameRate = videoComposition->frameRate;
     videoComposition->sequences.push_back(sequence);
 
-    Expected<void, PagExportError> filled =
-        EncodeVideoSequence(frameSource, sequence, 0, composition.duration, size.width, size.height,
-                            options.bitmapKeyFrameInterval, options.bitmapImageQuality);
+    Expected<void, PagExportError> filled = EncodeVideoSequence(
+        frameSource, sequence, 0, composition.duration, size.width, size.height,
+        options.bitmapKeyFrameInterval, options.bitmapImageQuality, options.cancelFlag);
     if (!filled.hasValue()) {
         delete videoComposition;
         return Unexpected(filled.error());

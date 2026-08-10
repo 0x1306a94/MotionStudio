@@ -552,9 +552,12 @@ Expected<pag::Composition *, PagExportError> PagFileBuilder::buildBitmapComposit
 
     PagBmpSequenceType kind = options_.bmpSequenceType;
     if (kind == PagBmpSequenceType::Auto) {
-        kind = IsAlmostStaticSequence(frameSource_, 0, composition.duration)
+        kind = IsAlmostStaticSequence(frameSource_, 0, composition.duration, options_.cancelFlag)
             ? PagBmpSequenceType::Bitmap
             : PagBmpSequenceType::Video;
+    }
+    if (IsPagExportCancelled(options_.cancelFlag)) {
+        return Unexpected(MakeCancelledPagExportError());
     }
 
     pag::Composition *builtComposition = nullptr;
@@ -798,9 +801,13 @@ Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
 
     PagBmpSequenceType kind = options_.bmpSequenceType;
     if (kind == PagBmpSequenceType::Auto) {
-        kind = IsAlmostStaticSequence(frameSource_, layer.inPoint, layer.outPoint)
+        kind = IsAlmostStaticSequence(frameSource_, layer.inPoint, layer.outPoint,
+                                      options_.cancelFlag)
             ? PagBmpSequenceType::Bitmap
             : PagBmpSequenceType::Video;
+    }
+    if (IsPagExportCancelled(options_.cancelFlag)) {
+        return Unexpected(MakeCancelledPagExportError());
     }
 
     if (kind == PagBmpSequenceType::Bitmap) {

@@ -14,10 +14,12 @@ namespace pag_export {
 // (VideoToolbox on Apple) into sequence->frames / headers. Sets alphaStartX=width,
 // alphaStartY=0. sequence->width/height should already be the logical size.
 // Calls frameSource->finish() before returning (success or failure).
+// cancelFlag non-null and non-zero aborts between frames with message "cancelled".
 Expected<void, PagExportError> EncodeVideoSequence(BitmapFrameSource *frameSource,
                                                    pag::VideoSequence *sequence, FrameTime start,
                                                    FrameTime end, int width, int height,
-                                                   int keyFrameInterval, int imageQuality);
+                                                   int keyFrameInterval, int imageQuality,
+                                                   const volatile int *cancelFlag = nullptr);
 
 }  // namespace pag_export
 }  // namespace motion

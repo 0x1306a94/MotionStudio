@@ -16,6 +16,7 @@ enum VideoExportError: Error {
 }
 
 enum PagExportError: Error {
+    case cancelled
     case failed(String)
 }
 
@@ -309,10 +310,12 @@ final class MotionDocumentCore {
         }
     }
 
+    /// Runs on the calling thread. Cancel via `cancelState.requestCancel()`.
     nonisolated func exportPAG(compositionID: UInt64,
                                outputPath: String,
                                allowBitmapExport: Bool,
-                               bmpSequenceType: MS_PAG_BMP_SEQUENCE_TYPE = .AUTO) throws
+                               bmpSequenceType: MS_PAG_BMP_SEQUENCE_TYPE = .AUTO,
+                               cancelState: VideoExportCancelState) throws
     {
         try outputPath.withCString { path in
             var options = MSPagExportOptions()
@@ -322,11 +325,20 @@ final class MotionDocumentCore {
             options.bmpSequenceType = bmpSequenceType
 
             var error: UnsafeMutablePointer<CChar>?
-            let ok = ms_pag_export(handle, compositionID, &options, &error)
+            let ok = ms_pag_export(
+                handle,
+                compositionID,
+                &options,
+                UnsafeRawPointer(cancelState.flagPointer).assumingMemoryBound(to: Int32.self),
+                &error,
+            )
             if ok {
                 return
             }
             let message = Self.takeString(error) ?? "export failed"
+            if message == "cancelled" {
+                throw PagExportError.cancelled
+            }
             throw PagExportError.failed(message)
         }
     }
