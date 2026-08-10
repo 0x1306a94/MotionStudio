@@ -39,6 +39,10 @@ class PagFileBuilder {
 
   private:
     Expected<void, PagExportError> collectCompositionOrder(EntityId compositionId);
+    void collectBitmapForcedCompositions();
+    Expected<pag::Composition *, PagExportError> buildOneComposition(const Composition &composition);
+    Expected<pag::BitmapComposition *, PagExportError> buildBitmapComposition(
+        const Composition &composition);
     Expected<pag::VectorComposition *, PagExportError> buildComposition(
         const Composition &composition);
     // Primary layer first; Shape Inside/Outside strokes append parallel sibling layers.
@@ -63,6 +67,8 @@ class PagFileBuilder {
     Expected<void, PagExportError> appendMainStyles(std::vector<pag::ShapeElement *> *contents,
                                                     const Layer &layer);
     bool needsBitmapFallback(const Layer &layer) const;
+    bool isBitmapForcedComposition(EntityId compositionId) const;
+    PagExportError unsupportedWithoutBmpError(const Layer &layer) const;
     void collectDescendants(EntityId rootLayerId, std::unordered_set<uint64_t> *out) const;
     void skipLayerWithWarning(const Layer &layer, const char *code, const char *message,
                               std::unordered_set<uint64_t> *skippedDescendants);
@@ -73,7 +79,7 @@ class PagFileBuilder {
                                 const ImageContent &content, int intrinsicWidth,
                                 int intrinsicHeight);
     Expected<pag::ImageBytes *, PagExportError> imageBytesForAsset(EntityId assetId,
-                                                                   EntityId layerId);
+                                                                   const Layer &layer);
     pag::Property<pag::TextDocumentHandle> *buildSourceText(const Layer &layer,
                                                             const TextContent &content,
                                                             bool forcePointText);
@@ -93,6 +99,7 @@ class PagFileBuilder {
     std::vector<PagExportWarning> warnings_;
     std::vector<EntityId> compositionOrder_;
     std::unordered_set<uint64_t> visitedCompositions_;
+    std::unordered_set<uint64_t> bitmapForcedCompositionIds_;
     std::unordered_map<uint64_t, pag::Composition *> compositionByEntity_;
     std::unordered_map<uint64_t, pag::Layer *> layerByEntity_;
     // Parallel stroke outline layers for an MS shape entity (share parent / track matte).

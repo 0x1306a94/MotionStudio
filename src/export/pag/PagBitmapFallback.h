@@ -19,13 +19,19 @@ struct BitmapFallbackResult {
     pag::BitmapComposition *composition = nullptr;
 };
 
-// Rasterizes one layer (or Group subtree root) into a BitmapComposition wrapped
-// by a PreComposeLayer with identity transform and the original timing.
+// Rasterizes layers / compositions marked with _bmp into BitmapComposition.
 class PagBitmapFallback {
   public:
+    // Layer-name _bmp: host-sized frames on the host timeline [in, out).
     static Expected<BitmapFallbackResult, PagExportError> Build(
         const Document &document, const Composition &hostComposition, const Layer &rootLayer,
         float bitmapScale, BitmapFrameSource *frameSource, pag::ID compositionId, pag::ID layerId,
+        std::vector<PagExportWarning> *warnings);
+
+    // Composition-name _bmp (or Precomp-forced): full composition timeline [0, duration).
+    static Expected<pag::BitmapComposition *, PagExportError> BuildComposition(
+        const Document &document, const Composition &composition, float bitmapScale,
+        BitmapFrameSource *frameSource, pag::ID compositionId,
         std::vector<PagExportWarning> *warnings);
 };
 

@@ -284,72 +284,41 @@ TEST(PagExporterTest, GroupParent) {
     EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
 }
 
-TEST(PagExporterTest, FollowPathSkippedWhenFallbackDisabled) {
+TEST(PagExporterTest, FollowPathWithoutBmpFailsWithDetails) {
     Document document = MakeEmptyDoc(400, 300, 30);
-    Composition *composition = Primary(document);
-    Layer *kept = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
-    kept->name = "Kept";
-    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
+    Layer *layer = AddShapeRect(document, Primary(document), Vec2{0, 0}, Vec2{20, 20});
     layer->name = "Follow";
     layer->followPath.enabled = true;
 
-    PagExportOptions options;
-    options.allowBitmapExport = false;
-    auto result = PagExporter::Export(document, options);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
-    bool foundSkip = false;
-    for (const auto &warning : result.value().warnings) {
-        if (warning.code == "UnsupportedFollowPath") {
-            foundSkip = true;
-        }
-    }
-    EXPECT_TRUE(foundSkip);
-    auto file = DecodeBytes(result.value().bytes);
-    ASSERT_NE(file, nullptr);
-    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    ASSERT_EQ(vector->layers.size(), 2u);
-    EXPECT_EQ(vector->layers[0]->name, "Kept");
-    EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
+    auto result = PagExporter::Export(document, {});
+    ASSERT_FALSE(result.hasValue());
+    EXPECT_EQ(result.error().kind, PagExportErrorKind::MappingFailed);
+    EXPECT_EQ(result.error().code, "UnsupportedFollowPath");
+    EXPECT_EQ(result.error().entityName, "Follow");
+    EXPECT_NE(result.error().message.find("Follow"), std::string::npos);
+    EXPECT_NE(result.error().message.find("_bmp"), std::string::npos);
 }
 
-TEST(PagExporterTest, FollowPathSkippedWithoutFrameSource) {
-    Document document = MakeEmptyDoc(400, 300, 30);
-    Composition *composition = Primary(document);
-    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
-    layer->followPath.enabled = true;
-
-    PagExportOptions options;
-    options.allowBitmapExport = true;
-    auto result = PagExporter::Export(document, options, nullptr);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
-    bool found = false;
-    for (const auto &warning : result.value().warnings) {
-        if (warning.code == "BitmapFallbackUnavailable") {
-            found = true;
-        }
-    }
-    EXPECT_TRUE(found);
-}
-
-TEST(PagExporterTest, FollowPathBitmapFallback) {
+TEST(PagExporterTest, FollowPathLayerBmpExportsBitmap) {
     Document document = MakeEmptyDoc(40, 30, 3);
     Composition *composition = Primary(document);
     Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{20, 20});
+    layer->name = "Follow_bmp";
     layer->followPath.enabled = true;
 
     FakeBitmapFrameSource frameSource;
     PagExportOptions options;
     options.allowBitmapExport = true;
     auto result = PagExporter::Export(document, options, &frameSource);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
 
-    bool foundFollowPathWarning = false;
+    bool foundLayerBmpWarning = false;
     for (const auto &warning : result.value().warnings) {
-        if (warning.code == "UnsupportedFollowPath") {
-            foundFollowPathWarning = true;
+        if (warning.code == "BitmapForcedByLayerName") {
+            foundLayerBmpWarning = true;
         }
     }
-    EXPECT_TRUE(foundFollowPathWarning);
+    EXPECT_TRUE(foundLayerBmpWarning);
 
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
@@ -366,12 +335,78 @@ TEST(PagExporterTest, FollowPathBitmapFallback) {
     EXPECT_EQ(main->layers.back()->name, "CompositionBackground");
 }
 
-TEST(PagExporterTest, GroupFollowPathRasterizesSubtree) {
+TEST(PagExporterTest, CompositionNameBmpExportsBitmap) {
+    Document document = MakeEmptyDoc(40, 30, 2);
+    Primary(document)->name = "Main_bmp";
+    FakeBitmapFrameSource frameSource;
+    auto result = PagExporter::Export(document, {}, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    EXPECT_EQ(file->compositions.back()->type(), pag::CompositionType::Bitmap);
+    EXPECT_EQ(file->compositions.back()->duration, 2);
+}
+
+TEST(PagExporterTest, AllowBitmapExportFalseWithBmpFails) {
+    Document document = MakeEmptyDoc(40, 30, 2);
+    Primary(document)->name = "Main_bmp";
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.allowBitmapExport = false;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_FALSE(result.hasValue());
+    EXPECT_EQ(result.error().kind, PagExportErrorKind::MappingFailed);
+    EXPECT_NE(result.error().message.find("allowBitmapExport"), std::string::npos);
+}
+
+TEST(PagExporterTest, PrecompLayerBmpForcesNestedBitmap) {
+    Document document;
+    auto nested = std::make_unique<Composition>();
+    nested->name = "Nested";
+    nested->width = 40;
+    nested->height = 30;
+    nested->duration = 2;
+    nested->frameRate = {30, 1};
+    Composition *nestedPtr = document.addComposition(std::move(nested));
+    AddShapeRect(document, nestedPtr, Vec2{0, 0}, Vec2{10, 10});
+
+    auto root = std::make_unique<Composition>();
+    root->name = "Root";
+    root->width = 40;
+    root->height = 30;
+    root->duration = 2;
+    root->frameRate = {30, 1};
+    Composition *rootPtr = document.addComposition(std::move(root));
+
+    auto layer = std::make_unique<Layer>(LayerType::Precomp);
+    layer->name = "Nested_bmp";
+    layer->inPoint = 0;
+    layer->outPoint = rootPtr->duration;
+    static_cast<PrecompContent *>(layer->content.get())->compositionId = nestedPtr->id;
+    document.addLayer(rootPtr->id, std::move(layer));
+
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.compositionId = rootPtr->id;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    bool foundNestedBitmap = false;
+    for (pag::Composition *comp : file->compositions) {
+        if (comp != file->compositions.back() && comp->type() == pag::CompositionType::Bitmap) {
+            foundNestedBitmap = true;
+        }
+    }
+    EXPECT_TRUE(foundNestedBitmap);
+}
+
+TEST(PagExporterTest, GroupBmpRasterizesSubtree) {
     Document document = MakeEmptyDoc(40, 30, 2);
     Composition *composition = Primary(document);
 
     auto group = std::make_unique<Layer>(LayerType::Group);
-    group->name = "Group";
+    group->name = "Group_bmp";
     group->inPoint = 0;
     group->outPoint = composition->duration;
     group->followPath.enabled = true;
@@ -383,7 +418,7 @@ TEST(PagExporterTest, GroupFollowPathRasterizesSubtree) {
     FakeBitmapFrameSource frameSource;
     PagExportOptions options;
     auto result = PagExporter::Export(document, options, &frameSource);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
 
     bool foundGroupWarning = false;
     for (const auto &warning : result.value().warnings) {
@@ -756,23 +791,21 @@ TEST(PagExporterTest, PrecompExports) {
     EXPECT_EQ(precomp->compositionStartTime, 5);
 }
 
-TEST(PagExporterTest, MissingImageAssetSkipped) {
+TEST(PagExporterTest, MissingImageAssetFailsWithDetails) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);
     auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->name = "Photo";
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
-    bool foundSkip = false;
-    for (const auto &warning : result.value().warnings) {
-        if (warning.code == "LayerSkipped" || warning.code == "ImageAssetMissing") {
-            foundSkip = true;
-        }
-    }
-    EXPECT_TRUE(foundSkip);
+    ASSERT_FALSE(result.hasValue());
+    EXPECT_EQ(result.error().kind, PagExportErrorKind::MappingFailed);
+    EXPECT_EQ(result.error().code, "ImageAssetMissing");
+    EXPECT_EQ(result.error().entityName, "Photo");
+    EXPECT_NE(result.error().message.find("Photo"), std::string::npos);
 }
 
 TEST(PagExporterTest, ShapePath) {

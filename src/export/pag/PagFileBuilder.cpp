@@ -37,6 +37,7 @@
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "PagAnimatableConvert.h"
 #include "PagBitmapFallback.h"
+#include "PagBmpSuffix.h"
 #include "PagExportErrorUtil.h"
 #include "PagStrokeOutline.h"
 #include "codec/utils/WebpDecoder.h"
@@ -354,54 +355,52 @@ PagFileBuilder::PagFileBuilder(const Document &document, const Composition &comp
 
 Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
     if (options_.bitmapScale <= 0.0f) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG export options"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG export options"));
     }
 
     Expected<void, PagExportError> collected = collectCompositionOrder(rootComposition_.id);
     if (!collected.hasValue()) {
         return Unexpected(collected.error());
     }
+    collectBitmapForcedCompositions();
 
-    auto cleanupOwned = [this](std::vector<pag::Composition *> &vectorCompositions) {
-        DeleteCompositions(&vectorCompositions);
-        DeleteCompositions(&bitmapCompositions_);
-        DeleteCompositions(&nestedCompositions_);
-        for (pag::ImageBytes *image : imageBytesList_) {
-            delete image;
-        }
-        imageBytesList_.clear();
-    };
-
-    std::vector<pag::Composition *> vectorCompositions;
-    vectorCompositions.reserve(compositionOrder_.size());
+    std::vector<pag::Composition *> orderedCompositions;
+    orderedCompositions.reserve(compositionOrder_.size());
     for (EntityId compositionId : compositionOrder_) {
         const Composition *source = findComposition(compositionId);
         if (source == nullptr) {
-            cleanupOwned(vectorCompositions);
-            return Unexpected(MakePagExportError(PagExportErrorKind::InvalidComposition, {}, "", "", "composition not found"));
+            DeleteCompositions(&orderedCompositions);
+            DeleteCompositions(&bitmapCompositions_);
+            DeleteCompositions(&nestedCompositions_);
+            return Unexpected(MakePagExportError(PagExportErrorKind::InvalidComposition, {}, "", "",
+                                                 "composition not found"));
         }
-        Expected<pag::VectorComposition *, PagExportError> built = buildComposition(*source);
+        Expected<pag::Composition *, PagExportError> built = buildOneComposition(*source);
         if (!built.hasValue()) {
-            cleanupOwned(vectorCompositions);
+            DeleteCompositions(&orderedCompositions);
+            DeleteCompositions(&bitmapCompositions_);
+            DeleteCompositions(&nestedCompositions_);
             return Unexpected(built.error());
         }
-        vectorCompositions.push_back(built.value());
+        orderedCompositions.push_back(built.value());
     }
 
-    // Nested clip inners first; MS composition roots last (File uses compositions.back() as main).
+    // Layer-level bitmap comps first; nested clip inners; MS composition roots last (main = back).
     std::vector<pag::Composition *> compositions;
     compositions.reserve(bitmapCompositions_.size() + nestedCompositions_.size() +
-                         vectorCompositions.size());
+                         orderedCompositions.size());
     compositions.insert(compositions.end(), bitmapCompositions_.begin(), bitmapCompositions_.end());
     compositions.insert(compositions.end(), nestedCompositions_.begin(), nestedCompositions_.end());
-    compositions.insert(compositions.end(), vectorCompositions.begin(), vectorCompositions.end());
+    compositions.insert(compositions.end(), orderedCompositions.begin(), orderedCompositions.end());
     bitmapCompositions_.clear();
     nestedCompositions_.clear();
 
     std::shared_ptr<pag::File> file = pag::Codec::VerifyAndMake(compositions, imageBytesList_);
     imageBytesList_.clear();
     if (file == nullptr) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG encode failed"));
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
+                                             "PAG encode failed"));
     }
     PagBuildResult result;
     result.file = std::move(file);
@@ -444,8 +443,98 @@ Expected<void, PagExportError> PagFileBuilder::collectCompositionOrder(EntityId 
     return Expected<void, PagExportError>();
 }
 
+void PagFileBuilder::collectBitmapForcedCompositions() {
+    bitmapForcedCompositionIds_.clear();
+    for (EntityId compositionId : compositionOrder_) {
+        const Composition *composition = findComposition(compositionId);
+        if (composition == nullptr) {
+            continue;
+        }
+        if (HasBmpSuffix(composition->name)) {
+            bitmapForcedCompositionIds_.insert(compositionId.value);
+        }
+        for (const auto &layerPtr : composition->layers) {
+            if (layerPtr == nullptr || layerPtr->type() != LayerType::Precomp) {
+                continue;
+            }
+            if (!HasBmpSuffix(layerPtr->name)) {
+                continue;
+            }
+            const auto &content = static_cast<const PrecompContent &>(*layerPtr->content);
+            if (content.compositionId.isValid()) {
+                bitmapForcedCompositionIds_.insert(content.compositionId.value);
+            }
+        }
+    }
+}
+
+bool PagFileBuilder::isBitmapForcedComposition(EntityId compositionId) const {
+    return bitmapForcedCompositionIds_.count(compositionId.value) != 0;
+}
+
 bool PagFileBuilder::needsBitmapFallback(const Layer &layer) const {
     return layer.followPath.enabled;
+}
+
+PagExportError PagFileBuilder::unsupportedWithoutBmpError(const Layer &layer) const {
+    const std::string name = layer.name.empty() ? "(unnamed layer)" : layer.name;
+    if (layer.followPath.enabled) {
+        return MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "UnsupportedFollowPath",
+            "Layer \"" + name +
+                "\": FollowPath is not supported in vector PAG export; add \"_bmp\" "
+                "suffix to the layer or composition name, or disable FollowPath.");
+    }
+    return MakePagExportError(
+        PagExportErrorKind::MappingFailed, layer.id, name, "LayerSkipped",
+        "Layer \"" + name +
+            "\": content cannot be mapped to vector PAG; add \"_bmp\" suffix to export as "
+            "bitmap.");
+}
+
+Expected<pag::Composition *, PagExportError> PagFileBuilder::buildOneComposition(
+    const Composition &composition) {
+    if (isBitmapForcedComposition(composition.id)) {
+        Expected<pag::BitmapComposition *, PagExportError> built =
+            buildBitmapComposition(composition);
+        if (!built.hasValue()) {
+            return Unexpected(built.error());
+        }
+        return built.value();
+    }
+    Expected<pag::VectorComposition *, PagExportError> built = buildComposition(composition);
+    if (!built.hasValue()) {
+        return Unexpected(built.error());
+    }
+    return built.value();
+}
+
+Expected<pag::BitmapComposition *, PagExportError> PagFileBuilder::buildBitmapComposition(
+    const Composition &composition) {
+    if (!options_.allowBitmapExport) {
+        const std::string name =
+            composition.name.empty() ? "(unnamed composition)" : composition.name;
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, composition.id, name, "BitmapForcedByCompositionName",
+            "Composition \"" + name +
+                "\": bitmap export is disabled (allowBitmapExport=false) but _bmp was requested."));
+    }
+    if (frameSource_ == nullptr) {
+        const std::string name =
+            composition.name.empty() ? "(unnamed composition)" : composition.name;
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, composition.id, name, "BitmapForcedByCompositionName",
+            "Composition \"" + name +
+                "\": bitmap export requires a BitmapFrameSource."));
+    }
+    Expected<pag::BitmapComposition *, PagExportError> built = PagBitmapFallback::BuildComposition(
+        document_, composition, options_.bitmapScale, frameSource_, nextCompositionId_++,
+        &warnings_);
+    if (!built.hasValue()) {
+        return Unexpected(built.error());
+    }
+    compositionByEntity_[composition.id.value] = built.value();
+    return built.value();
 }
 
 void PagFileBuilder::collectDescendants(EntityId rootLayerId,
@@ -630,11 +719,17 @@ pag::ShapeLayer *PagFileBuilder::buildCompositionBackdrop(const Composition &com
 
 Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
     const Layer &layer, const Composition &hostComposition) {
+    const std::string name = layer.name.empty() ? "(unnamed layer)" : layer.name;
     if (!options_.allowBitmapExport) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "BitmapForcedByLayerName",
+            "Layer \"" + name +
+                "\": bitmap export is disabled (allowBitmapExport=false) but _bmp was requested."));
     }
     if (frameSource_ == nullptr) {
-        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "BitmapForcedByLayerName",
+            "Layer \"" + name + "\": bitmap export requires a BitmapFrameSource."));
     }
     Expected<BitmapFallbackResult, PagExportError> built = PagBitmapFallback::Build(
         document_, hostComposition, layer, options_.bitmapScale, frameSource_, nextCompositionId_++,
@@ -669,7 +764,7 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     pagComposition->backgroundColor = ToPagColor(composition.backgroundColor);
     compositionByEntity_[composition.id.value] = pagComposition;
 
-    // Build in MS order (bottom→top) so Group fallback can skip descendants before they emit.
+    // Build in MS order (bottom→top) so Group _bmp can skip descendants before they emit.
     // Then reverse into PAG File order (index 0 = topmost; CompositionRenderer draws back→front).
     std::unordered_set<uint64_t> skippedDescendants;
     std::vector<pag::Layer *> contentLayers;
@@ -680,9 +775,12 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
         }
 
         Expected<std::vector<pag::Layer *>, PagExportError> layerResult =
-            Expected<std::vector<pag::Layer *>, PagExportError>(
-                Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed")));
-        if (needsBitmapFallback(*layerPtr)) {
+            Expected<std::vector<pag::Layer *>, PagExportError>(Unexpected(
+                MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "",
+                                   "PAG export mapping failed")));
+        const bool forceLayerBitmap =
+            HasBmpSuffix(layerPtr->name) && layerPtr->type() != LayerType::Precomp;
+        if (forceLayerBitmap) {
             Expected<pag::Layer *, PagExportError> fallback =
                 buildFallbackLayer(*layerPtr, composition);
             if (fallback.hasValue()) {
@@ -693,26 +791,12 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
             } else {
                 layerResult = Unexpected(fallback.error());
             }
+        } else if (needsBitmapFallback(*layerPtr)) {
+            layerResult = Unexpected(unsupportedWithoutBmpError(*layerPtr));
         } else {
             layerResult = buildLayers(*layerPtr);
         }
         if (!layerResult.hasValue()) {
-            // Soft-fail MappingFailed (and fallback unavailable): skip layer, keep exporting.
-            if (layerResult.error().kind == PagExportErrorKind::MappingFailed) {
-                const char *code = "LayerSkipped";
-                const char *message = "Layer skipped due to mapping failure";
-                if (needsBitmapFallback(*layerPtr)) {
-                    if (options_.allowBitmapExport && frameSource_ == nullptr) {
-                        code = "BitmapFallbackUnavailable";
-                        message = "Bitmap fallback is not available yet";
-                    } else if (layerPtr->followPath.enabled) {
-                        code = "UnsupportedFollowPath";
-                        message = "FollowPath layer skipped";
-                    }
-                }
-                skipLayerWithWarning(*layerPtr, code, message, &skippedDescendants);
-                continue;
-            }
             for (pag::Layer *owned : contentLayers) {
                 delete owned;
             }
@@ -1105,11 +1189,14 @@ pag::Property<pag::TextDocumentHandle> *PagFileBuilder::buildSourceText(const La
     return new pag::AnimatableProperty<pag::TextDocumentHandle>(keyframes);
 }
 
-Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(EntityId assetId,
-                                                                               EntityId layerId) {
+Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(
+    EntityId assetId, const Layer &layer) {
+    const std::string name = layer.name.empty() ? "(unnamed layer)" : layer.name;
     if (!assetId.isValid()) {
-        Warn(&warnings_, layerId, "ImageAssetMissing", "Image layer has no asset");
-        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "ImageAssetMissing",
+            "Layer \"" + name +
+                "\": image layer has no asset; assign an asset or add \"_bmp\" to rasterize."));
     }
     auto existing = imageBytesByAsset_.find(assetId.value);
     if (existing != imageBytesByAsset_.end()) {
@@ -1123,16 +1210,20 @@ Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(E
         }
     }
     if (asset == nullptr || asset->path.empty() || asset->width <= 0 || asset->height <= 0) {
-        Warn(&warnings_, layerId, "ImageAssetMissing", "Image asset missing or invalid");
-        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "ImageAssetMissing",
+            "Layer \"" + name +
+                "\": image asset is missing or invalid; fix the asset or add \"_bmp\" to rasterize."));
     }
     const std::string fullPath = JoinPath(document_.projectRoot, asset->path);
     int encodedWidth = 0;
     int encodedHeight = 0;
     std::unique_ptr<pag::ByteData> bytes = LoadImageAsWebP(fullPath, &encodedWidth, &encodedHeight);
     if (bytes == nullptr || bytes->length() == 0 || encodedWidth <= 0 || encodedHeight <= 0) {
-        Warn(&warnings_, layerId, "ImageAssetMissing", "Failed to read or encode image as WebP");
-        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
+        return Unexpected(MakePagExportError(
+            PagExportErrorKind::MappingFailed, layer.id, name, "ImageAssetMissing",
+            "Layer \"" + name +
+                "\": failed to read or encode image as WebP; fix the asset or add \"_bmp\"."));
     }
     auto *imageBytes = new pag::ImageBytes();
     imageBytes->id = nextImageId_++;
@@ -1148,7 +1239,7 @@ Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(E
 Expected<pag::ImageLayer *, PagExportError> PagFileBuilder::buildImageLayer(const Layer &layer) {
     const auto &content = static_cast<const ImageContent &>(*layer.content);
     Expected<pag::ImageBytes *, PagExportError> imageBytes =
-        imageBytesForAsset(content.assetId, layer.id);
+        imageBytesForAsset(content.assetId, layer);
     if (!imageBytes.hasValue()) {
         return Unexpected(imageBytes.error());
     }

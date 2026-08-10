@@ -239,7 +239,7 @@ git commit --only src/export/pag/PagBmpSuffix.h \
 
 ### Task 3: 去掉自动 Fallback；硬失败 + `_bmp` 触发
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp` / `.h`
@@ -260,7 +260,7 @@ git commit --only src/export/pag/PagBmpSuffix.h \
 5. `allowBitmapExport == false` 且需要 Bitmap → MappingFailed，message 说明禁止。
 6. 需要 Bitmap 且 `frameSource == nullptr` → MappingFailed，message 说明缺 FrameSource。
 
-- [ ] **Step 1: 改写失败测试（破坏性）**
+- [x] **Step 1: 改写失败测试（破坏性）**
 
 删除/替换：
 
@@ -313,12 +313,12 @@ TEST(PagExporterTest, CompositionNameBmpExportsBitmap) {
 
 另加：Precomp 层名 `_bmp` 强制子合成；`allowBitmapExport=false` + `_bmp` → fail。
 
-- [ ] **Step 2: 跑测确认失败（旧行为仍绿/新断言红）**
+- [x] **Step 2: 跑测确认失败（旧行为仍绿/新断言红）**
 
 Run: `./build/tests/pag_export_tests --gtest_filter='PagExporterTest.FollowPath*'`  
 Expected: 新用例 FAIL
 
-- [ ] **Step 3: 实现 Builder 策略**
+- [x] **Step 3: 实现 Builder 策略**
 
 - 删除 soft-fail 分支（`PagFileBuilder.cpp` 中 `MappingFailed` 时 skip 层的逻辑）。
 - 在 `build()` / `buildComposition` 接入 `_bmp` 集合。
@@ -327,12 +327,12 @@ Expected: 新用例 FAIL
 
 合成级 Bitmap：新增 `PagBitmapFallback::BuildComposition(...)`（若尚无，本 Task stub 调 `prepareComposition` + 现有整帧关键帧编码；Task 4 替换为 diff）。
 
-- [ ] **Step 4: 跑测确认通过**
+- [x] **Step 4: 跑测确认通过**
 
 Run: `./build/tests/pag_export_tests --gtest_filter='PagExporterTest.*'`  
 Expected: PASS（ASan build）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagFileBuilder.cpp \
