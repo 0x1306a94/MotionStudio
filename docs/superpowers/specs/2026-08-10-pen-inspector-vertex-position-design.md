@@ -1,7 +1,7 @@
 # Pen Inspector Vertex Position — 设计说明
 
 日期：2026-08-10  
-状态：已批准，待实现  
+状态：已实现  
 范围：钢笔模式下选中路径点时，Inspector Position X/Y 显示/编辑该点场景坐标；ESC 先取消选点再退出钢笔
 
 相关：`PathEditTarget` / `TransformInspector` / `networkEditMoveVertex` / `exitPenTool`

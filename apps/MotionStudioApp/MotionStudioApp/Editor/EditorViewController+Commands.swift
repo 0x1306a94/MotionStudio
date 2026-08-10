@@ -108,6 +108,11 @@ extension EditorViewController {
         guard editorState.tool == .pen else {
             return
         }
+        if var target = editorState.pathEditTarget, target.activeVertexId != 0 {
+            target.clearVertexSelection()
+            editorState.pathEditTarget = target
+            return
+        }
         finishPenTool()
     }
 

@@ -398,7 +398,7 @@ git commit --only \
 
 ### Task 4: ESC 先取消选中点
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController+Commands.swift`（`exitPenTool`）
@@ -409,7 +409,7 @@ git commit --only \
 - Consumes: `PathEditTarget.clearVertexSelection()`, `finishPenTool()`
 - Produces: 两步 ESC 行为
 
-- [ ] **Step 1: 改写 `exitPenTool`**
+- [x] **Step 1: 改写 `exitPenTool`**
 
 ```swift
 @objc func exitPenTool() {
@@ -427,18 +427,20 @@ git commit --only \
 
 勿改 `finishPenTool` / `activateSelectTool` / `togglePenTool` 的一步退出语义。
 
-- [ ] **Step 2: Build App 确认编译**
+- [x] **Step 2: Build App 确认编译**
 
 同 Task 3 构建路径。Expected: BUILD SUCCEEDED
 
-- [ ] **Step 3: 手动验证**
+- [x] **Step 3: 手动验证**
 
 1. 选中点 → ESC → 仍钢笔、无选中、tangent chrome 消失、Position 回包围盒  
 2. 再 ESC → 退出钢笔（shape 仍会 recenter）  
 3. 无选中时 ESC → 一次退出钢笔  
 4. 有选中时点 Select 工具 → 仍一步退出钢笔  
 
-- [ ] **Step 4: Commit**
+> 构建已通过；交互项留给用户跑通确认。
+
+- [x] **Step 4: Commit**
 
 同步 plan Task 4 全部完成；spec 状态改为「已实现」。
 
