@@ -22,20 +22,20 @@ void SetError(char **errorOut, const std::string &message) {
     *errorOut = strdup(message.c_str());
 }
 
-const char *MessageForError(motion::PagExportError error, bool allowBitmapFallback) {
-    switch (error) {
-        case motion::PagExportError::InvalidComposition:
+std::string MessageForError(const motion::PagExportError &error) {
+    if (!error.message.empty()) {
+        return error.message;
+    }
+    switch (error.kind) {
+        case motion::PagExportErrorKind::InvalidComposition:
             return "composition not found";
-        case motion::PagExportError::InvalidOptions:
+        case motion::PagExportErrorKind::InvalidOptions:
             return "invalid PAG export options";
-        case motion::PagExportError::MappingFailed:
-            if (allowBitmapFallback) {
-                return "Bitmap fallback is not available yet";
-            }
+        case motion::PagExportErrorKind::MappingFailed:
             return "PAG export mapping failed";
-        case motion::PagExportError::EncodeFailed:
+        case motion::PagExportErrorKind::EncodeFailed:
             return "PAG encode failed";
-        case motion::PagExportError::WriteFailed:
+        case motion::PagExportErrorKind::WriteFailed:
             return "failed to write PAG file";
     }
     return "PAG export failed";
@@ -66,7 +66,7 @@ bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExpo
     motion::PagExportOptions exportOptions;
     exportOptions.outputPath = options->outputPath;
     exportOptions.compositionId = motion::EntityId{compositionId};
-    exportOptions.allowBitmapFallback = options->allowBitmapFallback;
+    exportOptions.allowBitmapExport = options->allowBitmapExport;
     exportOptions.bitmapScale = options->bitmapScale > 0.0f ? options->bitmapScale : 1.0f;
     // Match MS TextLayout baseline (tgfx FontMetrics.ascent) instead of fontSize*0.8.
     exportOptions.textAscentResolver = [](const std::string &fontFamily,
@@ -83,7 +83,7 @@ bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExpo
     const auto result =
         motion::PagExporter::Export(*document->document, exportOptions, nullptr);
     if (!result.hasValue()) {
-        SetError(errorOut, MessageForError(result.error(), exportOptions.allowBitmapFallback));
+        SetError(errorOut, MessageForError(result.error()));
         return false;
     }
     return true;

@@ -10,7 +10,7 @@ TEST(PagExportBridgeTest, NullDocumentFails) {
     char *error = nullptr;
     MSPagExportOptions options{};
     options.outputPath = "/tmp/x.pag";
-    options.allowBitmapFallback = false;
+    options.allowBitmapExport = false;
     options.bitmapScale = 1.0f;
     EXPECT_FALSE(ms_pag_export(nullptr, 0, &options, &error));
     ASSERT_NE(error, nullptr);
@@ -24,7 +24,7 @@ TEST(PagExportBridgeTest, EmptyPathFails) {
     char *error = nullptr;
     MSPagExportOptions options{};
     options.outputPath = "";
-    options.allowBitmapFallback = false;
+    options.allowBitmapExport = false;
     options.bitmapScale = 1.0f;
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);
     EXPECT_FALSE(ms_pag_export(document, compositionId, &options, &error));

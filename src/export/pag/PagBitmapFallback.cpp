@@ -3,6 +3,7 @@
 #include <cmath>
 #include <vector>
 
+#include "PagExportErrorUtil.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
@@ -57,11 +58,11 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
     float bitmapScale, BitmapFrameSource *frameSource, pag::ID compositionId, pag::ID layerId,
     std::vector<PagExportWarning> *warnings) {
     if (frameSource == nullptr || bitmapScale <= 0.0f) {
-        return Unexpected(PagExportError::InvalidOptions);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG export options"));
     }
     const FrameTime duration = rootLayer.outPoint - rootLayer.inPoint;
     if (duration <= 0) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
 
     TimeRange visibleRange;
@@ -70,7 +71,7 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
     Expected<void, std::string> prepared = frameSource->prepare(
         document, hostComposition.id, rootLayer.id, visibleRange, bitmapScale);
     if (!prepared.hasValue()) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
 
     const int width =
@@ -79,7 +80,7 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
         static_cast<int>(std::lround(static_cast<double>(hostComposition.height) * bitmapScale));
     if (width <= 0 || height <= 0) {
         frameSource->finish();
-        return Unexpected(PagExportError::InvalidOptions);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG export options"));
     }
 
     auto *bitmapComposition = new pag::BitmapComposition();
@@ -127,7 +128,7 @@ Expected<BitmapFallbackResult, PagExportError> PagBitmapFallback::Build(
 
     if (encodeFailed || sequence->frames.empty()) {
         delete bitmapComposition;
-        return Unexpected(PagExportError::EncodeFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG encode failed"));
     }
 
     auto *pagLayer = new pag::PreComposeLayer();

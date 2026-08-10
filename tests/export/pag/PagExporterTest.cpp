@@ -52,6 +52,7 @@ using motion::Mask;
 using motion::MaskMode;
 using motion::PagExporter;
 using motion::PagExportError;
+using motion::PagExportErrorKind;
 using motion::PagExportOptions;
 using motion::PrecompContent;
 using motion::ShapeContent;
@@ -104,13 +105,14 @@ std::shared_ptr<pag::File> DecodeBytes(const std::vector<uint8_t> &bytes) {
 
 }  // namespace
 
-TEST(PagExporterTest, InvalidComposition) {
+TEST(PagExporterTest, InvalidCompositionHasStructuredError) {
     Document document;
     PagExportOptions options;
     options.compositionId = EntityId::Generate();
     auto result = PagExporter::Export(document, options);
     ASSERT_FALSE(result.hasValue());
-    EXPECT_EQ(result.error(), PagExportError::InvalidComposition);
+    EXPECT_EQ(result.error().kind, PagExportErrorKind::InvalidComposition);
+    EXPECT_FALSE(result.error().message.empty());
 }
 
 TEST(PagExporterTest, EmptyCompositionRoundTrip) {
@@ -118,7 +120,7 @@ TEST(PagExporterTest, EmptyCompositionRoundTrip) {
     Primary(document)->backgroundColor = Color{0.2f, 0.4f, 0.6f, 1.0f};
     PagExportOptions options;
     auto result = PagExporter::Export(document, options);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     EXPECT_FALSE(result.value().bytes.empty());
 
     auto file = DecodeBytes(result.value().bytes);
@@ -143,7 +145,7 @@ TEST(PagExporterTest, CompositionCornerRadiusAddsBackdrop) {
     AddShapeRect(document, composition, Vec2{10, 10}, Vec2{20, 20});
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *root = static_cast<pag::VectorComposition *>(file->compositions.back());
@@ -177,7 +179,7 @@ TEST(PagExporterTest, FillColorAlphaMapsToOpacity) {
     fill->color.setStaticValue(Color{228.0f / 255.0f, 245.0f / 255.0f, 252.0f / 255.0f, 26.0f / 255.0f});
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
@@ -209,7 +211,7 @@ TEST(PagExporterTest, ShapeRectStaticTransform) {
     layer->transform.opacity.setStaticValue(0.5f);
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     ASSERT_EQ(file->compositions.size(), 1u);
@@ -241,7 +243,7 @@ TEST(PagExporterTest, PositionKeyframes) {
     layer->transform.position.addKeyframe(to);
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
@@ -270,7 +272,7 @@ TEST(PagExporterTest, GroupParent) {
     ASSERT_TRUE(child->setParent(groupLayer->id, document));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
@@ -292,9 +294,9 @@ TEST(PagExporterTest, FollowPathSkippedWhenFallbackDisabled) {
     layer->followPath.enabled = true;
 
     PagExportOptions options;
-    options.allowBitmapFallback = false;
+    options.allowBitmapExport = false;
     auto result = PagExporter::Export(document, options);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     bool foundSkip = false;
     for (const auto &warning : result.value().warnings) {
         if (warning.code == "UnsupportedFollowPath") {
@@ -317,9 +319,9 @@ TEST(PagExporterTest, FollowPathSkippedWithoutFrameSource) {
     layer->followPath.enabled = true;
 
     PagExportOptions options;
-    options.allowBitmapFallback = true;
+    options.allowBitmapExport = true;
     auto result = PagExporter::Export(document, options, nullptr);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     bool found = false;
     for (const auto &warning : result.value().warnings) {
         if (warning.code == "BitmapFallbackUnavailable") {
@@ -337,9 +339,9 @@ TEST(PagExporterTest, FollowPathBitmapFallback) {
 
     FakeBitmapFrameSource frameSource;
     PagExportOptions options;
-    options.allowBitmapFallback = true;
+    options.allowBitmapExport = true;
     auto result = PagExporter::Export(document, options, &frameSource);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
 
     bool foundFollowPathWarning = false;
     for (const auto &warning : result.value().warnings) {
@@ -381,7 +383,7 @@ TEST(PagExporterTest, GroupFollowPathRasterizesSubtree) {
     FakeBitmapFrameSource frameSource;
     PagExportOptions options;
     auto result = PagExporter::Export(document, options, &frameSource);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
 
     bool foundGroupWarning = false;
     for (const auto &warning : result.value().warnings) {
@@ -422,7 +424,7 @@ TEST(PagExporterTest, TextLayerExports) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
@@ -491,7 +493,7 @@ TEST(PagExporterTest, TextPathExportsPathOption) {
     document.addLayer(composition->id, std::move(textLayer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     for (const auto &warning : result.value().warnings) {
         EXPECT_NE(warning.code, "TextPathUnresolved");
     }
@@ -539,7 +541,7 @@ TEST(PagExporterTest, TextPathUnresolvedWarns) {
     document.addLayer(composition->id, std::move(textLayer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     bool sawUnresolved = false;
     for (const auto &warning : result.value().warnings) {
         if (warning.code == "TextPathUnresolved") {
@@ -573,7 +575,7 @@ TEST(PagExporterTest, TextPointUsesResolvedAscent) {
         return fontSize * 1.06f;
     };
     auto result = PagExporter::Export(document, options);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
@@ -595,7 +597,7 @@ TEST(PagExporterTest, TextBoxTextModeExportsBoxText) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     for (const auto &warning : result.value().warnings) {
         EXPECT_NE(warning.code, "TextFeatureApproximated");
     }
@@ -653,7 +655,7 @@ TEST(PagExporterTest, ImageLayerExports) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     ASSERT_EQ(file->images.size(), 1u);
@@ -682,7 +684,7 @@ TEST(PagExporterTest, MaskExports) {
     layer->masks.push_back(mask);
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
@@ -701,7 +703,7 @@ TEST(PagExporterTest, TrackMatteExports) {
     target->trackMatteLayerId = matte->id;
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
@@ -741,7 +743,7 @@ TEST(PagExporterTest, PrecompExports) {
     PagExportOptions options;
     options.compositionId = rootPtr->id;
     auto result = PagExporter::Export(document, options);
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     ASSERT_EQ(file->compositions.size(), 2u);
@@ -763,7 +765,7 @@ TEST(PagExporterTest, MissingImageAssetSkipped) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     bool foundSkip = false;
     for (const auto &warning : result.value().warnings) {
         if (warning.code == "LayerSkipped" || warning.code == "ImageAssetMissing") {
@@ -789,7 +791,7 @@ TEST(PagExporterTest, ShapePath) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     ASSERT_NE(DecodeBytes(result.value().bytes), nullptr);
 }
 
@@ -819,7 +821,7 @@ TEST(PagExporterTest, SharedVertexNetworkFlattened) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     ASSERT_NE(DecodeBytes(result.value().bytes), nullptr);
 }
 
@@ -856,7 +858,7 @@ TEST(PagExporterTest, InsideOutsideStrokeBakedAsParallelLayers) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     int bakedCount = 0;
     for (const auto &warning : result.value().warnings) {
         if (warning.code == "StrokePositionBaked") {
@@ -939,7 +941,7 @@ TEST(PagExporterTest, PositionedStrokeTrimDoesNotClipMainFill) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
 
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
@@ -992,7 +994,7 @@ TEST(PagExporterTest, EllipseAndStroke) {
     document.addLayer(composition->id, std::move(layer));
 
     auto result = PagExporter::Export(document, {});
-    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error());
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
 }

@@ -2,13 +2,13 @@
 //  PagExportSettingsViewController.swift
 //  MotionStudioApp
 //
-//  Settings sheet for PAG export (vector-first; optional bitmap fallback flag).
+//  Settings sheet for PAG export (vector-first; optional bitmap export flag).
 //
 
 import UIKit
 
 struct PagExportSettings {
-    var allowBitmapFallback: Bool
+    var allowBitmapExport: Bool
 }
 
 @MainActor
@@ -49,7 +49,7 @@ final class PagExportSettingsViewController: UIViewController {
         summaryLabel.textColor = .secondaryLabel
         summaryLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        fallbackLabel.text = "Allow bitmap fallback"
+        fallbackLabel.text = "Allow bitmap export (_bmp)"
         fallbackLabel.font = .preferredFont(forTextStyle: .body)
         fallbackLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -95,6 +95,6 @@ final class PagExportSettingsViewController: UIViewController {
             present(alert, animated: true)
             return
         }
-        onExport?(PagExportSettings(allowBitmapFallback: fallbackSwitch.isOn))
+        onExport?(PagExportSettings(allowBitmapExport: fallbackSwitch.isOn))
     }
 }

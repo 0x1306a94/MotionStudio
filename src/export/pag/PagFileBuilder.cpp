@@ -37,6 +37,7 @@
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "PagAnimatableConvert.h"
 #include "PagBitmapFallback.h"
+#include "PagExportErrorUtil.h"
 #include "PagStrokeOutline.h"
 #include "codec/utils/WebpDecoder.h"
 #include "tgfx/core/ImageCodec.h"
@@ -353,7 +354,7 @@ PagFileBuilder::PagFileBuilder(const Document &document, const Composition &comp
 
 Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
     if (options_.bitmapScale <= 0.0f) {
-        return Unexpected(PagExportError::InvalidOptions);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG export options"));
     }
 
     Expected<void, PagExportError> collected = collectCompositionOrder(rootComposition_.id);
@@ -377,7 +378,7 @@ Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
         const Composition *source = findComposition(compositionId);
         if (source == nullptr) {
             cleanupOwned(vectorCompositions);
-            return Unexpected(PagExportError::InvalidComposition);
+            return Unexpected(MakePagExportError(PagExportErrorKind::InvalidComposition, {}, "", "", "composition not found"));
         }
         Expected<pag::VectorComposition *, PagExportError> built = buildComposition(*source);
         if (!built.hasValue()) {
@@ -400,7 +401,7 @@ Expected<PagBuildResult, PagExportError> PagFileBuilder::build() {
     std::shared_ptr<pag::File> file = pag::Codec::VerifyAndMake(compositions, imageBytesList_);
     imageBytesList_.clear();
     if (file == nullptr) {
-        return Unexpected(PagExportError::EncodeFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "", "PAG encode failed"));
     }
     PagBuildResult result;
     result.file = std::move(file);
@@ -419,7 +420,7 @@ const Composition *PagFileBuilder::findComposition(EntityId id) const {
 
 Expected<void, PagExportError> PagFileBuilder::collectCompositionOrder(EntityId compositionId) {
     if (!compositionId.isValid()) {
-        return Unexpected(PagExportError::InvalidComposition);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidComposition, {}, "", "", "composition not found"));
     }
     if (visitedCompositions_.count(compositionId.value) != 0) {
         return Expected<void, PagExportError>();
@@ -427,7 +428,7 @@ Expected<void, PagExportError> PagFileBuilder::collectCompositionOrder(EntityId 
     visitedCompositions_.insert(compositionId.value);
     const Composition *composition = findComposition(compositionId);
     if (composition == nullptr) {
-        return Unexpected(PagExportError::InvalidComposition);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidComposition, {}, "", "", "composition not found"));
     }
     for (const auto &layerPtr : composition->layers) {
         if (layerPtr == nullptr || layerPtr->type() != LayerType::Precomp) {
@@ -629,11 +630,11 @@ pag::ShapeLayer *PagFileBuilder::buildCompositionBackdrop(const Composition &com
 
 Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
     const Layer &layer, const Composition &hostComposition) {
-    if (!options_.allowBitmapFallback) {
-        return Unexpected(PagExportError::MappingFailed);
+    if (!options_.allowBitmapExport) {
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     if (frameSource_ == nullptr) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     Expected<BitmapFallbackResult, PagExportError> built = PagBitmapFallback::Build(
         document_, hostComposition, layer, options_.bitmapScale, frameSource_, nextCompositionId_++,
@@ -648,10 +649,10 @@ Expected<pag::Layer *, PagExportError> PagFileBuilder::buildFallbackLayer(
 Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposition(
     const Composition &composition) {
     if (composition.width <= 0 || composition.height <= 0 || composition.duration <= 0) {
-        return Unexpected(PagExportError::InvalidOptions);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG export options"));
     }
     if (composition.frameRate.den == 0) {
-        return Unexpected(PagExportError::InvalidOptions);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "", "invalid PAG export options"));
     }
 
     layerByEntity_.clear();
@@ -680,7 +681,7 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
 
         Expected<std::vector<pag::Layer *>, PagExportError> layerResult =
             Expected<std::vector<pag::Layer *>, PagExportError>(
-                Unexpected(PagExportError::MappingFailed));
+                Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed")));
         if (needsBitmapFallback(*layerPtr)) {
             Expected<pag::Layer *, PagExportError> fallback =
                 buildFallbackLayer(*layerPtr, composition);
@@ -697,11 +698,11 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
         }
         if (!layerResult.hasValue()) {
             // Soft-fail MappingFailed (and fallback unavailable): skip layer, keep exporting.
-            if (layerResult.error() == PagExportError::MappingFailed) {
+            if (layerResult.error().kind == PagExportErrorKind::MappingFailed) {
                 const char *code = "LayerSkipped";
                 const char *message = "Layer skipped due to mapping failure";
                 if (needsBitmapFallback(*layerPtr)) {
-                    if (options_.allowBitmapFallback && frameSource_ == nullptr) {
+                    if (options_.allowBitmapExport && frameSource_ == nullptr) {
                         code = "BitmapFallbackUnavailable";
                         message = "Bitmap fallback is not available yet";
                     } else if (layerPtr->followPath.enabled) {
@@ -882,7 +883,7 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildLayers(
             return std::vector<pag::Layer *>{precomp.value()};
         }
     }
-    return Unexpected(PagExportError::MappingFailed);
+    return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
 }
 
 Expected<pag::NullLayer *, PagExportError> PagFileBuilder::buildNullLayer(const Layer &layer) {
@@ -1108,7 +1109,7 @@ Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(E
                                                                                EntityId layerId) {
     if (!assetId.isValid()) {
         Warn(&warnings_, layerId, "ImageAssetMissing", "Image layer has no asset");
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     auto existing = imageBytesByAsset_.find(assetId.value);
     if (existing != imageBytesByAsset_.end()) {
@@ -1123,7 +1124,7 @@ Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(E
     }
     if (asset == nullptr || asset->path.empty() || asset->width <= 0 || asset->height <= 0) {
         Warn(&warnings_, layerId, "ImageAssetMissing", "Image asset missing or invalid");
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     const std::string fullPath = JoinPath(document_.projectRoot, asset->path);
     int encodedWidth = 0;
@@ -1131,7 +1132,7 @@ Expected<pag::ImageBytes *, PagExportError> PagFileBuilder::imageBytesForAsset(E
     std::unique_ptr<pag::ByteData> bytes = LoadImageAsWebP(fullPath, &encodedWidth, &encodedHeight);
     if (bytes == nullptr || bytes->length() == 0 || encodedWidth <= 0 || encodedHeight <= 0) {
         Warn(&warnings_, layerId, "ImageAssetMissing", "Failed to read or encode image as WebP");
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     auto *imageBytes = new pag::ImageBytes();
     imageBytes->id = nextImageId_++;
@@ -1171,7 +1172,7 @@ Expected<pag::PreComposeLayer *, PagExportError> PagFileBuilder::buildPrecompLay
     const auto &content = static_cast<const PrecompContent &>(*layer.content);
     auto compositionIt = compositionByEntity_.find(content.compositionId.value);
     if (compositionIt == compositionByEntity_.end()) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     auto *pagLayer = new pag::PreComposeLayer();
     Expected<void, PagExportError> filled = fillCommonLayer(pagLayer, layer);
@@ -1189,7 +1190,7 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
     const Layer &layer) {
     const auto &content = static_cast<const ShapeContent &>(*layer.content);
     if (content.geometry == nullptr) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
 
     auto *pagLayer = new pag::ShapeLayer();
@@ -1310,7 +1311,7 @@ Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildPositionedStrok
     if (!blendOk) {
         delete group;
         delete pagLayer;
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     fill->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
     fill->fillRule = pag::FillRule::NonZeroWinding;
@@ -1364,7 +1365,7 @@ Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildCenterTrimStrok
     if (!blendOk) {
         delete group;
         delete pagLayer;
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
     pagStroke->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
     pagStroke->color = ConvertColor(stroke.color, &warnings_, layer.id);
@@ -1406,9 +1407,9 @@ Expected<pag::ShapeElement *, PagExportError> PagFileBuilder::buildGeometry(
             return pagPath;
         }
         case ShapeType::TrimPath:
-            return Unexpected(PagExportError::MappingFailed);
+            return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
-    return Unexpected(PagExportError::MappingFailed);
+    return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
 }
 
 Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
@@ -1419,7 +1420,7 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
         pagFill->blendMode = mapBlendMode(fill.blendMode, layer.id, &blendOk);
         if (!blendOk) {
             delete pagFill;
-            return Unexpected(PagExportError::MappingFailed);
+            return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
         }
         pagFill->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
         pagFill->fillRule = MapFillRule(fill.fillRule);
@@ -1435,7 +1436,7 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
         pagStroke->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
         if (!blendOk) {
             delete pagStroke;
-            return Unexpected(PagExportError::MappingFailed);
+            return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
         }
         pagStroke->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
         pagStroke->color = ConvertColor(stroke.color, &warnings_, layer.id);
@@ -1458,7 +1459,7 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
             continue;
         }
         if (stylePtr->type() != LayerStyleType::Stroke) {
-            return Unexpected(PagExportError::MappingFailed);
+            return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
         }
         const auto &stroke = *static_cast<const StrokeStyle *>(stylePtr.get());
         // Inside/Outside and any trimmed stroke are parallel layers (TrimPaths would clip Fill).
@@ -1563,12 +1564,12 @@ Expected<void, PagExportError> PagFileBuilder::fillCommonLayer(pag::Layer *pagLa
     bool blendOk = true;
     pagLayer->blendMode = mapBlendMode(layer.blendMode, layer.id, &blendOk);
     if (!blendOk) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
 
     const FrameTime duration = layer.outPoint - layer.inPoint;
     if (duration <= 0) {
-        return Unexpected(PagExportError::MappingFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));
     }
 
     pagLayer->id = nextLayerId_++;

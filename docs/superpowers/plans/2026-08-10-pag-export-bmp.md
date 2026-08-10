@@ -39,7 +39,7 @@
 
 ### Task 1: 结构化 `PagExportError` + Options 字段
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/export/PagExporter.h`
@@ -85,7 +85,7 @@ int bitmapImageQuality = 80;
 ```
 - Consumes: 无
 
-- [ ] **Step 1: 写失败测试（错误形态）**
+- [x] **Step 1: 写失败测试（错误形态）**
 
 在 `PagExporterTest.cpp` 增加/改写：
 
@@ -101,12 +101,12 @@ TEST(PagExporterTest, InvalidCompositionHasStructuredError) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败（类型/字段尚不存在）**
+- [x] **Step 2: 跑测试确认失败（类型/字段尚不存在）**
 
 Run: `cmake --build build --target pag_export_tests && ./build/tests/pag_export_tests --gtest_filter='PagExporterTest.InvalidComposition*'`  
 Expected: 编译失败或断言失败（旧 `PagExportError` enum）
 
-- [ ] **Step 3: 实现公共类型与辅助函数**
+- [x] **Step 3: 实现公共类型与辅助函数**
 
 `PagExporter.h`：用上方 `PagExportErrorKind` / `PagExportError` 替换旧 enum。  
 `PagExportErrorUtil.h`：
@@ -131,7 +131,7 @@ inline PagExportError MakePagExportError(PagExportErrorKind kind, EntityId entit
 
 `PagExportOptions.h`：加入 `allowBitmapExport` 与三个 int；`allowBitmapFallback` 若保留则文档标注 deprecated，在 `PagExporter::Export` 开头：`if (!options.allowBitmapFallback) optionsEffective.allowBitmapExport = false;`（或要求调用方已迁完则直接删除旧字段——**本 Task 直接删除 `allowBitmapFallback`，测试一并改名**）。
 
-- [ ] **Step 4: 全量替换内部 `Unexpected`**
+- [x] **Step 4: 全量替换内部 `Unexpected`**
 
 所有 `Unexpected(PagExportError::X)` →  
 `Unexpected(MakePagExportError(PagExportErrorKind::X, {}, "", "", "…"))`  
@@ -139,12 +139,12 @@ inline PagExportError MakePagExportError(PagExportErrorKind kind, EntityId entit
 
 测试中所有 `result.error()` 与 `static_cast<int>(result.error())` 改为 `result.error().kind`。
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `./build/tests/pag_export_tests --gtest_filter='PagExporterTest.InvalidComposition*'`  
 Expected: PASS（其余 FollowPath 用例可能仍按旧行为暂时绿/红——若红，本 Task 仅保证编译 + InvalidComposition；FollowPath 行为留 Task 3）
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only include/MotionStudio/export/PagExporter.h \

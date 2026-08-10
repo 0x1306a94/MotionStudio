@@ -4,6 +4,7 @@
 
 #include "MotionStudio/export/BitmapFrameSource.h"
 #include "MotionStudio/model/Document.h"
+#include "PagExportErrorUtil.h"
 #include "PagFileBuilder.h"
 
 namespace motion {
@@ -31,12 +32,14 @@ Expected<void, PagExportError> WriteBytes(const std::string &path,
     }
     std::ofstream output(path, std::ios::binary);
     if (!output) {
-        return Unexpected(PagExportError::WriteFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::WriteFailed, {}, "", "",
+                                             "failed to write PAG file"));
     }
     output.write(reinterpret_cast<const char *>(bytes.data()),
                  static_cast<std::streamsize>(bytes.size()));
     if (!output) {
-        return Unexpected(PagExportError::WriteFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::WriteFailed, {}, "", "",
+                                             "failed to write PAG file"));
     }
     return Expected<void, PagExportError>();
 }
@@ -47,12 +50,14 @@ Expected<PagExportResult, PagExportError> PagExporter::Export(const Document &do
                                                               const PagExportOptions &options,
                                                               BitmapFrameSource *frameSource) {
     if (options.bitmapScale <= 0.0f) {
-        return Unexpected(PagExportError::InvalidOptions);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "bitmapScale must be greater than 0"));
     }
 
     const Composition *composition = ResolveComposition(document, options.compositionId);
     if (composition == nullptr) {
-        return Unexpected(PagExportError::InvalidComposition);
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidComposition, {}, "", "",
+                                             "composition not found"));
     }
 
     pag_export::PagFileBuilder builder(document, *composition, options, frameSource);
@@ -63,7 +68,8 @@ Expected<PagExportResult, PagExportError> PagExporter::Export(const Document &do
 
     std::unique_ptr<pag::ByteData> encoded = pag::Codec::Encode(built.value().file);
     if (encoded == nullptr || encoded->length() == 0) {
-        return Unexpected(PagExportError::EncodeFailed);
+        return Unexpected(MakePagExportError(PagExportErrorKind::EncodeFailed, {}, "", "",
+                                             "PAG encode failed"));
     }
 
     PagExportResult result;

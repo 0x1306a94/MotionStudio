@@ -767,7 +767,7 @@ bool ms_video_export(MSDocument *document, uint64_t compositionId,
 
 typedef struct MSPagExportOptions {
     const char *outputPath;
-    bool allowBitmapFallback;
+    bool allowBitmapExport;
     float bitmapScale;  // <=0 → 1.0
 } MSPagExportOptions;
 

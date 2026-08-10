@@ -27,7 +27,7 @@ struct PagExportResult {
     std::vector<PagExportWarning> warnings;
 };
 
-enum class PagExportError {
+enum class PagExportErrorKind {
     InvalidComposition,
     InvalidOptions,
     MappingFailed,
@@ -35,14 +35,23 @@ enum class PagExportError {
     WriteFailed,
 };
 
+// Structured export failure. MappingFailed should include entityName + reason.
+struct PagExportError {
+    PagExportErrorKind kind = PagExportErrorKind::MappingFailed;
+    EntityId entityId;
+    std::string entityName;
+    std::string code;
+    std::string message;
+};
+
 // Maps a MotionStudio Document composition to a binary .pag file via pag_codec
 // (pag::Codec::Encode). The Document must not be mutated during Export.
 class PagExporter {
   public:
     // document: source document (immutable for the call duration).
-    // options: composition selection, bitmap fallback flags, optional output path.
-    // frameSource: required when allowBitmapFallback is true and a layer needs
-    // rasterization; may be nullptr when fallback is not triggered.
+    // options: composition selection, bitmap export flags, optional output path.
+    // frameSource: required when allowBitmapExport is true and a _bmp unit needs
+    // rasterization; may be nullptr when bitmap export is not triggered.
     static Expected<PagExportResult, PagExportError> Export(
         const Document &document, const PagExportOptions &options,
         BitmapFrameSource *frameSource = nullptr);

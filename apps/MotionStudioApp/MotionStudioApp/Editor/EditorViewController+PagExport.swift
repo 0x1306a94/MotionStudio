@@ -78,7 +78,7 @@ extension EditorViewController {
 
         let core = document.core
         let outputPath = outputURL.path(percentEncoded: false)
-        let allowBitmapFallback = settings.allowBitmapFallback
+        let allowBitmapExport = settings.allowBitmapExport
         updateExportButtonState()
         UIMenuSystem.main.setNeedsRevalidate()
 
@@ -88,7 +88,7 @@ extension EditorViewController {
                 do {
                     try core.exportPAG(compositionID: compositionID,
                                        outputPath: outputPath,
-                                       allowBitmapFallback: allowBitmapFallback)
+                                       allowBitmapExport: allowBitmapExport)
                     await MainActor.run {
                         guard self.pagExportSession?.isDiscarded != true else { return }
                         self.finishPagExportSuccess(outputURL: outputURL, progressVC: progressVC)
