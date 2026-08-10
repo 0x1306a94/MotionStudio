@@ -7,6 +7,7 @@
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/model/ShaderDefinition.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 
@@ -19,6 +20,7 @@ struct EvaluatedShaderUniform {
     float floatValue = 0.f;
     Vec2 float2Value{};
     Vec3 float3Value{};
+    Vec4 float4Value{};
     Color colorValue{1, 1, 1, 1};
 };
 

@@ -183,6 +183,8 @@ AnimatableBase *resolveUniformEntry(ShaderUniformValue &entry) {
             return &entry.float2Value;
         case ShaderUniformValueKind::AnimFloat3:
             return &entry.float3Value;
+        case ShaderUniformValueKind::AnimFloat4:
+            return &entry.float4Value;
         case ShaderUniformValueKind::AnimColor:
             return &entry.colorValue;
         default:

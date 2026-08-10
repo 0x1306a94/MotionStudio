@@ -1033,12 +1033,15 @@ json ShaderUniformValueToJson(const ShaderUniformValue &value) {
             node["float3Value"] = AnimatableToJson(value.float3Value);
             break;
         }
+        case ShaderUniformValueKind::AnimFloat4: {
+            node["float4Value"] = AnimatableToJson(value.float4Value);
+            break;
+        }
         case ShaderUniformValueKind::AnimColor: {
             node["colorValue"] = AnimatableToJson(value.colorValue);
             break;
         }
         case ShaderUniformValueKind::StaticInt:
-        case ShaderUniformValueKind::AnimFloat4:
         case ShaderUniformValueKind::StaticMat3:
         case ShaderUniformValueKind::TextureAsset: {
             break;
@@ -1098,6 +1101,17 @@ Expected<ShaderUniformValue, std::string> ShaderUniformValueFromJson(const json 
             }
             break;
         }
+        case ShaderUniformValueKind::AnimFloat4: {
+            Expected<const json *, std::string> animNode = Child(node, "float4Value");
+            if (!animNode) {
+                return Unexpected(std::string("shader uniform is missing float4Value"));
+            }
+            Expected<void, std::string> result = AnimatableFromJson(**animNode, value.float4Value);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+            break;
+        }
         case ShaderUniformValueKind::AnimColor: {
             Expected<const json *, std::string> animNode = Child(node, "colorValue");
             if (!animNode) {
@@ -1110,7 +1124,6 @@ Expected<ShaderUniformValue, std::string> ShaderUniformValueFromJson(const json 
             break;
         }
         case ShaderUniformValueKind::StaticInt:
-        case ShaderUniformValueKind::AnimFloat4:
         case ShaderUniformValueKind::StaticMat3:
         case ShaderUniformValueKind::TextureAsset: {
             return Unexpected(std::string("unsupported shader uniform value kind for v1: " +

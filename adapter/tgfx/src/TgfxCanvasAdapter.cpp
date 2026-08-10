@@ -152,6 +152,12 @@ void WriteShaderUniformValues(UniformData *uniformData, const ShaderPaint &shade
                 uniformData->setData(value.name, xyz, sizeof(xyz));
                 break;
             }
+            case ShaderUniformValueKind::AnimFloat4: {
+                const float v[4] = {value.float4Value.x, value.float4Value.y, value.float4Value.z,
+                                    value.float4Value.w};
+                uniformData->setData(value.name, v, sizeof(v));
+                break;
+            }
             case ShaderUniformValueKind::AnimColor:
                 uniformData->setData(value.name, ToTgfxColor(value.colorValue));
                 break;

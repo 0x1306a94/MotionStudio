@@ -3,8 +3,10 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/animation/Animatable.h"
+#include "MotionStudio/animation/AnimatableType.h"
 #include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/Layer.h"
@@ -20,6 +22,7 @@
 
 using motion::Animatable;
 using motion::AnimatableBase;
+using motion::AnimatableType;
 using motion::BindShaderPaint;
 using motion::Composition;
 using motion::Document;
@@ -39,6 +42,7 @@ using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::StylePaintMode;
 using motion::UniformFormat;
+using motion::Vec4;
 
 TEST(ParsePropertyPathTest, SimpleDottedPath) {
     auto segments = ParsePropertyPath("transform.position");
@@ -251,6 +255,25 @@ TEST(PropertyPathTest, ResolvesShaderUniformFloat) {
         ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].uniformValues.tint"});
     ASSERT_NE(tint, nullptr);
     EXPECT_EQ(tint, static_cast<AnimatableBase *>(&fillStyle->uniformValues.entries[1].colorValue));
+}
+
+TEST(PropertyPathTest, ResolvesShaderUniformFloat4) {
+    ShapeScene scene;
+    ShaderDefinition shader;
+    shader.name = "Channels";
+    shader.uniforms.push_back(ShaderUniformDecl{"channels", UniformFormat::Float4, 1});
+
+    auto fill = std::make_unique<FillStyle>();
+    FillStyle *fillStyle = fill.get();
+    ASSERT_TRUE(BindShaderPaint(*fillStyle, shader).hasValue());
+    fillStyle->uniformValues.entries[0].float4Value.setStaticValue(Vec4{1, 2, 3, 4});
+    scene.layer->styles.push_back(std::move(fill));
+
+    AnimatableBase *resolved =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].uniformValues.channels"});
+    ASSERT_NE(resolved, nullptr);
+    EXPECT_EQ(resolved->valueType(), AnimatableType::Vec4);
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&fillStyle->uniformValues.entries[0].float4Value));
 }
 
 TEST(PropertyPathTest, ShaderUniformRequiresShaderPaintMode) {

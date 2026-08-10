@@ -132,6 +132,9 @@ std::vector<EvaluatedShaderUniform> EvaluateUniformValues(const ShaderUniformVal
             case ShaderUniformValueKind::AnimFloat3:
                 evaluated.float3Value = entry.float3Value.evaluatePreview(time);
                 break;
+            case ShaderUniformValueKind::AnimFloat4:
+                evaluated.float4Value = entry.float4Value.evaluatePreview(time);
+                break;
             case ShaderUniformValueKind::AnimColor:
                 evaluated.colorValue = entry.colorValue.evaluatePreview(time);
                 break;
