@@ -185,10 +185,12 @@ struct Transform {
     Animatable<Vec2>  anchorPoint{{0, 0}};
     Animatable<Vec2>  position{{0, 0}};
     Animatable<Vec2>  scale{{1, 1}};
-    Animatable<float> rotation{0};      // 度
+    Animatable<float> rotation{0};      // 度；正角度对齐 AE/Lottie（屏幕 Y 向下时视觉为顺时针）
     Animatable<float> opacity{1};       // 0.0 ~ 1.0
 };
 ```
+
+> 从 Figma Design / Motion 手抄旋转与时间时见 [`figma-to-motionstudio.md`](figma-to-motionstudio.md)。
 
 **世界变换**（local = T · R · S · T(-anchor)，再左乘父级世界变换）：
 

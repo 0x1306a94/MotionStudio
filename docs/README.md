@@ -8,6 +8,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 |---|---|
 | [architecture.md](architecture.md) | 总体架构：三层分层（Core / Bridge / App）、模块划分、目录结构、extern "C" 桥接层设计、依赖与构建 |
 | [data-model.md](data-model.md) | 动画数据结构：时间表示、EntityId、Document→Composition→Layer→Shape 层级、`Animatable<T>`、Transform 与父子继承、Command 模式 undo/redo、序列化与 DTO |
+| [figma-to-motionstudio.md](figma-to-motionstudio.md) | Figma Design / Motion → MotionStudio：毫秒↔帧、旋转符号与 Design+Motion 关键帧 |
 | [timeline-evaluation.md](timeline-evaluation.md) | 时间轴与曲线求值：关键帧求值流程、贝塞尔缓动（牛顿+二分）、空间插值、Precomp 时间映射、缓存策略 |
 | [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、Lottie/序列帧导出边界、线程模型 |
 | [color-source-effect.md](color-source-effect.md) | ColorSourceEffect / RenderCache：过程色填充、离屏路径、pipeline 指纹与 UBO 三缓冲、调用约定 |
