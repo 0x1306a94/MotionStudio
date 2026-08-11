@@ -21,8 +21,10 @@
 #include <tgfx/core/Typeface.h>
 #include <tgfx/gpu/Context.h>
 
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/render/ImageScaleLayout.h"
+#include "MotionStudio/render/Paint.h"
 #include "MotionStudio/textlayout/TextLayout.h"
 #include "RenderCache.h"
 #include "TextPathLayout.h"
@@ -167,15 +169,60 @@ void WriteShaderUniformValues(UniformData *uniformData, const ShaderPaint &shade
     }
 }
 
-// Builds an ImageShader for Shader-mode paints. Returns:
+std::shared_ptr<tgfx::Shader> MakeGradientTgfxShader(const EvaluatedGradient &gradient) {
+    if (gradient.stops.size() < 2u) {
+        return {};
+    }
+    std::vector<tgfx::Color> colors;
+    std::vector<float> positions;
+    colors.reserve(gradient.stops.size());
+    positions.reserve(gradient.stops.size());
+    for (const EvaluatedGradientStop &stop : gradient.stops) {
+        colors.push_back(ToTgfxColor(stop.color));
+        positions.push_back(stop.position);
+    }
+    const tgfx::Point start = tgfx::Point::Make(gradient.start.x, gradient.start.y);
+    const tgfx::Point end = tgfx::Point::Make(gradient.end.x, gradient.end.y);
+    switch (gradient.type) {
+        case GradientType::Linear:
+            return tgfx::Shader::MakeLinearGradient(start, end, colors, positions);
+        case GradientType::Radial: {
+            const float radius = tgfx::Point::Distance(start, end);
+            if (radius <= 0.f) {
+                return {};
+            }
+            return tgfx::Shader::MakeRadialGradient(start, radius, colors, positions);
+        }
+        case GradientType::Conic:
+            return tgfx::Shader::MakeConicGradient(start, gradient.startAngle, gradient.endAngle,
+                                                   colors, positions);
+        case GradientType::Diamond: {
+            const float radius = tgfx::Point::Distance(start, end);
+            if (radius <= 0.f) {
+                return {};
+            }
+            return tgfx::Shader::MakeDiamondGradient(start, radius, colors, positions);
+        }
+    }
+    return {};
+}
+
+// Builds a shader for Shader/Gradient paints. Returns:
 // - nullopt: Color mode (caller uses solid color)
-// - empty shared_ptr: Shader mode but unavailable (caller skips draw)
+// - empty shared_ptr: Shader/Gradient unavailable (caller skips draw)
 // - non-null: ready shader
 std::optional<std::shared_ptr<tgfx::Shader>> MakePaintImageShader(
     const Paint &paint, const tgfx::Rect &sourceBounds, RenderCache *renderCache,
     const ColorSourceFrameContext &frameContext) {
-    if (paint.paintMode != StylePaintMode::Shader) {
+    if (paint.paintMode == StylePaintMode::Color) {
         return std::nullopt;
+    }
+    if (paint.paintMode == StylePaintMode::Gradient) {
+        std::shared_ptr<tgfx::Shader> shader = MakeGradientTgfxShader(paint.gradient);
+        return shader;
+    }
+    if (paint.paintMode != StylePaintMode::Shader) {
+        return std::shared_ptr<tgfx::Shader>{};
     }
     if (renderCache == nullptr || !paint.shader.shaderId.isValid() || paint.shader.mainImage.empty()) {
         return std::shared_ptr<tgfx::Shader>{};

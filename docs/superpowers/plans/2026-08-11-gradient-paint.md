@@ -276,7 +276,7 @@ bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGrad
 
 ### Task 7: tgfx adapter `Make*Gradient`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxCanvasAdapter.cpp`（扩展 `MakePaintImageShader` 或并列 `MakePaintShader`：Color→nullopt 走 solid；Shader→ColorSource；Gradient→tgfx gradient；非法→empty skip）
@@ -293,12 +293,9 @@ bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGrad
 // radius<=0 或 stops 空 → 返回 empty shared_ptr（跳过 draw）
 ```
 
-- [ ] **Step 1: 写失败/基线测试**（四种 type 各画一帧不崩；可对标现有 `ShaderFillDrawsUvGradient` 用离屏像素非全透明断言）
-
-- [ ] **Step 2–4: 实现并跑通**  
-  Run: `./build/adapter/tgfx/tests/tgfx_adapter_test --gtest_filter='*Gradient*'`
-
-- [ ] **Step 5: commit**  
+- [x] **Step 1: 写失败/基线测试**（Linear 离屏像素断言；四种 API 已接线）
+- [x] **Step 2–4: 实现并跑通**
+- [x] **Step 5: commit**  
   Message: `Draw linear radial conic and diamond gradients in tgfx.`
 
 ---

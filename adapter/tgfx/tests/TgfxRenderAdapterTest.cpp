@@ -9,6 +9,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -22,6 +23,7 @@
 #include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedMask.h"
 #include "MotionStudio/render/EvaluatedTextItem.h"
+#include "MotionStudio/render/Paint.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -33,10 +35,12 @@ using motion::Color;
 using motion::Composition;
 using motion::Document;
 using motion::EntityId;
+using motion::EvaluatedGradientStop;
 using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
 using motion::FillStyle;
+using motion::GradientType;
 using motion::Layer;
 using motion::LayerType;
 using motion::LineCap;
@@ -682,6 +686,45 @@ TEST(TgfxRenderAdapterTest, SceneTextPathBaselineAlignsWithPathStroke) {
     std::printf("scene textTop=%d textBottom=%d mid=%.1f pathY=60\n", textTop, textBottom, mid);
     EXPECT_LT(std::fabs(60.0f - static_cast<float>(textBottom)), std::fabs(60.0f - mid));
     EXPECT_NEAR(60.0f, static_cast<float>(textBottom), 10.0f);
+}
+
+TEST(TgfxRenderAdapterTest, LinearGradientFillDraws) {
+    auto adapter = TgfxRenderAdapter::Make(64, 64);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 64;
+    state.viewportHeight = 64;
+    state.backgroundColor = Color{0, 0, 0, 1};
+
+    EvaluatedLayer layer;
+    layer.id = EntityId{1};
+    layer.worldTransform = Mat3::Identity();
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{32, 32}, Vec2{40, 40});
+    item.paint.paintMode = StylePaintMode::Gradient;
+    item.paint.gradient.type = GradientType::Linear;
+    item.paint.gradient.start = Vec2{12, 32};
+    item.paint.gradient.end = Vec2{52, 32};
+    item.paint.gradient.stops = {
+        EvaluatedGradientStop{Color{1, 0, 0, 1}, 0.f},
+        EvaluatedGradientStop{Color{0, 0, 1, 1}, 1.f},
+    };
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(64, 64, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel left = PixelAt(pixels, 64, 18, 32);
+    const Pixel right = PixelAt(pixels, 64, 46, 32);
+    EXPECT_GT(left.r, right.r);
+    EXPECT_GT(right.b, left.b);
 }
 
 TEST(TgfxRenderAdapterTest, ShaderFillDrawsUvGradient) {
