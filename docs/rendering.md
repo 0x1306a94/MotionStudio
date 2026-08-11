@@ -31,7 +31,7 @@ FrameTime t
 ```cpp
 struct EvaluatedShapeItem {
     BezierPath path;        // layer 局部坐标；世界位置由 EvaluatedLayer::worldTransform 表达
-    Paint paint;            // 纯色（M3 首版），后续扩展渐变
+    Paint paint;            // Color / Gradient / Shader（由 paintMode 选择）
     bool isStroke;
     float strokeWidth;
     LineCap cap;

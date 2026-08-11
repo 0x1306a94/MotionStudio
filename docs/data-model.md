@@ -56,7 +56,7 @@ Document
  └─ Composition[]              （多个合成，支持互相引用 = 预合成）
      └─ Layer[]                （有序，index 0 = 最底层，向上渲染）
          ├─ Transform          （5 个可动画属性，必有）
-         ├─ styles[]           （Fill / Stroke；color XOR shader）
+         ├─ styles[]           （Fill / Stroke；Color / Gradient / Shader）
          └─ LayerContent       （多态：Shape / Image / Text / Null / Precomp）
              └─ ShapeElement[] （Shape 类型时：Path / Rect / Ellipse / TrimPath ...）
 ```
@@ -298,14 +298,30 @@ class ShapeTrimPath : public ShapeElement { /* start, end, offset */ };
 // 组变换 → LayerType::Group（NullContent）+ parentId
 ```
 
-**Fill / Stroke 绘制源（color XOR shader）**：
+**Fill / Stroke 绘制源（Color / Gradient / Shader 三态共存）**：
 
 ```cpp
-enum class StylePaintMode : uint8_t { Color = 0, Shader = 1 };
+enum class StylePaintMode : uint8_t { Color = 0, Shader = 1, Gradient = 2 };
+enum class GradientType : uint8_t { Linear = 0, Radial = 1, Conic = 2, Diamond = 3 };
+
+struct GradientStop {
+    Animatable<Color> color;
+    Animatable<float> position;  // [0,1]，首尾须为 0/1
+};
+
+struct GradientPaint {
+    GradientType type = Linear;
+    Animatable<Vec2> start;       // 图层局部 px
+    Animatable<Vec2> end;         // Radial/Diamond：radius = |end-start|
+    Animatable<float> startAngle; // Conic
+    Animatable<float> endAngle;   // Conic
+    std::vector<GradientStop> stops;  // N≥2
+};
 
 class FillStyle : public LayerStyle {
     StylePaintMode paintMode = StylePaintMode::Color;
-    Animatable<Color> color;               // Color 模式；Shader 模式可保留但不参与绘制
+    Animatable<Color> color;               // 三态字段共存；仅当前 kind 参与绘制
+    GradientPaint gradient;                // Gradient 模式；切走不清空
     EntityId shaderId;                     // Shader 模式；须 ∈ Document.shaders
     ShaderUniformValues uniformValues;     // Shader 模式；按 name 对齐 scheme
     FillRule fillRule = NonZero;
@@ -314,9 +330,11 @@ class FillStyle : public LayerStyle {
 // StrokeStyle 同构（另含 width / cap / join / trim / …）
 ```
 
-`document.json` 中 `paintMode` / `shaderId` / `uniformValues` 为**可选**字段：缺省 → `Color`（与旧文档兼容）；`schemaVersion` **保持 1**。Color 模式写回时不输出 shader 字段。合并 `shader.json` 后可用 `ValidateShaderReferences` 校验引用。
+`document.json` 中 `paintMode` / `gradient` / `shaderId` / `uniformValues` 为**可选**字段：缺省 → `Color`（与旧文档兼容）；`schemaVersion` **保持 1**。非当前 kind 的字段仍可持久化（切回保留配置）。合并 `shader.json` 后可用 `ValidateShaderReferences` 校验引用。
 
-**不变式：** Color 模式 → `shaderId` 无效且 `uniformValues` 空；Shader 模式 → `shaderId` ∈ `Document.shaders`，`uniformValues` 与 scheme 按 name 对齐。切换用 `ClearShaderPaint` / `BindShaderPaint`（或 undo `SetStylePaintModeCommand`）。
+**不变式 / 切换：** `SetStylePaintModeCommand` **只改 kind**，不清空 `color` / `gradient` / `shader*`；切到 Gradient/Shader 时目标路不可用则懒初始化。求值只读当前 kind；Gradient 非法（stops 少于 2、positions 不合法、Radial/Diamond radius≤0）或 Shader 解析失败 → **跳过该 style 绘制**（不回退其它 kind）。Gradient undo：`SetGradientTypeCommand` / `AddGradientStopCommand` / `RemoveGradientStopCommand`。
+
+**PropertyPath（Gradient）：** `styles[i].gradient.start|end|startAngle|endAngle`、`styles[i].gradient.stops[j].color|position`。
 
 **实例 uniform 值（可扩展 kind）：**
 
@@ -472,6 +490,7 @@ private:
 struct PropertyPath {
     EntityId entityId;      // Layer 或 ShapeElement 的 ID
     std::string path;       // "transform.position"、"styles[0].color"、
+                            // "styles[0].gradient.start"、
                             // "styles[0].uniformValues.rippleCount"、"size"
 };
 
@@ -496,7 +515,7 @@ class MoveKeyframeCommand : public Command {
 
 **M1 需要的核心命令**（8 个）：`AddLayer`、`RemoveLayer`、`MoveLayer`（改顺序）、`SetStaticValue`、`AddKeyframe`、`RemoveKeyframe`、`MoveKeyframe`、`SetEasing`。
 
-过程色相关命令：`AddShaderCommand`、`RemoveShaderCommand`（仍被引用则跳过删除）、`UpdateShaderDefinitionCommand`（改 name/mainImage/uniforms 并对引用 Realign）、`SetStylePaintModeCommand`。
+过程色 / 渐变相关命令：`AddShaderCommand`、`RemoveShaderCommand`（仍被引用则跳过删除）、`UpdateShaderDefinitionCommand`（改 name/mainImage/uniforms 并对引用 Realign）、`SetStylePaintModeCommand`、`SetGradientTypeCommand`、`AddGradientStopCommand`、`RemoveGradientStopCommand`。
 
 **删除类命令的所有权**：`RemoveLayerCommand` 执行时把 `unique_ptr<Layer>` 移入命令内部；undo 时移回文档——完整恢复子结构与关键帧。
 

@@ -424,16 +424,16 @@ DrawCommandList BuildGradientEditCommands(const GradientEditHandles&, float stro
 
 ### Task 12: 文档同步
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `docs/data-model.md`（StylePaintMode 三态共存、GradientPaint、PropertyPath）
 - Modify: `docs/rendering.md`（若有 Paint 小节）
 - Modify: `docs/superpowers/specs/2026-08-11-gradient-paint-design.md` 状态 → 实现中/完成（随进度）
 
-- [ ] **Step 1: 按已实现行为改文档（勿写未做手柄/导出若仍未合）**
+- [x] **Step 1: 按已实现行为改文档（勿写未做手柄/导出若仍未合）**
 
-- [ ] **Step 2: commit**  
+- [x] **Step 2: commit**  
   Message: `Document gradient paint mode in the data model.`
 
 ---

@@ -1,7 +1,7 @@
 # Gradient Paint — 设计说明
 
 日期：2026-08-11  
-状态：设计已确认；实现计划见 `docs/superpowers/plans/2026-08-11-gradient-paint.md`  
+状态：已实现（见 `docs/superpowers/plans/2026-08-11-gradient-paint.md`）  
 关联：[数据模型](../../data-model.md)、[渲染](../../rendering.md)、[Color Source Core 存储](2026-08-07-color-source-core-storage-design.md)
 
 ## 目标
