@@ -158,9 +158,13 @@ TEST(BridgeShaderTest, GradientPaintModeAndStops) {
     ASSERT_TRUE(ms_document_remove_gradient_stop(document, layerId, 0, 1));
     EXPECT_EQ(ms_layer_style_gradient_stop_count(document, layerId, 0), 2);
 
+    // Default rect is 200×200; gradient endpoints are AABB-relative with 15% inset.
     float x = 0, y = 0;
     ms_property_evaluate_vec2(document, layerId, "styles[0].gradient.start", 0, &x, &y);
-    EXPECT_FLOAT_EQ(x, 0.f);
-    EXPECT_FLOAT_EQ(y, 0.f);
+    EXPECT_FLOAT_EQ(x, 30.f);
+    EXPECT_FLOAT_EQ(y, 100.f);
+    ms_property_evaluate_vec2(document, layerId, "styles[0].gradient.end", 0, &x, &y);
+    EXPECT_FLOAT_EQ(x, 170.f);
+    EXPECT_FLOAT_EQ(y, 100.f);
     ms_document_destroy(document);
 }
