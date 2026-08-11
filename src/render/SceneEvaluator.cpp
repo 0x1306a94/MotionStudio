@@ -219,7 +219,7 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
                       std::vector<EvaluatedShapeItem> &items) {
     // Paint order is Fill block then Stroke block (stable within each type),
     // independent of styles[] interleaving on disk.
-    auto appendFill = [&](const FillStyle &fill) {
+    auto appendFill = [&](const FillStyle &fill, int styleIndex) {
         Paint paint;
         paint.alpha = alpha;
         paint.fillRule = fill.fillRule;
@@ -229,10 +229,15 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
             return;
         }
         for (const ShapeGeometry &geometry : geometries) {
-            items.push_back({geometry, paint, false, {}});
+            EvaluatedShapeItem item;
+            item.geometry = geometry;
+            item.paint = paint;
+            item.isStroke = false;
+            item.styleIndex = styleIndex;
+            items.push_back(std::move(item));
         }
     };
-    auto appendStroke = [&](const StrokeStyle &stroke) {
+    auto appendStroke = [&](const StrokeStyle &stroke, int styleIndex) {
         Paint paint;
         paint.alpha = alpha;
         paint.fillRule = FillRule::NonZero;
@@ -251,17 +256,25 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
         for (const ShapeGeometry &geometry : geometries) {
             // Stroke uses strokePath when present; fill faces stay on
             // geometry.path for Inside/Outside positioning.
-            items.push_back({geometry, paint, true, options});
+            EvaluatedShapeItem item;
+            item.geometry = geometry;
+            item.paint = paint;
+            item.isStroke = true;
+            item.stroke = options;
+            item.styleIndex = styleIndex;
+            items.push_back(std::move(item));
         }
     };
-    for (const auto &style : layer.styles) {
+    for (size_t index = 0; index < layer.styles.size(); ++index) {
+        const auto &style = layer.styles[index];
         if (style->type() == LayerStyleType::Fill) {
-            appendFill(static_cast<const FillStyle &>(*style));
+            appendFill(static_cast<const FillStyle &>(*style), static_cast<int>(index));
         }
     }
-    for (const auto &style : layer.styles) {
+    for (size_t index = 0; index < layer.styles.size(); ++index) {
+        const auto &style = layer.styles[index];
         if (style->type() == LayerStyleType::Stroke) {
-            appendStroke(static_cast<const StrokeStyle &>(*style));
+            appendStroke(static_cast<const StrokeStyle &>(*style), static_cast<int>(index));
         }
     }
 }

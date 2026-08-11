@@ -358,7 +358,7 @@ bool ms_document_remove_gradient_stop(..., int stopIndex);
 
 ### Task 10: 画布渐变手柄
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/render/GradientEditHandles.h`
@@ -388,9 +388,9 @@ DrawCommandList BuildGradientEditCommands(const GradientEditHandles&, float stro
 - Radial/Diamond：Start=center、End=radiusPoint + 示意  
 - Conic：Center + 两角射线（拖角度写 `startAngle`/`endAngle`）
 
-- [ ] **Step 1–4: Core hit 测试 TDD → Bridge → Swift 接线 → 编译**
+- [x] **Step 1–4: Core hit 测试 TDD → Bridge → Swift 接线 → 编译**
 
-- [ ] **Step 5: commit**  
+- [x] **Step 5: commit**  
   Message: `Add canvas handles for editing gradient geometry.`
 
 ---

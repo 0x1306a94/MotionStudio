@@ -18,6 +18,7 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/GradientEditHandles.h"
 #include "MotionStudio/render/MotionPathChrome.h"
 #include "MotionStudio/render/PathEditHandles.h"
 #include "MotionStudio/render/PathOverlay.h"
@@ -236,6 +237,56 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document, ui
     return hit;
 }
 
+void ms_canvas_set_gradient_edit_target(MSCanvas *canvas, uint64_t layerId, int styleIndex) {
+    if (canvas == nullptr) {
+        return;
+    }
+    if (layerId == 0 || styleIndex < 0) {
+        canvas->hasGradientEditTarget = false;
+        canvas->gradientEditTarget = {};
+        return;
+    }
+    canvas->hasGradientEditTarget = true;
+    canvas->gradientEditTarget.layerId = EntityId{layerId};
+    canvas->gradientEditTarget.styleIndex = styleIndex;
+}
+
+MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *document,
+                                               uint64_t compositionId, double frameTime,
+                                               float sceneX, float sceneY) {
+    if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr ||
+        canvas->hasPathEditTarget || !canvas->hasGradientEditTarget) {
+        return MS_GRADIENT_HANDLE_NONE;
+    }
+    DocumentLock guard(document);
+    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId},
+                                                          motion::PreviewTime(frameTime));
+    if (!result.hasValue()) {
+        return MS_GRADIENT_HANDLE_NONE;
+    }
+    motion::SceneState &state = result.value();
+    motion::GradientEditHandles handles;
+    if (!motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
+        return MS_GRADIENT_HANDLE_NONE;
+    }
+    const float viewUnit =
+        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    const float handleRadius = 8.0f * viewUnit;
+    switch (motion::HitTestGradientEdit(handles, {sceneX, sceneY}, handleRadius)) {
+        case motion::GradientHandleKind::Start:
+            return MS_GRADIENT_HANDLE_START;
+        case motion::GradientHandleKind::End:
+            return MS_GRADIENT_HANDLE_END;
+        case motion::GradientHandleKind::StartAngle:
+            return MS_GRADIENT_HANDLE_START_ANGLE;
+        case motion::GradientHandleKind::EndAngle:
+            return MS_GRADIENT_HANDLE_END_ANGLE;
+        case motion::GradientHandleKind::None:
+            return MS_GRADIENT_HANDLE_NONE;
+    }
+    return MS_GRADIENT_HANDLE_NONE;
+}
+
 void ms_canvas_set_motion_path_selection(MSCanvas *canvas, uint64_t layerId, int selectedKeyframe) {
     if (canvas == nullptr) {
         return;
@@ -413,6 +464,14 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
                 }
             }
 
+            motion::DrawCommandList gradientEditCommands;
+            if (!canvas->hasPathEditTarget && canvas->hasGradientEditTarget) {
+                motion::GradientEditHandles handles;
+                if (motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
+                    gradientEditCommands = motion::BuildGradientEditCommands(handles, outlineWidth, handleSize);
+                }
+            }
+
             if (!canvas->hasPathEditTarget) {
                 for (EntityId layerId : canvas->selectedLayerIds) {
                     const int selectedKeyframe = layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
@@ -431,6 +490,8 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
                     state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
                     canvas->showSelectionAnchor, canvas->showSelectionScaleHandles);
             }
+            selectionCommands.insert(selectionCommands.end(), gradientEditCommands.begin(),
+                                     gradientEditCommands.end());
         }
         const auto buildEnd = ProfileClock::now();
         profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);

@@ -75,6 +75,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var layerDragGesture: UIPanGestureRecognizer?
     private var penPressGesture: UILongPressGestureRecognizer?
     private var freeTransformDrag: FreeTransformDrag?
+    private var gradientEditDrag: GradientEditDrag?
     private var freeTransformDidMove = false
 
     private struct PenDragState {
@@ -639,12 +640,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         case .changed:
             if motionPathDrag != nil {
                 updateMotionPathDrag(at: gesture.location(in: view))
+            } else if gradientEditDrag != nil {
+                updateGradientEdit(at: gesture.location(in: view))
             } else {
                 updateFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
             }
         case .ended, .cancelled, .failed:
             if motionPathDrag != nil {
                 endMotionPathDrag()
+            } else if gradientEditDrag != nil {
+                endGradientEdit()
             } else {
                 endFreeTransform()
             }
@@ -658,11 +663,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         freeTransformDidMove = false
         motionPathDrag = nil
         motionPathDragDidMove = false
+        gradientEditDrag = nil
         guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
             return
         }
 
         if beginMotionPathInteraction(at: scenePoint) {
+            return
+        }
+
+        if beginGradientEdit(at: scenePoint) {
             return
         }
 
@@ -1019,6 +1029,142 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
                                              layerID: editorState.motionPathLayerID,
                                              selectedKeyframe: editorState.motionPathSelectedKeyframe)
         updatePathEditChrome()
+        updateGradientEditChrome()
+    }
+
+    private func updateGradientEditChrome() {
+        guard let canvas else {
+            return
+        }
+        let selectTool = editorState.tool == .select
+        let primaryID = editorState.selectedLayerIDs.last
+        if selectTool,
+           editorState.pathEditTarget == nil,
+           let layerID = primaryID,
+           !document.core.layerIsLocked(layerID),
+           let styleIndex = document.core.firstGradientStyleIndex(layerID: layerID)
+        {
+            document.core.setGradientEditTarget(canvas: canvas, layerID: layerID, styleIndex: styleIndex)
+        } else {
+            document.core.setGradientEditTarget(canvas: canvas, layerID: nil, styleIndex: nil)
+        }
+    }
+
+    private struct GradientEditDrag {
+        var layerID: UInt64
+        var styleIndex: Int
+        var kind: MS_GRADIENT_HANDLE
+        var didMove: Bool
+    }
+
+    /// Starts a gradient-handle drag when chrome is hit. Returns true when consumed.
+    private func beginGradientEdit(at scenePoint: CGPoint) -> Bool {
+        guard let canvas, editorState.tool == .select else {
+            return false
+        }
+        updateGradientEditChrome()
+        let hit = document.core.hitGradientEdit(canvas: canvas, compositionID: compositionID,
+                                                frameTime: evaluationTime, point: scenePoint)
+        guard hit != .NONE else {
+            return false
+        }
+        guard let layerID = editorState.selectedLayerIDs.last,
+              let styleIndex = document.core.firstGradientStyleIndex(layerID: layerID)
+        else {
+            return false
+        }
+        document.core.beginMergeGroup()
+        gradientEditDrag = GradientEditDrag(layerID: layerID, styleIndex: styleIndex, kind: hit,
+                                            didMove: false)
+        return true
+    }
+
+    private func updateGradientEdit(at viewPoint: CGPoint) {
+        guard var drag = gradientEditDrag,
+              let scenePoint = scenePoint(fromViewPoint: viewPoint),
+              let local = document.core.transformScenePointToLocal(layerID: drag.layerID,
+                                                                   frame: evaluationFrame,
+                                                                   scenePoint: scenePoint)
+        else {
+            return
+        }
+        applyGradientEditDrag(drag, localPoint: local)
+        drag.didMove = true
+        gradientEditDrag = drag
+        requestDraw()
+    }
+
+    private func endGradientEdit() {
+        defer {
+            gradientEditDrag = nil
+        }
+        guard let drag = gradientEditDrag else {
+            return
+        }
+        document.core.endMergeGroup()
+        guard drag.didMove else {
+            return
+        }
+        let action = switch drag.kind {
+        case .START:
+            "Move Gradient Start"
+        case .END:
+            "Move Gradient End"
+        case .START_ANGLE:
+            "Move Gradient Start Angle"
+        case .END_ANGLE:
+            "Move Gradient End Angle"
+        default:
+            "Edit Gradient"
+        }
+        registerEdit(action)
+    }
+
+    private func applyGradientEditDrag(_ drag: GradientEditDrag, localPoint: CGPoint) {
+        let core = document.core
+        let frame = evaluationFrame
+        switch drag.kind {
+        case .START:
+            writeGradientVec2(layerID: drag.layerID,
+                              path: StyleProperty.gradientStart(styleIndex: drag.styleIndex),
+                              value: CGVector(dx: localPoint.x, dy: localPoint.y),
+                              frame: frame)
+        case .END:
+            writeGradientVec2(layerID: drag.layerID,
+                              path: StyleProperty.gradientEnd(styleIndex: drag.styleIndex),
+                              value: CGVector(dx: localPoint.x, dy: localPoint.y),
+                              frame: frame)
+        case .START_ANGLE, .END_ANGLE:
+            let start = core.evaluateVec2(entityID: drag.layerID,
+                                          path: StyleProperty.gradientStart(styleIndex: drag.styleIndex),
+                                          frame: frame)
+            let angle = Float(atan2(localPoint.y - start.dy, localPoint.x - start.dx) * 180 /
+                Double.pi)
+            let path = drag.kind == .START_ANGLE
+                ? StyleProperty.gradientStartAngle(styleIndex: drag.styleIndex)
+                : StyleProperty.gradientEndAngle(styleIndex: drag.styleIndex)
+            writeGradientFloat(layerID: drag.layerID, path: path, value: angle, frame: frame)
+        default:
+            break
+        }
+    }
+
+    private func writeGradientVec2(layerID: UInt64, path: String, value: CGVector, frame: Int64) {
+        let core = document.core
+        if core.isAnimated(entityID: layerID, path: path) {
+            core.addKeyframeVec2(entityID: layerID, path: path, frame: frame, value: value)
+        } else {
+            core.setStaticVec2(entityID: layerID, path: path, value: value)
+        }
+    }
+
+    private func writeGradientFloat(layerID: UInt64, path: String, value: Float, frame: Int64) {
+        let core = document.core
+        if core.isAnimated(entityID: layerID, path: path) {
+            core.addKeyframeFloat(entityID: layerID, path: path, frame: frame, value: value)
+        } else {
+            core.setStaticFloat(entityID: layerID, path: path, value: value)
+        }
     }
 
     /// Point text has no content-size resize; keep move/rotate/anchor only.

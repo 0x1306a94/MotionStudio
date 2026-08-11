@@ -212,6 +212,23 @@ bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int6
     return true;
 }
 
+bool ms_layer_transform_scene_point(MSDocument *document, uint64_t layerId, int64_t frame,
+                                    float sceneX, float sceneY, float *localX, float *localY) {
+    DocumentLock guard(document);
+    if (document == nullptr || document->document == nullptr || localX == nullptr ||
+        localY == nullptr) {
+        return false;
+    }
+    Vec2 local;
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, static_cast<FrameTime>(frame),
+                           {sceneX, sceneY}, local)) {
+        return false;
+    }
+    *localX = local.x;
+    *localY = local.y;
+    return true;
+}
+
 void ms_command_path_edit_move_vertex(MSDocument *document, uint64_t layerId, MS_PATH_EDIT kind,
                                       int maskIndex, int64_t frame, size_t index, float sceneX,
                                       float sceneY, bool linkedHandles) {

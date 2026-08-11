@@ -1740,6 +1740,38 @@ final class MotionDocumentCore {
         ms_canvas_set_motion_path_selection(canvas, layerID ?? 0, Int32(selectedKeyframe ?? -1))
     }
 
+    func setGradientEditTarget(canvas: OpaquePointer, layerID: UInt64?, styleIndex: Int?) {
+        ms_canvas_set_gradient_edit_target(canvas, layerID ?? 0, Int32(styleIndex ?? -1))
+    }
+
+    func hitGradientEdit(canvas: OpaquePointer, compositionID: UInt64, frameTime: Double,
+                         point: CGPoint) -> MS_GRADIENT_HANDLE
+    {
+        ms_canvas_hit_gradient_edit(canvas, handle, compositionID, frameTime,
+                                    Float(point.x), Float(point.y))
+    }
+
+    /// First Fill/Stroke style in Gradient paint mode, or nil.
+    func firstGradientStyleIndex(layerID: UInt64) -> Int? {
+        for index in 0 ..< styleCount(layerID: layerID) {
+            if stylePaintMode(layerID: layerID, index: index) == .GRADIENT {
+                return index
+            }
+        }
+        return nil
+    }
+
+    func transformScenePointToLocal(layerID: UInt64, frame: Int64, scenePoint: CGPoint) -> CGPoint? {
+        var localX: Float = 0
+        var localY: Float = 0
+        guard ms_layer_transform_scene_point(handle, layerID, frame, Float(scenePoint.x),
+                                             Float(scenePoint.y), &localX, &localY)
+        else {
+            return nil
+        }
+        return CGPoint(x: CGFloat(localX), y: CGFloat(localY))
+    }
+
     func dragMotionPathTangent(layerID: UInt64, keyframeIndex: Int, isOut: Bool,
                                scenePoint: CGPoint, frameTime: Double)
     {

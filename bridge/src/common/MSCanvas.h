@@ -6,6 +6,7 @@
 
 #include "FrameCommandCache.h"
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/render/GradientEditHandles.h"
 #include "MotionStudio/render/MotionPathChrome.h"
 #include "MotionStudio/render/PathEditHandles.h"
 #include "MotionStudio/render/PathOverlay.h"
@@ -25,6 +26,8 @@ struct MSCanvas {
     // of motionPathLayerId (-1 = none). layerId 0 clears selection chrome.
     motion::EntityId motionPathLayerId;
     int motionPathSelectedKeyframe = -1;
+    bool hasGradientEditTarget = false;
+    motion::GradientEditTarget gradientEditTarget;
     std::vector<motion::PathOverlayItem> customPathOverlays;
     // Mirrors MS_CANVAS_DRAW_MODE (0 = EDIT, 1 = PLAYBACK).
     int drawMode = 0;

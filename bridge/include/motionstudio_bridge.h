@@ -327,6 +327,11 @@ bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_
 bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int64_t frame,
                                     float localX, float localY, float *sceneX, float *sceneY);
 
+// Inverse of ms_layer_transform_local_point. Returns false when the layer is
+// missing or the world transform is not invertible.
+bool ms_layer_transform_scene_point(MSDocument *document, uint64_t layerId, int64_t frame,
+                                    float sceneX, float sceneY, float *localX, float *localY);
+
 // Selection chrome geometry in scene space for free-transform hit-testing.
 // corners / edgeMids are TL,TR,BR,BL and top,right,bottom,left respectively.
 // primaryLayerId selects the anchor owner (AE primary). Returns false when
@@ -958,6 +963,23 @@ typedef struct MSMotionPathHit {
 MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document,
                                           uint64_t compositionId, double frameTime, float sceneX,
                                           float sceneY);
+
+// Gradient edit chrome (Select tool). styleIndex < 0 or layerId 0 clears.
+void ms_canvas_set_gradient_edit_target(MSCanvas *canvas, uint64_t layerId, int styleIndex);
+
+typedef CF_CLOSED_ENUM(int, MS_GRADIENT_HANDLE) {
+    MS_GRADIENT_HANDLE_NONE = 0,
+    MS_GRADIENT_HANDLE_START = 1,
+    MS_GRADIENT_HANDLE_END = 2,
+    MS_GRADIENT_HANDLE_START_ANGLE = 3,
+    MS_GRADIENT_HANDLE_END_ANGLE = 4,
+};
+
+// Hits gradient chrome for the current gradient-edit target. Skips when a
+// path-edit target is active. Returns NONE when nothing hits.
+MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *document,
+                                               uint64_t compositionId, double frameTime,
+                                               float sceneX, float sceneY);
 
 // Writes spatial tangents for a motion-path handle drag (parent-space via scene
 // point). Also seeds the adjacent keyframe's opposite handle when missing.

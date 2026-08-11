@@ -13,6 +13,8 @@ struct EvaluatedShapeItem {
     Paint paint;
     bool isStroke = false;
     StrokeOptions stroke;
+    // Index into Layer::styles for this paint; -1 when not from a layer style.
+    int styleIndex = -1;
 };
 
 }  // namespace motion
