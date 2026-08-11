@@ -7,6 +7,7 @@
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerType.h"
 #include "MotionStudio/model/LineCap.h"
@@ -68,6 +69,9 @@ Expected<TextAlign, std::string> textAlignFromString(const std::string &text);
 
 const char *ToString(StylePaintMode mode);
 Expected<StylePaintMode, std::string> stylePaintModeFromString(const std::string &text);
+
+const char *ToString(GradientType type);
+Expected<GradientType, std::string> gradientTypeFromString(const std::string &text);
 
 const char *ToString(UniformFormat format);
 Expected<UniformFormat, std::string> uniformFormatFromString(const std::string &text);

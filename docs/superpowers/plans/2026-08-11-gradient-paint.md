@@ -191,7 +191,7 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end);  // �
 
 ### Task 4: 序列化 round-trip
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/serialization/Dto.cpp`（`ToString` / `stylePaintModeFromString` / gradient type 字符串）
@@ -204,11 +204,9 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end);  // �
 - 未知 paintMode → `Unexpected`
 - Gradient 反序列化后若 stops 非法 → `Unexpected`（或加载后校验阶段失败，与现有 Validate 风格一致）
 
-- [ ] **Step 1: 写失败测试**（四种 type + 关键帧几何/stop 往返；切 kind 后三态字段都在）
-
-- [ ] **Step 2–4: 实现并跑通**
-
-- [ ] **Step 5: commit**  
+- [x] **Step 1: 写失败测试**（四种 type + 关键帧几何/stop 往返；切 kind 后三态字段都在）
+- [x] **Step 2–4: 实现并跑通**
+- [x] **Step 5: commit**  
   Message: `Serialize and load gradient paint on fill and stroke.`
 
 ---

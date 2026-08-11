@@ -7,6 +7,7 @@
 #include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
@@ -37,8 +38,10 @@ using motion::Composition;
 using motion::Document;
 using motion::DocumentFingerprint;
 using motion::Easing;
+using motion::EnsureDefaultGradient;
 using motion::Expected;
 using motion::FillStyle;
+using motion::GradientType;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
@@ -944,4 +947,36 @@ TEST(SerializerTest, MissingPaintModeDefaultsToColor) {
     EXPECT_EQ(restoredFill->paintMode, StylePaintMode::Color);
     EXPECT_FALSE(restoredFill->shaderId.isValid());
     EXPECT_TRUE(restoredFill->uniformValues.entries.empty());
+}
+
+TEST(SerializerTest, DocumentGradientPaintRoundTrip) {
+    Document original;
+    Composition *composition = original.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *layer = original.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    auto fill = std::make_unique<FillStyle>();
+    fill->paintMode = StylePaintMode::Gradient;
+    EnsureDefaultGradient(fill->gradient, Vec2{0, 10}, Vec2{200, 10});
+    fill->gradient.type = GradientType::Radial;
+    fill->gradient.stops[1].color.setStaticValue(Color{0, 0, 1, 1});
+    layer->styles.push_back(std::move(fill));
+    original.refreshEntityIndex();
+
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(Serializer::serialize(original));
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    ASSERT_TRUE(ValidateShaderReferences(**loaded).hasValue());
+
+    const auto *restored =
+        static_cast<const FillStyle *>((*loaded)->compositions[0]->layers[0]->styles[0].get());
+    EXPECT_EQ(restored->paintMode, StylePaintMode::Gradient);
+    EXPECT_EQ(restored->gradient.type, GradientType::Radial);
+    EXPECT_EQ(restored->gradient.start.staticValue(), (Vec2{0, 10}));
+    EXPECT_EQ(restored->gradient.end.staticValue(), (Vec2{200, 10}));
+    ASSERT_EQ(restored->gradient.stops.size(), 2u);
+    EXPECT_EQ(restored->gradient.stops[1].color.staticValue(), (Color{0, 0, 1, 1}));
+
+    nlohmann::json root = nlohmann::json::parse(Serializer::serialize(original));
+    EXPECT_EQ(root["compositions"][0]["layers"][0]["styles"][0]["paintMode"], "gradient");
+    EXPECT_EQ(root["compositions"][0]["layers"][0]["styles"][0]["gradient"]["type"], "radial");
 }

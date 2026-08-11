@@ -436,6 +436,9 @@ const char *ToString(StylePaintMode mode) {
         case StylePaintMode::Shader: {
             return "shader";
         }
+        case StylePaintMode::Gradient: {
+            return "gradient";
+        }
     }
     return "unknown";
 }
@@ -447,7 +450,44 @@ Expected<StylePaintMode, std::string> stylePaintModeFromString(const std::string
     if (text == "shader") {
         return StylePaintMode::Shader;
     }
+    if (text == "gradient") {
+        return StylePaintMode::Gradient;
+    }
     return Unexpected(std::string("unknown style paint mode: " + text));
+}
+
+const char *ToString(GradientType type) {
+    switch (type) {
+        case GradientType::Linear: {
+            return "linear";
+        }
+        case GradientType::Radial: {
+            return "radial";
+        }
+        case GradientType::Conic: {
+            return "conic";
+        }
+        case GradientType::Diamond: {
+            return "diamond";
+        }
+    }
+    return "unknown";
+}
+
+Expected<GradientType, std::string> gradientTypeFromString(const std::string &text) {
+    if (text == "linear") {
+        return GradientType::Linear;
+    }
+    if (text == "radial") {
+        return GradientType::Radial;
+    }
+    if (text == "conic") {
+        return GradientType::Conic;
+    }
+    if (text == "diamond") {
+        return GradientType::Diamond;
+    }
+    return Unexpected(std::string("unknown gradient type: " + text));
 }
 
 const char *ToString(UniformFormat format) {

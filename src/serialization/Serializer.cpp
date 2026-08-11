@@ -19,8 +19,11 @@
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientPaint.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShaderDefinition.h"
@@ -1156,23 +1159,109 @@ Expected<ShaderUniformValues, std::string> ShaderUniformValuesFromJson(const jso
     return values;
 }
 
-void AppendStylePaintToJson(json &node, StylePaintMode paintMode, EntityId shaderId,
-                            const ShaderUniformValues &uniformValues) {
-    // Color mode omits paintMode/shader fields so schema-1 docs stay compact.
-    if (paintMode != StylePaintMode::Shader) {
-        return;
+json GradientPaintToJson(const GradientPaint &gradient) {
+    json stops = json::array();
+    for (const GradientStop &stop : gradient.stops) {
+        stops.push_back({{"color", AnimatableToJson(stop.color)},
+                         {"position", AnimatableToJson(stop.position)}});
     }
-    node["paintMode"] = dto::ToString(paintMode);
-    node["shaderId"] = IdToString(shaderId);
-    node["uniformValues"] = ShaderUniformValuesToJson(uniformValues);
+    return {{"type", dto::ToString(gradient.type)},
+            {"start", AnimatableToJson(gradient.start)},
+            {"end", AnimatableToJson(gradient.end)},
+            {"startAngle", AnimatableToJson(gradient.startAngle)},
+            {"endAngle", AnimatableToJson(gradient.endAngle)},
+            {"stops", std::move(stops)}};
+}
+
+Expected<GradientPaint, std::string> GradientPaintFromJson(const json &node) {
+    GradientPaint gradient;
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Unexpected(std::string("gradient is missing type"));
+    }
+    Expected<GradientType, std::string> type = dto::gradientTypeFromString(*typeText);
+    if (!type) {
+        return Unexpected(type.error());
+    }
+    gradient.type = *type;
+
+    Expected<const json *, std::string> startNode = Child(node, "start");
+    Expected<const json *, std::string> endNode = Child(node, "end");
+    if (!startNode || !endNode) {
+        return Unexpected(std::string("gradient is missing start/end"));
+    }
+    Expected<void, std::string> result = AnimatableFromJson(**startNode, gradient.start);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    result = AnimatableFromJson(**endNode, gradient.end);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    if (const json *angleNode = FindChild(node, "startAngle")) {
+        result = AnimatableFromJson(*angleNode, gradient.startAngle);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+    }
+    if (const json *angleNode = FindChild(node, "endAngle")) {
+        result = AnimatableFromJson(*angleNode, gradient.endAngle);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+    }
+    Expected<const json *, std::string> stopsNode = Child(node, "stops");
+    if (!stopsNode || !(*stopsNode)->is_array()) {
+        return Unexpected(std::string("gradient is missing stops array"));
+    }
+    for (const json &stopNode : **stopsNode) {
+        if (!stopNode.is_object()) {
+            return Unexpected(std::string("gradient stop must be an object"));
+        }
+        Expected<const json *, std::string> colorNode = Child(stopNode, "color");
+        Expected<const json *, std::string> positionNode = Child(stopNode, "position");
+        if (!colorNode || !positionNode) {
+            return Unexpected(std::string("gradient stop is missing color/position"));
+        }
+        GradientStop stop;
+        result = AnimatableFromJson(**colorNode, stop.color);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        result = AnimatableFromJson(**positionNode, stop.position);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        gradient.stops.push_back(std::move(stop));
+    }
+    return gradient;
+}
+
+void AppendStylePaintToJson(json &node, StylePaintMode paintMode, EntityId shaderId,
+                            const ShaderUniformValues &uniformValues,
+                            const GradientPaint &gradient) {
+    // Color kind omits paintMode for compact schema-1 docs. Inactive shader /
+    // gradient fields are still written when present so kind switches survive.
+    if (paintMode != StylePaintMode::Color) {
+        node["paintMode"] = dto::ToString(paintMode);
+    }
+    if (shaderId.isValid()) {
+        node["shaderId"] = IdToString(shaderId);
+        node["uniformValues"] = ShaderUniformValuesToJson(uniformValues);
+    }
+    if (paintMode == StylePaintMode::Gradient || !gradient.stops.empty()) {
+        node["gradient"] = GradientPaintToJson(gradient);
+    }
 }
 
 Expected<void, std::string> StylePaintFromJson(const json &node, StylePaintMode &paintMode,
                                                EntityId &shaderId,
-                                               ShaderUniformValues &uniformValues) {
+                                               ShaderUniformValues &uniformValues,
+                                               GradientPaint &gradient) {
     paintMode = StylePaintMode::Color;
     shaderId = {};
     uniformValues = {};
+    gradient = {};
     if (const json *modeNode = FindChild(node, "paintMode")) {
         Expected<std::string, std::string> modeText = AsString(*modeNode);
         if (!modeText) {
@@ -1184,23 +1273,34 @@ Expected<void, std::string> StylePaintFromJson(const json &node, StylePaintMode 
         }
         paintMode = *mode;
     }
-    if (paintMode != StylePaintMode::Shader) {
-        return {};
-    }
-    Expected<EntityId, std::string> id = IdField(node, "shaderId");
-    if (!id) {
+    if (FindChild(node, "shaderId") != nullptr) {
+        Expected<EntityId, std::string> id = IdField(node, "shaderId");
+        if (!id) {
+            return Unexpected(std::string("invalid shaderId"));
+        }
+        shaderId = *id;
+        const json *valuesNode = FindChild(node, "uniformValues");
+        if (valuesNode == nullptr) {
+            return Unexpected(std::string("shaderId present without uniformValues"));
+        }
+        Expected<ShaderUniformValues, std::string> values = ShaderUniformValuesFromJson(*valuesNode);
+        if (!values) {
+            return Unexpected(values.error());
+        }
+        uniformValues = std::move(*values);
+    } else if (paintMode == StylePaintMode::Shader) {
         return Unexpected(std::string("Shader paint mode is missing shaderId"));
     }
-    shaderId = *id;
-    const json *valuesNode = FindChild(node, "uniformValues");
-    if (valuesNode == nullptr) {
-        return Unexpected(std::string("Shader paint mode is missing uniformValues"));
+    if (const json *gradientNode = FindChild(node, "gradient")) {
+        Expected<GradientPaint, std::string> loaded = GradientPaintFromJson(*gradientNode);
+        if (!loaded) {
+            return Unexpected(loaded.error());
+        }
+        gradient = std::move(*loaded);
     }
-    Expected<ShaderUniformValues, std::string> values = ShaderUniformValuesFromJson(*valuesNode);
-    if (!values) {
-        return Unexpected(values.error());
+    if (paintMode == StylePaintMode::Gradient && !GradientStopsAreValid(gradient)) {
+        return Unexpected(std::string("Gradient paint mode has invalid stops"));
     }
-    uniformValues = std::move(*values);
     return {};
 }
 
@@ -1358,6 +1458,17 @@ Expected<ShaderDefinition, std::string> ShaderDefinitionFromJson(const json &nod
     return shader;
 }
 
+Expected<void, std::string> ValidateStyleGradientPaint(StylePaintMode paintMode,
+                                                       const GradientPaint &gradient) {
+    if (paintMode != StylePaintMode::Gradient) {
+        return {};
+    }
+    if (!GradientStopsAreValid(gradient)) {
+        return Unexpected(std::string("style gradient has invalid stops"));
+    }
+    return {};
+}
+
 Expected<void, std::string> ValidateStyleShaderPaint(const Document &document,
                                                      StylePaintMode paintMode, EntityId shaderId,
                                                      const ShaderUniformValues &uniformValues) {
@@ -1400,7 +1511,8 @@ json LayerStyleToJson(const LayerStyle &style) {
                       {"color", AnimatableToJson(fill.color)},
                       {"fillRule", dto::ToString(fill.fillRule)},
                       {"blendMode", dto::ToString(fill.blendMode)}};
-            AppendStylePaintToJson(node, fill.paintMode, fill.shaderId, fill.uniformValues);
+            AppendStylePaintToJson(node, fill.paintMode, fill.shaderId, fill.uniformValues,
+                                   fill.gradient);
             return node;
         }
         case LayerStyleType::Stroke: {
@@ -1417,7 +1529,8 @@ json LayerStyleToJson(const LayerStyle &style) {
                       {"trimStart", AnimatableToJson(stroke.trimStart)},
                       {"trimEnd", AnimatableToJson(stroke.trimEnd)},
                       {"trimOffset", AnimatableToJson(stroke.trimOffset)}};
-            AppendStylePaintToJson(node, stroke.paintMode, stroke.shaderId, stroke.uniformValues);
+            AppendStylePaintToJson(node, stroke.paintMode, stroke.shaderId, stroke.uniformValues,
+                                   stroke.gradient);
             return node;
         }
     }
@@ -1460,7 +1573,8 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
             }
             fill->blendMode = *blendMode;
         }
-        result = StylePaintFromJson(node, fill->paintMode, fill->shaderId, fill->uniformValues);
+        result = StylePaintFromJson(node, fill->paintMode, fill->shaderId, fill->uniformValues,
+                                    fill->gradient);
         if (!result) {
             return Unexpected(result.error());
         }
@@ -1529,8 +1643,8 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
                 return Unexpected(result.error());
             }
         }
-        result =
-            StylePaintFromJson(node, stroke->paintMode, stroke->shaderId, stroke->uniformValues);
+        result = StylePaintFromJson(node, stroke->paintMode, stroke->shaderId, stroke->uniformValues,
+                                    stroke->gradient);
         if (!result) {
             return Unexpected(result.error());
         }
@@ -2304,10 +2418,16 @@ Expected<void, std::string> ValidateShaderReferences(const Document &document) {
                     const auto &fill = static_cast<const FillStyle &>(*style);
                     result = ValidateStyleShaderPaint(document, fill.paintMode, fill.shaderId,
                                                       fill.uniformValues);
+                    if (result) {
+                        result = ValidateStyleGradientPaint(fill.paintMode, fill.gradient);
+                    }
                 } else if (style->type() == LayerStyleType::Stroke) {
                     const auto &stroke = static_cast<const StrokeStyle &>(*style);
                     result = ValidateStyleShaderPaint(document, stroke.paintMode, stroke.shaderId,
                                                       stroke.uniformValues);
+                    if (result) {
+                        result = ValidateStyleGradientPaint(stroke.paintMode, stroke.gradient);
+                    }
                 } else {
                     continue;
                 }
