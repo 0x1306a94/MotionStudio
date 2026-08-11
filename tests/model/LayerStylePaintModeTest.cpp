@@ -148,9 +148,9 @@ TEST(LayerStylePaintModeTest, DefaultGradientEndpointsUsesRectAABB) {
     Vec2 start{};
     Vec2 end{};
     ASSERT_TRUE(DefaultGradientEndpoints(layer, 0, start, end));
-    EXPECT_FLOAT_EQ(start.x, 0.f);
+    EXPECT_FLOAT_EQ(start.x, 6.f);  // 0.15 * 40
     EXPECT_FLOAT_EQ(start.y, 10.f);
-    EXPECT_FLOAT_EQ(end.x, 40.f);
+    EXPECT_FLOAT_EQ(end.x, 34.f);  // 0.85 * 40
     EXPECT_FLOAT_EQ(end.y, 10.f);
 }
 

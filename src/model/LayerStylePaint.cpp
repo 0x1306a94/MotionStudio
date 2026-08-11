@@ -164,8 +164,11 @@ bool DefaultGradientEndpoints(const Layer &layer, FrameTime time, Vec2 &outStart
     }
     const float width = maxPoint.x - minPoint.x;
     const float height = maxPoint.y - minPoint.y;
-    outStart = {0.f, height * 0.5f};
-    outEnd = {width, height * 0.5f};
+    // Inset from left/right so default handles sit clear of resize chrome.
+    constexpr float kHorizontalInsetFraction = 0.15f;
+    const float insetX = width * kHorizontalInsetFraction;
+    outStart = {insetX, height * 0.5f};
+    outEnd = {width - insetX, height * 0.5f};
     return true;
 }
 

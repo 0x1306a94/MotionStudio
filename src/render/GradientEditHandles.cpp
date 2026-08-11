@@ -11,8 +11,8 @@
 namespace motion {
 namespace {
 
-constexpr Color kChromeStrokeColor{0.95f, 0.55f, 0.15f, 1.0f};
-constexpr Color kChromeFillColor{1.0f, 0.95f, 0.85f, 1.0f};
+constexpr Color kChromeStrokeColor{1.0f, 1.0f, 1.0f, 1.0f};
+constexpr Color kChromeFillColor{1.0f, 1.0f, 1.0f, 1.0f};
 constexpr float kPi = 3.14159265358979323846f;
 
 float LengthSquared(Vec2 value) {

@@ -90,7 +90,7 @@ GradientPaint gradient;
 
 | 切到 | 条件 | 动作 |
 |---|---|---|
-| Gradient | `stops.size() < 2` | 填默认：`type=Linear`；`start`/`end` = AABB 左上角空间左中→右中 `(0,h/2)→(w,h/2)`（无 bounds 则 `(0,0)→(100,0)`）；stops = 黑@0 / 白@1 |
+| Gradient | `stops.size() < 2` | 填默认：`type=Linear`；`start`/`end` = AABB 左上角空间水平中线内缩 15% `(0.15w,h/2)→(0.85w,h/2)`（无 bounds 则 `(0,0)→(100,0)`）；stops = 黑@0 / 白@1 |
 | Shader | `shaderId` 无效 | 绑定库中第一个 shader 并 `MakeDefaultUniformValues`（若库空则拒绝切换） |
 | Color | （无） | 只改 kind；`color` 沿用已有值 |
 
