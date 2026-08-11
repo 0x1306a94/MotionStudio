@@ -140,17 +140,18 @@ TEST(LayerStylePaintModeTest, EnsureDefaultGradientOnlyWhenStopsMissing) {
 TEST(LayerStylePaintModeTest, DefaultGradientEndpointsUsesRectAABB) {
     Layer layer(LayerType::Shape);
     auto rect = std::make_unique<ShapeRect>();
-    rect->position.setStaticValue(Vec2{50, 40});
-    rect->size.setStaticValue(Vec2{100, 80});
+    // AABB min is (30, 40); defaults are relative to that top-left.
+    rect->position.setStaticValue(Vec2{50, 50});
+    rect->size.setStaticValue(Vec2{40, 20});
     static_cast<ShapeContent *>(layer.content.get())->geometry = std::move(rect);
 
     Vec2 start{};
     Vec2 end{};
     ASSERT_TRUE(DefaultGradientEndpoints(layer, 0, start, end));
     EXPECT_FLOAT_EQ(start.x, 0.f);
-    EXPECT_FLOAT_EQ(start.y, 40.f);
-    EXPECT_FLOAT_EQ(end.x, 100.f);
-    EXPECT_FLOAT_EQ(end.y, 40.f);
+    EXPECT_FLOAT_EQ(start.y, 10.f);
+    EXPECT_FLOAT_EQ(end.x, 40.f);
+    EXPECT_FLOAT_EQ(end.y, 10.f);
 }
 
 TEST(LayerStylePaintModeTest, ShaderIsReferencedTracksFillAndStroke) {

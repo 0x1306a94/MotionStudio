@@ -1124,8 +1124,9 @@ TEST(PagExporterTest, LinearGradientFillExportsGradientFillElement) {
     auto *fill = static_cast<FillStyle *>(layer->styles[0].get());
     fill->paintMode = StylePaintMode::Gradient;
     fill->gradient.type = GradientType::Linear;
-    fill->gradient.start.setStaticValue(Vec2{0, 0});
-    fill->gradient.end.setStaticValue(Vec2{100, 0});
+    // Stored in AABB top-left space; rect center (0,0) size (100,50) → min (-50,-25).
+    fill->gradient.start.setStaticValue(Vec2{0, 25});
+    fill->gradient.end.setStaticValue(Vec2{100, 25});
     fill->gradient.stops.resize(2);
     fill->gradient.stops[0].color.setStaticValue(Color{1, 0, 0, 1});
     fill->gradient.stops[0].position.setStaticValue(0.f);
@@ -1150,8 +1151,11 @@ TEST(PagExporterTest, LinearGradientFillExportsGradientFillElement) {
     EXPECT_EQ(pagFill->fillType, pag::GradientFillType::Linear);
     ASSERT_NE(pagFill->startPoint, nullptr);
     ASSERT_NE(pagFill->endPoint, nullptr);
-    EXPECT_FLOAT_EQ(pagFill->startPoint->value.x, 0);
-    EXPECT_FLOAT_EQ(pagFill->endPoint->value.x, 100);
+    // Exported in shape-path space (aabbMin + stored).
+    EXPECT_FLOAT_EQ(pagFill->startPoint->value.x, -50);
+    EXPECT_FLOAT_EQ(pagFill->startPoint->value.y, 0);
+    EXPECT_FLOAT_EQ(pagFill->endPoint->value.x, 50);
+    EXPECT_FLOAT_EQ(pagFill->endPoint->value.y, 0);
     ASSERT_NE(pagFill->colors, nullptr);
     ASSERT_NE(pagFill->colors->value, nullptr);
     ASSERT_EQ(pagFill->colors->value->colorStops.size(), 2u);

@@ -5,6 +5,7 @@
 #include <limits>
 #include <utility>
 
+#include "MotionStudio/animation/Keyframe.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/LayerType.h"
@@ -93,9 +94,7 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end) {
     gradient.stops.push_back(std::move(endStop));
 }
 
-bool DefaultGradientEndpoints(const Layer &layer, FrameTime time, Vec2 &outStart, Vec2 &outEnd) {
-    outStart = {0.f, 0.f};
-    outEnd = {100.f, 0.f};
+bool LayerShapeLocalAABB(const Layer &layer, FrameTime time, Vec2 &outMin, Vec2 &outMax) {
     if (layer.content == nullptr || layer.content->type() != LayerType::Shape) {
         return false;
     }
@@ -150,10 +149,39 @@ bool DefaultGradientEndpoints(const Layer &layer, FrameTime time, Vec2 &outStart
     if (!hasBounds || !(maxPoint.x > minPoint.x) || !(maxPoint.y >= minPoint.y)) {
         return false;
     }
-    const float midY = (minPoint.y + maxPoint.y) * 0.5f;
-    outStart = {minPoint.x, midY};
-    outEnd = {maxPoint.x, midY};
+    outMin = minPoint;
+    outMax = maxPoint;
     return true;
+}
+
+bool DefaultGradientEndpoints(const Layer &layer, FrameTime time, Vec2 &outStart, Vec2 &outEnd) {
+    outStart = {0.f, 0.f};
+    outEnd = {100.f, 0.f};
+    Vec2 minPoint{};
+    Vec2 maxPoint{};
+    if (!LayerShapeLocalAABB(layer, time, minPoint, maxPoint)) {
+        return false;
+    }
+    const float width = maxPoint.x - minPoint.x;
+    const float height = maxPoint.y - minPoint.y;
+    outStart = {0.f, height * 0.5f};
+    outEnd = {width, height * 0.5f};
+    return true;
+}
+
+Animatable<Vec2> OffsetAnimatableVec2(const Animatable<Vec2> &source, Vec2 offset) {
+    Animatable<Vec2> result;
+    if (!source.isAnimated()) {
+        result.setStaticValue(source.staticValue() + offset);
+        return result;
+    }
+    result.setStaticValue(source.staticValue() + offset);
+    for (const Keyframe<Vec2> &keyframe : source.keyframes()) {
+        Keyframe<Vec2> shifted = keyframe;
+        shifted.value = keyframe.value + offset;
+        result.addKeyframe(std::move(shifted));
+    }
+    return result;
 }
 
 }  // namespace motion

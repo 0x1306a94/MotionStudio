@@ -22,6 +22,7 @@
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/MaskMode.h"
@@ -1692,8 +1693,13 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
             pagFill->fillRule = MapFillRule(fill.fillRule);
             pagFill->fillType = MapGradientFillType(fill.gradient.type);
             pagFill->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
-            pagFill->startPoint = ConvertPoint(fill.gradient.start, &warnings_, layer.id);
-            pagFill->endPoint = ConvertPoint(fill.gradient.end, &warnings_, layer.id);
+            Vec2 aabbMin{0.f, 0.f};
+            Vec2 aabbMax{};
+            LayerShapeLocalAABB(layer, 0, aabbMin, aabbMax);
+            const Animatable<Vec2> shapeStart = OffsetAnimatableVec2(fill.gradient.start, aabbMin);
+            const Animatable<Vec2> shapeEnd = OffsetAnimatableVec2(fill.gradient.end, aabbMin);
+            pagFill->startPoint = ConvertPoint(shapeStart, &warnings_, layer.id);
+            pagFill->endPoint = ConvertPoint(shapeEnd, &warnings_, layer.id);
             pagFill->colors = ConvertGradientColors(fill.gradient, &warnings_, layer.id);
             contents->push_back(pagFill);
             return Expected<void, PagExportError>();
@@ -1739,8 +1745,13 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
             pagStroke->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
             pagStroke->fillType = MapGradientFillType(stroke.gradient.type);
             pagStroke->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
-            pagStroke->startPoint = ConvertPoint(stroke.gradient.start, &warnings_, layer.id);
-            pagStroke->endPoint = ConvertPoint(stroke.gradient.end, &warnings_, layer.id);
+            Vec2 aabbMin{0.f, 0.f};
+            Vec2 aabbMax{};
+            LayerShapeLocalAABB(layer, 0, aabbMin, aabbMax);
+            const Animatable<Vec2> shapeStart = OffsetAnimatableVec2(stroke.gradient.start, aabbMin);
+            const Animatable<Vec2> shapeEnd = OffsetAnimatableVec2(stroke.gradient.end, aabbMin);
+            pagStroke->startPoint = ConvertPoint(shapeStart, &warnings_, layer.id);
+            pagStroke->endPoint = ConvertPoint(shapeEnd, &warnings_, layer.id);
             pagStroke->colors = ConvertGradientColors(stroke.gradient, &warnings_, layer.id);
             pagStroke->strokeWidth = ConvertFloat(stroke.width, &warnings_, layer.id);
             pagStroke->lineCap = MapLineCap(stroke.cap);

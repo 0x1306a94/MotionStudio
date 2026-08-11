@@ -14,9 +14,11 @@ struct GradientStop {
     Animatable<float> position{0.f};
 };
 
-// Gradient paint data embedded on FillStyle / StrokeStyle. Coordinates are
-// layer-local pixels (same space as shape paths). Radial/Diamond radius is
-// Distance(start, end); Conic uses start as center plus startAngle/endAngle.
+// Gradient paint data embedded on FillStyle / StrokeStyle.
+// start/end are stored in layer-local AABB top-left space: (0,0) = local
+// bounds min. SceneEvaluator adds aabb.min before draw (shape-path space).
+// Radial/Diamond radius is Distance(start, end) after that conversion.
+// Conic uses start as center plus startAngle/endAngle.
 struct GradientPaint {
     GradientType type = GradientType::Linear;
     Animatable<Vec2> start{Vec2{0, 0}};

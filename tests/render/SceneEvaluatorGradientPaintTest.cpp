@@ -52,7 +52,8 @@ struct GradientFillScene {
         auto fillElement = std::make_unique<FillStyle>();
         fill = fillElement.get();
         fill->paintMode = StylePaintMode::Gradient;
-        EnsureDefaultGradient(fill->gradient, Vec2{0, 0}, Vec2{100, 0});
+        // Stored in AABB top-left space; rect AABB min is (30, 40).
+        EnsureDefaultGradient(fill->gradient, Vec2{0, 10}, Vec2{40, 10});
         fill->gradient.type = GradientType::Linear;
         fill->color.setStaticValue(Color{1, 0, 0, 1});
         layer->styles.push_back(std::move(fillElement));
@@ -71,8 +72,9 @@ TEST(SceneEvaluatorGradientPaintTest, EvaluatesGradientFillSnapshot) {
     const auto &paint = result->layers[0].shapeItems[0].paint;
     EXPECT_EQ(paint.paintMode, StylePaintMode::Gradient);
     EXPECT_EQ(paint.gradient.type, GradientType::Linear);
-    EXPECT_EQ(paint.gradient.start, (Vec2{0, 0}));
-    EXPECT_EQ(paint.gradient.end, (Vec2{100, 0}));
+    // Evaluated endpoints are shape-path local: aabbMin + stored.
+    EXPECT_EQ(paint.gradient.start, (Vec2{30, 50}));
+    EXPECT_EQ(paint.gradient.end, (Vec2{70, 50}));
     ASSERT_EQ(paint.gradient.stops.size(), 2u);
     EXPECT_FLOAT_EQ(paint.gradient.stops[0].position, 0.f);
     EXPECT_FLOAT_EQ(paint.gradient.stops[1].position, 1.f);
@@ -92,7 +94,7 @@ TEST(SceneEvaluatorGradientPaintTest, InvalidStopsSkipStyle) {
 TEST(SceneEvaluatorGradientPaintTest, ZeroRadiusRadialSkipsStyle) {
     GradientFillScene scene;
     scene.fill->gradient.type = GradientType::Radial;
-    scene.fill->gradient.end.setStaticValue(Vec2{0, 0});
+    scene.fill->gradient.end.setStaticValue(Vec2{0, 10});
     Expected<SceneState, std::string> result =
         SceneEvaluator::Evaluate(scene.document, scene.composition->id, 0);
     ASSERT_TRUE(result.hasValue());

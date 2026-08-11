@@ -62,6 +62,7 @@ struct GradientStop {
 
 struct GradientPaint {
     GradientType type = GradientType::Linear;
+    // start/end：图层局部 AABB 左上角空间（(0,0)=bounds.min）；求值时 + aabb.min → shape 路径空间
     Animatable<Vec2> start{Vec2{0, 0}};    // Linear 起点；其它类型中心
     Animatable<Vec2> end{Vec2{100, 0}};    // Linear 终点；Radial/Diamond 半径点
     Animatable<float> startAngle{0.f};     // 仅 Conic，度
@@ -89,7 +90,7 @@ GradientPaint gradient;
 
 | 切到 | 条件 | 动作 |
 |---|---|---|
-| Gradient | `stops.size() < 2` | 填默认：`type=Linear`；`start`/`end` = 层局部 AABB 左中→右中（无 bounds 则 `(0,0)→(100,0)`）；stops = 黑@0 / 白@1 |
+| Gradient | `stops.size() < 2` | 填默认：`type=Linear`；`start`/`end` = AABB 左上角空间左中→右中 `(0,h/2)→(w,h/2)`（无 bounds 则 `(0,0)→(100,0)`）；stops = 黑@0 / 白@1 |
 | Shader | `shaderId` 无效 | 绑定库中第一个 shader 并 `MakeDefaultUniformValues`（若库空则拒绝切换） |
 | Color | （无） | 只改 kind；`color` 沿用已有值 |
 

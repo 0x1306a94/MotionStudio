@@ -1128,22 +1128,27 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private func applyGradientEditDrag(_ drag: GradientEditDrag, localPoint: CGPoint) {
         let core = document.core
         let frame = evaluationFrame
+        // Gradient start/end are stored in AABB top-left space; drag points are
+        // shape-path local (same as ms_layer_transform_scene_point).
+        let origin = layerLocalAABBOrigin(layerID: drag.layerID, frame: frame)
+        let topLeftLocal = CGPoint(x: localPoint.x - origin.x, y: localPoint.y - origin.y)
         switch drag.kind {
         case .START:
             writeGradientVec2(layerID: drag.layerID,
                               path: StyleProperty.gradientStart(styleIndex: drag.styleIndex),
-                              value: CGVector(dx: localPoint.x, dy: localPoint.y),
+                              value: CGVector(dx: topLeftLocal.x, dy: topLeftLocal.y),
                               frame: frame)
         case .END:
             writeGradientVec2(layerID: drag.layerID,
                               path: StyleProperty.gradientEnd(styleIndex: drag.styleIndex),
-                              value: CGVector(dx: localPoint.x, dy: localPoint.y),
+                              value: CGVector(dx: topLeftLocal.x, dy: topLeftLocal.y),
                               frame: frame)
         case .START_ANGLE, .END_ANGLE:
-            let start = core.evaluateVec2(entityID: drag.layerID,
-                                          path: StyleProperty.gradientStart(styleIndex: drag.styleIndex),
-                                          frame: frame)
-            let angle = Float(atan2(localPoint.y - start.dy, localPoint.x - start.dx) * 180 /
+            let storedStart = core.evaluateVec2(entityID: drag.layerID,
+                                                path: StyleProperty.gradientStart(styleIndex: drag.styleIndex),
+                                                frame: frame)
+            let shapeStart = CGPoint(x: storedStart.dx + origin.x, y: storedStart.dy + origin.y)
+            let angle = Float(atan2(localPoint.y - shapeStart.y, localPoint.x - shapeStart.x) * 180 /
                 Double.pi)
             let path = drag.kind == .START_ANGLE
                 ? StyleProperty.gradientStartAngle(styleIndex: drag.styleIndex)
@@ -1152,6 +1157,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         default:
             break
         }
+    }
+
+    private func layerLocalAABBOrigin(layerID: UInt64, frame: Int64) -> CGPoint {
+        guard let bounds = document.core.layerLocalBounds(compositionID: compositionID,
+                                                          layerID: layerID,
+                                                          frameTime: Double(frame))
+        else {
+            return .zero
+        }
+        return CGPoint(x: bounds.minX, y: bounds.minY)
     }
 
     private func writeGradientVec2(layerID: UInt64, path: String, value: CGVector, frame: Int64) {

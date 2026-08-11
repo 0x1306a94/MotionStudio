@@ -311,8 +311,8 @@ struct GradientStop {
 
 struct GradientPaint {
     GradientType type = Linear;
-    Animatable<Vec2> start;       // 图层局部 px
-    Animatable<Vec2> end;         // Radial/Diamond：radius = |end-start|
+    Animatable<Vec2> start;       // AABB 左上角空间 px；(0,0)=层局部 bounds.min；求值 +min → shape 空间
+    Animatable<Vec2> end;         // 同上；Radial/Diamond：radius = |end-start|（求值后）
     Animatable<float> startAngle; // Conic
     Animatable<float> endAngle;   // Conic
     std::vector<GradientStop> stops;  // N≥2

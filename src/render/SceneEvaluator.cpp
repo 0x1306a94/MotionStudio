@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -164,13 +165,57 @@ bool MakeShaderPaint(const Document &document, EntityId shaderId,
     return true;
 }
 
-bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGradient &out) {
+bool BoundsOfShapeGeometries(const std::vector<ShapeGeometry> &geometries, Vec2 &outMin,
+                             Vec2 &outMax) {
+    Vec2 minPoint{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+    Vec2 maxPoint{std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
+    bool hasBounds = false;
+    for (const ShapeGeometry &geometry : geometries) {
+        switch (geometry.kind) {
+            case ShapeGeometryKind::Rect:
+            case ShapeGeometryKind::Ellipse: {
+                const float halfW = std::max(geometry.size.x * 0.5f, 0.f);
+                const float halfH = std::max(geometry.size.y * 0.5f, 0.f);
+                const Vec2 minCorner{geometry.center.x - halfW, geometry.center.y - halfH};
+                const Vec2 maxCorner{geometry.center.x + halfW, geometry.center.y + halfH};
+                minPoint.x = std::min(minPoint.x, minCorner.x);
+                minPoint.y = std::min(minPoint.y, minCorner.y);
+                maxPoint.x = std::max(maxPoint.x, maxCorner.x);
+                maxPoint.y = std::max(maxPoint.y, maxCorner.y);
+                hasBounds = true;
+                break;
+            }
+            case ShapeGeometryKind::Path: {
+                for (const BezierPath::Contour &contour : geometry.path.contours) {
+                    for (const BezierPath::Vertex &vertex : contour.vertices) {
+                        minPoint.x = std::min(minPoint.x, vertex.point.x);
+                        minPoint.y = std::min(minPoint.y, vertex.point.y);
+                        maxPoint.x = std::max(maxPoint.x, vertex.point.x);
+                        maxPoint.y = std::max(maxPoint.y, vertex.point.y);
+                        hasBounds = true;
+                    }
+                }
+                break;
+            }
+        }
+    }
+    if (!hasBounds) {
+        return false;
+    }
+    outMin = minPoint;
+    outMax = maxPoint;
+    return true;
+}
+
+bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, Vec2 aabbOrigin,
+                       EvaluatedGradient &out) {
     if (!GradientStopsAreValid(src)) {
         return false;
     }
     out.type = src.type;
-    out.start = src.start.evaluatePreview(time);
-    out.end = src.end.evaluatePreview(time);
+    // Stored coords are AABB top-left relative; draw space is shape-path local.
+    out.start = src.start.evaluatePreview(time) + aabbOrigin;
+    out.end = src.end.evaluatePreview(time) + aabbOrigin;
     out.startAngle = src.startAngle.evaluatePreview(time);
     out.endAngle = src.endAngle.evaluatePreview(time);
     if (src.type == GradientType::Radial || src.type == GradientType::Diamond) {
@@ -194,7 +239,7 @@ bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGrad
 bool ResolveStylePaint(const Document &document, StylePaintMode paintMode,
                        const Animatable<Color> &color, const GradientPaint &gradient,
                        EntityId shaderId, const ShaderUniformValues &uniformValues,
-                       PreviewTime time, Paint &paint) {
+                       PreviewTime time, Vec2 gradientOrigin, Paint &paint) {
     if (paintMode == StylePaintMode::Shader) {
         if (!MakeShaderPaint(document, shaderId, uniformValues, time, paint.shader)) {
             return false;
@@ -203,7 +248,7 @@ bool ResolveStylePaint(const Document &document, StylePaintMode paintMode,
         return true;
     }
     if (paintMode == StylePaintMode::Gradient) {
-        if (!MakeGradientPaint(gradient, time, paint.gradient)) {
+        if (!MakeGradientPaint(gradient, time, gradientOrigin, paint.gradient)) {
             return false;
         }
         paint.paintMode = StylePaintMode::Gradient;
@@ -217,6 +262,12 @@ bool ResolveStylePaint(const Document &document, StylePaintMode paintMode,
 void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime time, float alpha,
                       const std::vector<ShapeGeometry> &geometries,
                       std::vector<EvaluatedShapeItem> &items) {
+    Vec2 gradientOrigin{0.f, 0.f};
+    Vec2 gradientMax{};
+    if (!BoundsOfShapeGeometries(geometries, gradientOrigin, gradientMax)) {
+        gradientOrigin = {0.f, 0.f};
+    }
+
     // Paint order is Fill block then Stroke block (stable within each type),
     // independent of styles[] interleaving on disk.
     auto appendFill = [&](const FillStyle &fill, int styleIndex) {
@@ -225,7 +276,7 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
         paint.fillRule = fill.fillRule;
         paint.blendMode = fill.blendMode;
         if (!ResolveStylePaint(document, fill.paintMode, fill.color, fill.gradient, fill.shaderId,
-                               fill.uniformValues, time, paint)) {
+                               fill.uniformValues, time, gradientOrigin, paint)) {
             return;
         }
         for (const ShapeGeometry &geometry : geometries) {
@@ -243,7 +294,8 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
         paint.fillRule = FillRule::NonZero;
         paint.blendMode = stroke.blendMode;
         if (!ResolveStylePaint(document, stroke.paintMode, stroke.color, stroke.gradient,
-                               stroke.shaderId, stroke.uniformValues, time, paint)) {
+                               stroke.shaderId, stroke.uniformValues, time, gradientOrigin,
+                               paint)) {
             return;
         }
         const StrokeOptions options{stroke.width.evaluatePreview(time),
