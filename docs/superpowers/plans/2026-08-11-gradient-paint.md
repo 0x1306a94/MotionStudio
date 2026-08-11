@@ -244,7 +244,7 @@ class RemoveGradientStopCommand : public Command {
 
 ### Task 6: SceneEvaluator 按 kind 求值；非法跳过
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/Paint.h`（`EvaluatedGradient` / `EvaluatedGradientStop`）
@@ -267,15 +267,9 @@ bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGrad
 
 合法条件（spec §2.1.1）：stops≥2；首 pos=0 末=1 中间严格递增；Radial/Diamond 还要求 `Distance(start,end) > 0`。
 
-- [ ] **Step 1: 写失败测试**
-  - 合法 Linear → item.paint.paintMode==Gradient 且 stops 求值正确  
-  - `stops.size()<2` → **不产生** EvaluatedShapeItem  
-  - Shader 失败仍跳过（回归）  
-  - kind=Gradient 时即使 color/shader 有值也**不**用它们
-
-- [ ] **Step 2–4: 实现并跑通**
-
-- [ ] **Step 5: commit**  
+- [x] **Step 1: 写失败测试**
+- [x] **Step 2–4: 实现并跑通**
+- [x] **Step 5: commit**  
   Message: `Evaluate gradient paints and skip invalid style draws.`
 
 ---

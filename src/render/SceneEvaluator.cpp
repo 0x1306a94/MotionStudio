@@ -5,13 +5,17 @@
 #include <utility>
 #include <vector>
 
+#include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/BezierPathTransform.h"
 #include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/AssetType.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientPaint.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -160,6 +164,56 @@ bool MakeShaderPaint(const Document &document, EntityId shaderId,
     return true;
 }
 
+bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGradient &out) {
+    if (!GradientStopsAreValid(src)) {
+        return false;
+    }
+    out.type = src.type;
+    out.start = src.start.evaluatePreview(time);
+    out.end = src.end.evaluatePreview(time);
+    out.startAngle = src.startAngle.evaluatePreview(time);
+    out.endAngle = src.endAngle.evaluatePreview(time);
+    if (src.type == GradientType::Radial || src.type == GradientType::Diamond) {
+        const float dx = out.end.x - out.start.x;
+        const float dy = out.end.y - out.start.y;
+        if (dx * dx + dy * dy <= 0.f) {
+            return false;
+        }
+    }
+    out.stops.clear();
+    out.stops.reserve(src.stops.size());
+    for (const GradientStop &stop : src.stops) {
+        EvaluatedGradientStop evaluated;
+        evaluated.color = stop.color.evaluatePreview(time);
+        evaluated.position = stop.position.evaluatePreview(time);
+        out.stops.push_back(evaluated);
+    }
+    return true;
+}
+
+bool ResolveStylePaint(const Document &document, StylePaintMode paintMode,
+                       const Animatable<Color> &color, const GradientPaint &gradient,
+                       EntityId shaderId, const ShaderUniformValues &uniformValues,
+                       PreviewTime time, Paint &paint) {
+    if (paintMode == StylePaintMode::Shader) {
+        if (!MakeShaderPaint(document, shaderId, uniformValues, time, paint.shader)) {
+            return false;
+        }
+        paint.paintMode = StylePaintMode::Shader;
+        return true;
+    }
+    if (paintMode == StylePaintMode::Gradient) {
+        if (!MakeGradientPaint(gradient, time, paint.gradient)) {
+            return false;
+        }
+        paint.paintMode = StylePaintMode::Gradient;
+        return true;
+    }
+    paint.paintMode = StylePaintMode::Color;
+    paint.color = color.evaluatePreview(time);
+    return true;
+}
+
 void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime time, float alpha,
                       const std::vector<ShapeGeometry> &geometries,
                       std::vector<EvaluatedShapeItem> &items) {
@@ -170,14 +224,9 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
         paint.alpha = alpha;
         paint.fillRule = fill.fillRule;
         paint.blendMode = fill.blendMode;
-        if (fill.paintMode == StylePaintMode::Shader) {
-            if (!MakeShaderPaint(document, fill.shaderId, fill.uniformValues, time, paint.shader)) {
-                return;
-            }
-            paint.paintMode = StylePaintMode::Shader;
-        } else {
-            paint.paintMode = StylePaintMode::Color;
-            paint.color = fill.color.evaluatePreview(time);
+        if (!ResolveStylePaint(document, fill.paintMode, fill.color, fill.gradient, fill.shaderId,
+                               fill.uniformValues, time, paint)) {
+            return;
         }
         for (const ShapeGeometry &geometry : geometries) {
             items.push_back({geometry, paint, false, {}});
@@ -188,15 +237,9 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
         paint.alpha = alpha;
         paint.fillRule = FillRule::NonZero;
         paint.blendMode = stroke.blendMode;
-        if (stroke.paintMode == StylePaintMode::Shader) {
-            if (!MakeShaderPaint(document, stroke.shaderId, stroke.uniformValues, time,
-                                 paint.shader)) {
-                return;
-            }
-            paint.paintMode = StylePaintMode::Shader;
-        } else {
-            paint.paintMode = StylePaintMode::Color;
-            paint.color = stroke.color.evaluatePreview(time);
+        if (!ResolveStylePaint(document, stroke.paintMode, stroke.color, stroke.gradient,
+                               stroke.shaderId, stroke.uniformValues, time, paint)) {
+            return;
         }
         const StrokeOptions options{stroke.width.evaluatePreview(time),
                                     stroke.cap,
