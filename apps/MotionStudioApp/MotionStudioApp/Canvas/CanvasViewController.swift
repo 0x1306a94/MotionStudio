@@ -636,7 +636,12 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let alternate = gesture.modifierFlags.contains(.alternate) || KeyboardModifiers.alternatePressed
         switch gesture.state {
         case .began:
-            beginFreeTransform(at: gesture.location(in: view), shift: shift, alternate: alternate)
+            // Pan `.began` fires after the movement threshold; hit-test at the
+            // original press so small gradient / selection chrome still hit.
+            let location = gesture.location(in: view)
+            let translation = gesture.translation(in: view)
+            let pressPoint = CGPoint(x: location.x - translation.x, y: location.y - translation.y)
+            beginFreeTransform(at: pressPoint, shift: shift, alternate: alternate)
         case .changed:
             if motionPathDrag != nil {
                 updateMotionPathDrag(at: gesture.location(in: view))

@@ -16,12 +16,15 @@
 #include "MotionStudio/model/LayerType.h"
 #include "MotionStudio/model/ShaderDefinition.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
+#include "MotionStudio/model/ShapeContent.h"
+#include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/StylePaintMode.h"
 
 using motion::BindShaderPaint;
 using motion::ClearShaderPaint;
 using motion::Color;
 using motion::Composition;
+using motion::DefaultGradientEndpoints;
 using motion::Document;
 using motion::EnsureDefaultGradient;
 using motion::EntityId;
@@ -35,6 +38,8 @@ using motion::ShaderDefinition;
 using motion::ShaderIsReferenced;
 using motion::ShaderUniformDecl;
 using motion::ShaderUniformValueKind;
+using motion::ShapeContent;
+using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::StylePaintMode;
 using motion::UniformFormat;
@@ -130,6 +135,22 @@ TEST(LayerStylePaintModeTest, EnsureDefaultGradientOnlyWhenStopsMissing) {
     gradient.stops[0].color.setStaticValue(Color{1, 0, 0, 1});
     EnsureDefaultGradient(gradient, Vec2{0, 0}, Vec2{1, 0});
     EXPECT_EQ(gradient.stops[0].color.staticValue(), (Color{1, 0, 0, 1}));
+}
+
+TEST(LayerStylePaintModeTest, DefaultGradientEndpointsUsesRectAABB) {
+    Layer layer(LayerType::Shape);
+    auto rect = std::make_unique<ShapeRect>();
+    rect->position.setStaticValue(Vec2{50, 40});
+    rect->size.setStaticValue(Vec2{100, 80});
+    static_cast<ShapeContent *>(layer.content.get())->geometry = std::move(rect);
+
+    Vec2 start{};
+    Vec2 end{};
+    ASSERT_TRUE(DefaultGradientEndpoints(layer, 0, start, end));
+    EXPECT_FLOAT_EQ(start.x, 0.f);
+    EXPECT_FLOAT_EQ(start.y, 40.f);
+    EXPECT_FLOAT_EQ(end.x, 100.f);
+    EXPECT_FLOAT_EQ(end.y, 40.f);
 }
 
 TEST(LayerStylePaintModeTest, ShaderIsReferencedTracksFillAndStroke) {

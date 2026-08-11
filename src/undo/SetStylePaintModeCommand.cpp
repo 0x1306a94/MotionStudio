@@ -155,7 +155,13 @@ void SetStylePaintModeCommand::execute(Document &document) {
         if (gradient == nullptr) {
             return;
         }
-        EnsureDefaultGradient(*gradient, Vec2{0, 0}, Vec2{100, 0});
+        const Layer *layer = document.entityIndex().findLayer(layerId_);
+        Vec2 start{0, 0};
+        Vec2 end{100, 0};
+        if (layer != nullptr) {
+            DefaultGradientEndpoints(*layer, 0, start, end);
+        }
+        EnsureDefaultGradient(*gradient, start, end);
         SetPaintModeOnly(style, StylePaintMode::Gradient);
         return;
     }

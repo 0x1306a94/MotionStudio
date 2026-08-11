@@ -271,7 +271,8 @@ MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *doc
     }
     const float viewUnit =
         canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
-    const float handleRadius = 8.0f * viewUnit;
+    // Slightly larger than drawn chrome (~7pt) so press→pan threshold still hits.
+    const float handleRadius = 12.0f * viewUnit;
     switch (motion::HitTestGradientEdit(handles, {sceneX, sceneY}, handleRadius)) {
         case motion::GradientHandleKind::Start:
             return MS_GRADIENT_HANDLE_START;
