@@ -114,30 +114,36 @@ if(NOT EXISTS "${_arch_dir}/tgfx.a")
   endif()
 endif()
 
-message(STATUS "======== BuildTgfx BEGIN ========")
-message(STATUS "BuildTgfx: platform=${_platform_name} catalyst=${_is_maccatalyst} CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -> -p ${_tgfx_platform} -a ${_tgfx_arch} -o ${_out_root} deploy=${_deploy_target}")
-message(STATUS "BuildTgfx: node=${NODE_EXECUTABLE} cwd=${TGFX_SOURCE_DIR}")
+# Reuse a completed prebuilt when present. Always invoking build_tgfx can fail (depsync /
+# toolchain churn) even though Products already have a usable tgfx.a for linking.
+if(EXISTS "${_arch_dir}/tgfx.a")
+  message(STATUS "BuildTgfx: reusing existing ${CMAKE_BUILD_TYPE} ${_arch_dir}/tgfx.a")
+else()
+  message(STATUS "======== BuildTgfx BEGIN ========")
+  message(STATUS "BuildTgfx: platform=${_platform_name} catalyst=${_is_maccatalyst} CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -> -p ${_tgfx_platform} -a ${_tgfx_arch} -o ${_out_root} deploy=${_deploy_target}")
+  message(STATUS "BuildTgfx: node=${NODE_EXECUTABLE} cwd=${TGFX_SOURCE_DIR}")
 
-execute_process(
-  COMMAND
-    "${NODE_EXECUTABLE}" "${TGFX_SOURCE_DIR}/build_tgfx" tgfx
-    -p "${_tgfx_platform}"
-    -a "${_tgfx_arch}"
-    -o "${_out_root}"
-    -i
-    ${_debug_flag}
-    ${_cmake_args}
-  WORKING_DIRECTORY "${TGFX_SOURCE_DIR}"
-  COMMAND_ECHO STDOUT
-  RESULT_VARIABLE _tgfx_build_result
-)
-if(NOT _tgfx_build_result EQUAL 0)
-  message(FATAL_ERROR "BuildTgfx: build_tgfx failed with code ${_tgfx_build_result}")
-endif()
-message(STATUS "======== BuildTgfx END ========")
+  execute_process(
+    COMMAND
+      "${NODE_EXECUTABLE}" "${TGFX_SOURCE_DIR}/build_tgfx" tgfx
+      -p "${_tgfx_platform}"
+      -a "${_tgfx_arch}"
+      -o "${_out_root}"
+      -i
+      ${_debug_flag}
+      ${_cmake_args}
+    WORKING_DIRECTORY "${TGFX_SOURCE_DIR}"
+    COMMAND_ECHO STDOUT
+    RESULT_VARIABLE _tgfx_build_result
+  )
+  if(NOT _tgfx_build_result EQUAL 0)
+    message(FATAL_ERROR "BuildTgfx: build_tgfx failed with code ${_tgfx_build_result}")
+  endif()
+  message(STATUS "======== BuildTgfx END ========")
 
-if(NOT EXISTS "${_arch_dir}/tgfx.a")
-  message(FATAL_ERROR "BuildTgfx: expected library missing: ${_arch_dir}/tgfx.a")
+  if(NOT EXISTS "${_arch_dir}/tgfx.a")
+    message(FATAL_ERROR "BuildTgfx: expected library missing: ${_arch_dir}/tgfx.a")
+  endif()
 endif()
 
 # build_tgfx emits tgfx.a; expose libtgfx.a so -ltgfx works with LIBRARY_SEARCH_PATHS.
