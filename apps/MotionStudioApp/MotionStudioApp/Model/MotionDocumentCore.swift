@@ -1638,6 +1638,12 @@ final class MotionDocumentCore {
         changed()
     }
 
+    /// Moves a style within the same Fill or Stroke block. Cross-type is a no-op.
+    func moveStyle(layerID: UInt64, from fromIndex: Int, to toIndex: Int) {
+        ms_command_move_layer_style(handle, layerID, Int32(fromIndex), Int32(toIndex))
+        changed()
+    }
+
     func addStrokeStyle(layerID: UInt64) {
         ms_command_add_stroke_style(handle, layerID)
         changed()

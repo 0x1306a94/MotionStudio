@@ -282,6 +282,23 @@ TEST(BridgeCommandTest, FillStyleLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, MoveLayerStyleReorder) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ms_command_add_fill_style(document, layerId);
+    ASSERT_EQ(ms_layer_style_count(document, layerId), 2);
+
+    ms_command_set_style_blend_mode(document, layerId, 0, MS_BLEND_MULTIPLY);
+    ms_command_move_layer_style(document, layerId, 0, 1);
+    EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_MULTIPLY);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 0), MS_BLEND_MULTIPLY);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, ColorKeyframeLifecycle) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

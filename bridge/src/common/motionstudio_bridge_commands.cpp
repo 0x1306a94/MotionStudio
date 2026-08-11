@@ -18,6 +18,7 @@
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
@@ -341,6 +342,12 @@ void ms_command_add_stroke_style(MSDocument *document, uint64_t layerId) {
 void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::RemoveStyleCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_move_layer_style(MSDocument *document, uint64_t layerId, int fromIndex,
+                                 int toIndex) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::MoveLayerStyleCommand>(EntityId{layerId}, fromIndex, toIndex));
 }
 
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode) {

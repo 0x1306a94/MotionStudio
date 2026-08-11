@@ -236,7 +236,7 @@ git commit --only \
 
 ### Task 2: Bridge + `MotionDocumentCore.moveStyle`
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（紧挨 `ms_command_remove_style`）
@@ -259,7 +259,7 @@ func moveStyle(layerID: UInt64, from fromIndex: Int, to toIndex: Int) {
 }
 ```
 
-- [ ] **Step 1: 写失败 bridge 测试**
+- [x] **Step 1: 写失败 bridge 测试**
 
 在 `BridgeTest.cpp` 的 style 生命周期测试附近追加（或扩展现有 `StyleLifecycle`）：
 
@@ -285,12 +285,12 @@ TEST(BridgeCommandTest, MoveLayerStyleReorder) {
 
 （若默认 rect 只有 1 fill，`add_fill_style` 后 count==2；用 type 断言即可，不必比 id。）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cmake --build build && ./build/tests/bridge_test --gtest_filter='BridgeCommandTest.MoveLayerStyleReorder'`  
 Expected: 链接/编译失败（缺声明）
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 `motionstudio_bridge.h`：
 
@@ -312,14 +312,14 @@ void ms_command_move_layer_style(MSDocument *document, uint64_t layerId, int fro
 
 `MotionDocumentCore.swift` 在 `removeStyle` 旁加 `moveStyle`（见 Interfaces）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: 同上 + `./build/tests/core_tests --gtest_filter='MoveLayerStyleCommandTest.*'`  
 Expected: PASS
 
 App 侧：Xcode MCP `BuildProject`（或回退 `xcodebuild`）确认 Swift 调用编译通过。
 
-- [ ] **Step 5: 勾选本 Task、更新 Status、commit**
+- [x] **Step 5: 勾选本 Task、更新 Status、commit**
 
 ```bash
 git commit --only \

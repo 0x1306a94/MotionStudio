@@ -765,6 +765,9 @@ void ms_command_add_fill_style(MSDocument *document, uint64_t layerId);
 void ms_command_add_stroke_style(MSDocument *document, uint64_t layerId);
 // Removes the style at index from the layer's style list.
 void ms_command_remove_style(MSDocument *document, uint64_t layerId, int index);
+// Moves a layer style within the same Fill or Stroke block. Cross-type is a no-op.
+void ms_command_move_layer_style(MSDocument *document, uint64_t layerId, int fromIndex,
+                                 int toIndex);
 // blendMode: MS_BLEND_* tag. Applies to fill and stroke styles.
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode);
 // position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
