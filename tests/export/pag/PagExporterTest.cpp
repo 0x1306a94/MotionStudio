@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "FakeBitmapFrameSource.h"
+#include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/animation/Easing.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
@@ -15,6 +16,8 @@
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientPaint.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/Layer.h"
@@ -26,10 +29,12 @@
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "pag/file.h"
 
+using motion::Animatable;
 using motion::Asset;
 using motion::AssetType;
 using motion::BezierPath;
@@ -43,6 +48,8 @@ using motion::EntityId;
 using motion::FakeBitmapFrameSource;
 using motion::FillStyle;
 using motion::FrameTime;
+using motion::GradientStop;
+using motion::GradientType;
 using motion::ImageContent;
 using motion::ImageScaleMode;
 using motion::Keyframe;
@@ -63,6 +70,7 @@ using motion::ShapePath;
 using motion::ShapeRect;
 using motion::StrokePosition;
 using motion::StrokeStyle;
+using motion::StylePaintMode;
 using motion::TextContent;
 using motion::TrackMatteType;
 using motion::Vec2;
@@ -1107,6 +1115,81 @@ TEST(PagExporterTest, EllipseAndStroke) {
     ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
+}
+
+TEST(PagExporterTest, LinearGradientFillExportsGradientFillElement) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 50});
+    auto *fill = static_cast<FillStyle *>(layer->styles[0].get());
+    fill->paintMode = StylePaintMode::Gradient;
+    fill->gradient.type = GradientType::Linear;
+    fill->gradient.start.setStaticValue(Vec2{0, 0});
+    fill->gradient.end.setStaticValue(Vec2{100, 0});
+    fill->gradient.stops.resize(2);
+    fill->gradient.stops[0].color.setStaticValue(Color{1, 0, 0, 1});
+    fill->gradient.stops[0].position.setStaticValue(0.f);
+    fill->gradient.stops[1].color.setStaticValue(Color{0, 0, 1, 1});
+    fill->gradient.stops[1].position.setStaticValue(1.f);
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    auto *group = static_cast<pag::ShapeGroupElement *>(shapeLayer->contents[0]);
+    pag::GradientFillElement *pagFill = nullptr;
+    for (pag::ShapeElement *element : group->elements) {
+        if (element->type() == pag::ShapeType::GradientFill) {
+            pagFill = static_cast<pag::GradientFillElement *>(element);
+            break;
+        }
+    }
+    ASSERT_NE(pagFill, nullptr);
+    EXPECT_EQ(pagFill->fillType, pag::GradientFillType::Linear);
+    ASSERT_NE(pagFill->startPoint, nullptr);
+    ASSERT_NE(pagFill->endPoint, nullptr);
+    EXPECT_FLOAT_EQ(pagFill->startPoint->value.x, 0);
+    EXPECT_FLOAT_EQ(pagFill->endPoint->value.x, 100);
+    ASSERT_NE(pagFill->colors, nullptr);
+    ASSERT_NE(pagFill->colors->value, nullptr);
+    ASSERT_EQ(pagFill->colors->value->colorStops.size(), 2u);
+}
+
+TEST(PagExporterTest, ConicGradientFillSkippedWithWarning) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 50});
+    auto *fill = static_cast<FillStyle *>(layer->styles[0].get());
+    fill->paintMode = StylePaintMode::Gradient;
+    fill->gradient.type = GradientType::Conic;
+    fill->gradient.stops.resize(2);
+    fill->gradient.stops[0].color.setStaticValue(Color{1, 0, 0, 1});
+    fill->gradient.stops[0].position.setStaticValue(0.f);
+    fill->gradient.stops[1].color.setStaticValue(Color{0, 1, 0, 1});
+    fill->gradient.stops[1].position.setStaticValue(1.f);
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    bool found = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "SkippedUnsupportedPaint") {
+            found = true;
+            EXPECT_NE(warning.message.find("BMP"), std::string::npos);
+            break;
+        }
+    }
+    EXPECT_TRUE(found);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    auto *group = static_cast<pag::ShapeGroupElement *>(shapeLayer->contents[0]);
+    for (pag::ShapeElement *element : group->elements) {
+        EXPECT_NE(element->type(), pag::ShapeType::GradientFill);
+        EXPECT_NE(element->type(), pag::ShapeType::Fill);
+    }
 }
 
 #if defined(__APPLE__)

@@ -397,7 +397,7 @@ DrawCommandList BuildGradientEditCommands(const GradientEditHandles&, float stro
 
 ### Task 11: PAG 导出 Linear/Radial + 跳过提示
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp`（`appendFill` / stroke：按 kind 分支）
@@ -412,12 +412,12 @@ DrawCommandList BuildGradientEditCommands(const GradientEditHandles&, float stro
 | Gradient Conic/Diamond | **不** append 该 paint；`warnings_` 加一条（含 layerId/名，提示可用 BMP） |
 | Shader | 同现有：跳过或已有策略；保证不崩，warning 提示 BMP |
 
-- [ ] **Step 1: 写失败测试**（Linear fill 导出后 File 含 GradientFill；Conic 无对应元素但 Export 成功 + warning）
+- [x] **Step 1: 写失败测试**（Linear fill 导出后 File 含 GradientFill；Conic 无对应元素但 Export 成功 + warning）
 
-- [ ] **Step 2–4: 实现并跑通**  
+- [x] **Step 2–4: 实现并跑通**  
   Run: `./build/tests/export/pag/...` 或 ctest `-R PagExporter`
 
-- [ ] **Step 5: commit**  
+- [x] **Step 5: commit**  
   Message: `Export linear and radial gradients to PAG files.`
 
 ---

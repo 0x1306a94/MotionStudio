@@ -17,6 +17,8 @@
 #include "MotionStudio/model/Asset.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/GradientPaint.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
@@ -30,6 +32,7 @@
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeType.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextPath.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -178,6 +181,67 @@ void Warn(std::vector<PagExportWarning> *warnings, EntityId entityId, const char
     warning.entityId = entityId;
     warning.code = code;
     warning.message = message;
+    warnings->push_back(std::move(warning));
+}
+
+uint8_t ChannelToU8(float channel) {
+    const float clamped = std::min(1.0f, std::max(0.0f, channel));
+    return static_cast<uint8_t>(std::lround(clamped * 255.0f));
+}
+
+pag::GradientFillType MapGradientFillType(GradientType type) {
+    switch (type) {
+        case GradientType::Linear:
+            return pag::GradientFillType::Linear;
+        case GradientType::Radial:
+            return pag::GradientFillType::Radial;
+        case GradientType::Conic:
+        case GradientType::Diamond:
+            break;
+    }
+    return pag::GradientFillType::Linear;
+}
+
+bool GradientStopsAnimated(const GradientPaint &gradient) {
+    for (const GradientStop &stop : gradient.stops) {
+        if (stop.color.isAnimated() || stop.position.isAnimated()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+pag::Property<pag::GradientColorHandle> *ConvertGradientColors(
+    const GradientPaint &gradient, std::vector<PagExportWarning> *warnings, EntityId entityId) {
+    if (GradientStopsAnimated(gradient)) {
+        Warn(warnings, entityId, "GradientStopAnimationBakedAsStatic",
+             "Animated gradient stops were baked at frame 0 for PAG export");
+    }
+    auto colors = std::make_shared<pag::GradientColor>();
+    for (const GradientStop &stop : gradient.stops) {
+        const Color color = stop.color.evaluate(0);
+        const float position = stop.position.evaluate(0);
+        pag::ColorStop colorStop;
+        colorStop.position = position;
+        colorStop.midpoint = 0.5f;
+        colorStop.color = pag::Color{ChannelToU8(color.r), ChannelToU8(color.g), ChannelToU8(color.b)};
+        colors->colorStops.push_back(colorStop);
+        pag::AlphaStop alphaStop;
+        alphaStop.position = position;
+        alphaStop.midpoint = 0.5f;
+        alphaStop.opacity = static_cast<pag::Opacity>(ChannelToU8(color.a));
+        colors->alphaStops.push_back(alphaStop);
+    }
+    return new pag::Property<pag::GradientColorHandle>(std::move(colors));
+}
+
+void WarnSkippedUnsupportedPaint(std::vector<PagExportWarning> *warnings, EntityId entityId,
+                                 const char *kindLabel) {
+    PagExportWarning warning;
+    warning.entityId = entityId;
+    warning.code = "SkippedUnsupportedPaint";
+    warning.message = std::string(kindLabel) +
+        " paint was skipped in PAG export; use a BMP-named layer to rasterize if needed";
     warnings->push_back(std::move(warning));
 }
 
@@ -1604,6 +1668,37 @@ Expected<pag::ShapeElement *, PagExportError> PagFileBuilder::buildGeometry(
 Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
     std::vector<pag::ShapeElement *> *contents, const Layer &layer) {
     auto appendFill = [&](const FillStyle &fill) -> Expected<void, PagExportError> {
+        if (fill.paintMode == StylePaintMode::Shader) {
+            WarnSkippedUnsupportedPaint(&warnings_, layer.id, "Shader");
+            return Expected<void, PagExportError>();
+        }
+        if (fill.paintMode == StylePaintMode::Gradient) {
+            if (fill.gradient.type == GradientType::Conic ||
+                fill.gradient.type == GradientType::Diamond) {
+                WarnSkippedUnsupportedPaint(&warnings_, layer.id,
+                                            fill.gradient.type == GradientType::Conic ? "Conic gradient"
+                                                                                      : "Diamond gradient");
+                return Expected<void, PagExportError>();
+            }
+            auto *pagFill = new pag::GradientFillElement();
+            bool blendOk = true;
+            pagFill->blendMode = mapBlendMode(fill.blendMode, layer.id, &blendOk);
+            if (!blendOk) {
+                delete pagFill;
+                return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "",
+                                                     "PAG export mapping failed"));
+            }
+            pagFill->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
+            pagFill->fillRule = MapFillRule(fill.fillRule);
+            pagFill->fillType = MapGradientFillType(fill.gradient.type);
+            pagFill->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+            pagFill->startPoint = ConvertPoint(fill.gradient.start, &warnings_, layer.id);
+            pagFill->endPoint = ConvertPoint(fill.gradient.end, &warnings_, layer.id);
+            pagFill->colors = ConvertGradientColors(fill.gradient, &warnings_, layer.id);
+            contents->push_back(pagFill);
+            return Expected<void, PagExportError>();
+        }
+
         auto *pagFill = new pag::FillElement();
         bool blendOk = true;
         pagFill->blendMode = mapBlendMode(fill.blendMode, layer.id, &blendOk);
@@ -1620,6 +1715,41 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
     };
 
     auto appendCenterStroke = [&](const StrokeStyle &stroke) -> Expected<void, PagExportError> {
+        if (stroke.paintMode == StylePaintMode::Shader) {
+            WarnSkippedUnsupportedPaint(&warnings_, layer.id, "Shader");
+            return Expected<void, PagExportError>();
+        }
+        if (stroke.paintMode == StylePaintMode::Gradient) {
+            if (stroke.gradient.type == GradientType::Conic ||
+                stroke.gradient.type == GradientType::Diamond) {
+                WarnSkippedUnsupportedPaint(&warnings_, layer.id,
+                                            stroke.gradient.type == GradientType::Conic
+                                                ? "Conic gradient"
+                                                : "Diamond gradient");
+                return Expected<void, PagExportError>();
+            }
+            auto *pagStroke = new pag::GradientStrokeElement();
+            bool blendOk = true;
+            pagStroke->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
+            if (!blendOk) {
+                delete pagStroke;
+                return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "",
+                                                     "PAG export mapping failed"));
+            }
+            pagStroke->composite = pag::CompositeOrder::AbovePreviousInSameGroup;
+            pagStroke->fillType = MapGradientFillType(stroke.gradient.type);
+            pagStroke->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+            pagStroke->startPoint = ConvertPoint(stroke.gradient.start, &warnings_, layer.id);
+            pagStroke->endPoint = ConvertPoint(stroke.gradient.end, &warnings_, layer.id);
+            pagStroke->colors = ConvertGradientColors(stroke.gradient, &warnings_, layer.id);
+            pagStroke->strokeWidth = ConvertFloat(stroke.width, &warnings_, layer.id);
+            pagStroke->lineCap = MapLineCap(stroke.cap);
+            pagStroke->lineJoin = MapLineJoin(stroke.join);
+            pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
+            contents->push_back(pagStroke);
+            return Expected<void, PagExportError>();
+        }
+
         auto *pagStroke = new pag::StrokeElement();
         bool blendOk = true;
         pagStroke->blendMode = mapBlendMode(stroke.blendMode, layer.id, &blendOk);
