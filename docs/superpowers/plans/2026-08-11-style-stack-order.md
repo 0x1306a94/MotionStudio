@@ -335,7 +335,7 @@ git commit --only \
 
 ### Task 3: Inspector 倒序 + 上/下移 + 文档
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Inspector/FillsInspector.swift`
@@ -347,7 +347,7 @@ git commit --only \
 - Consumes: `MotionDocumentCore.moveStyle`（Task 2）、既有 `fillIndices` / `strokeIndices`
 - Produces: 视觉列表顶 = 最大同类 index；「Fill N」/「Stroke N」用视觉序（`position + 1`，在 `reversed` 后 `enumerated` 已满足）
 
-- [ ] **Step 1: FillsInspector — 倒序列表**
+- [x] **Step 1: FillsInspector — 倒序列表**
 
 将：
 
@@ -363,7 +363,7 @@ let fills = fillIndices().reversed()
 
 `ForEach(Array(fills.enumerated()), id: \.element)` 不变 → 顶行 `position == 0` 对应最大 core index，「Fill 1」即视觉顶。
 
-- [ ] **Step 2: FillsInspector — 上/下移按钮与 helper**
+- [x] **Step 2: FillsInspector — 上/下移按钮与 helper**
 
 在每行 `HStack`（blend picker 与 minus 之间）加入：
 
@@ -412,12 +412,12 @@ private func moveFill(styleIndex: Int, visuallyUp: Bool) {
 
 说明：相邻交换用 `from=styleIndex, to=neighborCoreIndex`（erase+insert 与 `MoveMask` 一致）；视觉上移 → 更大 core index。
 
-- [ ] **Step 3: StrokesInspector — 同样改动**
+- [x] **Step 3: StrokesInspector — 同样改动**
 
 - `let strokes = strokeIndices().reversed()`
 - 复制上/下移按钮与 `canMoveStroke` / `moveStroke`（文案 `"Move Stroke"` / help Bring/Send stroke）
 
-- [ ] **Step 4: 文档**
+- [x] **Step 4: 文档**
 
 `docs/data-model.md` 在绘制序说明（约「先全部 Fill、再全部 Stroke」）后补一句：
 
@@ -425,11 +425,11 @@ private func moveFill(styleIndex: Int, visuallyUp: Bool) {
 
 Spec 顶部状态改为：`已实现`。
 
-- [ ] **Step 5: 构建 App + 手动冒烟**
+- [x] **Step 5: 构建 App + 手动冒烟**
 
 Xcode MCP `BuildProject`（或 `xcodebuild`）。手动：两 Fill → 新在顶；上移/下移改变叠盖；Undo 还原。
 
-- [ ] **Step 6: 勾选本 Task、更新 Status、commit**
+- [x] **Step 6: 勾选本 Task、更新 Status、commit**
 
 ```bash
 git commit --only \

@@ -1,7 +1,7 @@
 # Style Stack Order（Fills / Strokes 列表序）— 设计说明
 
 日期：2026-08-11  
-状态：待实现  
+状态：已实现  
 关联：[数据模型](../../data-model.md)、[Gradient Paint](2026-08-11-gradient-paint-design.md)
 
 ## 目标

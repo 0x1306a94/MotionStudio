@@ -26,7 +26,8 @@ struct FillsInspector: View {
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.revision
-        let fills = fillIndices()
+        // Newest / topmost paint first (matches Figma: list top = draw top).
+        let fills = Array(fillIndices().reversed())
         HStack {
             Text("Fills")
                 .font(.subheadline)
@@ -73,6 +74,20 @@ struct FillsInspector: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .fixedSize()
+                    Button {
+                        moveFill(styleIndex: styleIndex, visuallyUp: true)
+                    } label: {
+                        Image(systemName: "chevron.up")
+                    }
+                    .disabled(!isEditable || !canMoveFill(styleIndex: styleIndex, visuallyUp: true))
+                    .help("Bring fill forward")
+                    Button {
+                        moveFill(styleIndex: styleIndex, visuallyUp: false)
+                    } label: {
+                        Image(systemName: "chevron.down")
+                    }
+                    .disabled(!isEditable || !canMoveFill(styleIndex: styleIndex, visuallyUp: false))
+                    .help("Send fill backward")
                     Button(role: .destructive) {
                         removeFill(styleIndex: styleIndex)
                     } label: {
@@ -161,6 +176,27 @@ struct FillsInspector: View {
         guard isEditable else { return }
         perform("Remove Fill") {
             core.removeStyle(layerID: layerID, index: styleIndex)
+        }
+    }
+
+    private func canMoveFill(styleIndex: Int, visuallyUp: Bool) -> Bool {
+        let ascending = fillIndices()
+        guard let pos = ascending.firstIndex(of: styleIndex) else { return false }
+        if visuallyUp {
+            return pos + 1 < ascending.count
+        }
+        return pos > 0
+    }
+
+    private func moveFill(styleIndex: Int, visuallyUp: Bool) {
+        guard isEditable else { return }
+        let ascending = fillIndices()
+        guard let pos = ascending.firstIndex(of: styleIndex) else { return }
+        let neighborPos = visuallyUp ? pos + 1 : pos - 1
+        guard ascending.indices.contains(neighborPos) else { return }
+        let toIndex = ascending[neighborPos]
+        perform("Move Fill") {
+            core.moveStyle(layerID: layerID, from: styleIndex, to: toIndex)
         }
     }
 }
