@@ -47,7 +47,7 @@
 
 ### Task 1: `MoveLayerStyleCommand` + 单测
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/undo/MoveLayerStyleCommand.h`
@@ -116,7 +116,7 @@ void MoveLayerStyleInLayer(Layer &layer, int fromIndex, int toIndex) {
 
 `execute` / `undo` / `mergeWith` 镜像 `MoveMaskCommand`（undo 交换 from/to；merge 要求 `other.fromIndex_ == toIndex_` 后吸收 `toIndex_`）。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `tests/undo/CommandsTest.cpp` 增加 include / `using`，并追加：
 
@@ -205,22 +205,22 @@ TEST(MoveLayerStyleCommandTest, MergesChainedMoves) {
 
 （`StrokeStyle` 已由 `LayerStyle.h` 提供；若编译缺符号，加 `using motion::StrokeStyle;`。）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cmake --build build && ./build/tests/core_tests --gtest_filter='MoveLayerStyleCommandTest.*'`  
 Expected: 编译失败（缺 `MoveLayerStyleCommand`）
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 1. `CommandKind.h` 在 `RemoveStyle` 后（或 `MoveMask` 旁）加 `MoveLayerStyle`
 2. 按 Interfaces 写 `.h` / `.cpp`（校验 + `MoveLayerStyleInLayer`；`describe` 返回 `"Move Style"`）
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: 同上  
 Expected: PASS（含 `MergesChainedMoves`：两次 execute 合并为一次 undo）
 
-- [ ] **Step 5: 勾选本 Task、更新 Status、commit**
+- [x] **Step 5: 勾选本 Task、更新 Status、commit**
 
 ```bash
 git commit --only \

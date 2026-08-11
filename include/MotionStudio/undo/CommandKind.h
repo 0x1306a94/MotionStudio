@@ -21,6 +21,7 @@ enum class CommandKind {
     SetCompositionSettings,
     AddLayerStyle,
     RemoveStyle,
+    MoveLayerStyle,
     SetStyleBlendMode,
     SetLayerBlendMode,
     SetStrokePosition,

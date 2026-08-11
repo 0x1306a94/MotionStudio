@@ -22,6 +22,7 @@
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
@@ -65,6 +66,7 @@ using motion::Mask;
 using motion::MaskMode;
 using motion::MoveKeyframeCommand;
 using motion::MoveLayerCommand;
+using motion::MoveLayerStyleCommand;
 using motion::MoveMaskCommand;
 using motion::PropertyPath;
 using motion::PropertyValue;
@@ -89,6 +91,7 @@ using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::ShapeType;
+using motion::StrokeStyle;
 using motion::TextContent;
 using motion::TrackMatteType;
 using motion::UndoManager;
@@ -454,6 +457,87 @@ TEST(RemoveStyleCommandTest, ExecuteSkipsMissingLayer) {
     scene.execute<RemoveStyleCommand>(EntityId{999}, 0);
     scene.undo.undo(scene.document);
     EXPECT_TRUE(scene.layer->styles.empty());
+}
+
+TEST(MoveLayerStyleCommandTest, ReordersFillsWithinBlock) {
+    Scene scene;
+    auto a = std::make_unique<FillStyle>();
+    auto b = std::make_unique<FillStyle>();
+    auto c = std::make_unique<FillStyle>();
+    const EntityId idA = a->id;
+    const EntityId idB = b->id;
+    const EntityId idC = c->id;
+    scene.layer->styles.push_back(std::move(a));
+    scene.layer->styles.push_back(std::move(b));
+    scene.layer->styles.push_back(std::move(c));
+
+    scene.execute<MoveLayerStyleCommand>(scene.layer->id, 0, 2);
+    EXPECT_EQ(scene.layer->styles[0]->id, idB);
+    EXPECT_EQ(scene.layer->styles[1]->id, idC);
+    EXPECT_EQ(scene.layer->styles[2]->id, idA);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->styles[0]->id, idA);
+    EXPECT_EQ(scene.layer->styles[1]->id, idB);
+    EXPECT_EQ(scene.layer->styles[2]->id, idC);
+
+    scene.undo.redo(scene.document);
+    EXPECT_EQ(scene.layer->styles[2]->id, idA);
+}
+
+TEST(MoveLayerStyleCommandTest, CrossFillStrokeIsNoOp) {
+    Scene scene;
+    auto fill = std::make_unique<FillStyle>();
+    auto stroke = std::make_unique<StrokeStyle>();
+    const EntityId fillId = fill->id;
+    const EntityId strokeId = stroke->id;
+    scene.layer->styles.push_back(std::move(fill));
+    scene.layer->styles.push_back(std::move(stroke));
+
+    scene.execute<MoveLayerStyleCommand>(scene.layer->id, 0, 1);
+    EXPECT_EQ(scene.layer->styles[0]->id, fillId);
+    EXPECT_EQ(scene.layer->styles[1]->id, strokeId);
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->styles[0]->id, fillId);
+}
+
+TEST(MoveLayerStyleCommandTest, ReordersStrokesPreservingFillPrefix) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+    auto s0 = std::make_unique<StrokeStyle>();
+    auto s1 = std::make_unique<StrokeStyle>();
+    const EntityId stroke0 = s0->id;
+    const EntityId stroke1 = s1->id;
+    scene.layer->styles.push_back(std::move(s0));
+    scene.layer->styles.push_back(std::move(s1));
+
+    scene.execute<MoveLayerStyleCommand>(scene.layer->id, 1, 2);
+    EXPECT_EQ(scene.layer->styles[0]->type(), motion::LayerStyleType::Fill);
+    EXPECT_EQ(scene.layer->styles[1]->id, stroke1);
+    EXPECT_EQ(scene.layer->styles[2]->id, stroke0);
+}
+
+TEST(MoveLayerStyleCommandTest, ExecuteSkipsMissingLayer) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+    scene.execute<MoveLayerStyleCommand>(EntityId{999}, 0, 0);
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->styles.size(), 1u);
+}
+
+TEST(MoveLayerStyleCommandTest, MergesChainedMoves) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+    scene.layer->styles.push_back(std::make_unique<FillStyle>());
+    const EntityId id0 = scene.layer->styles[0]->id;
+
+    scene.execute<MoveLayerStyleCommand>(scene.layer->id, 0, 1);
+    scene.execute<MoveLayerStyleCommand>(scene.layer->id, 1, 2);
+    EXPECT_EQ(scene.layer->styles[2]->id, id0);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->styles[0]->id, id0);
 }
 
 TEST(SetStyleBlendModeCommandTest, SetAndUndo) {
