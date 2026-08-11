@@ -132,6 +132,8 @@ struct StyleShaderPaintControls<BelowPaintMode: View>: View {
         }
         .pickerStyle(.menu)
         .disabled(!isEditable)
+        // Menu pickers cache the title; remount when undo/redo changes the type.
+        .id("style-gradient-type-\(styleIndex)-\(gradientType.rawValue)")
 
         vec2PropertyRow(label: "Start", path: StyleProperty.gradientStart(styleIndex: styleIndex))
         vec2PropertyRow(label: "End", path: StyleProperty.gradientEnd(styleIndex: styleIndex))
@@ -188,6 +190,7 @@ struct StyleShaderPaintControls<BelowPaintMode: View>: View {
         let positionHasKeyframe = core.keyframeFrames(entityID: layerID, path: positionPath)
             .contains(playheadFrame)
 
+        let stopColor = core.evaluateColor(entityID: layerID, path: colorPath, frame: playheadFrame)
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 ColorPicker("Stop \(stopIndex + 1)",
@@ -195,10 +198,10 @@ struct StyleShaderPaintControls<BelowPaintMode: View>: View {
                                                     animatable: true),
                             supportsOpacity: true)
                     .font(.callout)
+                    // ColorPicker ignores external Binding updates; remount when model color changes.
+                    .id("style-gradient-stop-\(styleIndex)-\(stopIndex)-\(stopColor.r)-\(stopColor.g)-\(stopColor.b)-\(stopColor.a)")
                 Button {
-                    let value = core.evaluateColor(entityID: layerID, path: colorPath,
-                                                   frame: playheadFrame)
-                    toggleColorKeyframe(path: colorPath, value: value, hasKeyframe: colorHasKeyframe)
+                    toggleColorKeyframe(path: colorPath, value: stopColor, hasKeyframe: colorHasKeyframe)
                 } label: {
                     Image(systemName: colorHasKeyframe ? "diamond.fill" : "diamond")
                         .foregroundStyle(colorHasKeyframe ? .yellow : .secondary)
@@ -589,9 +592,9 @@ private struct CompactAxisField: View {
                 }
         }
         .onChange(of: value, initial: true) { _, newValue in
-            if !isFieldFocused {
-                draft = formattedValue(newValue)
-            }
+            // Always mirror model value (including undo/redo while focused), matching
+            // NumberPropertyRow — otherwise Start/End stay stale after Cmd+Z.
+            draft = formattedValue(newValue)
         }
     }
 
