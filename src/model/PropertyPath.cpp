@@ -4,6 +4,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
@@ -192,6 +193,67 @@ AnimatableBase *resolveUniformEntry(ShaderUniformValue &entry) {
     }
 }
 
+AnimatableBase *resolveGradientLeaf(GradientPaint &gradient, const std::string &name) {
+    if (name == "start") {
+        return &gradient.start;
+    }
+    if (name == "end") {
+        return &gradient.end;
+    }
+    if (name == "startAngle") {
+        return &gradient.startAngle;
+    }
+    if (name == "endAngle") {
+        return &gradient.endAngle;
+    }
+    return nullptr;
+}
+
+AnimatableBase *resolveGradientStopLeaf(GradientStop &stop, const std::string &name) {
+    if (name == "color") {
+        return &stop.color;
+    }
+    if (name == "position") {
+        return &stop.position;
+    }
+    return nullptr;
+}
+
+GradientPaint *gradientOfStyle(LayerStyle *style) {
+    switch (style->type()) {
+        case LayerStyleType::Fill:
+            return &static_cast<FillStyle *>(style)->gradient;
+        case LayerStyleType::Stroke:
+            return &static_cast<StrokeStyle *>(style)->gradient;
+    }
+    return nullptr;
+}
+
+AnimatableBase *resolveStyleGradientProperty(LayerStyle *style,
+                                             const std::vector<PathSegment> &segments,
+                                             size_t gradientSegmentIndex) {
+    GradientPaint *gradient = gradientOfStyle(style);
+    if (gradient == nullptr) {
+        return nullptr;
+    }
+    // styles[i].gradient.<leaf>
+    if (segments.size() == gradientSegmentIndex + 2) {
+        return resolveGradientLeaf(*gradient, segments[gradientSegmentIndex + 1].name);
+    }
+    // styles[i].gradient.stops[j].<leaf>
+    if (segments.size() == gradientSegmentIndex + 3 &&
+        segments[gradientSegmentIndex + 1].name == "stops" &&
+        segments[gradientSegmentIndex + 1].index >= 0) {
+        const int stopIndex = segments[gradientSegmentIndex + 1].index;
+        if (stopIndex >= static_cast<int>(gradient->stops.size())) {
+            return nullptr;
+        }
+        return resolveGradientStopLeaf(gradient->stops[static_cast<size_t>(stopIndex)],
+                                       segments[gradientSegmentIndex + 2].name);
+    }
+    return nullptr;
+}
+
 AnimatableBase *resolveStyleUniformProperty(LayerStyle *style, const std::string &uniformName) {
     ShaderUniformValues *values = nullptr;
     switch (style->type()) {
@@ -261,6 +323,9 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             LayerStyle *style = layer->styles[static_cast<size_t>(first.index)].get();
             if (segments.size() == 2) {
                 return resolveStyleProperty(style, segments[1].name);
+            }
+            if (segments.size() >= 3 && segments[1].name == "gradient") {
+                return resolveStyleGradientProperty(style, segments, 1);
             }
             if (segments.size() == 3 && segments[1].name == "uniformValues") {
                 return resolveStyleUniformProperty(style, segments[2].name);

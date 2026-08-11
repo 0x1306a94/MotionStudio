@@ -4,6 +4,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/animation/AnimatableType.h"
+#include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/UniformFormat.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec4.h"
@@ -24,8 +25,10 @@ using motion::Animatable;
 using motion::AnimatableBase;
 using motion::AnimatableType;
 using motion::BindShaderPaint;
+using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::EnsureDefaultGradient;
 using motion::FillStyle;
 using motion::Layer;
 using motion::LayerType;
@@ -42,6 +45,7 @@ using motion::ShapeRect;
 using motion::StrokeStyle;
 using motion::StylePaintMode;
 using motion::UniformFormat;
+using motion::Vec2;
 using motion::Vec4;
 
 TEST(ParsePropertyPathTest, SimpleDottedPath) {
@@ -304,5 +308,38 @@ TEST(PropertyPathTest, MissingShaderUniformReturnsNull) {
 
     EXPECT_EQ(ResolveAnimatable(scene.document,
                                 {scene.layer->id, "styles[0].uniformValues.missing"}),
+              nullptr);
+}
+
+TEST(PropertyPathTest, ResolvesGradientGeometryAndStops) {
+    ShapeScene scene;
+    auto fill = std::make_unique<FillStyle>();
+    FillStyle *fillStyle = fill.get();
+    EnsureDefaultGradient(fillStyle->gradient, Vec2{0, 0}, Vec2{100, 0});
+    scene.layer->styles.push_back(std::move(fill));
+
+    AnimatableBase *start =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].gradient.start"});
+    ASSERT_NE(start, nullptr);
+    EXPECT_EQ(start, static_cast<AnimatableBase *>(&fillStyle->gradient.start));
+
+    AnimatableBase *endAngle =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].gradient.endAngle"});
+    ASSERT_NE(endAngle, nullptr);
+
+    AnimatableBase *stopColor =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].gradient.stops[1].color"});
+    ASSERT_NE(stopColor, nullptr);
+    auto *colorAnim = static_cast<Animatable<Color> *>(stopColor);
+    colorAnim->setStaticValue(Color{1, 0, 0, 1});
+    EXPECT_EQ(fillStyle->gradient.stops[1].color.staticValue(), (Color{1, 0, 0, 1}));
+
+    AnimatableBase *stopPos =
+        ResolveAnimatable(scene.document, {scene.layer->id, "styles[0].gradient.stops[0].position"});
+    ASSERT_NE(stopPos, nullptr);
+    EXPECT_EQ(stopPos->valueType(), AnimatableType::Float);
+
+    EXPECT_EQ(ResolveAnimatable(scene.document,
+                                {scene.layer->id, "styles[0].gradient.stops[9].color"}),
               nullptr);
 }

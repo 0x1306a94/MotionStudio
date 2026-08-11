@@ -16,6 +16,8 @@ class Document;
 //                  "size" (ShapeContent; resolves against the primary geometry element)
 //                  "styles[0].color" (Layer style; styles apply to layer output)
 //                  "styles[0].uniformValues.rippleCount" (shader paint uniforms; Shader mode only)
+//                  "styles[0].gradient.start" / ".end" / ".startAngle" / ".endAngle"
+//                  "styles[0].gradient.stops[0].color" / ".position"
 //   ShapeElement:  "path" / "size" / "cornerRadius" ... (entityId points directly at the element)
 struct PropertyPath {
     EntityId entityId;  // id of the owning Layer or ShapeElement

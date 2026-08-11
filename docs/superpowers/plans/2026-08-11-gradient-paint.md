@@ -164,7 +164,7 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end);  // �
 
 ### Task 3: PropertyPath 解析 `styles[i].gradient.*`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/model/PropertyPath.h`（注释示例）
@@ -180,15 +180,11 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end);  // �
   - `styles[0].gradient.stops[0].position` → `Animatable<float>*`
 - 越界 stop index → `nullptr`
 
-- [ ] **Step 1: 写失败测试**（解析 + setStatic/evaluate round-trip）
-
-- [ ] **Step 2: 跑测失败**
-
-- [ ] **Step 3: 实现解析**（在 `resolveStyleProperty` 旁增加 `resolveGradientProperty(Fill/Stroke, segments)`；禁止 lambda，用显式函数）
-
-- [ ] **Step 4: 跑测通过**
-
-- [ ] **Step 5: 勾选、commit**  
+- [x] **Step 1: 写失败测试**（解析 + setStatic/evaluate round-trip）
+- [x] **Step 2: 跑测失败**
+- [x] **Step 3: 实现解析**（在 `resolveStyleProperty` 旁增加 `resolveGradientProperty(Fill/Stroke, segments)`；禁止 lambda，用显式函数）
+- [x] **Step 4: 跑测通过**
+- [x] **Step 5: 勾选、commit**  
   Message: `Resolve animatable paths for gradient paint properties.`
 
 ---
