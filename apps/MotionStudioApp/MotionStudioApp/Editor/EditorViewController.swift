@@ -186,6 +186,11 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "[", modifierFlags: [.command], action: #selector(sendLayersBackward)),
             UIKeyCommand(input: "]", modifierFlags: [.command, .alternate], action: #selector(bringLayersToFront)),
             UIKeyCommand(input: "[", modifierFlags: [.command, .alternate], action: #selector(sendLayersToBack)),
+            UIKeyCommand(title: "Show Selection Anchor",
+                         image: nil,
+                         action: #selector(toggleSelectionAnchor),
+                         input: "r",
+                         modifierFlags: [.alternate]),
         ] + nudgeCommands
     }
 
@@ -203,7 +208,8 @@ final class EditorViewController: UIViewController {
              #selector(addImageLayer),
              #selector(addTextLayer),
              #selector(renameCurrentProject),
-             #selector(togglePlayback):
+             #selector(togglePlayback),
+             #selector(toggleSelectionAnchor):
             true
         case #selector(bringLayersToFront):
             canArrangeSelection(.bringToFront)

@@ -27,7 +27,14 @@ struct TimelineSegmentSelection: Equatable {
 final class EditorState {
     /// Ordered multi-selection. Last entry is the AE primary selection
     /// (Inspector / anchor handle follow it).
-    var selectedLayerIDs: [UInt64] = []
+    var selectedLayerIDs: [UInt64] = [] {
+        didSet {
+            // Figma-like: each selection change hides the anchor again.
+            if selectedLayerIDs != oldValue {
+                showSelectionAnchor = false
+            }
+        }
+    }
 
     /// Primary selected layer (last in `selectedLayerIDs`), or nil.
     var selectedLayerID: UInt64? {
@@ -62,6 +69,10 @@ final class EditorState {
     /// Selected position keyframe on the motion path (Select tool). `nil` when none.
     var motionPathLayerID: UInt64?
     var motionPathSelectedKeyframe: Int?
+
+    /// Selection chrome anchor. Hidden after every selection change; Option+R toggles
+    /// for the current selection only (editor-page state, not persisted).
+    var showSelectionAnchor = false
 
     func isLayerSelected(_ layerID: UInt64) -> Bool {
         selectedLayerIDs.contains(layerID)

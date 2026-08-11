@@ -264,6 +264,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             _ = editorState.pathEditTarget
             _ = editorState.motionPathLayerID
             _ = editorState.motionPathSelectedKeyframe
+            _ = editorState.showSelectionAnchor
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.syncFromState()
@@ -970,7 +971,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             let dy = point.y - viewPoint.y
             return dx * dx + dy * dy <= radius * radius
         }
-        if isNear(handles.anchor) {
+        if editorState.showSelectionAnchor, isNear(handles.anchor) {
             return .ANCHOR
         }
         if allowScaleHandles {
@@ -1028,7 +1029,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         selectedLayerIDs.withUnsafeBufferPointer { buffer in
             ms_canvas_set_selected_layers(canvas, buffer.baseAddress, buffer.count)
         }
-        ms_canvas_set_selection_show_anchor(canvas, true)
+        ms_canvas_set_selection_show_anchor(canvas, editorState.showSelectionAnchor)
         ms_canvas_set_selection_show_scale_handles(canvas, selectionAllowsScaleHandles())
         document.core.setMotionPathSelection(canvas: canvas,
                                              layerID: editorState.motionPathLayerID,

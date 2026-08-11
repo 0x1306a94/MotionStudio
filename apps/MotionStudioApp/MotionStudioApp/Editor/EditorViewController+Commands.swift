@@ -88,6 +88,10 @@ extension EditorViewController {
         finishPenTool()
     }
 
+    @objc func toggleSelectionAnchor() {
+        editorState.showSelectionAnchor.toggle()
+    }
+
     @objc func activatePenTool() {
         guard editorState.tool != .pen else {
             return
