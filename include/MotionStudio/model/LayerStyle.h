@@ -5,6 +5,7 @@
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
@@ -44,6 +45,7 @@ class FillStyle : public LayerStyle {
 
     StylePaintMode paintMode = StylePaintMode::Color;
     Animatable<Color> color{Color{0, 0, 0, 1}};
+    GradientPaint gradient;
     EntityId shaderId{};
     ShaderUniformValues uniformValues;
     FillRule fillRule = FillRule::NonZero;
@@ -59,6 +61,7 @@ class StrokeStyle : public LayerStyle {
 
     StylePaintMode paintMode = StylePaintMode::Color;
     Animatable<Color> color{Color{0, 0, 0, 1}};
+    GradientPaint gradient;
     EntityId shaderId{};
     ShaderUniformValues uniformValues;
     Animatable<float> width{2.0f};
