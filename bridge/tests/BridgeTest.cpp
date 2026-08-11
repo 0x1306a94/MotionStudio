@@ -447,6 +447,23 @@ TEST(BridgeCommandTest, LayerVisibleAndLockedUndo) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, HitTestIncludesLockedLayer) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+
+    const float x = ms_composition_width(document, compositionId) * 0.5f;
+    const float y = ms_composition_height(document, compositionId) * 0.5f;
+    EXPECT_EQ(ms_composition_hit_test_layer(document, compositionId, 0, x, y, 0), layerId);
+
+    ms_command_set_layer_locked(document, layerId, true);
+    EXPECT_TRUE(ms_layer_locked(document, layerId));
+    EXPECT_EQ(ms_composition_hit_test_layer(document, compositionId, 0, x, y, 0), layerId);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, Vec2AndColorProperties) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

@@ -122,9 +122,9 @@ uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositio
     }
     motion::SceneState &state = result.value();
     ResolvePointTextContainerSizes(state);
+    // Locked layers remain hittable/selectable; transform edits still refuse locks in the app.
     for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
-        const Layer *layer = doc->entityIndex().findLayer(it->id);
-        if (layer != nullptr && !layer->locked && motion::HitTestLayer(*it, Vec2{x, y}, tolerance)) {
+        if (motion::HitTestLayer(*it, Vec2{x, y}, tolerance)) {
             return it->id.value;
         }
     }
