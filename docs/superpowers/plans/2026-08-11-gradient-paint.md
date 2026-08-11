@@ -335,7 +335,7 @@ bool ms_document_remove_gradient_stop(..., int stopIndex);
 
 ### Task 9: Inspector Gradient 面板
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/.../Inspector/StyleShaderPaintControls.swift`（三段 Picker；Gradient 子面板：type、start/end、angles、stops +/-）
@@ -347,11 +347,11 @@ bool ms_document_remove_gradient_stop(..., int stopIndex);
 - 改 type → `setGradientType`；增删 stop → bridge 命令
 - 关键帧控件复用 `NumberPropertyRow` / ColorPicker + diamond，与 shader uniform 行同模式
 
-- [ ] **Step 1: 实现 UI（无单独 gtest；以 Xcode 编译 + 手动点选为准）**
+- [x] **Step 1: 实现 UI（无单独 gtest；以 Xcode 编译 + 手动点选为准）**
 
-- [ ] **Step 2: Xcode 编译 MotionStudioApp（Catalyst 或当前 destination）**
+- [x] **Step 2: Xcode 编译 MotionStudioApp（Catalyst 或当前 destination）**
 
-- [ ] **Step 3: 勾选、commit**  
+- [x] **Step 3: 勾选、commit**  
   Message: `Add gradient controls to the fill and stroke inspector.`
 
 ---

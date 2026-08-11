@@ -2,7 +2,7 @@
 //  StyleShaderPaintControls.swift
 //  MotionStudioApp
 //
-//  Shared Color/Shader paint-mode controls for Fill and Stroke inspector rows.
+//  Shared Color/Gradient/Shader paint-mode controls for Fill and Stroke inspector rows.
 //
 
 import MotionStudioBridging
@@ -33,7 +33,9 @@ struct StyleShaderPaintControls: View {
             .pickerStyle(.segmented)
             .disabled(!isEditable)
 
-            if mode == .SHADER {
+            if mode == .GRADIENT {
+                gradientControls
+            } else if mode == .SHADER {
                 HStack(spacing: 8) {
                     Picker("Shader", selection: shaderBinding) {
                         Text("Select Shader…").tag(UInt64(0))
@@ -113,6 +115,168 @@ struct StyleShaderPaintControls: View {
                 _ = core.setStylePaintMode(layerID: layerID, index: styleIndex, mode: .SHADER,
                                            shaderID: newValue)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var gradientControls: some View {
+        let gradientType = resolvedGradientType
+        Picker("Type", selection: gradientTypeBinding) {
+            ForEach(MS_GRADIENT_TYPE.allCases) { tag in
+                Text(tag.label).tag(tag)
+            }
+        }
+        .pickerStyle(.menu)
+        .disabled(!isEditable)
+
+        vec2PropertyRow(label: "Start", path: StyleProperty.gradientStart(styleIndex: styleIndex))
+        vec2PropertyRow(label: "End", path: StyleProperty.gradientEnd(styleIndex: styleIndex))
+        if gradientType == .CONIC {
+            floatPropertyRow(label: "Start Angle",
+                             path: StyleProperty.gradientStartAngle(styleIndex: styleIndex))
+            floatPropertyRow(label: "End Angle",
+                             path: StyleProperty.gradientEndAngle(styleIndex: styleIndex))
+        }
+
+        HStack {
+            Text("Stops")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                addGradientStop()
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .disabled(!isEditable)
+        }
+
+        let stopCount = core.styleGradientStopCount(layerID: layerID, index: styleIndex)
+        ForEach(0 ..< stopCount, id: \.self) { stopIndex in
+            gradientStopRow(stopIndex: stopIndex, stopCount: stopCount)
+        }
+    }
+
+    private var resolvedGradientType: MS_GRADIENT_TYPE {
+        let type = core.styleGradientType(layerID: layerID, index: styleIndex)
+        return type == .INVALID ? .LINEAR : type
+    }
+
+    private var gradientTypeBinding: Binding<MS_GRADIENT_TYPE> {
+        Binding {
+            resolvedGradientType
+        } set: { newValue in
+            guard isEditable, newValue != .INVALID else { return }
+            perform("Set \(actionPrefix) Gradient Type") {
+                _ = core.setGradientType(layerID: layerID, index: styleIndex, type: newValue)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gradientStopRow(stopIndex: Int, stopCount: Int) -> some View {
+        let colorPath = StyleProperty.gradientStopColor(styleIndex: styleIndex, stopIndex: stopIndex)
+        let positionPath = StyleProperty.gradientStopPosition(styleIndex: styleIndex,
+                                                              stopIndex: stopIndex)
+        let colorHasKeyframe = core.keyframeFrames(entityID: layerID, path: colorPath)
+            .contains(playheadFrame)
+        let positionHasKeyframe = core.keyframeFrames(entityID: layerID, path: positionPath)
+            .contains(playheadFrame)
+
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                ColorPicker("Stop \(stopIndex + 1)",
+                            selection: colorBinding(path: colorPath, hasKeyframe: colorHasKeyframe,
+                                                    animatable: true),
+                            supportsOpacity: true)
+                    .font(.callout)
+                Button {
+                    let value = core.evaluateColor(entityID: layerID, path: colorPath,
+                                                   frame: playheadFrame)
+                    toggleColorKeyframe(path: colorPath, value: value, hasKeyframe: colorHasKeyframe)
+                } label: {
+                    Image(systemName: colorHasKeyframe ? "diamond.fill" : "diamond")
+                        .foregroundStyle(colorHasKeyframe ? .yellow : .secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(!isEditable)
+                Button {
+                    removeGradientStop(stopIndex: stopIndex)
+                } label: {
+                    Image(systemName: "minus")
+                }
+                .buttonStyle(.borderless)
+                .disabled(!isEditable || stopCount <= 2)
+            }
+            NumberPropertyRow(
+                label: "Pos",
+                value: core.evaluateFloat(entityID: layerID, path: positionPath, frame: playheadFrame),
+                hasKeyframeAtPlayhead: positionHasKeyframe,
+                isEditable: isEditable,
+                showsKeyframeButton: true,
+                onCommit: { value in
+                    writeFloat(path: positionPath, value: value, hasKeyframe: positionHasKeyframe)
+                },
+                onToggleKeyframe: { value in
+                    toggleFloatKeyframe(path: positionPath, value: value,
+                                        hasKeyframe: positionHasKeyframe)
+                },
+            )
+        }
+    }
+
+    private func vec2PropertyRow(label: String, path: String) -> some View {
+        let value = core.evaluateVec2(entityID: layerID, path: path, frame: playheadFrame)
+        let hasKeyframe = core.keyframeFrames(entityID: layerID, path: path).contains(playheadFrame)
+        return compactVectorRow(name: label, animatable: true, hasKeyframe: hasKeyframe,
+                                onToggleKeyframe: {
+                                    toggleVec2Keyframe(path: path, value: value,
+                                                       hasKeyframe: hasKeyframe)
+                                }) {
+            CompactAxisField(label: "X", value: Float(value.dx), isEditable: isEditable) { x in
+                writeVec2(path: path, value: CGVector(dx: CGFloat(x), dy: value.dy),
+                          hasKeyframe: hasKeyframe)
+            }
+            CompactAxisField(label: "Y", value: Float(value.dy), isEditable: isEditable) { y in
+                writeVec2(path: path, value: CGVector(dx: value.dx, dy: CGFloat(y)),
+                          hasKeyframe: hasKeyframe)
+            }
+        }
+    }
+
+    private func floatPropertyRow(label: String, path: String) -> some View {
+        let hasKeyframe = core.keyframeFrames(entityID: layerID, path: path).contains(playheadFrame)
+        return NumberPropertyRow(
+            label: label,
+            value: core.evaluateFloat(entityID: layerID, path: path, frame: playheadFrame),
+            hasKeyframeAtPlayhead: hasKeyframe,
+            isEditable: isEditable,
+            showsKeyframeButton: true,
+            onCommit: { value in
+                writeFloat(path: path, value: value, hasKeyframe: hasKeyframe)
+            },
+            onToggleKeyframe: { value in
+                toggleFloatKeyframe(path: path, value: value, hasKeyframe: hasKeyframe)
+            },
+        )
+    }
+
+    private func addGradientStop() {
+        guard isEditable else { return }
+        let stopCount = core.styleGradientStopCount(layerID: layerID, index: styleIndex)
+        let insertIndex = max(stopCount - 1, 0)
+        perform("Add \(actionPrefix) Gradient Stop") {
+            _ = core.addGradientStop(layerID: layerID, index: styleIndex, insertIndex: insertIndex,
+                                     color: MotionColor(r: 0.5, g: 0.5, b: 0.5, a: 1),
+                                     position: 0.5)
+        }
+    }
+
+    private func removeGradientStop(stopIndex: Int) {
+        guard isEditable else { return }
+        perform("Remove \(actionPrefix) Gradient Stop") {
+            _ = core.removeGradientStop(layerID: layerID, index: styleIndex, stopIndex: stopIndex)
         }
     }
 

@@ -65,7 +65,8 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
 }
 
 /// Animated style tracks of a shape layer: fill/stroke color (Color mode),
-/// shader uniform values (Shader mode), and stroke width/trim.
+/// gradient geometry/stops (Gradient mode), shader uniforms (Shader mode),
+/// and stroke width/trim.
 /// Fills and strokes are numbered like the inspector.
 func timelineStyleTracks(core: MotionDocumentCore,
                          layerID: UInt64) -> [(path: String, label: String)]
@@ -77,6 +78,7 @@ func timelineStyleTracks(core: MotionDocumentCore,
         let styleType = core.styleType(layerID: layerID, index: index)
         let paintMode = core.stylePaintMode(layerID: layerID, index: index)
         let isShaderPaint = paintMode == .SHADER
+        let isGradientPaint = paintMode == .GRADIENT
         if styleType == .FILL {
             fillPosition += 1
             let name = "Fill \(fillPosition)"
@@ -85,6 +87,11 @@ func timelineStyleTracks(core: MotionDocumentCore,
                                                                       layerID: layerID,
                                                                       styleIndex: index,
                                                                       styleLabel: name))
+            } else if isGradientPaint {
+                tracks.append(contentsOf: timelineGradientTracks(core: core,
+                                                                 layerID: layerID,
+                                                                 styleIndex: index,
+                                                                 styleLabel: name))
             } else {
                 let path = StyleProperty.color.path(at: index)
                 if !core.keyframeFrames(entityID: layerID, path: path).isEmpty {
@@ -94,7 +101,7 @@ func timelineStyleTracks(core: MotionDocumentCore,
         } else if styleType == .STROKE {
             strokePosition += 1
             let name = "Stroke \(strokePosition)"
-            let strokeProperties: [StyleProperty] = isShaderPaint
+            let strokeProperties: [StyleProperty] = (isShaderPaint || isGradientPaint)
                 ? [.width, .trimStart, .trimEnd, .trimOffset]
                 : StyleProperty.allCases
             for property in strokeProperties {
@@ -108,6 +115,11 @@ func timelineStyleTracks(core: MotionDocumentCore,
                                                                       layerID: layerID,
                                                                       styleIndex: index,
                                                                       styleLabel: name))
+            } else if isGradientPaint {
+                tracks.append(contentsOf: timelineGradientTracks(core: core,
+                                                                 layerID: layerID,
+                                                                 styleIndex: index,
+                                                                 styleLabel: name))
             }
         }
     }
@@ -133,6 +145,35 @@ func timelineShaderUniformTracks(core: MotionDocumentCore,
         }
     }
     return tracks
+}
+
+/// Animated gradient geometry / stop tracks for one Fill/Stroke in Gradient paint mode.
+func timelineGradientTracks(core: MotionDocumentCore,
+                            layerID: UInt64,
+                            styleIndex: Int,
+                            styleLabel: String) -> [(path: String, label: String)]
+{
+    var candidates: [(path: String, label: String)] = [
+        (StyleProperty.gradientStart(styleIndex: styleIndex), "\(styleLabel) Start"),
+        (StyleProperty.gradientEnd(styleIndex: styleIndex), "\(styleLabel) End"),
+    ]
+    let gradientType = core.styleGradientType(layerID: layerID, index: styleIndex)
+    if gradientType == .CONIC {
+        candidates.append((StyleProperty.gradientStartAngle(styleIndex: styleIndex),
+                           "\(styleLabel) Start Angle"))
+        candidates.append((StyleProperty.gradientEndAngle(styleIndex: styleIndex),
+                           "\(styleLabel) End Angle"))
+    }
+    let stopCount = core.styleGradientStopCount(layerID: layerID, index: styleIndex)
+    for stopIndex in 0 ..< stopCount {
+        candidates.append((StyleProperty.gradientStopColor(styleIndex: styleIndex,
+                                                           stopIndex: stopIndex),
+                           "\(styleLabel) Stop \(stopIndex + 1) Color"))
+        candidates.append((StyleProperty.gradientStopPosition(styleIndex: styleIndex,
+                                                              stopIndex: stopIndex),
+                           "\(styleLabel) Stop \(stopIndex + 1) Pos"))
+    }
+    return candidates.filter { !core.keyframeFrames(entityID: layerID, path: $0.path).isEmpty }
 }
 
 /// Animated mask scalar tracks (opacity / feather / expansion).
