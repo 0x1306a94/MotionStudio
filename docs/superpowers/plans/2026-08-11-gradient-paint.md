@@ -302,7 +302,7 @@ bool MakeGradientPaint(const GradientPaint &src, PreviewTime time, EvaluatedGrad
 
 ### Task 8: Bridge + Swift `MS_PAINT_MODE_GRADIENT`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（`MS_PAINT_MODE_GRADIENT = 2`；gradient 读 API；set type / add/remove stop）
@@ -327,9 +327,8 @@ bool ms_document_remove_gradient_stop(..., int stopIndex);
 // set_style_paint_mode: mode=GRADIENT 时 shaderId 可传 0
 ```
 
-- [ ] **Step 1–4: Bridge 测试 + Swift 编译**（Xcode MCP 或 xcodebuild）
-
-- [ ] **Step 5: commit**  
+- [x] **Step 1–4: Bridge 测试 + Swift 侧 facade/enum**（App 全量编译在 Task 9）
+- [x] **Step 5: commit**  
   Message: `Expose gradient paint mode and stops through the bridge.`
 
 ---

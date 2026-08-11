@@ -140,6 +140,30 @@ enum StyleProperty: String, CaseIterable {
         "styles[\(styleIndex)].uniformValues.\(name)"
     }
 
+    static func gradientStart(styleIndex: Int) -> String {
+        "styles[\(styleIndex)].gradient.start"
+    }
+
+    static func gradientEnd(styleIndex: Int) -> String {
+        "styles[\(styleIndex)].gradient.end"
+    }
+
+    static func gradientStartAngle(styleIndex: Int) -> String {
+        "styles[\(styleIndex)].gradient.startAngle"
+    }
+
+    static func gradientEndAngle(styleIndex: Int) -> String {
+        "styles[\(styleIndex)].gradient.endAngle"
+    }
+
+    static func gradientStopColor(styleIndex: Int, stopIndex: Int) -> String {
+        "styles[\(styleIndex)].gradient.stops[\(stopIndex)].color"
+    }
+
+    static func gradientStopPosition(styleIndex: Int, stopIndex: Int) -> String {
+        "styles[\(styleIndex)].gradient.stops[\(stopIndex)].position"
+    }
+
     var actionLabel: String {
         switch self {
         case .color:

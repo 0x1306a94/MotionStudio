@@ -622,11 +622,21 @@ int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 = image
 
 // ---- Document shader library (process color / Color Source) ----
 
-// Paint source for Fill/Stroke; mirrors motion::StylePaintMode.
+// Paint kind for Fill/Stroke; mirrors motion::StylePaintMode.
 typedef CF_CLOSED_ENUM(int, MS_PAINT_MODE) {
     MS_PAINT_MODE_INVALID = -1,
     MS_PAINT_MODE_COLOR = 0,
     MS_PAINT_MODE_SHADER = 1,
+    MS_PAINT_MODE_GRADIENT = 2,
+};
+
+// Gradient type; mirrors motion::GradientType.
+typedef CF_CLOSED_ENUM(int, MS_GRADIENT_TYPE) {
+    MS_GRADIENT_TYPE_INVALID = -1,
+    MS_GRADIENT_TYPE_LINEAR = 0,
+    MS_GRADIENT_TYPE_RADIAL = 1,
+    MS_GRADIENT_TYPE_CONIC = 2,
+    MS_GRADIENT_TYPE_DIAMOND = 3,
 };
 
 // User-editable scheme formats (v1 UI subset). Map to motion::UniformFormat via
@@ -679,9 +689,20 @@ MSDocument *ms_document_load_json_with_shaders(const char *documentJson, size_t 
 
 MS_PAINT_MODE ms_layer_style_paint_mode_at(MSDocument *document, uint64_t layerId, int index);
 uint64_t ms_layer_style_shader_id_at(MSDocument *document, uint64_t layerId, int index);
-// mode COLOR ignores shaderId; mode SHADER requires a library shaderId.
+// COLOR/GRADIENT ignore shaderId. SHADER uses shaderId when the style has none yet
+// (or when rebinding to a different shader); pass 0 to keep/reuse the current binding.
 bool ms_document_set_style_paint_mode(MSDocument *document, uint64_t layerId, int index,
                                       MS_PAINT_MODE mode, uint64_t shaderId);
+
+MS_GRADIENT_TYPE ms_layer_style_gradient_type_at(MSDocument *document, uint64_t layerId, int index);
+int ms_layer_style_gradient_stop_count(MSDocument *document, uint64_t layerId, int index);
+bool ms_document_set_gradient_type(MSDocument *document, uint64_t layerId, int index,
+                                   MS_GRADIENT_TYPE type);
+bool ms_document_add_gradient_stop(MSDocument *document, uint64_t layerId, int index,
+                                   int insertIndex, float r, float g, float b, float a,
+                                   float position);
+bool ms_document_remove_gradient_stop(MSDocument *document, uint64_t layerId, int index,
+                                      int stopIndex);
 
 // Adds a Text layer (400x120, boxTextMode off, PingFang SC, black fill, centered).
 uint64_t ms_command_add_text_layer(MSDocument *document, uint64_t compositionId);

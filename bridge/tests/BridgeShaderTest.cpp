@@ -140,3 +140,27 @@ TEST(BridgeShaderTest, RenameAndRemoveUnreferenced) {
     EXPECT_EQ(ms_document_shader_count(document), 0);
     ms_document_destroy(document);
 }
+
+TEST(BridgeShaderTest, GradientPaintModeAndStops) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_TRUE(ms_document_set_style_paint_mode(document, layerId, 0, MS_PAINT_MODE_GRADIENT, 0));
+    EXPECT_EQ(ms_layer_style_paint_mode_at(document, layerId, 0), MS_PAINT_MODE_GRADIENT);
+    EXPECT_EQ(ms_layer_style_gradient_type_at(document, layerId, 0), MS_GRADIENT_TYPE_LINEAR);
+    EXPECT_EQ(ms_layer_style_gradient_stop_count(document, layerId, 0), 2);
+
+    ASSERT_TRUE(ms_document_set_gradient_type(document, layerId, 0, MS_GRADIENT_TYPE_RADIAL));
+    EXPECT_EQ(ms_layer_style_gradient_type_at(document, layerId, 0), MS_GRADIENT_TYPE_RADIAL);
+    ASSERT_TRUE(ms_document_add_gradient_stop(document, layerId, 0, 1, 1, 0, 0, 1, 0.5f));
+    EXPECT_EQ(ms_layer_style_gradient_stop_count(document, layerId, 0), 3);
+    ASSERT_TRUE(ms_document_remove_gradient_stop(document, layerId, 0, 1));
+    EXPECT_EQ(ms_layer_style_gradient_stop_count(document, layerId, 0), 2);
+
+    float x = 0, y = 0;
+    ms_property_evaluate_vec2(document, layerId, "styles[0].gradient.start", 0, &x, &y);
+    EXPECT_FLOAT_EQ(x, 0.f);
+    EXPECT_FLOAT_EQ(y, 0.f);
+    ms_document_destroy(document);
+}

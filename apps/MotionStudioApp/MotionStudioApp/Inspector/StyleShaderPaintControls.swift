@@ -90,6 +90,11 @@ struct StyleShaderPaintControls: View {
                     _ = core.setStylePaintMode(layerID: layerID, index: styleIndex, mode: .SHADER,
                                                shaderID: target)
                 }
+            } else if newValue == .GRADIENT {
+                perform("Set \(actionPrefix) Paint Mode") {
+                    _ = core.setStylePaintMode(layerID: layerID, index: styleIndex, mode: .GRADIENT,
+                                               shaderID: 0)
+                }
             } else {
                 perform("Set \(actionPrefix) Paint Mode") {
                     _ = core.setStylePaintMode(layerID: layerID, index: styleIndex, mode: .COLOR,

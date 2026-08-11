@@ -356,7 +356,7 @@ extension MS_UNIFORM_FORMAT: @retroactive CaseIterable, @retroactive Identifiabl
 
 extension MS_PAINT_MODE: @retroactive CaseIterable, @retroactive Identifiable {
     public static var allCases: [MS_PAINT_MODE] {
-        [.COLOR, .SHADER]
+        [.COLOR, .GRADIENT, .SHADER]
     }
 
     public var id: Int32 {
@@ -367,8 +367,35 @@ extension MS_PAINT_MODE: @retroactive CaseIterable, @retroactive Identifiable {
         switch self {
         case .COLOR:
             "Color"
+        case .GRADIENT:
+            "Gradient"
         case .SHADER:
             "Shader"
+        default:
+            "Invalid"
+        }
+    }
+}
+
+extension MS_GRADIENT_TYPE: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_GRADIENT_TYPE] {
+        [.LINEAR, .RADIAL, .CONIC, .DIAMOND]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .LINEAR:
+            "Linear"
+        case .RADIAL:
+            "Radial"
+        case .CONIC:
+            "Conic"
+        case .DIAMOND:
+            "Diamond"
         default:
             "Invalid"
         }

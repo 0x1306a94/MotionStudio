@@ -234,6 +234,44 @@ final class MotionDocumentCore {
         return ok
     }
 
+    func styleGradientType(layerID: UInt64, index: Int) -> MS_GRADIENT_TYPE {
+        ms_layer_style_gradient_type_at(handle, layerID, Int32(index))
+    }
+
+    func styleGradientStopCount(layerID: UInt64, index: Int) -> Int {
+        Int(ms_layer_style_gradient_stop_count(handle, layerID, Int32(index)))
+    }
+
+    @discardableResult
+    func setGradientType(layerID: UInt64, index: Int, type: MS_GRADIENT_TYPE) -> Bool {
+        let ok = ms_document_set_gradient_type(handle, layerID, Int32(index), type)
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
+    @discardableResult
+    func addGradientStop(layerID: UInt64, index: Int, insertIndex: Int, color: MotionColor,
+                         position: Float) -> Bool
+    {
+        let ok = ms_document_add_gradient_stop(handle, layerID, Int32(index), Int32(insertIndex),
+                                               color.r, color.g, color.b, color.a, position)
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
+    @discardableResult
+    func removeGradientStop(layerID: UInt64, index: Int, stopIndex: Int) -> Bool {
+        let ok = ms_document_remove_gradient_stop(handle, layerID, Int32(index), Int32(stopIndex))
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
     // MARK: - Undo / redo
 
     var canUndo: Bool {
