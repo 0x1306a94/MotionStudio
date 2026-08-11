@@ -133,6 +133,36 @@ TEST(ShaderCommandTest, SetPaintModeToShaderBindsDefaults) {
     EXPECT_TRUE(fillPtr->uniformValues.entries.empty());
 }
 
+TEST(ShaderCommandTest, SwitchToColorDoesNotClearShader) {
+    ShaderScene scene;
+    ShaderDefinition shader = MakeRippleShader();
+    const EntityId shaderId = shader.id;
+    scene.document.shaders.push_back(shader);
+    FillStyle *fill = AddBoundFill(scene.layer, scene.document.shaders[0]);
+    fill->uniformValues.entries[0].floatValue.setStaticValue(3.f);
+
+    scene.execute<SetStylePaintModeCommand>(scene.layer->id, 0, StylePaintMode::Color);
+    EXPECT_EQ(fill->paintMode, StylePaintMode::Color);
+    EXPECT_EQ(fill->shaderId, shaderId);
+    ASSERT_FALSE(fill->uniformValues.entries.empty());
+    EXPECT_FLOAT_EQ(fill->uniformValues.entries[0].floatValue.staticValue(), 3.f);
+
+    scene.execute<SetStylePaintModeCommand>(scene.layer->id, 0, StylePaintMode::Shader, shaderId);
+    EXPECT_EQ(fill->paintMode, StylePaintMode::Shader);
+    EXPECT_FLOAT_EQ(fill->uniformValues.entries[0].floatValue.staticValue(), 3.f);
+}
+
+TEST(ShaderCommandTest, SwitchToGradientLazyInitsStops) {
+    ShaderScene scene;
+    auto fill = std::make_unique<FillStyle>();
+    scene.layer->styles.push_back(std::move(fill));
+    auto *fillPtr = static_cast<FillStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStylePaintModeCommand>(scene.layer->id, 0, StylePaintMode::Gradient);
+    EXPECT_EQ(fillPtr->paintMode, StylePaintMode::Gradient);
+    EXPECT_TRUE(motion::GradientStopsAreValid(fillPtr->gradient));
+}
+
 TEST(ShaderCommandTest, UpdateShaderDefinitionRealignsReferencingStyles) {
     ShaderScene scene;
     ShaderDefinition shader = MakeRippleShader();

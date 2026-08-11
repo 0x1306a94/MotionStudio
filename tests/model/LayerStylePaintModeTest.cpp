@@ -2,10 +2,14 @@
 
 #include <memory>
 
+#include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/common/UniformFormat.h"
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/GradientPaint.h"
+#include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
@@ -16,10 +20,15 @@
 
 using motion::BindShaderPaint;
 using motion::ClearShaderPaint;
+using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::EnsureDefaultGradient;
 using motion::EntityId;
 using motion::FillStyle;
+using motion::GradientPaint;
+using motion::GradientStopsAreValid;
+using motion::GradientType;
 using motion::Layer;
 using motion::LayerType;
 using motion::ShaderDefinition;
@@ -29,6 +38,7 @@ using motion::ShaderUniformValueKind;
 using motion::StrokeStyle;
 using motion::StylePaintMode;
 using motion::UniformFormat;
+using motion::Vec2;
 
 namespace {
 
@@ -91,6 +101,35 @@ TEST(LayerStylePaintModeTest, BindRejectsInvalidShaderId) {
     auto bound = BindShaderPaint(fill, shader);
     EXPECT_FALSE(bound.hasValue());
     EXPECT_EQ(fill.paintMode, StylePaintMode::Color);
+}
+
+TEST(LayerStylePaintModeTest, SwitchKindPreservesShaderAndGradient) {
+    FillStyle fill;
+    ShaderDefinition shader = MakeRippleShader();
+    ASSERT_TRUE(BindShaderPaint(fill, shader).hasValue());
+    fill.gradient.stops.resize(2);
+    fill.gradient.stops[0].position.setStaticValue(0.f);
+    fill.gradient.stops[1].position.setStaticValue(1.f);
+    fill.gradient.stops[1].color.setStaticValue(Color{1, 1, 1, 1});
+    fill.paintMode = StylePaintMode::Gradient;
+    const EntityId keptShader = fill.shaderId;
+    fill.paintMode = StylePaintMode::Color;
+    EXPECT_EQ(fill.shaderId, keptShader);
+    EXPECT_EQ(fill.gradient.stops.size(), 2u);
+    EXPECT_FALSE(fill.uniformValues.entries.empty());
+}
+
+TEST(LayerStylePaintModeTest, EnsureDefaultGradientOnlyWhenStopsMissing) {
+    GradientPaint gradient;
+    EnsureDefaultGradient(gradient, Vec2{10, 20}, Vec2{110, 20});
+    ASSERT_TRUE(GradientStopsAreValid(gradient));
+    EXPECT_EQ(gradient.type, GradientType::Linear);
+    EXPECT_EQ(gradient.start.staticValue(), (Vec2{10, 20}));
+    EXPECT_EQ(gradient.end.staticValue(), (Vec2{110, 20}));
+
+    gradient.stops[0].color.setStaticValue(Color{1, 0, 0, 1});
+    EnsureDefaultGradient(gradient, Vec2{0, 0}, Vec2{1, 0});
+    EXPECT_EQ(gradient.stops[0].color.staticValue(), (Color{1, 0, 0, 1}));
 }
 
 TEST(LayerStylePaintModeTest, ShaderIsReferencedTracksFillAndStroke) {

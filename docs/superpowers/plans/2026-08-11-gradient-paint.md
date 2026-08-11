@@ -133,7 +133,7 @@ git commit --only include/MotionStudio/model/GradientType.h \
 
 ### Task 2: kind 切换不清空 + 懒初始化
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/model/LayerStylePaint.h` + `src/model/LayerStylePaint.cpp`
@@ -155,48 +155,11 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end);  // �
 // ClearShaderPaint / BindShaderPaint 保留给显式解绑/绑定，kind 切换不再 Clear
 ```
 
-- [ ] **Step 1: 写失败测试**
-
-```cpp
-TEST(LayerStylePaintModeTest, SwitchKindPreservesShaderAndGradient) {
-    FillStyle fill;
-    ShaderDefinition shader = MakeRippleShader();
-    ASSERT_TRUE(BindShaderPaint(fill, shader).hasValue());
-    fill.gradient.stops.resize(2);
-    fill.gradient.stops[0].position.setStaticValue(0.f);
-    fill.gradient.stops[1].position.setStaticValue(1.f);
-    fill.gradient.stops[1].color.setStaticValue(Color{1, 1, 1, 1});
-    fill.paintMode = StylePaintMode::Gradient;
-    const EntityId keptShader = fill.shaderId;
-    fill.paintMode = StylePaintMode::Color;  // 模拟只改 kind
-    EXPECT_EQ(fill.shaderId, keptShader);
-    EXPECT_EQ(fill.gradient.stops.size(), 2u);
-}
-
-TEST(SetStylePaintModeCommandTest, SwitchToColorDoesNotClearShader) {
-    // 建 document + fill 绑 shader → SetStylePaintMode(Color)
-    // EXPECT shaderId 仍有效、uniformValues 非空、paintMode==Color
-}
-```
-
-- [ ] **Step 2: 跑测试确认失败**（旧 Clear 行为会失败）
-
-Run: `./build/tests/core_tests --gtest_filter='LayerStylePaintModeTest.*:SetStylePaintModeCommandTest.*'`
-
-- [ ] **Step 3: 改 `SetStylePaintModeCommand` + `EnsureDefaultGradient`**
-
-`EnsureDefaultGradient` 默认：type=Linear，stops 黑@0/白@1，start/end 用参数（command 内：有层 bounds 用左中→右中，否则 `(0,0)→(100,0)`）。
-
-undo 快照需同时保存 `paintMode` + `shaderId` + `uniformValues` + **整份 `gradient`**（扩展 `PaintSnapshot`）。
-
-- [ ] **Step 4: 跑测试确认通过**
-
-- [ ] **Step 5: 勾选、commit**
-
-```bash
-git commit --only ... -m "Keep color gradient and shader data when switching paint kind."
-```
-
+- [x] **Step 1: 写失败测试**
+- [x] **Step 2: 跑测试确认失败**（旧 Clear 行为会失败）
+- [x] **Step 3: 改 `SetStylePaintModeCommand` + `EnsureDefaultGradient`**
+- [x] **Step 4: 跑测试确认通过**
+- [x] **Step 5: 勾选、commit**
 ---
 
 ### Task 3: PropertyPath 解析 `styles[i].gradient.*`

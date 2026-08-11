@@ -4,20 +4,24 @@
 #include <string>
 
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/undo/Command.h"
 
 namespace motion {
 
-// Sets Fill/Stroke paintMode between Color and Shader.
-// Color clears shader fields; Shader binds via FindShader + BindShaderPaint.
+// Sets Fill/Stroke paintMode (kind). Does not clear inactive color/gradient/shader
+// fields. Lazy-inits default gradient or binds a shader when the target path is
+// not yet usable.
 class SetStylePaintModeCommand : public Command {
   public:
     // layerId: target layer.
     // styleIndex: index into layer.styles.
-    // mode: desired paint mode.
-    // shaderId: required when mode is Shader; ignored for Color.
+    // mode: desired paint kind.
+    // shaderId: used when mode is Shader and the style has no valid shader yet;
+    //           ignored for Color/Gradient. When rebinding to a different shader,
+    //           pass the new id (resets uniformValues via BindShaderPaint).
     SetStylePaintModeCommand(EntityId layerId, int styleIndex, StylePaintMode mode,
                              EntityId shaderId = {});
 
@@ -32,6 +36,7 @@ class SetStylePaintModeCommand : public Command {
         StylePaintMode paintMode = StylePaintMode::Color;
         EntityId shaderId = {};
         ShaderUniformValues uniformValues;
+        GradientPaint gradient;
     };
 
     EntityId layerId_ = {};

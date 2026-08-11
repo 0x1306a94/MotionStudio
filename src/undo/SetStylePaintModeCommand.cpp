@@ -15,6 +15,7 @@ struct StylePaintState {
     StylePaintMode paintMode = StylePaintMode::Color;
     EntityId shaderId = {};
     ShaderUniformValues uniformValues;
+    GradientPaint gradient;
 };
 
 bool ReadStylePaintState(LayerStyle *style, StylePaintState &out) {
@@ -26,6 +27,7 @@ bool ReadStylePaintState(LayerStyle *style, StylePaintState &out) {
         out.paintMode = fill.paintMode;
         out.shaderId = fill.shaderId;
         out.uniformValues = fill.uniformValues;
+        out.gradient = fill.gradient;
         return true;
     }
     if (style->type() == LayerStyleType::Stroke) {
@@ -33,6 +35,7 @@ bool ReadStylePaintState(LayerStyle *style, StylePaintState &out) {
         out.paintMode = stroke.paintMode;
         out.shaderId = stroke.shaderId;
         out.uniformValues = stroke.uniformValues;
+        out.gradient = stroke.gradient;
         return true;
     }
     return false;
@@ -47,6 +50,7 @@ bool WriteStylePaintState(LayerStyle *style, const StylePaintState &state) {
         fill.paintMode = state.paintMode;
         fill.shaderId = state.shaderId;
         fill.uniformValues = state.uniformValues;
+        fill.gradient = state.gradient;
         return true;
     }
     if (style->type() == LayerStyleType::Stroke) {
@@ -54,6 +58,7 @@ bool WriteStylePaintState(LayerStyle *style, const StylePaintState &state) {
         stroke.paintMode = state.paintMode;
         stroke.shaderId = state.shaderId;
         stroke.uniformValues = state.uniformValues;
+        stroke.gradient = state.gradient;
         return true;
     }
     return false;
@@ -66,6 +71,50 @@ LayerStyle *FindLayerStyle(Document &document, EntityId layerId, int styleIndex)
         return nullptr;
     }
     return layer->styles[static_cast<size_t>(styleIndex)].get();
+}
+
+void SetPaintModeOnly(LayerStyle *style, StylePaintMode mode) {
+    if (style->type() == LayerStyleType::Fill) {
+        static_cast<FillStyle &>(*style).paintMode = mode;
+        return;
+    }
+    if (style->type() == LayerStyleType::Stroke) {
+        static_cast<StrokeStyle &>(*style).paintMode = mode;
+    }
+}
+
+GradientPaint *GradientOf(LayerStyle *style) {
+    if (style->type() == LayerStyleType::Fill) {
+        return &static_cast<FillStyle &>(*style).gradient;
+    }
+    if (style->type() == LayerStyleType::Stroke) {
+        return &static_cast<StrokeStyle &>(*style).gradient;
+    }
+    return nullptr;
+}
+
+EntityId ShaderIdOf(const LayerStyle *style) {
+    if (style->type() == LayerStyleType::Fill) {
+        return static_cast<const FillStyle &>(*style).shaderId;
+    }
+    if (style->type() == LayerStyleType::Stroke) {
+        return static_cast<const StrokeStyle &>(*style).shaderId;
+    }
+    return EntityId{};
+}
+
+const ShaderDefinition *ResolveShaderForMode(Document &document, EntityId requestedId,
+                                             EntityId currentId) {
+    if (requestedId.isValid()) {
+        return FindShader(document, requestedId);
+    }
+    if (currentId.isValid()) {
+        return FindShader(document, currentId);
+    }
+    if (!document.shaders.empty()) {
+        return &document.shaders.front();
+    }
+    return nullptr;
 }
 
 }  // namespace
@@ -83,31 +132,6 @@ void SetStylePaintModeCommand::execute(Document &document) {
     if (style == nullptr) {
         return;
     }
-
-    if (mode_ == StylePaintMode::Shader) {
-        const ShaderDefinition *shader = FindShader(document, shaderId_);
-        if (shader == nullptr) {
-            return;
-        }
-        if (!oldPaint_) {
-            StylePaintState state;
-            if (!ReadStylePaintState(style, state)) {
-                return;
-            }
-            PaintSnapshot snapshot;
-            snapshot.paintMode = state.paintMode;
-            snapshot.shaderId = state.shaderId;
-            snapshot.uniformValues = std::move(state.uniformValues);
-            oldPaint_ = std::move(snapshot);
-        }
-        if (style->type() == LayerStyleType::Fill) {
-            BindShaderPaint(static_cast<FillStyle &>(*style), *shader);
-        } else if (style->type() == LayerStyleType::Stroke) {
-            BindShaderPaint(static_cast<StrokeStyle &>(*style), *shader);
-        }
-        return;
-    }
-
     if (!oldPaint_) {
         StylePaintState state;
         if (!ReadStylePaintState(style, state)) {
@@ -117,12 +141,45 @@ void SetStylePaintModeCommand::execute(Document &document) {
         snapshot.paintMode = state.paintMode;
         snapshot.shaderId = state.shaderId;
         snapshot.uniformValues = std::move(state.uniformValues);
+        snapshot.gradient = std::move(state.gradient);
         oldPaint_ = std::move(snapshot);
     }
+
+    if (mode_ == StylePaintMode::Color) {
+        SetPaintModeOnly(style, StylePaintMode::Color);
+        return;
+    }
+
+    if (mode_ == StylePaintMode::Gradient) {
+        GradientPaint *gradient = GradientOf(style);
+        if (gradient == nullptr) {
+            return;
+        }
+        EnsureDefaultGradient(*gradient, Vec2{0, 0}, Vec2{100, 0});
+        SetPaintModeOnly(style, StylePaintMode::Gradient);
+        return;
+    }
+
+    if (mode_ != StylePaintMode::Shader) {
+        return;
+    }
+
+    const EntityId currentId = ShaderIdOf(style);
+    const ShaderDefinition *shader = ResolveShaderForMode(document, shaderId_, currentId);
+    if (shader == nullptr) {
+        return;
+    }
+
+    // Same shader already bound: only flip kind so uniformValues stay intact.
+    if (currentId == shader->id && currentId.isValid()) {
+        SetPaintModeOnly(style, StylePaintMode::Shader);
+        return;
+    }
+
     if (style->type() == LayerStyleType::Fill) {
-        ClearShaderPaint(static_cast<FillStyle &>(*style));
+        BindShaderPaint(static_cast<FillStyle &>(*style), *shader);
     } else if (style->type() == LayerStyleType::Stroke) {
-        ClearShaderPaint(static_cast<StrokeStyle &>(*style));
+        BindShaderPaint(static_cast<StrokeStyle &>(*style), *shader);
     }
 }
 
@@ -138,6 +195,7 @@ void SetStylePaintModeCommand::undo(Document &document) {
     state.paintMode = oldPaint_->paintMode;
     state.shaderId = oldPaint_->shaderId;
     state.uniformValues = oldPaint_->uniformValues;
+    state.gradient = oldPaint_->gradient;
     WriteStylePaintState(style, state);
 }
 
