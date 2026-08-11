@@ -213,7 +213,7 @@ void EnsureDefaultGradient(GradientPaint &gradient, Vec2 start, Vec2 end);  // �
 
 ### Task 5: `SetGradientType` / Add/Remove stop 命令
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/undo/CommandKind.h`
@@ -236,9 +236,8 @@ class RemoveGradientStopCommand : public Command {
 };
 ```
 
-- [ ] **Step 1–4: TDD 覆盖 type 切换、增删、undo/redo、N≥2**
-
-- [ ] **Step 5: commit**  
+- [x] **Step 1–4: TDD 覆盖 type 切换、增删、undo/redo、N≥2**
+- [x] **Step 5: commit**  
   Message: `Add undo commands for gradient type and color stops.`
 
 ---

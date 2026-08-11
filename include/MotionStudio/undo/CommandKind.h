@@ -46,6 +46,9 @@ enum class CommandKind {
     RemoveShader,
     UpdateShaderDefinition,
     SetStylePaintMode,
+    SetGradientType,
+    AddGradientStop,
+    RemoveGradientStop,
     Composite,
 };
 
