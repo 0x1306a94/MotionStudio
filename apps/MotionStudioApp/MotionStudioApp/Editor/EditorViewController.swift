@@ -28,7 +28,7 @@ final class EditorViewController: UIViewController {
         static let sidePanelBottomSpacing: CGFloat = 12
         static let sidePanelHorizontalInset: CGFloat = 16
         static let projectPanelWidth: CGFloat = 260
-        static let inspectorPanelWidth: CGFloat = 320
+        static let inspectorPanelWidth: CGFloat = 380
         static let sidePanelCornerRadius: CGFloat = 12
         static let toolbarButtonSize: CGFloat = 36
         static let topToolbarHorizontalInset: CGFloat = 18

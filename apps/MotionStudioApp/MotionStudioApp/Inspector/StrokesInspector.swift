@@ -48,12 +48,48 @@ struct StrokesInspector: View {
                 StyleShaderPaintControls(core: core, layerID: layerID, styleIndex: styleIndex,
                                          playheadFrame: playheadFrame, isEditable: isEditable,
                                          actionPrefix: "Stroke", perform: perform)
-                HStack(spacing: 8) {
-                    if paintMode == .COLOR {
+                {
+                    HStack(spacing: 8) {
+                        Text("Stroke \(position + 1)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                        Picker("", selection: blendBinding(styleIndex: styleIndex)) {
+                            ForEach(MS_BLEND.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                        Button {
+                            moveStroke(styleIndex: styleIndex, visuallyUp: true)
+                        } label: {
+                            Image(systemName: "chevron.up")
+                        }
+                        .disabled(!isEditable || !canMoveStroke(styleIndex: styleIndex, visuallyUp: true))
+                        .help("Bring stroke forward")
+                        Button {
+                            moveStroke(styleIndex: styleIndex, visuallyUp: false)
+                        } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .disabled(!isEditable || !canMoveStroke(styleIndex: styleIndex, visuallyUp: false))
+                        .help("Send stroke backward")
+                        Button(role: .destructive) {
+                            removeStroke(styleIndex: styleIndex)
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                    }
+                }
+                if paintMode == .COLOR {
+                    HStack(spacing: 8) {
                         ColorPicker("Stroke \(position + 1)",
                                     selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe),
                                     supportsOpacity: true)
-                            .font(.callout)
+                            .labelsHidden()
+                            .fixedSize()
                         Button {
                             toggleColorKeyframe(styleIndex: styleIndex, hasKeyframe: hasColorKeyframe)
                         } label: {
@@ -62,37 +98,6 @@ struct StrokesInspector: View {
                         }
                         .buttonStyle(.plain)
                         .help(hasColorKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
-                    } else {
-                        Text("Stroke \(position + 1)")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Picker("", selection: blendBinding(styleIndex: styleIndex)) {
-                        ForEach(MS_BLEND.allCases) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .fixedSize()
-                    Button {
-                        moveStroke(styleIndex: styleIndex, visuallyUp: true)
-                    } label: {
-                        Image(systemName: "chevron.up")
-                    }
-                    .disabled(!isEditable || !canMoveStroke(styleIndex: styleIndex, visuallyUp: true))
-                    .help("Bring stroke forward")
-                    Button {
-                        moveStroke(styleIndex: styleIndex, visuallyUp: false)
-                    } label: {
-                        Image(systemName: "chevron.down")
-                    }
-                    .disabled(!isEditable || !canMoveStroke(styleIndex: styleIndex, visuallyUp: false))
-                    .help("Send stroke backward")
-                    Button(role: .destructive) {
-                        removeStroke(styleIndex: styleIndex)
-                    } label: {
-                        Image(systemName: "minus")
                     }
                 }
                 if !isTextLayer {

@@ -47,12 +47,48 @@ struct FillsInspector: View {
                 StyleShaderPaintControls(core: core, layerID: layerID, styleIndex: styleIndex,
                                          playheadFrame: playheadFrame, isEditable: isEditable,
                                          actionPrefix: "Fill", perform: perform)
-                HStack(spacing: 8) {
-                    if paintMode == .COLOR {
+                {
+                    HStack(spacing: 8) {
+                        Text("Fill \(position + 1)")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                        Picker("", selection: blendBinding(styleIndex: styleIndex)) {
+                            ForEach(MS_BLEND.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                        Button {
+                            moveFill(styleIndex: styleIndex, visuallyUp: true)
+                        } label: {
+                            Image(systemName: "chevron.up")
+                        }
+                        .disabled(!isEditable || !canMoveFill(styleIndex: styleIndex, visuallyUp: true))
+                        .help("Bring fill forward")
+                        Button {
+                            moveFill(styleIndex: styleIndex, visuallyUp: false)
+                        } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .disabled(!isEditable || !canMoveFill(styleIndex: styleIndex, visuallyUp: false))
+                        .help("Send fill backward")
+                        Button(role: .destructive) {
+                            removeFill(styleIndex: styleIndex)
+                        } label: {
+                            Image(systemName: "minus")
+                        }
+                    }
+                }
+                if paintMode == .COLOR {
+                    HStack(spacing: 8) {
                         ColorPicker("Fill \(position + 1)",
                                     selection: colorBinding(styleIndex: styleIndex, hasKeyframe: hasKeyframe),
                                     supportsOpacity: true)
-                            .font(.callout)
+                            .labelsHidden()
+                            .fixedSize()
                         Button {
                             toggleKeyframe(styleIndex: styleIndex, hasKeyframe: hasKeyframe)
                         } label: {
@@ -61,37 +97,6 @@ struct FillsInspector: View {
                         }
                         .buttonStyle(.plain)
                         .help(hasKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
-                    } else {
-                        Text("Fill \(position + 1)")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                    Picker("", selection: blendBinding(styleIndex: styleIndex)) {
-                        ForEach(MS_BLEND.allCases) { mode in
-                            Text(mode.label).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .fixedSize()
-                    Button {
-                        moveFill(styleIndex: styleIndex, visuallyUp: true)
-                    } label: {
-                        Image(systemName: "chevron.up")
-                    }
-                    .disabled(!isEditable || !canMoveFill(styleIndex: styleIndex, visuallyUp: true))
-                    .help("Bring fill forward")
-                    Button {
-                        moveFill(styleIndex: styleIndex, visuallyUp: false)
-                    } label: {
-                        Image(systemName: "chevron.down")
-                    }
-                    .disabled(!isEditable || !canMoveFill(styleIndex: styleIndex, visuallyUp: false))
-                    .help("Send fill backward")
-                    Button(role: .destructive) {
-                        removeFill(styleIndex: styleIndex)
-                    } label: {
-                        Image(systemName: "minus")
                     }
                 }
             }

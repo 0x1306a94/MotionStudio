@@ -8,7 +8,7 @@
 import MotionStudioBridging
 import SwiftUI
 
-struct StyleShaderPaintControls: View {
+struct StyleShaderPaintControls<BelowPaintMode: View>: View {
     let core: MotionDocumentCore
     let layerID: UInt64
     let styleIndex: Int
@@ -16,6 +16,7 @@ struct StyleShaderPaintControls: View {
     let isEditable: Bool
     let actionPrefix: String
     let perform: (String, () -> Void) -> Void
+    @ViewBuilder let belowPaintMode: () -> BelowPaintMode
 
     @State private var editingShaderID: UInt64?
 
@@ -32,6 +33,9 @@ struct StyleShaderPaintControls: View {
             }
             .pickerStyle(.segmented)
             .disabled(!isEditable)
+
+            // Title / blend / reorder sit here so Color / Gradient / Shader share one layout.
+            belowPaintMode()
 
             if mode == .GRADIENT {
                 gradientControls
