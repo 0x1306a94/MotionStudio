@@ -835,6 +835,141 @@ TEST(PagExporterTest, TrackMatteExports) {
     EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
 }
 
+TEST(PagExporterTest, TrackMatteWrapsMultipleTrimStrokesInPrecomp) {
+    // PAG decode only binds track matte to layers[index-1]. Multiple trim-stroke siblings
+    // cannot all share one matte — wrap them in an export-only Precomp so the host alone
+    // carries trackMatte (MS has no Precomp/container for this yet).
+    Document document = MakeEmptyDoc(400, 300, 90);
+    Composition *composition = Primary(document);
+
+    Layer *matte = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    matte->name = "Matte";
+
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "PathDualTrim";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    layer->transform.position.setStaticValue(Vec2{200, 150});
+    layer->trackMatteType = TrackMatteType::Alpha;
+    layer->trackMatteLayerId = matte->id;
+
+    auto path = std::make_unique<ShapePath>();
+    BezierPath geometry =
+        MakeSingleContour({{{-40, 0}, {}, {}}, {{40, 0}, {}, {}}}, false);
+    path->path.setStaticValue(BezierPathToVectorNetwork(geometry));
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+
+    auto black = std::make_unique<StrokeStyle>();
+    black->color.setStaticValue(Color{0, 0, 0, 1});
+    black->width.setStaticValue(20.0f);
+    Keyframe<float> blackTrim0;
+    blackTrim0.time = 0;
+    blackTrim0.value = 0.0f;
+    Keyframe<float> blackTrim1;
+    blackTrim1.time = 60;
+    blackTrim1.value = 1.0f;
+    black->trimEnd.addKeyframe(blackTrim0);
+    black->trimEnd.addKeyframe(blackTrim1);
+    layer->styles.push_back(std::move(black));
+
+    auto yellow = std::make_unique<StrokeStyle>();
+    yellow->color.setStaticValue(Color{0.97f, 0.77f, 0.02f, 1});
+    yellow->width.setStaticValue(10.0f);
+    Keyframe<float> yellowTrim0;
+    yellowTrim0.time = 0;
+    yellowTrim0.value = 0.0f;
+    Keyframe<float> yellowTrim1;
+    yellowTrim1.time = 60;
+    yellowTrim1.value = 1.0f;
+    yellow->trimEnd.addKeyframe(yellowTrim0);
+    yellow->trimEnd.addKeyframe(yellowTrim1);
+    layer->styles.push_back(std::move(yellow));
+
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+
+    bool wrapped = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "StrokeSiblingsWrappedForTrackMatte") {
+            wrapped = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(wrapped);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+
+    pag::PreComposeLayer *host = nullptr;
+    pag::Layer *matteLayer = nullptr;
+    auto *root = static_cast<pag::VectorComposition *>(file->compositions.back());
+    for (pag::Layer *pagLayer : root->layers) {
+        if (pagLayer->name == "Matte") {
+            matteLayer = pagLayer;
+        }
+        if (pagLayer->name == "PathDualTrim" && pagLayer->type() == pag::LayerType::PreCompose) {
+            host = static_cast<pag::PreComposeLayer *>(pagLayer);
+        }
+        // Must not leave bare stroke siblings in the root (they would steal / break matte).
+        EXPECT_EQ(pagLayer->name.find("PathDualTrim / Stroke"), std::string::npos);
+    }
+    ASSERT_NE(host, nullptr);
+    ASSERT_NE(matteLayer, nullptr);
+    EXPECT_EQ(host->trackMatteType, pag::TrackMatteType::Alpha);
+    EXPECT_EQ(host->trackMatteLayer, matteLayer);
+    EXPECT_FALSE(matteLayer->isActive);
+    ASSERT_NE(host->transform, nullptr);
+    ASSERT_NE(host->transform->position, nullptr);
+    // Host spatial is identity; layer position stays on inner stroke layers (nested comps
+    // clip to [0,0,w,h], so negative local path coords need the layer position).
+    EXPECT_FLOAT_EQ(host->transform->position->value.x, 0);
+    EXPECT_FLOAT_EQ(host->transform->position->value.y, 0);
+
+    ASSERT_NE(host->composition, nullptr);
+    ASSERT_EQ(host->composition->type(), pag::CompositionType::Vector);
+    auto *inner = static_cast<pag::VectorComposition *>(host->composition);
+    // No fill on the MS layer → empty Path-only main is dropped; only the two trim strokes.
+    ASSERT_EQ(inner->layers.size(), 2u);
+
+    int strokeElementCount = 0;
+    bool sawBlack = false;
+    bool sawYellow = false;
+    for (pag::Layer *innerLayer : inner->layers) {
+        EXPECT_EQ(innerLayer->trackMatteType, pag::TrackMatteType::None);
+        EXPECT_EQ(innerLayer->trackMatteLayer, nullptr);
+        ASSERT_NE(innerLayer->transform, nullptr);
+        ASSERT_NE(innerLayer->transform->position, nullptr);
+        EXPECT_FLOAT_EQ(innerLayer->transform->position->value.x, 200);
+        EXPECT_FLOAT_EQ(innerLayer->transform->position->value.y, 150);
+        if (innerLayer->type() != pag::LayerType::Shape) {
+            continue;
+        }
+        auto *shape = static_cast<pag::ShapeLayer *>(innerLayer);
+        ASSERT_FALSE(shape->contents.empty());
+        auto *group = static_cast<pag::ShapeGroupElement *>(shape->contents[0]);
+        for (pag::ShapeElement *element : group->elements) {
+            if (element->type() != pag::ShapeType::Stroke) {
+                continue;
+            }
+            ++strokeElementCount;
+            auto *stroke = static_cast<pag::StrokeElement *>(element);
+            ASSERT_NE(stroke->color, nullptr);
+            if (stroke->color->value.red == 0 && stroke->color->value.green == 0 &&
+                stroke->color->value.blue == 0) {
+                sawBlack = true;
+            }
+            if (stroke->color->value.red > 200 && stroke->color->value.green > 150) {
+                sawYellow = true;
+            }
+        }
+    }
+    EXPECT_EQ(strokeElementCount, 2);
+    EXPECT_TRUE(sawBlack);
+    EXPECT_TRUE(sawYellow);
+}
+
 TEST(PagExporterTest, PrecompExports) {
     Document document;
     auto nested = std::make_unique<Composition>();

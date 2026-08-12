@@ -418,7 +418,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 | `ShapeEllipse` | `Ellipse` |
 | `ShapeTrimPath` / Stroke trim* | `TrimPath` |
 | `FillStyle` | `Fill` |
-| `StrokeStyle` | Shape `Stroke`（width/cap/join/miter）。`Inside`/`Outside` → **平行 ShapeLayer**（outline `ShapePath` + `Fill`；trim 先作用于 stroke 几何再做 Inside/Outside 布尔，对齐 MS）；trim 动画按帧烘焙 Path。`Center`+Trim → 平行层（Path+TrimPaths+Stroke），**禁止**把 TrimPaths 放进主层（会裁掉 Fill）。主层仅 Fill + 无 Trim 的 Center Stroke |
+| `StrokeStyle` | Shape `Stroke`（width/cap/join/miter）。`Inside`/`Outside` → **平行 ShapeLayer**（outline `ShapePath` + `Fill`；trim 先作用于 stroke 几何再做 Inside/Outside 布尔，对齐 MS）；trim 动画按帧烘焙 Path。`Center`+Trim → 平行层（Path+TrimPaths+Stroke），**禁止**把 TrimPaths 放进主层（会裁掉 Fill）。主层仅 Fill + 无 Trim 的 Center Stroke。**特例**：同一 MS 层拆出 ≥2 个 PAG 层且带 TrackMatte 时，导出侧包一层 **export-only Precomp**（宿主挂 opacity/timing/masks/blend/parent/trackMatte，空间 transform 为单位；内部层保留空间 transform、无 matte）。原因：① PAG decode 只把 matte 绑到 `layers[index-1]`；② 嵌套合成会 `clip(0,0,w,h)`，路径局部坐标常为负，空间 transform 必须留在内层。MS 暂无容器 UI，不依赖模型 Precomp |
 
 \* 若 trim 仅在 `StrokeStyle` 上：导出为 shape 内容链中的 TrimPath，行为对齐 MS 渲染。
 
@@ -527,6 +527,7 @@ Encode(file)
 | `UnsupportedBlendMode` | 混合模式无映射；无 `_bmp` 时附于 `MappingFailed` |
 | `StrokePositionBaked` | Inside/Outside 已导出为平行 outline ShapeLayer |
 | `StrokePositionBakeFailed` | 轮廓烘焙失败，该描边省略 |
+| `StrokeSiblingsWrappedForTrackMatte` | 同一 Shape 拆出多平行层且带 TrackMatte → 包进 export-only Precomp，宿主独占 matte 邻接 |
 | `StrokeTrimSeparated` | 带 Trim 的 Center Stroke 已拆到平行层，避免裁切 Fill |
 | `SpatialEasingApproximated` | 空间缓动被采样近似 |
 | `TextFeatureApproximated` | 文本特性部分丢失但仍矢量 |
@@ -582,7 +583,8 @@ Encode(file)
 
 2. **Track Matte**  
    - Decode 时 `InstallReferences` 把有 matte 的层的源**强制绑成** `layers[index - 1]`（只认邻接，不认任意指针）。导出后须把 matte 源排在目标层正上方。  
-   - AE exporter：`trackMatteLayer->isActive = false`。PAG 渲染跳过 `!isActive` 层，仅经 `trackMatteLayer` 采样。若源层仍 `isActive=true`，会当普通层画出（例如白色 silhouette 盖住蓝色 Luma 结果）。对齐 MS `usedAsMatteOnly`。
+   - AE exporter：`trackMatteLayer->isActive = false`。PAG 渲染跳过 `!isActive` 层，仅经 `trackMatteLayer` 采样。若源层仍 `isActive=true`，会当普通层画出（例如白色 silhouette 盖住蓝色 Luma 结果）。对齐 MS `usedAsMatteOnly`。  
+   - **多平行 stroke 层**：同一 MS Shape 因 Trim / Inside/Outside 拆成 ≥2 个 PAG 层时，不能让每个 sibling 都挂同一 matte（重排后只有一层邻接正确）。导出在 `buildShapeLayers` 末尾包 **export-only Precomp**：宿主 `PreComposeLayer` 承担 trackMatte（及 opacity/timing/masks/blend/parent；空间 transform 为单位）；内部层**保留空间 transform**、无 matte（嵌套合成 `clip(0,0,w,h)`，负局部坐标依赖层 position）。触发条件：`layers.size()>1` 且 MS 层有有效 track matte。warning：`StrokeSiblingsWrappedForTrackMatte`。
 
 3. **合成背景色**  
    - `Composition.backgroundColor` 会进文件，但很多预览器**不铺该字段**、只画图层。  
@@ -617,6 +619,7 @@ Encode(file)
 | Shape Rect/Ellipse/Path + Transform KF | Load 成功；ShapeLayer；关键帧数量符合 |
 | Fill + Stroke + Trim | shape contents 含对应元素 |
 | Fill + Inside/Outside Stroke | 主 ShapeLayer（Path+Fill）+ 两个平行 outline ShapeLayer；有 `StrokePositionBaked` warning |
+| 双 Trim Center Stroke + TrackMatte | 根合成一个 `PreComposeLayer` 挂 matte；内合成含两条 Stroke；`StrokeSiblingsWrappedForTrackMatte` |
 | Text + Fill/Stroke styles | TextDocument `applyFill`/`fillColor`/`applyStroke`/`strokeWidth` 正确 |
 | Text + `boxTextMode=false`（默认） | `boxText=false`；`firstBaseLine=0`；`position.y` 含 `+ ascent`（无 resolver 时 `fontSize*0.8`） |
 | Text + resolver | `position.y` 使用 resolver 返回的 ascent |

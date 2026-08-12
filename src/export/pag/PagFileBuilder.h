@@ -58,6 +58,13 @@ class PagFileBuilder {
     // Center stroke with Trim — own layer so TrimPaths cannot clip the main Fill.
     Expected<pag::ShapeLayer *, PagExportError> buildCenterTrimStrokeLayer(
         const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke);
+    // When one MS shape expands to ≥2 PAG layers AND has track matte, wrap them in an
+    // export-only Precomp (MS has no container UI yet). Host keeps opacity / timing /
+    // masks / blend / parent / trackMatte (spatial identity). Inners keep spatial
+    // transform so nested composition clip [0,0,w,h] does not discard negative local paths.
+    // Takes ownership of `siblings` on success.
+    Expected<pag::PreComposeLayer *, PagExportError> wrapStrokeSiblingsForTrackMatte(
+        const Layer &layer, std::vector<pag::Layer *> siblings);
     Expected<pag::NullLayer *, PagExportError> buildNullLayer(const Layer &layer);
     Expected<pag::TextLayer *, PagExportError> buildTextLayer(const Layer &layer);
     Expected<pag::ImageLayer *, PagExportError> buildImageLayer(const Layer &layer);
@@ -106,12 +113,14 @@ class PagFileBuilder {
     std::unordered_set<uint64_t> bitmapForcedCompositionIds_;
     std::unordered_map<uint64_t, pag::Composition *> compositionByEntity_;
     std::unordered_map<uint64_t, pag::Layer *> layerByEntity_;
-    // Parallel stroke outline layers for an MS shape entity (share parent / track matte).
+    // Parallel stroke outline layers for an MS shape entity (share parent / track matte)
+    // when NOT wrapped into an export-only Precomp (see wrapStrokeSiblingsForTrackMatte).
     std::unordered_map<uint64_t, std::vector<pag::Layer *>> strokeSiblingsByEntity_;
     std::unordered_map<uint64_t, pag::ImageBytes *> imageBytesByAsset_;
     std::vector<pag::ImageBytes *> imageBytesList_;
     std::vector<pag::Composition *> bitmapCompositions_;
-    // Inner comps created when wrapping corner-radius clip; owned until VerifyAndMake.
+    // Inner comps from corner-radius clip or stroke-sibling track-matte wrap; owned until
+    // VerifyAndMake.
     std::vector<pag::Composition *> nestedCompositions_;
     const Composition *currentHostComposition_ = nullptr;
     pag::ID nextLayerId_ = 1;

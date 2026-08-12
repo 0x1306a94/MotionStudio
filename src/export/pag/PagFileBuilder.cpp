@@ -185,6 +185,64 @@ void Warn(std::vector<PagExportWarning> *warnings, EntityId entityId, const char
     warnings->push_back(std::move(warning));
 }
 
+void SetTransformOpacityOpaque(pag::Transform2D *transform) {
+    if (transform == nullptr) {
+        return;
+    }
+    delete transform->opacity;
+    transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+}
+
+// Keep opacity; zero spatial so content placed by inner layers is not double-transformed.
+void SetTransformSpatialIdentity(pag::Transform2D *transform) {
+    if (transform == nullptr) {
+        return;
+    }
+    delete transform->anchorPoint;
+    delete transform->position;
+    delete transform->scale;
+    delete transform->rotation;
+    transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    transform->rotation = new pag::Property<float>(0);
+}
+
+// Nested VectorComposition clips to [0,0,w,h]. Shape paths are often centered at local
+// origin (negative coords); keep each sibling's spatial transform so content stays on-canvas.
+// Opacity / blend / masks / track matte stay on the host PreComposeLayer only.
+void RelocalizeLayerInsideStrokePrecomp(pag::Layer *layer, FrameTime duration) {
+    SetTransformOpacityOpaque(layer->transform);
+    for (pag::MaskData *mask : layer->masks) {
+        delete mask;
+    }
+    layer->masks.clear();
+    layer->parent = nullptr;
+    layer->trackMatteType = pag::TrackMatteType::None;
+    layer->trackMatteLayer = nullptr;
+    layer->startTime = 0;
+    layer->duration = duration;
+    layer->blendMode = pag::BlendMode::Normal;
+}
+
+bool GroupHasPaintStyle(const pag::ShapeGroupElement *group) {
+    if (group == nullptr) {
+        return false;
+    }
+    for (const pag::ShapeElement *element : group->elements) {
+        switch (element->type()) {
+            case pag::ShapeType::Fill:
+            case pag::ShapeType::Stroke:
+            case pag::ShapeType::GradientFill:
+            case pag::ShapeType::GradientStroke:
+                return true;
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
 uint8_t ChannelToU8(float channel) {
     const float clamped = std::min(1.0f, std::max(0.0f, channel));
     return static_cast<uint8_t>(std::lround(clamped * 255.0f));
@@ -1482,8 +1540,14 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
 
     pagLayer->contents.push_back(group);
 
+    // Trim / Inside / Outside strokes become sibling layers. If the main group has no paint
+    // (Path 22: only trimmed strokes), drop the empty Path-only main layer.
+    const bool keepMainLayer = GroupHasPaintStyle(group);
+
     std::vector<pag::Layer *> layers;
-    layers.push_back(pagLayer);
+    if (keepMainLayer) {
+        layers.push_back(pagLayer);
+    }
 
     for (const auto &stylePtr : layer.styles) {
         if (stylePtr->type() != LayerStyleType::Stroke) {
@@ -1501,6 +1565,9 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
             sibling = buildPositionedStrokeLayer(layer, *content.geometry, stroke);
         }
         if (!sibling.hasValue()) {
+            if (!keepMainLayer) {
+                delete pagLayer;
+            }
             for (pag::Layer *owned : layers) {
                 delete owned;
             }
@@ -1511,7 +1578,93 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
         }
         layers.push_back(sibling.value());
     }
+
+    if (!keepMainLayer) {
+        if (layers.empty()) {
+            layers.push_back(pagLayer);  // no drawable siblings — keep Path-only layer
+        } else {
+            delete pagLayer;
+        }
+    }
+
+    // PAG Codec::InstallReferences rebinds trackMatte to layers[index-1] only. Multiple
+    // parallel stroke layers from one MS shape cannot all sit under the same matte source.
+    // Wrap into an export-only Precomp (no MS container UI required); host alone carries matte.
+    if (layers.size() > 1 && layer.trackMatteType != TrackMatteType::None &&
+        layer.trackMatteLayerId.isValid()) {
+        Expected<pag::PreComposeLayer *, PagExportError> wrapped =
+            wrapStrokeSiblingsForTrackMatte(layer, std::move(layers));
+        if (!wrapped.hasValue()) {
+            // wrapStrokeSiblingsForTrackMatte always takes ownership of siblings.
+            return Unexpected(wrapped.error());
+        }
+        return std::vector<pag::Layer *>{wrapped.value()};
+    }
     return layers;
+}
+
+Expected<pag::PreComposeLayer *, PagExportError> PagFileBuilder::wrapStrokeSiblingsForTrackMatte(
+    const Layer &layer, std::vector<pag::Layer *> siblings) {
+    auto deleteSiblings = [&siblings]() {
+        for (pag::Layer *owned : siblings) {
+            delete owned;
+        }
+        siblings.clear();
+    };
+
+    if (currentHostComposition_ == nullptr || siblings.size() < 2) {
+        deleteSiblings();
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "",
+                                             "PAG export mapping failed"));
+    }
+    const FrameTime duration = layer.outPoint - layer.inPoint;
+    if (duration <= 0) {
+        deleteSiblings();
+        return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "",
+                                             "PAG export mapping failed"));
+    }
+    if (currentHostComposition_->frameRate.den == 0) {
+        deleteSiblings();
+        return Unexpected(MakePagExportError(PagExportErrorKind::InvalidOptions, {}, "", "",
+                                             "invalid PAG export options"));
+    }
+
+    auto *inner = new pag::VectorComposition();
+    inner->id = nextCompositionId_++;
+    inner->width = currentHostComposition_->width;
+    inner->height = currentHostComposition_->height;
+    inner->duration = duration;
+    inner->frameRate = static_cast<float>(currentHostComposition_->frameRate.num) /
+        static_cast<float>(currentHostComposition_->frameRate.den);
+    inner->backgroundColor = ToPagColor(Color{0, 0, 0, 0});
+
+    for (pag::Layer *sibling : siblings) {
+        RelocalizeLayerInsideStrokePrecomp(sibling, duration);
+        sibling->containingComposition = inner;
+    }
+    // siblings are MS bottom→top; PAG File order is index 0 = topmost.
+    std::reverse(siblings.begin(), siblings.end());
+    inner->layers = std::move(siblings);
+
+    auto *host = new pag::PreComposeLayer();
+    Expected<void, PagExportError> filled = fillCommonLayer(host, layer);
+    if (!filled.hasValue()) {
+        delete host;
+        // VectorComposition dtor deletes inner->layers (former siblings).
+        delete inner;
+        return Unexpected(filled.error());
+    }
+    host->composition = inner;
+    host->compositionStartTime = 0;
+    // Spatial on inners (avoids nested clip killing negative local path coords); host keeps
+    // opacity / timing / masks / blend / parent / trackMatte only.
+    SetTransformSpatialIdentity(host->transform);
+
+    nestedCompositions_.push_back(inner);
+    Warn(&warnings_, layer.id, "StrokeSiblingsWrappedForTrackMatte",
+         "Multiple stroke layers wrapped in export-only Precomp so a single host can carry "
+         "track matte (PAG binds matte to layers[index-1] only)");
+    return host;
 }
 
 Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildPositionedStrokeLayer(
