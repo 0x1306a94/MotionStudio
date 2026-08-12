@@ -21,7 +21,7 @@ struct StyleShaderPaintControls<BelowPaintMode: View>: View {
     @State private var editingShaderID: UInt64?
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let mode = paintMode
         let shaderID = core.styleShaderID(layerID: layerID, index: styleIndex)
 
@@ -51,7 +51,7 @@ struct StyleShaderPaintControls<BelowPaintMode: View>: View {
                     .pickerStyle(.menu)
                     .disabled(!isEditable || core.shaderIDs().isEmpty)
                     // Menu pickers cache option titles; recreate when the library changes.
-                    .id("style-shader-\(styleIndex)-\(core.revision)")
+                    .id("style-shader-\(styleIndex)-\(core.panelRevision)")
 
                     Button("Edit Source") {
                         if shaderID != 0 {

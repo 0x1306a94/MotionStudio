@@ -22,7 +22,7 @@ struct PathKeyframeInspector: View {
     private let path = ShapeProperty.path.path
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let hasKeyframe = core.keyframeFrames(entityID: layerID, path: path)
             .contains(playheadFrame)
         HStack {
@@ -40,7 +40,7 @@ struct PathKeyframeInspector: View {
             .help(hasKeyframe ? "Delete keyframe at playhead" : "Add keyframe at playhead")
         }
         .font(.callout)
-        .id("path-kf-\(core.revision)-\(hasKeyframe)")
+        .id("path-kf-\(core.panelRevision)-\(hasKeyframe)")
     }
 
     private func toggle(hasKeyframe: Bool) {

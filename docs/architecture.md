@@ -156,7 +156,7 @@ void      ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document,
 
 **内存约定**：所有由 C ABI 返回的字符串，一律经 `ms_string_free` 释放。
 
-**变更通知**：无回调机制——Swift 侧 `MotionDocumentCore` 在每次命令后自增 `revision`（`@Observable`），视图读取它来订阅模型变化。
+**变更通知**：无回调机制——Swift 侧 `MotionDocumentCore` 在每次命令后自增 `revision`（`@Observable`），并同步 bridge `contentRevision`。Canvas / Timeline（UIKit）与缓存失效读即时 `revision`。临时 SwiftUI 面板（Inspector / ProjectPanel）读 `panelRevision`（非 merge 同步；merge 推迟，松手立刻 flush）；计划用 UIKit 替换这些面板后删除 `panelRevision`。详见 [edit-drag-responsiveness.md](edit-drag-responsiveness.md)。
 
 ## 第三方依赖
 

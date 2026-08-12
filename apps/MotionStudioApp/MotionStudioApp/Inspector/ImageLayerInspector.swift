@@ -22,7 +22,7 @@ struct ImageLayerInspector: View {
     }
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let assets = core.imageAssetIDs()
         let boundAssetID = core.imageAssetID(layerID: layerID)
         let selectedAssetName = boundAssetID == 0 ? "None" : core.assetName(boundAssetID)

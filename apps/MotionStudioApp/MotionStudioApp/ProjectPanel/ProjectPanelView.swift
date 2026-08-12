@@ -19,7 +19,7 @@ struct ProjectPanelView: View {
 
     var body: some View {
         let core = document.core
-        let _ = core.revision
+        let _ = core.panelRevision
         let assets = core.assetIDs()
         let shaders = core.shaderIDs()
 
@@ -103,7 +103,7 @@ struct ProjectPanelView: View {
                                         .frame(width: 16)
                                     Text(core.shaderName(shaderID))
                                         .lineLimit(1)
-                                        .id("shader-name-\(shaderID)-\(core.revision)")
+                                        .id("shader-name-\(shaderID)-\(core.panelRevision)")
                                     Spacer(minLength: 0)
                                 }
                                 .font(.subheadline)
@@ -123,7 +123,7 @@ struct ProjectPanelView: View {
                                 }
                             }
                         }
-                        .id("shader-list-\(core.revision)")
+                        .id("shader-list-\(core.panelRevision)")
                     }
                     .frame(maxHeight: 180)
                 }

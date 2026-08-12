@@ -22,7 +22,7 @@ struct FollowPathInspector: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let enabled = core.followPathEnabled(layerID: layerID)
         let pathLayerID = core.followPathLayerID(layerID: layerID)
         let orient = core.followPathOrient(layerID: layerID)
@@ -41,7 +41,7 @@ struct FollowPathInspector: View {
             }
         }
         .disabled(!isEditable || !enabled)
-        .id("follow-path-layer-\(pathLayerID)-\(core.revision)")
+        .id("follow-path-layer-\(pathLayerID)-\(core.panelRevision)")
 
         Toggle("Orient Along Path", isOn: orientBinding)
             .disabled(!isEditable || !enabled)

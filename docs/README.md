@@ -13,6 +13,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、Lottie/序列帧导出边界、线程模型 |
 | [color-source-effect.md](color-source-effect.md) | ColorSourceEffect / RenderCache：过程色填充、离屏路径、pipeline 指纹与 UBO 三缓冲、调用约定 |
 | [libpag-rendering-optimization-notes.md](libpag-rendering-optimization-notes.md) | libpag 渲染优化对照：contentVersion / 静帧缓存 / Snapshot / maxFrameRate 等，及对 MotionStudio 持续播放高 CPU 的改进建议 |
+| [edit-drag-responsiveness.md](edit-drag-responsiveness.md) | 编辑拖动跟手：`revision` vs `panelRevision`、Timeline merge 推迟、点文本缓存；SwiftUI→UIKit 后删除清单 |
 | [superpowers/specs/2026-07-31-pag-export-design.md](superpowers/specs/2026-07-31-pag-export-design.md) | PAG 导出设计；**§0 已落地**：唯一 tgfx 源 + Metal 预编译 + `pag_codec`（base+codec），及取舍原因 |
 | [superpowers/specs/2026-07-29-playback-cpu-optimization-design.md](superpowers/specs/2026-07-29-playback-cpu-optimization-design.md) | 播放预览 CPU：Phase 1/2 已落地；Phase 3 GPU Snapshot 取消及原因 |
 | [superpowers/specs/2026-07-29-timeline-uikit-migration-design.md](superpowers/specs/2026-07-29-timeline-uikit-migration-design.md) | 底部 Timeline 已迁 UIKit（按职责分子目录）；PlayheadClock listener + 保留 @Observable |

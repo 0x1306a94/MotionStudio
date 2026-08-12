@@ -33,7 +33,7 @@ struct TextLayerInspector: View {
     }
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let size = core.textSize(layerID: layerID)
         let fontSize = core.textFontSize(layerID: layerID)
         let boxTextMode = core.textBoxTextMode(layerID: layerID)

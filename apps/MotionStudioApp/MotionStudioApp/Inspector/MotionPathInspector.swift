@@ -27,7 +27,7 @@ struct MotionPathInspector: View {
     private let path = "transform.position"
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let frames = core.keyframeFrames(entityID: layerID, path: path)
         if frames.count >= 2 {
             let segment = resolveSegment(frameCount: frames.count)

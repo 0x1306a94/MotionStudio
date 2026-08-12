@@ -21,7 +21,7 @@ struct TransformInspector: View {
 
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
-        let _ = core.revision
+        let _ = core.panelRevision
         let followEnabled = core.followPathEnabled(layerID: layerID)
         let followOrients = core.followPathOrient(layerID: layerID)
         let positionEditable = isEditable && !followEnabled

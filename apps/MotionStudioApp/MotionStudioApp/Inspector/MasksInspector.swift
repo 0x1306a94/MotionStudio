@@ -24,7 +24,7 @@ struct MasksInspector: View {
 
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
-        let _ = core.revision
+        let _ = core.panelRevision
         let count = core.maskCount(layerID: layerID)
         HStack {
             Text("Masks")
@@ -59,7 +59,7 @@ struct MasksInspector: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .fixedSize()
-                .id("mask-mode-\(index)-\(core.revision)")
+                .id("mask-mode-\(index)-\(core.panelRevision)")
                 Button {
                     setInverted(index: index, inverted: !inverted)
                 } label: {
@@ -103,7 +103,7 @@ struct MasksInspector: View {
             floatPropertyRow(index: index, property: .expansion, label: "Expansion")
         }
         .padding(.vertical, 2)
-        .id("mask-row-\(index)-\(core.revision)")
+        .id("mask-row-\(index)-\(core.panelRevision)")
     }
 
     private func floatPropertyRow(index: Int, property: MaskProperty, label: String) -> some View {
@@ -133,7 +133,7 @@ struct MasksInspector: View {
                 }
             }
         }
-        .id("mask-\(path)-\(core.revision)-\(hasKeyframe)")
+        .id("mask-\(path)-\(core.panelRevision)-\(hasKeyframe)")
     }
 
     private func hasKeyframeAtPlayhead(path: String) -> Bool {

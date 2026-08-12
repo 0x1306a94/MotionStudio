@@ -22,7 +22,7 @@ struct TextPathInspector: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let enabled = core.textPathEnabled(layerID: layerID)
         let pathLayerID = core.textPathLayerID(layerID: layerID)
 
@@ -40,7 +40,7 @@ struct TextPathInspector: View {
             }
         }
         .disabled(!isEditable || !enabled)
-        .id("text-path-layer-\(pathLayerID)-\(core.revision)")
+        .id("text-path-layer-\(pathLayerID)-\(core.panelRevision)")
 
         Toggle("Reversed", isOn: reversedBinding)
             .disabled(!isEditable || !enabled)

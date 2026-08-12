@@ -24,13 +24,18 @@ enum PagExportError: Error {
 /// serialization to the SwiftUI layer.
 ///
 /// The document model lives in C++; SwiftUI cannot track its individual
-/// properties. `revision` is bumped after every mutation so views that read
-/// it re-evaluate — the standard pattern for reference-backed document models.
+/// properties. `revision` is bumped after every mutation for canvas / bridge
+/// caches / UIKit. Temporary SwiftUI panels subscribe to `panelRevision`
+/// instead (deferred while `mergeGroupDepth > 0`); remove when UIKit replaces them.
 @MainActor
 @Observable
 final class MotionDocumentCore {
-    /// Bumped after every mutation; views read it to subscribe to changes.
+    /// Bumped after every mutation; canvas, timeline, and bridge caches read this.
     private(set) var revision: Int = 0
+
+    /// Coalesced revision for temporary SwiftUI panels (Inspector / ProjectPanel).
+    /// Tracks `revision` immediately when not merging; flush on merge end.
+    private(set) var panelRevision: Int = 0
 
     @ObservationIgnored
     private nonisolated(unsafe) let handle: OpaquePointer
@@ -40,6 +45,9 @@ final class MotionDocumentCore {
     /// (title-bar dot, close prompt, Save menu item).
     @ObservationIgnored
     var onDidChange: (@MainActor () -> Void)?
+
+    @ObservationIgnored
+    private var panelRevisionPending = false
 
     /// Construction is main-actor independent (plain C calls), so document
     /// creation works from @Sendable contexts like DocumentGroup.makeDocument.
@@ -312,6 +320,9 @@ final class MotionDocumentCore {
         ms_document_end_merge_group(handle)
         if mergeGroupDepth > 0 {
             mergeGroupDepth -= 1
+        }
+        if mergeGroupDepth == 0 {
+            flushPanelRevision()
         }
     }
 
@@ -1799,6 +1810,24 @@ final class MotionDocumentCore {
         revision += 1
         ms_document_set_content_revision(handle, UInt64(revision))
         onDidChange?()
+        if mergeGroupDepth > 0 {
+            panelRevisionPending = true
+        } else {
+            panelRevisionPending = false
+            if panelRevision != revision {
+                panelRevision = revision
+            }
+        }
+    }
+
+    private func flushPanelRevision() {
+        guard panelRevisionPending || panelRevision != revision else {
+            return
+        }
+        panelRevisionPending = false
+        if panelRevision != revision {
+            panelRevision = revision
+        }
     }
 
     private nonisolated static func rationalFrameRate(_ framesPerSecond: Float) -> (num: UInt32, den: UInt32) {

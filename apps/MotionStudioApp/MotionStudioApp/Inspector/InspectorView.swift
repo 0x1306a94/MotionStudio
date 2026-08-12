@@ -26,7 +26,7 @@ struct InspectorView: View {
         GeometryReader { proxy in
             let core = document.core
             if let layerID = editorState.selectedLayerID {
-                let _ = core.revision
+                let _ = core.panelRevision
                 let isVisible = core.layerIsVisible(layerID)
                 let isLocked = core.layerIsLocked(layerID)
                 let isEditable = isVisible && !isLocked

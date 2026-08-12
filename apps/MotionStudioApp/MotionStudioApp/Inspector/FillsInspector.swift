@@ -25,7 +25,7 @@ struct FillsInspector: View {
 
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
-        let _ = core.revision
+        let _ = core.panelRevision
         // Newest / topmost paint first (matches Figma: list top = draw top).
         let fills = Array(fillIndices().reversed())
         HStack {

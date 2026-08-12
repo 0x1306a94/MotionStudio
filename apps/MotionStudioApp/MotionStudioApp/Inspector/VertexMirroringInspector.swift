@@ -25,7 +25,7 @@ struct VertexMirroringInspector: View {
     }
 
     private var degree: Int {
-        let _ = core.revision
+        let _ = core.panelRevision
         return core.networkVertexDegree(entityID: layerID, path: path, frame: playheadFrame,
                                         vertexId: vertexId)
     }
@@ -33,7 +33,7 @@ struct VertexMirroringInspector: View {
     private var modeBinding: Binding<MS_VERTEX_MIRROR> {
         Binding(
             get: {
-                _ = core.revision
+                _ = core.panelRevision
                 return core.networkVertexMirrorMode(entityID: layerID, path: path,
                                                     frame: playheadFrame, vertexId: vertexId)
             },
@@ -51,7 +51,7 @@ struct VertexMirroringInspector: View {
     }
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         VStack(alignment: .leading, spacing: 4) {
             Text("Mirroring")
                 .font(.caption)

@@ -24,7 +24,7 @@ struct ShapeSizeInspector: View {
 
     var body: some View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
-        let _ = core.revision
+        let _ = core.panelRevision
         let size = core.evaluateVec2(entityID: layerID, path: shapeSizePath, frame: playheadFrame)
 
         NumberPropertyRow(label: ShapeSizeField.width.label,

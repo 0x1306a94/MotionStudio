@@ -16,7 +16,7 @@ struct TrackMatteInspector: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let type = currentType
         let sourceID = core.trackMatteLayerID(layerID: layerID)
         Text("Track Matte")
@@ -32,7 +32,7 @@ struct TrackMatteInspector: View {
             .pickerStyle(.menu)
             .fixedSize()
             .disabled(!isEditable)
-            .id("track-matte-type-\(type.rawValue)-\(core.revision)")
+            .id("track-matte-type-\(type.rawValue)-\(core.panelRevision)")
 
             Picker("Source", selection: sourceBinding) {
                 Text("None").tag(UInt64(0))
@@ -43,7 +43,7 @@ struct TrackMatteInspector: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .disabled(!isEditable || type == .NONE)
-            .id("track-matte-source-\(sourceID)-\(core.revision)")
+            .id("track-matte-source-\(sourceID)-\(core.panelRevision)")
         }
     }
 

@@ -14,7 +14,7 @@ struct CompositionInspector: View {
     let perform: (String, () -> Void) -> Void
 
     var body: some View {
-        let _ = core.revision
+        let _ = core.panelRevision
         let color = core.backgroundColor(compositionID: compositionID)
         let size = core.size(compositionID: compositionID)
 
