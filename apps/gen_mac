@@ -30,5 +30,6 @@ ${@} \
 
 
 echo "[*] patch xcode project file PATH environment"
-sed -i '' "s#shellScript = \"#shellScript = \"source ~/.zshenv\\n#" "$GEN_XCODE_PROJEC_FILE"
+# sed -i '' "s#shellScript = \"#shellScript = \"source ~/.zshenv\\n#" "$GEN_XCODE_PROJEC_FILE"
+sed -i '' "s#shellPath = /bin/sh#shellPath = /bin/zsh#" "$GEN_XCODE_PROJEC_FILE"
 echo "[*] Patch done."

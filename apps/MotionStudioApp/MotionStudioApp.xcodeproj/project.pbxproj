@@ -31,12 +31,6 @@
 		3C3F01F5300F477800C76B6A /* MotionStudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MotionStudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C3F0205300F477900C76B6A /* MotionStudioAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MotionStudioAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C3F020F300F477900C76B6A /* MotionStudioAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MotionStudioAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		3C3F0234300F47BB00C76B6A /* libmotionstudio_core.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_core.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		3C3F0235300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_tgfx_adapter.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		3C3F0236300F47BB00C76B6A /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		4BA6486A3014522F00A310A7 /* libmotionstudio_bridge.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_bridge.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		4BA6486C3014527C00A310A7 /* libmotionstudio_core.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_core.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		4BA6486D3014527C00A310A7 /* libmotionstudio_tgfx_adapter.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = libmotionstudio_tgfx_adapter.a; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -114,7 +108,6 @@
 				3C3F01F7300F477800C76B6A /* MotionStudioApp */,
 				3C3F0208300F477900C76B6A /* MotionStudioAppTests */,
 				3C3F0212300F477900C76B6A /* MotionStudioAppUITests */,
-				3C3F0233300F47BB00C76B6A /* Frameworks */,
 				3C3F01F6300F477800C76B6A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -127,19 +120,6 @@
 				3C3F020F300F477900C76B6A /* MotionStudioAppUITests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		3C3F0233300F47BB00C76B6A /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				4BA6486C3014527C00A310A7 /* libmotionstudio_core.a */,
-				4BA6486D3014527C00A310A7 /* libmotionstudio_tgfx_adapter.a */,
-				4BA6486A3014522F00A310A7 /* libmotionstudio_bridge.a */,
-				3C3F0234300F47BB00C76B6A /* libmotionstudio_core.a */,
-				3C3F0235300F47BB00C76B6A /* libmotionstudio_tgfx_adapter.a */,
-				3C3F0236300F47BB00C76B6A /* tgfx.a */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
