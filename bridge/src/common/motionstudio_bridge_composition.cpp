@@ -19,6 +19,7 @@
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
 #include "MSDocument.h"
+#include "ProfileClock.h"
 
 using namespace bridge;
 

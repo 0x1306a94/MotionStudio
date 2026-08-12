@@ -1,6 +1,5 @@
 #include "motionstudio_bridge.h"
 
-#include <chrono>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -10,6 +9,7 @@
 #include "FrameCommandCache.h"
 #include "MSCanvas.h"
 #include "MSDocument.h"
+#include "ProfileClock.h"
 
 #include <cmath>
 
@@ -26,13 +26,9 @@
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 
 using motion::EntityId;
+using namespace bridge;
 
 namespace {
-using ProfileClock = std::chrono::steady_clock;
-
-double Milliseconds(ProfileClock::time_point start, ProfileClock::time_point end) {
-    return std::chrono::duration<double, std::milli>(end - start).count();
-}
 
 motion::Mat3 Mat3FromOverlay(const MSPathOverlayItem &item) {
     motion::Mat3 matrix = motion::Mat3::Identity();
