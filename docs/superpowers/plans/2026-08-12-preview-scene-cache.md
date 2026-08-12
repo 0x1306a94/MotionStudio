@@ -511,13 +511,13 @@ EOF
 
 ### Task 6: 收尾验证
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-12-preview-scene-cache-design.md`（状态改为已实现，可选）
 - Modify: 本 plan 全部 Task `**Status:** ✅ Done`
 
-- [ ] **Step 1: ASan 全量 bridge + 相关 core 测试**
+- [x] **Step 1: ASan 全量 bridge + 相关 core 测试**
 
 ```bash
 cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON
@@ -526,14 +526,14 @@ ctest --test-dir build -R 'bridge_test|Bridge' --output-on-failure
 ```
 Expected: PASS
 
-- [ ] **Step 2: 手测清单（勾选记录）**
+- [x] **Step 2: 手测清单（勾选记录）**
 
 - 编辑静止：拖选/hover 流畅，无刷屏 evaluate 日志（printf 应已删）
 - 播放中点击画布：不改变选中
 - 暂停后点选：正常
 - 循环播放：第二圈无明显 evaluate/build 尖峰（Instruments 或既有 frame profile 可选）
 
-- [ ] **Step 3: 更新 plan/spec 状态并 commit**
+- [x] **Step 3: 更新 plan/spec 状态并 commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'

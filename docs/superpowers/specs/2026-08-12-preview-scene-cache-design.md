@@ -2,7 +2,9 @@
 
 > 日期：2026-08-12  
 > 相关：[2026-07-29-playback-cpu-optimization-design.md](./2026-07-29-playback-cpu-optimization-design.md)（Phase 2 仅在 PLAYBACK 缓存 `DrawCommandList`）  
-> 状态：设计已确认，待实现
+> 状态：已实现
+
+补充：`Execute` / undo / redo 会 `previewSceneCache.clear()`，避免 bridge 测试与未推送 revision 的调用方读到过期 SceneState。`FrameCommandCache` 仍靠 `contentRevision` 失效。
 
 ## 目标
 
