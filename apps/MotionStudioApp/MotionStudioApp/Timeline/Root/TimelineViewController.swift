@@ -38,6 +38,10 @@ final class TimelineViewController: UIViewController {
     private var isObservingZoom = false
     private var isObservingSelection = false
     private var isTimeRangeDragging = false
+    /// Revision seen by the last timeline structural reload / observation tick.
+    private var observedDocumentRevision = 0
+    /// Set when revision changes inside a merge group; flushed when merge ends.
+    private var deferDocumentReload = false
     private var splitDragStartWidth: CGFloat?
     private var horizontalPanStartScrollX: CGFloat?
     private var easingHost: UIViewController?
@@ -275,6 +279,8 @@ final class TimelineViewController: UIViewController {
 
     private func reloadFromDocument() {
         let core = document.core
+        observedDocumentRevision = core.revision
+        deferDocumentReload = false
         let compositionID = core.firstCompositionID
         scrollCoordinator.duration = core.duration(compositionID: compositionID)
         let frameRate = core.frameRate(compositionID: compositionID)
@@ -344,14 +350,36 @@ final class TimelineViewController: UIViewController {
         isObservingDocument = true
         withObservationTracking {
             _ = document.core.revision
+            _ = document.core.mergeGroupDepth
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, isObservingDocument else {
                     return
                 }
-                reloadFromDocument()
+                handleDocumentObservation()
                 observeDocumentRevision()
             }
+        }
+    }
+
+    /// Skips structural timeline rebuilds during merge-group drags (canvas
+    /// transform, inspector scrub, track edits). Reloads once when the merge
+    /// ends or when revision changes outside a merge.
+    private func handleDocumentObservation() {
+        let core = document.core
+        let revision = core.revision
+        let merging = core.mergeGroupDepth > 0
+        if revision != observedDocumentRevision {
+            observedDocumentRevision = revision
+            if merging {
+                deferDocumentReload = true
+                return
+            }
+            reloadFromDocument()
+            return
+        }
+        if !merging, deferDocumentReload {
+            reloadFromDocument()
         }
     }
 

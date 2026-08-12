@@ -349,11 +349,17 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     // MARK: - Playback
 
     private func configurePlayback(_ playing: Bool, wasPlaying: Bool) {
-        // Align display callbacks with content frame rate so playback does not
-        // evaluate unique sub-frames at 60/120Hz.
-        let preferredFramesPerSecond = max(1, Int(frameRate.rounded()))
-        metalView.preferredFramesPerSecond = preferredFramesPerSecond
-        playbackFramesPerSecond = Double(preferredFramesPerSecond)
+        // Playback stays on composition FPS so we do not evaluate unique
+        // sub-frames at 60/120Hz. Edit uses display refresh so selection /
+        // handle drags stay responsive on ProMotion.
+        let compositionFramesPerSecond = max(1, Int(frameRate.rounded()))
+        playbackFramesPerSecond = Double(compositionFramesPerSecond)
+        if playing {
+            metalView.preferredFramesPerSecond = compositionFramesPerSecond
+        } else {
+            let screen = view.window?.windowScene?.screen ?? UIScreen.main
+            metalView.preferredFramesPerSecond = max(1, screen.maximumFramesPerSecond)
+        }
         metalView.enableSetNeedsDisplay = !playing
         metalView.isPaused = !playing
         if let canvas {

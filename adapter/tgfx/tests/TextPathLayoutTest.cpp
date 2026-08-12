@@ -74,6 +74,15 @@ TEST(TextPathLayoutTest, EmptyPathYieldsNoGlyphs) {
     EXPECT_TRUE(result.glyphs.empty());
 }
 
+TEST(TextPathLayoutTest, MeasurePointTextSizeIsStableAcrossCalls) {
+    const Vec2 first = MeasurePointTextSize("CacheMe", 24.0f, TextAlign::Left, "Helvetica", "");
+    const Vec2 second = MeasurePointTextSize("CacheMe", 24.0f, TextAlign::Left, "Helvetica", "");
+    EXPECT_FLOAT_EQ(first.x, second.x);
+    EXPECT_FLOAT_EQ(first.y, second.y);
+    EXPECT_GE(first.x, 1.0f);
+    EXPECT_GE(first.y, 1.0f);
+}
+
 TEST(TextPathLayoutTest, ArcPathBoundsDifferFromPointTextBox) {
     BezierPath arc = MakeSingleContour({{{0.0f, 100.0f}, {0.0f, 0.0f}, {55.0f, 0.0f}},
                                         {{100.0f, 0.0f}, {0.0f, 55.0f}, {0.0f, 0.0f}}},

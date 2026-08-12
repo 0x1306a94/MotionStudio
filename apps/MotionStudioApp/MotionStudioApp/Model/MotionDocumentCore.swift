@@ -296,14 +296,23 @@ final class MotionDocumentCore {
         }
     }
 
+    /// Nested `beginMergeGroup` / `endMergeGroup` depth. Continuous edits
+    /// (canvas drag, inspector scrub) keep this > 0 so UI can defer structural
+    /// reloads until the gesture ends.
+    private(set) var mergeGroupDepth: Int = 0
+
     /// Opens a merge window so mixed property edits become one undo unit.
     func beginMergeGroup() {
         ms_document_begin_merge_group(handle)
+        mergeGroupDepth += 1
     }
 
     /// Closes the core's merge window.
     func endMergeGroup() {
         ms_document_end_merge_group(handle)
+        if mergeGroupDepth > 0 {
+            mergeGroupDepth -= 1
+        }
     }
 
     // MARK: - Composition queries
