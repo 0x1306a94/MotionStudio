@@ -500,24 +500,36 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private func resetViewTransform() {
         let compositionSize = document.core.size(compositionID: compositionID)
         let drawableSize = metalView.drawableSize
-        let freeRect = view.bounds
-            .inset(by: viewportInsetsProvider?() ?? .zero)
-            .insetBy(dx: Self.viewportFitMargin, dy: Self.viewportFitMargin)
         guard compositionSize.width > 0,
               compositionSize.height > 0,
               drawableSize.width > 0,
               drawableSize.height > 0,
               view.bounds.width > 0,
-              freeRect.width > 0,
-              freeRect.height > 0
+              view.bounds.height > 0
         else {
             canvasZoom = 1
             canvasPan = .zero
             pushViewTransform()
             return
         }
-        // Base fit mirroring the adapter's on-screen transform, then re-solve
-        // zoom/pan so the composition lands fully inside the unobscured rect.
+        let contentsScale = drawableSize.width / view.bounds.width
+        // Insets / margin are authored in points; convert once and fit in drawable pixels.
+        let freeRectPoints = view.bounds
+            .inset(by: viewportInsetsProvider?() ?? .zero)
+            .insetBy(dx: Self.viewportFitMargin, dy: Self.viewportFitMargin)
+        let freeRectPixels = CGRect(x: freeRectPoints.minX * contentsScale,
+                                    y: freeRectPoints.minY * contentsScale,
+                                    width: freeRectPoints.width * contentsScale,
+                                    height: freeRectPoints.height * contentsScale)
+        guard freeRectPixels.width > 0, freeRectPixels.height > 0 else {
+            canvasZoom = 1
+            canvasPan = .zero
+            pushViewTransform()
+            return
+        }
+
+        // Mirror adapter base fit (≤100% into full drawable), then choose zoom so
+        // the composition fills the free rect in pixel space (zoom may exceed 1).
         let fitScale = min(1, min(drawableSize.width / compositionSize.width,
                                   drawableSize.height / compositionSize.height))
         let destWidth = max(1, floor(compositionSize.width * fitScale + 0.000001))
@@ -526,16 +538,18 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let fitScaleY = destHeight / compositionSize.height
         let offsetX = floor((drawableSize.width - destWidth) * 0.5)
         let offsetY = floor((drawableSize.height - destHeight) * 0.5)
-        let contentsScale = drawableSize.width / view.bounds.width
 
-        let targetScale = min(1, min(freeRect.width * contentsScale / compositionSize.width,
-                                     freeRect.height * contentsScale / compositionSize.height))
+        let targetScale = min(freeRectPixels.width / compositionSize.width,
+                              freeRectPixels.height / compositionSize.height)
         let zoom = min(targetScale / fitScaleX, targetScale / fitScaleY)
         canvasZoom = min(max(zoom, Self.minCanvasZoom), Self.maxCanvasZoom)
-        let displayedWidth = compositionSize.width * canvasZoom * fitScaleX / contentsScale
-        let displayedHeight = compositionSize.height * canvasZoom * fitScaleY / contentsScale
-        canvasPan = CGPoint(x: freeRect.midX - displayedWidth * 0.5 - canvasZoom * offsetX / contentsScale,
-                            y: freeRect.midY - displayedHeight * 0.5 - canvasZoom * offsetY / contentsScale)
+
+        let displayedWidth = compositionSize.width * canvasZoom * fitScaleX
+        let displayedHeight = compositionSize.height * canvasZoom * fitScaleY
+        let panXPixels = freeRectPixels.midX - displayedWidth * 0.5 - canvasZoom * offsetX
+        let panYPixels = freeRectPixels.midY - displayedHeight * 0.5 - canvasZoom * offsetY
+        // Adapter pan API is in points.
+        canvasPan = CGPoint(x: panXPixels / contentsScale, y: panYPixels / contentsScale)
         pushViewTransform()
     }
 
