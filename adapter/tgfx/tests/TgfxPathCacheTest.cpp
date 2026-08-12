@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <tgfx/core/Rect.h>
+
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -42,6 +44,22 @@ TEST(TgfxPathCacheTest, MaskExpandedDifferentExpansionMisses) {
 
     EXPECT_FALSE(grow.isSame(shrink));
     EXPECT_NE(grow, shrink);
+}
+
+// AE / PAG: negative expansion shrinks to a smaller solid (center stays covered).
+TEST(TgfxPathCacheTest, MaskExpandedNegativeShrinksSolidNotRing) {
+    TgfxPathCache cache;
+    const auto geometry = MakeRectGeometry(Vec2{0, 0}, Vec2{200, 200}, 0.0f);
+    const tgfx::Path source = cache.Resolve(geometry, FillRule::NonZero);
+    const tgfx::Path shrink = cache.ResolveMaskExpanded(geometry, FillRule::NonZero, -40.0f, source);
+
+    const tgfx::Rect sourceBounds = source.getBounds();
+    const tgfx::Rect shrinkBounds = shrink.getBounds();
+    EXPECT_FALSE(shrink.isEmpty());
+    EXPECT_LT(shrinkBounds.width(), sourceBounds.width());
+    EXPECT_LT(shrinkBounds.height(), sourceBounds.height());
+    EXPECT_TRUE(shrink.contains(0.0f, 0.0f));
+    EXPECT_FALSE(shrink.contains(95.0f, 0.0f));
 }
 
 TEST(TgfxPathCacheTest, ClearDropsCachedPathRefs) {

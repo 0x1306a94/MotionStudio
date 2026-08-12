@@ -253,6 +253,44 @@ TEST(TgfxRenderAdapterTest, PathMaskAddClipsLayerContent) {
     EXPECT_NEAR(outside.r, 0, 8);
 }
 
+// Inv must use content bounds as the coverage clip; path-only bounds make inverse
+// fill empty (clip == path) so Inv appears to do nothing.
+TEST(TgfxRenderAdapterTest, PathMaskInvertedRevealsOutsidePath) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{80, 80});
+    item.paint = Paint{Color{1, 0, 0, 1}};
+    layer.shapeItems.push_back(item);
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Add;
+    mask.inverted = true;
+    BezierPath path = MakeSingleContour(
+        {{{40, 40}, {}, {}}, {{60, 40}, {}, {}}, {{60, 60}, {}, {}}, {{40, 60}, {}, {}}}, true);
+    mask.path = path;
+    layer.masks.push_back(mask);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel insideMask = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(insideMask.r, 0, 8);
+    const Pixel outsideMaskInsideContent = PixelAt(pixels, 100, 20, 50);
+    EXPECT_NEAR(outsideMaskInsideContent.r, 255, 8);
+}
+
 TEST(TgfxRenderAdapterTest, PathMaskFeatherSoftensEdge) {
     auto adapter = TgfxRenderAdapter::Make(100, 100);
     if (!adapter) {

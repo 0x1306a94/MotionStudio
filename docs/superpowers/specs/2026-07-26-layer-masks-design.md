@@ -187,7 +187,7 @@ Restore
 
 - `BeginLayer`：分配/压入离屏 surface（或等价 `saveLayer`）
 - 内容绘制进当前离屏
-- `BeginMask`/`EndMask`：另开 coverage 缓冲；PathCoverage 内绘制白色 path（expansion → stroke/offset 近似或 path 扩张；feather → blur）；按 mode 与 inverted/opacity 累积；Matte 模式按 alpha/luma/反相写入 coverage
+- `BeginMask`/`EndMask`：有 content bounds 时在**有限 Surface**上画 mask；Inv 用 `contentBounds − path`（不用 inverse fill type，避免几何 bounds 不变导致无像素）；expansion 对齐 AE/libpag `ExpandPath`；feather → blur；按 mode/opacity 累积；Matte 按 alpha/luma/反相写入 coverage
 - `EndLayer`：用 coverage 作 mask filter 合成到父级
 
 离屏/上屏适配器共享基类实现。无 mask 的层保持现有直接绘制路径。
@@ -279,10 +279,12 @@ Composition
 
 1. 选中 **Ellipse**；Track Matte → **None**。
 2. Inspector → **Masks** → `+`（path 应为椭圆外形快照，非固定方框）。
-3. **Expansion** → **-40**（或更负）→ Ellipse 边缘被明显裁小。
+3. **Expansion** → **-40**（或更负）→ Ellipse **边缘被明显裁小**（仍是实心，中心保留）。
   - 正数 = 扩张 mask；若 mask 已完全盖住图层内容，正数**看不出变化**（先缩再扩可验证）。  
+  - **单 mask 镂空框**：Mode=**Add** + 负 Expansion + 勾选 **Inv**（path 贴合外形时，Inv 露出「外形 − 内缩 mask」的环带）。  
+  - 也可用两条 mask：外圈 Add + 内圈 Subtract（不必勾 Inv）。  
   - Inv 按钮选中时应有高亮描边/底色。
-4. 勾选 **Inv** → 方框外/挖空类效果；再点取消 → 恢复，按钮高亮同步消失。
+4. 勾选 **Inv**（Expansion=0）→ path 外可见、path 内挖空；再点取消 → 恢复，按钮高亮同步消失。
 5. **Feather** → **20~40** → 边缘变软；再改回 **0** → 硬边恢复。
   - 若该属性已有关键帧，改值必须打在当前时间关键帧上（菱形应立即高亮）。
 6. Mask **Opacity** → **0.3** → 裁切区半透（不是整层 opacity）。

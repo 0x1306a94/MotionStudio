@@ -38,21 +38,20 @@ tgfx::Path BuildPositionedStrokeOutline(const tgfx::Path &strokeGeometry,
     return outline;
 }
 
-// Miter/Butt keep hard corners; Round made shrink look like residual feather.
+// Match libpag ExpandPath / AE Mask Expansion: stroke band width = 2*|expansion|,
+// grow = Union, shrink = Difference (smaller solid — not the stroke∩source ring).
 tgfx::Path BuildMaskExpandedPath(const tgfx::Path &sourcePath, float expansion) {
-    tgfx::Stroke stroke(std::abs(expansion) * 2.0f, tgfx::LineCap::Butt, tgfx::LineJoin::Miter);
+    tgfx::Stroke stroke(std::abs(expansion) * 2.0f, tgfx::LineCap::Butt, tgfx::LineJoin::Round);
     tgfx::Path stroked = sourcePath;
     if (!stroke.applyToPath(&stroked)) {
         return sourcePath;
     }
+    tgfx::Path result = sourcePath;
     if (expansion > 0.0f) {
-        tgfx::Path result = sourcePath;
         result.addPath(stroked, tgfx::PathOp::Union);
-        return result;
+    } else {
+        result.addPath(stroked, tgfx::PathOp::Difference);
     }
-    // Shrink: keep the inner half of the stroke band.
-    tgfx::Path result = stroked;
-    result.addPath(sourcePath, tgfx::PathOp::Intersect);
     return result;
 }
 

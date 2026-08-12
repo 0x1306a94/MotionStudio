@@ -180,7 +180,7 @@ struct Mask {
     Animatable<float> opacity{1};
     bool inverted = false;
     Animatable<float> feather{0};    // 羽化半径 px
-    Animatable<float> expansion{0};  // 扩张/收缩 px（可负）
+    Animatable<float> expansion{0};  // 扩张/收缩 px（可负）；负值=mask 内缩为更小实心（AE/PAG）。单 mask 镂空：Add + 负 expansion + inverted
 };
 ```
 

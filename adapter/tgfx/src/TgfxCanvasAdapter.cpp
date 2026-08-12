@@ -1,6 +1,7 @@
 #include "TgfxCanvasAdapter.h"
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <utility>
@@ -51,6 +52,30 @@ void DrawMaskPathContribution(tgfx::Canvas *target, const tgfx::Path &path, floa
     paint.setColor(tgfx::Color::FromRGBA(255, 255, 255, ToByte(opacity)));
     paint.setBlendMode(ToMaskBlendMode(mode));
     target->drawPath(path, paint);
+}
+
+void NoteIsolationContentBounds(IsolationLayer &layer, tgfx::Canvas *canvas,
+                                const tgfx::Rect &localBounds) {
+    if (layer.masking || canvas == nullptr || canvas != layer.contentCanvas ||
+        localBounds.isEmpty()) {
+        return;
+    }
+    const tgfx::Rect mapped = canvas->getMatrix().mapRect(localBounds);
+    if (mapped.isEmpty()) {
+        return;
+    }
+    if (layer.contentBounds.isEmpty()) {
+        layer.contentBounds = mapped;
+    } else {
+        layer.contentBounds.join(mapped);
+    }
+}
+
+IsolationLayer *TopIsolationLayer(const std::unique_ptr<TgfxIsolationStack> &stack) {
+    if (stack == nullptr || stack->layers.empty()) {
+        return nullptr;
+    }
+    return &stack->layers.back();
 }
 
 uint64_t HashTextPathDrawParams(const TextDrawParams &params) {
@@ -453,6 +478,9 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
         tgfxPaint.setAlpha(paint.color.a * paint.alpha * opacity_);
     }
     canvas->drawPath(path, tgfxPaint);
+    if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
+        NoteIsolationContentBounds(*layer, canvas, path.getBounds());
+    }
 }
 
 void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &paint,
@@ -518,6 +546,11 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
         tgfxPaint.setLineCap(ToTgfxLineCap(options.cap));
         tgfxPaint.setLineJoin(ToTgfxLineJoin(options.join));
         canvas->drawPath(strokeGeometry, tgfxPaint);
+        if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
+            tgfx::Rect strokeBounds = bounds;
+            strokeBounds.outset(options.width * 0.5f, options.width * 0.5f);
+            NoteIsolationContentBounds(*layer, canvas, strokeBounds);
+        }
         return;
     }
 
@@ -531,6 +564,9 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
     }
     tgfxPaint.setStyle(tgfx::PaintStyle::Fill);
     canvas->drawPath(outline, tgfxPaint);
+    if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
+        NoteIsolationContentBounds(*layer, canvas, outline.getBounds());
+    }
 }
 
 void TgfxCanvasAdapter::clipPath(const ShapeGeometry &geometry, FillRule rule) {
@@ -599,7 +635,32 @@ void TgfxCanvasAdapter::beginMask(MaskApplyMode mode) {
     layer.masking = true;
     layer.savedOpacity = opacity_;
     opacity_ = 1.0f;
-    // maskRecorder is already owned by the stack entry; begin after settle.
+    layer.maskSurface = nullptr;
+    layer.maskSurfaceBounds = tgfx::Rect::MakeEmpty();
+    layer.maskCanvas = nullptr;
+
+    // Prefer a finite surface sized to content: inverse fill needs a clip larger
+    // than the path's geometric bounds (Picture+MakeFrom leaves Inv empty).
+    if (!layer.contentBounds.isEmpty() && surface_ != nullptr) {
+        tgfx::Rect bounds = layer.contentBounds;
+        bounds.roundOut();
+        const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
+        const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
+        tgfx::Context *context = surface_->getContext();
+        std::shared_ptr<tgfx::Surface> maskSurface =
+            tgfx::Surface::Make(context, width, height, true);
+        if (maskSurface == nullptr) {
+            maskSurface = tgfx::Surface::Make(context, width, height);
+        }
+        if (maskSurface != nullptr) {
+            layer.maskSurface = maskSurface;
+            layer.maskSurfaceBounds = bounds;
+            layer.maskCanvas = maskSurface->getCanvas();
+            layer.maskCanvas->clear();
+            layer.maskCanvas->setMatrix(tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top));
+            return;
+        }
+    }
     layer.maskCanvas = layer.maskRecorder.beginRecording();
 }
 
@@ -614,21 +675,41 @@ void TgfxCanvasAdapter::endMask() {
     layer.masking = false;
     layer.maskCanvas = nullptr;
     opacity_ = layer.savedOpacity;
-    std::shared_ptr<tgfx::Picture> maskPicture = layer.maskRecorder.finishRecordingAsPicture();
-    if (maskPicture == nullptr || surface_ == nullptr) {
+    if (surface_ == nullptr) {
+        layer.maskSurface = nullptr;
         return;
     }
 
-    tgfx::Rect bounds = maskPicture->getBounds();
-    if (bounds.isEmpty()) {
-        return;
+    std::shared_ptr<tgfx::Image> image;
+    tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
+    if (layer.maskSurface != nullptr) {
+        bounds = layer.maskSurfaceBounds;
+        image = layer.maskSurface->makeImageSnapshot();
+        layer.maskSurface = nullptr;
+        layer.maskSurfaceBounds = tgfx::Rect::MakeEmpty();
+    } else {
+        std::shared_ptr<tgfx::Picture> maskPicture = layer.maskRecorder.finishRecordingAsPicture();
+        if (maskPicture == nullptr) {
+            return;
+        }
+        bounds = maskPicture->getBounds();
+        if (!layer.contentBounds.isEmpty()) {
+            if (bounds.isEmpty()) {
+                bounds = layer.contentBounds;
+            } else {
+                bounds.join(layer.contentBounds);
+            }
+        }
+        if (bounds.isEmpty()) {
+            return;
+        }
+        bounds.roundOut();
+        const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
+        const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
+        tgfx::Matrix pictureMatrix = tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top);
+        image = tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
     }
-    bounds.roundOut();
-    const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
-    const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
-    tgfx::Matrix pictureMatrix = tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top);
-    std::shared_ptr<tgfx::Image> image = tgfx::Image::MakeFrom(maskPicture, width, height, &pictureMatrix);
-    if (image == nullptr) {
+    if (image == nullptr || bounds.isEmpty()) {
         return;
     }
 
@@ -672,8 +753,21 @@ void TgfxCanvasAdapter::drawMaskPath(const ShapeGeometry &geometry, MaskMode mod
     tgfx::Canvas *canvas = layer.maskCanvas;
     tgfx::Path path = pathCache_->Resolve(geometry, FillRule::NonZero);
     path = pathCache_->ResolveMaskExpanded(geometry, FillRule::NonZero, expansion, path);
+    // Inverse fill type keeps geometric bounds; on a finite mask surface build
+    // exterior explicitly (contentBounds − path) so AE Inv has coverage pixels.
     if (inverted) {
-        path.toggleInverseFillType();
+        tgfx::Rect exteriorBounds = layer.maskSurfaceBounds;
+        if (exteriorBounds.isEmpty()) {
+            exteriorBounds = layer.contentBounds;
+        }
+        if (!exteriorBounds.isEmpty()) {
+            tgfx::Path exterior;
+            exterior.addRect(exteriorBounds);
+            exterior.addPath(path, tgfx::PathOp::Difference);
+            path = std::move(exterior);
+        } else {
+            path.toggleInverseFillType();
+        }
     }
 
     if (feather > 0.0f) {
@@ -721,6 +815,10 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
                                               static_cast<float>(image->height()));
     const tgfx::Rect dst = tgfx::Rect::MakeXYWH(destination.x, destination.y, destination.width, destination.height);
     canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
+    if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
+        NoteIsolationContentBounds(*layer, canvas,
+                                   tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
+    }
 }
 
 void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
@@ -756,6 +854,12 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
             textPathCacheValid_ = true;
         }
         DrawTextOnPath(canvas, params, opacity_, textPathCacheResult_, typeface);
+        if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
+            const Vec2 &min = textPathCacheResult_.boundsMin;
+            const Vec2 &max = textPathCacheResult_.boundsMax;
+            NoteIsolationContentBounds(
+                *layer, canvas, tgfx::Rect::MakeLTRB(min.x, min.y, max.x, max.y));
+        }
         return;
     }
 
@@ -821,6 +925,30 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
                 paint.setStyle(tgfx::PaintStyle::Fill);
             }
             canvas->drawTextBlob(blob, line.x, line.y, paint);
+        }
+    }
+    if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
+        if (boxTextMode) {
+            NoteIsolationContentBounds(
+                *layer, canvas,
+                tgfx::Rect::MakeWH(params.containerSize.x, params.containerSize.y));
+        } else {
+            tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
+            for (const textlayout::TextLine &line : layout.lines) {
+                if (line.text.empty()) {
+                    continue;
+                }
+                const float width = line.width > 0.0f ? line.width : layout.appliedFontSize;
+                const float height = layout.appliedFontSize;
+                const tgfx::Rect lineBounds =
+                    tgfx::Rect::MakeXYWH(line.x, line.y - height, width, height);
+                if (textBounds.isEmpty()) {
+                    textBounds = lineBounds;
+                } else {
+                    textBounds.join(lineBounds);
+                }
+            }
+            NoteIsolationContentBounds(*layer, canvas, textBounds);
         }
     }
 }
