@@ -113,6 +113,38 @@ std::shared_ptr<pag::File> DecodeBytes(const std::vector<uint8_t> &bytes) {
     return pag::Codec::Decode(bytes.data(), static_cast<uint32_t>(bytes.size()), "");
 }
 
+void CountPathVerbs(const pag::PathHandle &handle, size_t *curves, size_t *lines) {
+    *curves = 0;
+    *lines = 0;
+    if (handle == nullptr) {
+        return;
+    }
+    for (pag::PathDataVerb verb : handle->verbs) {
+        if (verb == pag::PathDataVerb::CurveTo) {
+            ++(*curves);
+        } else if (verb == pag::PathDataVerb::LineTo) {
+            ++(*lines);
+        }
+    }
+}
+
+float PathAabbArea(const pag::PathHandle &handle) {
+    if (handle == nullptr || handle->points.empty()) {
+        return 0;
+    }
+    float minX = handle->points[0].x;
+    float maxX = minX;
+    float minY = handle->points[0].y;
+    float maxY = minY;
+    for (const pag::Point &point : handle->points) {
+        minX = std::min(minX, point.x);
+        maxX = std::max(maxX, point.x);
+        minY = std::min(minY, point.y);
+        maxY = std::max(maxY, point.y);
+    }
+    return std::max(0.0f, maxX - minX) * std::max(0.0f, maxY - minY);
+}
+
 }  // namespace
 
 TEST(PagExporterTest, InvalidCompositionHasStructuredError) {
@@ -1076,6 +1108,95 @@ TEST(PagExporterTest, SharedVertexNetworkFlattened) {
     auto result = PagExporter::Export(document, {});
     ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
     ASSERT_NE(DecodeBytes(result.value().bytes), nullptr);
+}
+
+TEST(PagExporterTest, AnimatedPathExportsCubicMorphStableNotSampledFill) {
+    // Path 19 class: same 4 vertices, changing handles. CompileFillFaces polylines
+    // mis-align across keys; export must keep cubic stroke topology for PAG morph.
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "PathMorph";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+
+    VectorNetwork kf0;
+    kf0.vertices = {{1, {147.5f, 82.5f}}, {2, {236.5f, 174.5f}}, {3, {147.5f, 266.5f}}, {4, {58.5f, 174.5f}}};
+    kf0.edges = {
+        {1, 1, 2, {44.6667f, 0}, {-44.6667f, 0}},
+        {2, 2, 3, {0, 44.6667f}, {0, -44.6667f}},
+        {3, 3, 4, {-44.6667f, 0}, {44.6667f, 0}},
+        {4, 4, 1, {0, -44.6667f}, {0, 44.6667f}},
+    };
+    VectorNetwork kf19 = kf0;
+    kf19.edges = {
+        {1, 1, 2, {62.8333f, -39.6667f}, {15.3333f, -60.1667f}},
+        {2, 2, 3, {-39.6667f, 62.8333f}, {-60.1667f, 15.3333f}},
+        {3, 3, 4, {-62.8333f, 39.6667f}, {-15.3333f, 60.1667f}},
+        {4, 4, 1, {39.6667f, -62.8333f}, {60.1667f, -15.3333f}},
+    };
+
+    auto path = std::make_unique<ShapePath>();
+    Keyframe<VectorNetwork> from;
+    from.time = 0;
+    from.value = kf0;
+    Keyframe<VectorNetwork> to;
+    to.time = 19;
+    to.value = kf19;
+    path->path.addKeyframe(from);
+    path->path.addKeyframe(to);
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.97f, 0.23f, 0.86f, 1});
+    layer->styles.push_back(std::move(fill));
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::ShapeLayer *shapeLayer = nullptr;
+    for (pag::Layer *candidate : vector->layers) {
+        if (candidate->name == "PathMorph") {
+            shapeLayer = static_cast<pag::ShapeLayer *>(candidate);
+            break;
+        }
+    }
+    ASSERT_NE(shapeLayer, nullptr);
+    ASSERT_EQ(shapeLayer->contents.size(), 1u);
+    auto *group = static_cast<pag::ShapeGroupElement *>(shapeLayer->contents[0]);
+    ASSERT_FALSE(group->elements.empty());
+    ASSERT_EQ(group->elements[0]->type(), pag::ShapeType::ShapePath);
+    auto *pathElement = static_cast<pag::ShapePathElement *>(group->elements[0]);
+    ASSERT_NE(pathElement->shapePath, nullptr);
+    ASSERT_TRUE(pathElement->shapePath->animatable());
+
+    pag::PathHandle atStart = pathElement->shapePath->getValueAt(0);
+    pag::PathHandle atMid = pathElement->shapePath->getValueAt(9);
+    pag::PathHandle atEnd = pathElement->shapePath->getValueAt(19);
+    ASSERT_NE(atStart, nullptr);
+    ASSERT_NE(atMid, nullptr);
+    ASSERT_NE(atEnd, nullptr);
+
+    size_t curves = 0;
+    size_t lines = 0;
+    CountPathVerbs(atStart, &curves, &lines);
+    EXPECT_GE(curves, 3u);
+    EXPECT_EQ(lines, 0u);
+    EXPECT_LT(atStart->points.size(), 20u);
+
+    CountPathVerbs(atMid, &curves, &lines);
+    EXPECT_GE(curves, 3u);
+    EXPECT_EQ(lines, 0u);
+    EXPECT_LT(atMid->points.size(), 20u);
+
+    CountPathVerbs(atEnd, &curves, &lines);
+    EXPECT_GE(curves, 3u);
+    EXPECT_EQ(lines, 0u);
+
+    // Collapsed crescent morph had ~7% of correct area; cubic morph stays large.
+    EXPECT_GT(PathAabbArea(atMid), PathAabbArea(atStart) * 0.5f);
 }
 
 TEST(PagExporterTest, InsideOutsideStrokeBakedAsParallelLayers) {

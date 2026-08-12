@@ -413,7 +413,7 @@ MS `ShapeContent` 当前为 **单 geometry** + 层级 `styles`（Fill/Stroke，�
 
 | MS | PAG ShapeElement |
 | --- | --- |
-| `ShapePath` | `ShapePath`（或等价路径元素） |
+| `ShapePath` | `ShapePath`（`VectorNetwork` 拍平：多关键帧优先 `CompileStrokeEdges` 供 morph；静态优先 `CompileFillFaces`） |
 | `ShapeRect` | `Rectangle` |
 | `ShapeEllipse` | `Ellipse` |
 | `ShapeTrimPath` / Stroke trim* | `TrimPath` |

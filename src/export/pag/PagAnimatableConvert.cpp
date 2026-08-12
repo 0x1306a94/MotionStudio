@@ -127,7 +127,8 @@ pag::Keyframe<pag::PathHandle> *MakeNetworkPathKeyframe(const Keyframe<VectorNet
     return keyframe;
 }
 
-BezierPath NetworkToExportPath(const VectorNetwork &network) {
+// Static / single-frame: fill faces match editor silhouettes (incl. shared-vertex nets).
+BezierPath NetworkToExportPathFillPreferred(const VectorNetwork &network) {
     BezierPath fill = CompileFillFaces(network);
     if (!fill.contours.empty()) {
         return fill;
@@ -135,8 +136,23 @@ BezierPath NetworkToExportPath(const VectorNetwork &network) {
     return CompileStrokeEdges(network);
 }
 
-pag::PathHandle ToPagPathFromNetwork(const VectorNetwork &network) {
-    return ToPagPath(NetworkToExportPath(network));
+// Animated keyframes: PAG morphs PathData by index. CompileFillFaces samples cubics into
+// polylines whose start phase can differ across keys (Path 19 0→19). Prefer cubic stroke
+// topology so corresponding vertices/handles morph like AE.
+BezierPath NetworkToExportPathMorphStable(const VectorNetwork &network) {
+    BezierPath stroke = CompileStrokeEdges(network);
+    if (!stroke.contours.empty()) {
+        return stroke;
+    }
+    return CompileFillFaces(network);
+}
+
+pag::PathHandle ToPagPathFromNetworkFillPreferred(const VectorNetwork &network) {
+    return ToPagPath(NetworkToExportPathFillPreferred(network));
+}
+
+pag::PathHandle ToPagPathFromNetworkMorphStable(const VectorNetwork &network) {
+    return ToPagPath(NetworkToExportPathMorphStable(network));
 }
 
 pag::Keyframe<pag::Percent> *MakePercentKeyframe(const Keyframe<float> &from,
@@ -300,7 +316,12 @@ pag::Property<pag::Opacity> *ConvertOpacity(const Animatable<float> &source,
 
 pag::Property<pag::PathHandle> *ConvertPath(const Animatable<VectorNetwork> &source,
                                             std::vector<PagExportWarning> *, EntityId) {
-    return ConvertAnimatableRef(source, MakeNetworkPathKeyframe, ToPagPathFromNetwork);
+    if (source.isAnimated() && source.keyframes().size() > 1) {
+        return ConvertAnimatableRef(source, MakeNetworkPathKeyframe,
+                                    ToPagPathFromNetworkMorphStable);
+    }
+    return ConvertAnimatableRef(source, MakeNetworkPathKeyframe,
+                                ToPagPathFromNetworkFillPreferred);
 }
 
 pag::Property<pag::PathHandle> *ConvertBezierPath(const Animatable<BezierPath> &source,

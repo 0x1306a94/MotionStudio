@@ -27,7 +27,7 @@
 | 关键帧 / morph | 对 `VectorNetwork` 插值（同拓扑）；**不对**编译后 Path 插值 |
 | 异拓扑关键帧 | 不插值（hold） |
 | 渲染结构 | Network（权威）+ 多轮廓 `BezierPath`（编译产物） |
-| 导出 Lottie/PAG | 按当前帧编译拍平为 Path；丢失共享点语义 |
+| 导出 Lottie/PAG | 拍平为 Path（无 Network）；**多关键帧**优先 `CompileStrokeEdges` 供 PAG morph；**静态**优先 `CompileFillFaces`；丢失共享点语义 |
 | Schema | **不升** `schemaVersion`；同版本双读静默转换旧 `BezierPath` |
 | 提交 | 本文档与后续实现均按指示提交；**本阶段不自动 commit** |
 
@@ -238,7 +238,12 @@ SceneEvaluator
 
 ## 导出
 
-Lottie / PAG 无 Vector Network：导出时对 **当前帧** `evaluate` → `CompileFillFaces` + stroke 边 → 既有 Path 导出路径。共享点在导出结果中拆成轮廓副本（可接受，已锁定）。
+Lottie / PAG 无 Vector Network，写出前必须拍平为 `PathData`（共享点拆成轮廓副本，可接受）：
+
+- **静态 / 单关键帧**：`CompileFillFaces`（空则 `CompileStrokeEdges`）——对齐编辑器填面，含共享点多面网络
+- **多关键帧动画**：优先 `CompileStrokeEdges`（空则 FillFaces）——保留立方拓扑与顶点对应，供 PAG `PathData::interpolate` morph；**禁止**对 `CompileFillFaces` 采样折线做跨关键帧 morph（相位易错位，见 Path 19）
+
+编辑器内 morph 仍只对 `VectorNetwork` 插值，与上表一致。
 
 ## 测试要点
 

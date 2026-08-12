@@ -4,7 +4,7 @@
 
 **目标：** 用 `VectorNetwork` 替换权威创作模型中的 `BezierPath`，使钢笔闭合后仍可续画（Figma 式共享顶点、面填充、边描边）。
 
-**架构：** `ShapePath` / Mask 权威类型为 `Animatable<VectorNetwork>`。求值时编译为多轮廓 `BezierPath`（fill 面）以及独立的边 stroke path。Morph 在 Network 上按同拓扑插值；导出按当前帧拍平。`schemaVersion` 保持 1，JSON 双读静默转换。
+**架构：** `ShapePath` / Mask 权威类型为 `Animatable<VectorNetwork>`。求值时编译为多轮廓 `BezierPath`（fill 面）以及独立的边 stroke path。Morph 在 Network 上按同拓扑插值；导出拍平为 Path（动画优先 StrokeEdges，静态优先 FillFaces）。`schemaVersion` 保持 1，JSON 双读静默转换。
 
 **技术栈：** C++17 core、Apple C bridge、Swift/UIKit App、GoogleTest、tgfx adapter。
 
@@ -50,7 +50,7 @@
 | `bridge/include/motionstudio_bridge.h` | `MSVectorNetwork` + 编辑命令 |
 | `bridge/src/common/motionstudio_bridge_path_edit.cpp` | 命令写回 |
 | App Swift 钢笔手势 / `PathEditTarget` | `activeVertexId` + `drawing` 会话 |
-| 导出（Lottie/PAG） | 当前帧将 Network 拍平为 Path |
+| 导出（Lottie/PAG） | Network 拍平为 Path（动画→StrokeEdges；静态→FillFaces） |
 | `tests/common/`、`tests/animation/`、`tests/serialization/`、`tests/render/`、`bridge/tests/` | 各 Task 覆盖测试 |
 
 `src/common/`、`tests/common/` 由 CMake 按扩展名自动收集——新增 `.cpp` **无需**改 CMake 列表。
@@ -507,9 +507,11 @@ Canvas hit：尽量返回 vertex id / edge id，而非仅顶点下标。
 - Modify: 读取 ShapePath::path / mask path 的 Lottie/PAG 导出路径
 - Test: 更新既有导出测试夹具为 Network
 
-**行为：** 导出帧 evaluate → CompileFillFaces（若导出 stroke 几何则再加边）。输出格式中不保留 Network。
+**行为：** 输出格式中不保留 Network。静态：`CompileFillFaces`（空则 StrokeEdges）。多关键帧：优先 `CompileStrokeEdges` 以保持 PAG path morph 顶点对应（禁止对 FillFaces 采样折线 morph）。
 
 - [x] **Step 1: 修编译；增/改一条含共享顶点 Network 的导出测试**
+
+- [x] **Step 1b: 动画 path 导出改走 StrokeEdges + 回归测试**（`AnimatedPathExportsCubicMorphStableNotSampledFill`）
 
 - [x] **Step 2: Commit** — **跳过**，除非用户要求。
 
