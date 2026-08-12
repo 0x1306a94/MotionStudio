@@ -6,28 +6,19 @@
 //
 
 import Foundation
-import SwiftUI
-#if canImport(UIKit)
-    import UIKit
-#endif
 import MotionStudioBridging
+import SwiftUI
 
 extension MotionColor {
+    /// Converts a SwiftUI `Color` (including ColorPicker output with opacity).
+    /// Uses `Color.resolve` so gray / Display P3 / catalog colors keep alpha;
+    /// `UIColor.getRed` often fails for those and previously fell back to opaque black.
     init(_ color: Color) {
-        #if canImport(UIKit)
-            let uiColor = UIColor(color)
-            var r: CGFloat = 0
-            var g: CGFloat = 0
-            var b: CGFloat = 0
-            var a: CGFloat = 1
-            if uiColor.getRed(&r, green: &g, blue: &b, alpha: &a) {
-                self.init(r: Float(r), g: Float(g), b: Float(b), a: Float(a))
-            } else {
-                self = .black
-            }
-        #else
-            self = .black
-        #endif
+        let resolved = color.resolve(in: EnvironmentValues())
+        self.init(r: Float(resolved.red),
+                  g: Float(resolved.green),
+                  b: Float(resolved.blue),
+                  a: Float(resolved.opacity))
     }
 
     var swiftUIColor: Color {
