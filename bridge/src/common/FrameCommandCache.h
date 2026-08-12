@@ -2,19 +2,22 @@
 
 #include <cstdint>
 #include <list>
+#include <memory>
 #include <unordered_map>
 
 #include "MotionStudio/common/Color.h"
+#include "MotionStudio/common/Time.h"
 #include "MotionStudio/render/DrawCommand.h"
 
 namespace motionstudio {
 
-// Caches scene DrawCommandList for playback integer frames so looping / repeated
-// draws skip SceneEvaluator and BuildCommands. View transform and editor chrome
-// stay outside this cache.
+// Caches scene DrawCommandList for edit and playback so repeated draws skip
+// BuildCommands. View transform and editor chrome stay outside this cache.
+// Keyed by exact PreviewTime bits; scoped by compositionId + contentRevision.
 class FrameCommandCache {
   public:
     struct Entry {
+        motion::PreviewTime time = 0;
         int viewportWidth = 0;
         int viewportHeight = 0;
         motion::Color backgroundColor = {};
@@ -28,8 +31,10 @@ class FrameCommandCache {
 
     void clear();
     void invalidateIfStale(uint64_t compositionId, uint64_t revision);
-    const Entry *find(int64_t frame);
-    void put(int64_t frame, Entry entry);
+    const Entry *find(motion::PreviewTime time);
+    // Takes ownership; overwrites same key. Returned pointer is owned by the
+    // cache — do not delete; valid only while DocumentLock is held.
+    Entry *put(motion::PreviewTime time, std::unique_ptr<Entry> entry);
 
     uint64_t compositionId() const {
         return compositionId_;
@@ -46,11 +51,11 @@ class FrameCommandCache {
 
     uint64_t compositionId_ = 0;
     uint64_t revision_ = 0;
-    std::unordered_map<int64_t, Entry> entries_ = {};
-    std::list<int64_t> lru_ = {};
-    std::unordered_map<int64_t, std::list<int64_t>::iterator> lruPositions_ = {};
+    std::unordered_map<uint64_t, std::unique_ptr<Entry>> entries_ = {};
+    std::list<uint64_t> lru_ = {};
+    std::unordered_map<uint64_t, std::list<uint64_t>::iterator> lruPositions_ = {};
 
-    void touch(int64_t frame);
+    void touch(uint64_t key);
     void evictIfNeeded();
 };
 

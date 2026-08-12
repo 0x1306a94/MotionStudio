@@ -665,8 +665,8 @@ TEST(BridgeTest, NullHandlesAreSafe) {
     ms_canvas_draw_frame(nullptr, nullptr, 0, 0);
     ms_canvas_set_draw_mode(nullptr, MS_CANVAS_DRAW_MODE_PLAYBACK);
     EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
-    ms_canvas_set_content_revision(nullptr, 7);
-    EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
+    ms_document_set_content_revision(nullptr, 7);
+    EXPECT_EQ(ms_document_get_content_revision(nullptr), 0u);
     ms_command_add_keyframe_float(nullptr, 0, "transform.position", 0, 0.0f);
     ms_command_add_stroke_style(nullptr, 0);
     ms_command_set_stroke_position(nullptr, 0, 0, MS_STROKE_POSITION_INSIDE);
@@ -676,31 +676,29 @@ TEST(BridgeTest, NullHandlesAreSafe) {
 TEST(BridgeCanvasTest, DrawModeApiNullSafe) {
     // Full canvas create needs Metal; getters on null document the defaults.
     EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
-    EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
     ms_canvas_set_draw_mode(nullptr, MS_CANVAS_DRAW_MODE_PLAYBACK);
-    ms_canvas_set_content_revision(nullptr, 99);
     EXPECT_EQ(ms_canvas_get_draw_mode(nullptr), MS_CANVAS_DRAW_MODE_EDIT);
-    EXPECT_EQ(ms_canvas_get_content_revision(nullptr), 0u);
 }
 
 TEST(BridgeCanvasTest, FrameCommandCacheHitAndRevisionInvalidation) {
     motionstudio::FrameCommandCache cache;
     cache.invalidateIfStale(10, 1);
-    motionstudio::FrameCommandCache::Entry entry;
-    entry.viewportWidth = 100;
-    entry.viewportHeight = 50;
-    entry.layerCount = 2;
-    cache.put(3, entry);
+    auto entry = std::make_unique<motionstudio::FrameCommandCache::Entry>();
+    entry->viewportWidth = 100;
+    entry->viewportHeight = 50;
+    entry->layerCount = 2;
+    auto *stored = cache.put(3.0, std::move(entry));
+    ASSERT_NE(stored, nullptr);
 
-    const motionstudio::FrameCommandCache::Entry *found = cache.find(3);
+    const auto *found = cache.find(3.0);
     ASSERT_NE(found, nullptr);
     EXPECT_EQ(found->viewportWidth, 100);
     EXPECT_EQ(found->viewportHeight, 50);
     EXPECT_EQ(found->layerCount, 2u);
-    EXPECT_EQ(cache.find(4), nullptr);
+    EXPECT_EQ(cache.find(3.1), nullptr);
 
     cache.invalidateIfStale(10, 2);
-    EXPECT_EQ(cache.find(3), nullptr);
+    EXPECT_EQ(cache.find(3.0), nullptr);
     EXPECT_EQ(cache.size(), 0u);
 }
 

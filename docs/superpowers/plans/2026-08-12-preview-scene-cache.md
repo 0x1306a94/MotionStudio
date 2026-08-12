@@ -316,7 +316,7 @@ EOF
 
 ### Task 3: FrameCommandCache 演进 + EnsureSceneCommands + draw
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/src/common/FrameCommandCache.h`
@@ -340,7 +340,7 @@ EnsureSceneCommands(MSCanvas *canvas, MSDocument *handle,
                     const motion::SceneState &state);
 ```
 
-- [ ] **Step 1: 改写 FrameCommandCache 单测为新 API**
+- [x] **Step 1: 改写 FrameCommandCache 单测为新 API**
 
 将 `BridgeCanvasTest.FrameCommandCacheHitAndRevisionInvalidation` 改为：
 
@@ -367,7 +367,7 @@ TEST(BridgeCanvasTest, FrameCommandCacheHitAndRevisionInvalidation) {
 
 同步改 null-safe 测试：去掉 `ms_canvas_set/get_content_revision`，改为 Document revision（Task 1 已有）。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run:
 ```bash
@@ -375,7 +375,7 @@ Run:
 ```
 Expected: 编译失败（旧 `put(int64_t, Entry)` 签名）。
 
-- [ ] **Step 3: 实现缓存演进 + draw 路径**
+- [x] **Step 3: 实现缓存演进 + draw 路径**
 
 1. `FrameCommandCache`：键改为 `PreviewTimeKey`；`unique_ptr<Entry>`；`put` 返回裸指针；注释更新为 EDIT+PLAYBACK。
 2. `EnsureSceneCommands`：`invalidateIfStale(compId, handle->contentRevision)`；hit 则返回 `&commands`；miss 则填 viewport 元数据 + `BuildCommands(state)` 后 `put`。
@@ -385,7 +385,7 @@ Expected: 编译失败（旧 `put(int64_t, Entry)` 签名）。
    - chrome 仍仅 `!playbackMode`，数据来自 `entry->state`。
 4. 删除 `ms_canvas_set/get_content_revision` 实现与头文件声明；删除 `MSCanvas::contentRevision`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run:
 ```bash
@@ -394,7 +394,7 @@ cmake --build build --target bridge_test
 ```
 Expected: PASS
 
-- [ ] **Step 5: 更新 plan 勾选并 commit**
+- [x] **Step 5: 更新 plan 勾选并 commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'

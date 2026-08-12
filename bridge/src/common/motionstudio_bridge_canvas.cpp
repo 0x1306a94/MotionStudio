@@ -6,12 +6,10 @@
 
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
-#include "FrameCommandCache.h"
 #include "MSCanvas.h"
 #include "MSDocument.h"
+#include "PreviewEnsure.h"
 #include "ProfileClock.h"
-
-#include <cmath>
 
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
@@ -104,20 +102,6 @@ MS_CANVAS_DRAW_MODE ms_canvas_get_draw_mode(const MSCanvas *canvas) {
         return MS_CANVAS_DRAW_MODE_EDIT;
     }
     return static_cast<MS_CANVAS_DRAW_MODE>(canvas->drawMode);
-}
-
-void ms_canvas_set_content_revision(MSCanvas *canvas, uint64_t revision) {
-    if (canvas == nullptr) {
-        return;
-    }
-    canvas->contentRevision = revision;
-}
-
-uint64_t ms_canvas_get_content_revision(const MSCanvas *canvas) {
-    if (canvas == nullptr) {
-        return 0;
-    }
-    return canvas->contentRevision;
 }
 
 void ms_canvas_set_preview_backdrop(MSCanvas *canvas, MS_PREVIEWER_BACKDROP backdrop) {
@@ -383,130 +367,99 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     }
 
     const bool playbackMode = canvas->drawMode == static_cast<int>(MS_CANVAS_DRAW_MODE_PLAYBACK);
-    const int64_t cacheFrame = static_cast<int64_t>(std::floor(frameTime));
-    motion::DrawCommandList commands;
+    const motion::PreviewTime previewTime(frameTime);
     motion::DrawCommandList pathOverlayCommands;
     motion::DrawCommandList pathEditCommands;
     motion::DrawCommandList motionPathCommands;
     motion::DrawCommandList selectionCommands;
-    int viewportWidth = 0;
-    int viewportHeight = 0;
-    motion::Color backgroundColor{};
-    float cornerRadius = 0.0f;
-    float timeSeconds = 0.0f;
-    int64_t frameIndex = 0;
-    float frameRate = 30.0f;
-    bool usedFrameCache = false;
 
-    if (playbackMode) {
-        canvas->frameCommandCache.invalidateIfStale(compositionId, canvas->contentRevision);
-        if (const motionstudio::FrameCommandCache::Entry *cached = canvas->frameCommandCache.find(cacheFrame)) {
-            commands = cached->commands;
-            viewportWidth = cached->viewportWidth;
-            viewportHeight = cached->viewportHeight;
-            backgroundColor = cached->backgroundColor;
-            cornerRadius = cached->cornerRadius;
-            timeSeconds = cached->timeSeconds;
-            frameIndex = cached->frameIndex;
-            frameRate = cached->frameRate;
-            profile.layerCount = cached->layerCount;
-            profile.sceneEvaluateMs = 0.0;
-            profile.buildCommandsMs = 0.0;
-            profile.drawCommandCount = commands.size();
-            profile.usedFrameCache = true;
-            usedFrameCache = true;
+    const auto evaluateStart = ProfileClock::now();
+    auto ensured = EnsurePreviewScene(document, compositionId, previewTime);
+    const auto evaluateEnd = ProfileClock::now();
+    profile.sceneEvaluateMs = Milliseconds(evaluateStart, evaluateEnd);
+    if (!ensured.hasValue()) {
+        profile.totalMs = Milliseconds(totalStart, ProfileClock::now());
+        if (profileOut != nullptr) {
+            *profileOut = profile;
         }
+        return;
     }
+    const motion::SceneState &state = ensured.value()->state;
+    profile.layerCount = state.layers.size();
+    const int viewportWidth = state.viewportWidth;
+    const int viewportHeight = state.viewportHeight;
+    const motion::Color backgroundColor = state.backgroundColor;
+    const float cornerRadius = state.cornerRadius;
+    const float timeSeconds = state.timeSeconds;
+    const int64_t frameIndex = state.frameIndex;
+    const float frameRate = state.frameRate;
 
-    if (!usedFrameCache) {
-        const auto evaluateStart = ProfileClock::now();
-        auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
-        const auto evaluateEnd = ProfileClock::now();
-        profile.sceneEvaluateMs = Milliseconds(evaluateStart, evaluateEnd);
-        if (!result.hasValue()) {
-            profile.totalMs = Milliseconds(totalStart, ProfileClock::now());
-            if (profileOut != nullptr) {
-                *profileOut = profile;
-            }
-            return;
+    canvas->frameCommandCache.invalidateIfStale(compositionId, document->contentRevision);
+    const bool usedFrameCache = canvas->frameCommandCache.find(previewTime) != nullptr;
+    const auto buildStart = ProfileClock::now();
+    const motion::DrawCommandList *commands =
+        EnsureSceneCommands(canvas, document, compositionId, previewTime, state);
+    const auto buildEnd = ProfileClock::now();
+    profile.buildCommandsMs = usedFrameCache ? 0.0 : Milliseconds(buildStart, buildEnd);
+    profile.usedFrameCache = usedFrameCache;
+    if (commands == nullptr) {
+        profile.totalMs = Milliseconds(totalStart, ProfileClock::now());
+        if (profileOut != nullptr) {
+            *profileOut = profile;
         }
-        motion::SceneState &state = result.value();
-        bridge::ResolvePointTextContainerSizes(state);
-        profile.layerCount = state.layers.size();
-        viewportWidth = state.viewportWidth;
-        viewportHeight = state.viewportHeight;
-        backgroundColor = state.backgroundColor;
-        cornerRadius = state.cornerRadius;
-        timeSeconds = state.timeSeconds;
-        frameIndex = state.frameIndex;
-        frameRate = state.frameRate;
-
-        const auto buildStart = ProfileClock::now();
-        commands = motion::BuildCommands(state);
-        const bool buildEditorChrome = !playbackMode;
-        if (buildEditorChrome) {
-            const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
-            const float outlineWidth = 1.5f * viewUnit;
-            const float handleSize = 7.0f * viewUnit;
-            constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
-            std::vector<motion::PathOverlayItem> pathOverlays = motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
-            pathOverlays.insert(pathOverlays.end(), canvas->customPathOverlays.begin(), canvas->customPathOverlays.end());
-            pathOverlayCommands = motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
-
-            if (canvas->hasPathEditTarget) {
-                motion::PathEditHandles handles;
-                if (motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
-                    pathEditCommands = motion::BuildPathEditCommands(handles, outlineWidth, handleSize);
-                }
-            }
-
-            motion::DrawCommandList gradientEditCommands;
-            if (!canvas->hasPathEditTarget && canvas->hasGradientEditTarget) {
-                motion::GradientEditHandles handles;
-                if (motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
-                    gradientEditCommands = motion::BuildGradientEditCommands(handles, outlineWidth, handleSize);
-                }
-            }
-
-            if (!canvas->hasPathEditTarget) {
-                for (EntityId layerId : canvas->selectedLayerIds) {
-                    const int selectedKeyframe = layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
-                    motion::MotionPathChrome chrome;
-                    if (!motion::BuildMotionPathChrome(*document->document, layerId, motion::PreviewTime(frameTime), selectedKeyframe, chrome)) {
-                        continue;
-                    }
-                    motion::DrawCommandList layerCommands = motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
-                    motionPathCommands.insert(motionPathCommands.end(), layerCommands.begin(), layerCommands.end());
-                }
-            }
-
-            if (!canvas->hasPathEditTarget) {
-                const motion::EntityId primaryLayerId = canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
-                selectionCommands = motion::BuildSelectionOutlineCommands(
-                    state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
-                    canvas->showSelectionAnchor, canvas->showSelectionScaleHandles);
-            }
-            selectionCommands.insert(selectionCommands.end(), gradientEditCommands.begin(),
-                                     gradientEditCommands.end());
-        }
-        const auto buildEnd = ProfileClock::now();
-        profile.buildCommandsMs = Milliseconds(buildStart, buildEnd);
-        profile.drawCommandCount = commands.size() + pathOverlayCommands.size() + pathEditCommands.size() + motionPathCommands.size() + selectionCommands.size();
-
-        if (playbackMode) {
-            motionstudio::FrameCommandCache::Entry entry;
-            entry.viewportWidth = viewportWidth;
-            entry.viewportHeight = viewportHeight;
-            entry.backgroundColor = backgroundColor;
-            entry.cornerRadius = cornerRadius;
-            entry.timeSeconds = timeSeconds;
-            entry.frameIndex = frameIndex;
-            entry.frameRate = frameRate;
-            entry.layerCount = profile.layerCount;
-            entry.commands = commands;
-            canvas->frameCommandCache.put(cacheFrame, std::move(entry));
-        }
+        return;
     }
+    if (!playbackMode) {
+        const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+        const float outlineWidth = 1.5f * viewUnit;
+        const float handleSize = 7.0f * viewUnit;
+        constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
+        std::vector<motion::PathOverlayItem> pathOverlays =
+            motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
+        pathOverlays.insert(pathOverlays.end(), canvas->customPathOverlays.begin(), canvas->customPathOverlays.end());
+        pathOverlayCommands = motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
+
+        if (canvas->hasPathEditTarget) {
+            motion::PathEditHandles handles;
+            if (motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
+                pathEditCommands = motion::BuildPathEditCommands(handles, outlineWidth, handleSize);
+            }
+        }
+
+        motion::DrawCommandList gradientEditCommands;
+        if (!canvas->hasPathEditTarget && canvas->hasGradientEditTarget) {
+            motion::GradientEditHandles handles;
+            if (motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
+                gradientEditCommands = motion::BuildGradientEditCommands(handles, outlineWidth, handleSize);
+            }
+        }
+
+        if (!canvas->hasPathEditTarget) {
+            for (EntityId layerId : canvas->selectedLayerIds) {
+                const int selectedKeyframe =
+                    layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
+                motion::MotionPathChrome chrome;
+                if (!motion::BuildMotionPathChrome(*document->document, layerId, previewTime, selectedKeyframe,
+                                                   chrome)) {
+                    continue;
+                }
+                motion::DrawCommandList layerCommands =
+                    motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
+                motionPathCommands.insert(motionPathCommands.end(), layerCommands.begin(), layerCommands.end());
+            }
+        }
+
+        if (!canvas->hasPathEditTarget) {
+            const motion::EntityId primaryLayerId =
+                canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
+            selectionCommands = motion::BuildSelectionOutlineCommands(
+                state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
+                canvas->showSelectionAnchor, canvas->showSelectionScaleHandles);
+        }
+        selectionCommands.insert(selectionCommands.end(), gradientEditCommands.begin(), gradientEditCommands.end());
+    }
+    profile.drawCommandCount = commands->size() + pathOverlayCommands.size() + pathEditCommands.size() +
+        motionPathCommands.size() + selectionCommands.size();
 
     const auto beginFrameStart = ProfileClock::now();
     canvas->adapter->beginFrame(viewportWidth, viewportHeight, backgroundColor, cornerRadius);
@@ -516,7 +469,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     canvas->adapter->setColorSourceFrameContext(timeSeconds, frameIndex, frameRate);
 
     const auto playCommandsStart = ProfileClock::now();
-    motion::PlayCommands(commands, *canvas->adapter);
+    motion::PlayCommands(*commands, *canvas->adapter);
     if (!pathOverlayCommands.empty() || !pathEditCommands.empty() || !motionPathCommands.empty() || !selectionCommands.empty()) {
         canvas->adapter->restoreCompositionClip();
         if (!pathOverlayCommands.empty()) {

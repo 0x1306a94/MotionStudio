@@ -858,11 +858,6 @@ typedef CF_CLOSED_ENUM(int, MS_CANVAS_DRAW_MODE) {
 void ms_canvas_set_draw_mode(MSCanvas *canvas, MS_CANVAS_DRAW_MODE mode);
 MS_CANVAS_DRAW_MODE ms_canvas_get_draw_mode(const MSCanvas *canvas);
 
-// Content generation counter from the app (Swift revision). Used to invalidate
-// future draw caches; ignored by the Phase 1 draw path beyond storage.
-void ms_canvas_set_content_revision(MSCanvas *canvas, uint64_t revision);
-uint64_t ms_canvas_get_content_revision(const MSCanvas *canvas);
-
 // Evaluates the composition at frame and presents the result into the
 // canvas's MTKView drawable.
 void ms_canvas_draw_frame(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, int64_t frame);

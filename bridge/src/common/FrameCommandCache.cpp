@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "PreviewTimeKey.h"
+
 namespace motionstudio {
 
 void FrameCommandCache::clear() {
@@ -21,41 +23,50 @@ void FrameCommandCache::invalidateIfStale(uint64_t compositionId, uint64_t revis
     revision_ = revision;
 }
 
-const FrameCommandCache::Entry *FrameCommandCache::find(int64_t frame) {
-    const auto found = entries_.find(frame);
+const FrameCommandCache::Entry *FrameCommandCache::find(motion::PreviewTime time) {
+    const uint64_t key = PreviewTimeKey(time);
+    const auto found = entries_.find(key);
     if (found == entries_.end()) {
         return nullptr;
     }
-    touch(frame);
-    return &found->second;
+    touch(key);
+    return found->second.get();
 }
 
-void FrameCommandCache::put(int64_t frame, Entry entry) {
-    auto found = entries_.find(frame);
+FrameCommandCache::Entry *FrameCommandCache::put(motion::PreviewTime time,
+                                                 std::unique_ptr<Entry> entry) {
+    if (entry == nullptr) {
+        return nullptr;
+    }
+    entry->time = time;
+    const uint64_t key = PreviewTimeKey(time);
+    auto found = entries_.find(key);
     if (found != entries_.end()) {
         found->second = std::move(entry);
-        touch(frame);
-        return;
+        touch(key);
+        return found->second.get();
     }
-    entries_.emplace(frame, std::move(entry));
-    lru_.push_front(frame);
-    lruPositions_[frame] = lru_.begin();
+    Entry *stored = entry.get();
+    entries_.emplace(key, std::move(entry));
+    lru_.push_front(key);
+    lruPositions_[key] = lru_.begin();
     evictIfNeeded();
+    return stored;
 }
 
-void FrameCommandCache::touch(int64_t frame) {
-    const auto position = lruPositions_.find(frame);
+void FrameCommandCache::touch(uint64_t key) {
+    const auto position = lruPositions_.find(key);
     if (position == lruPositions_.end()) {
         return;
     }
     lru_.erase(position->second);
-    lru_.push_front(frame);
-    lruPositions_[frame] = lru_.begin();
+    lru_.push_front(key);
+    lruPositions_[key] = lru_.begin();
 }
 
 void FrameCommandCache::evictIfNeeded() {
     while (entries_.size() > MaxEntries && !lru_.empty()) {
-        const int64_t oldest = lru_.back();
+        const uint64_t oldest = lru_.back();
         lru_.pop_back();
         lruPositions_.erase(oldest);
         entries_.erase(oldest);

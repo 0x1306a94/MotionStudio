@@ -31,6 +31,5 @@ struct MSCanvas {
     std::vector<motion::PathOverlayItem> customPathOverlays;
     // Mirrors MS_CANVAS_DRAW_MODE (0 = EDIT, 1 = PLAYBACK).
     int drawMode = 0;
-    uint64_t contentRevision = 0;
     motionstudio::FrameCommandCache frameCommandCache = {};
 };
