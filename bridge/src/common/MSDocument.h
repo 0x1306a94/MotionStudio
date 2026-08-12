@@ -7,8 +7,11 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
+
+#include "PreviewSceneCache.h"
 
 namespace motion {
 class Document;
@@ -23,4 +26,8 @@ struct MSDocument {
     std::mutex mutex;
     std::unique_ptr<motion::Document> document;
     std::unique_ptr<motion::UndoManager> undoManager;
+    // Content generation from the app (Swift revision). Invalidates
+    // PreviewSceneCache / FrameCommandCache when it changes.
+    uint64_t contentRevision = 0;
+    motionstudio::PreviewSceneCache previewSceneCache = {};
 };

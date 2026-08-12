@@ -135,6 +135,20 @@ void ms_document_destroy(MSDocument *document) {
     delete document;
 }
 
+void ms_document_set_content_revision(MSDocument *document, uint64_t revision) {
+    if (document == nullptr) {
+        return;
+    }
+    document->contentRevision = revision;
+}
+
+uint64_t ms_document_get_content_revision(const MSDocument *document) {
+    if (document == nullptr) {
+        return 0;
+    }
+    return document->contentRevision;
+}
+
 char *ms_document_save(MSDocument *document) {
     DocumentLock guard(document);
     if (document == nullptr) {

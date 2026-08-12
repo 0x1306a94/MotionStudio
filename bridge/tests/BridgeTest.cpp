@@ -12,9 +12,12 @@
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
 #include "FrameCommandCache.h"
+#include "MSDocument.h"
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
+#include "PreviewSceneCache.h"
+#include "PreviewTimeKey.h"
 #include "motionstudio_bridge.h"
 
 using bridge::Doc;
@@ -699,6 +702,52 @@ TEST(BridgeCanvasTest, FrameCommandCacheHitAndRevisionInvalidation) {
     cache.invalidateIfStale(10, 2);
     EXPECT_EQ(cache.find(3), nullptr);
     EXPECT_EQ(cache.size(), 0u);
+}
+
+TEST(PreviewSceneCacheTest, HitPutAndRevisionInvalidation) {
+    motionstudio::PreviewSceneCache cache;
+    cache.invalidateIfStale(10, 1);
+    auto entry = std::make_unique<motionstudio::PreviewSceneCache::Entry>();
+    entry->time = 3.0;
+    entry->state.viewportWidth = 100;
+    entry->state.viewportHeight = 50;
+    motionstudio::PreviewSceneCache::Entry *stored = cache.put(3.0, std::move(entry));
+    ASSERT_NE(stored, nullptr);
+    EXPECT_EQ(stored->state.viewportWidth, 100);
+
+    const auto *found = cache.find(3.0);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found, stored);
+    EXPECT_EQ(cache.find(3.1), nullptr);
+    EXPECT_NE(motionstudio::PreviewTimeKey(3.0), motionstudio::PreviewTimeKey(3.1));
+
+    cache.invalidateIfStale(10, 2);
+    EXPECT_EQ(cache.find(3.0), nullptr);
+    EXPECT_EQ(cache.size(), 0u);
+}
+
+TEST(PreviewSceneCacheTest, LruEvictsOldest) {
+    motionstudio::PreviewSceneCache cache;
+    cache.invalidateIfStale(1, 1);
+    for (int i = 0; i < 257; ++i) {
+        auto entry = std::make_unique<motionstudio::PreviewSceneCache::Entry>();
+        entry->time = static_cast<double>(i);
+        cache.put(entry->time, std::move(entry));
+    }
+    EXPECT_EQ(cache.size(), 256u);
+    EXPECT_EQ(cache.find(0.0), nullptr);
+    EXPECT_NE(cache.find(256.0), nullptr);
+}
+
+TEST(BridgeDocumentTest, ContentRevisionApi) {
+    EXPECT_EQ(ms_document_get_content_revision(nullptr), 0u);
+    ms_document_set_content_revision(nullptr, 7);
+
+    MSDocument *document = ms_document_create();
+    EXPECT_EQ(ms_document_get_content_revision(document), 0u);
+    ms_document_set_content_revision(document, 42);
+    EXPECT_EQ(ms_document_get_content_revision(document), 42u);
+    ms_document_destroy(document);
 }
 
 TEST(BridgeCommandTest, StrokeStyleLifecycle) {
