@@ -200,7 +200,7 @@ Restore
 
 - Bridge：增删改 mask；设 `trackMatteLayerId` / `trackMatteType`；PropertyPath 读写已有通道复用
 - Undo：mask 增删与属性变更走现有 Command / SetStaticValue / Keyframe；track matte 用专用小命令或 Set 层字段命令
-- Inspector：Masks 列表（mode / inverted / opacity / feather / expansion）；Track Matte 选择层 + 类型
+- Inspector：Masks 列表（mode / inverted / opacity / feather / expansion）；**倒序显示**（`+` 仍 append，最上 = 最新 / 最大 index；「Mask N」按视觉序）；Inv 后提供上/下移（`MoveMaskCommand`）；Track Matte 选择层 + 类型
 - **Add Mask 默认 path**：按当前 playhead **烘焙**层形状几何（Rect/Ellipse/Path → `BezierPath` 快照）；非 Shape 层回退 200×200 中心矩形。与形状之后**不联动**（AE 语义）。
 - 画布：选中层显示 mask 路径描边（通用 `PathOverlay`；编辑 / 钢笔后续）
 - 时间轴：mask 可动画属性出现在属性子行（与 transform 一致）
@@ -278,11 +278,12 @@ Composition
 默认 `Masks +` 会把**当前 playhead 下的层外形**烘焙成 mask path（椭圆→椭圆 path，矩形→矩形 path）。Mode=Add 且未改 Expansion 时，画面可能几乎不变——属正常；用 Expansion / Feather / Inv / Subtract 验证。
 
 1. 选中 **Ellipse**；Track Matte → **None**。
-2. Inspector → **Masks** → `+`（path 应为椭圆外形快照，非固定方框）。
+2. Inspector → **Masks** → `+`（path 应为椭圆外形快照，非固定方框；新 mask 出现在列表**最上**，称 Mask 1）。
 3. **Expansion** → **-40**（或更负）→ Ellipse **边缘被明显裁小**（仍是实心，中心保留）。
   - 正数 = 扩张 mask；若 mask 已完全盖住图层内容，正数**看不出变化**（先缩再扩可验证）。  
   - **单 mask 镂空框**：Mode=**Add** + 负 Expansion + 勾选 **Inv**（path 贴合外形时，Inv 露出「外形 − 内缩 mask」的环带）。  
   - 也可用两条 mask：外圈 Add + 内圈 Subtract（不必勾 Inv）。  
+  - Inv 后 **↑/↓** 可调列表序（相对视觉；最上禁 ↑，最下禁 ↓）。  
   - Inv 按钮选中时应有高亮描边/底色。
 4. 勾选 **Inv**（Expansion=0）→ path 外可见、path 内挖空；再点取消 → 恢复，按钮高亮同步消失。
 5. **Feather** → **20~40** → 边缘变软；再改回 **0** → 硬边恢复。

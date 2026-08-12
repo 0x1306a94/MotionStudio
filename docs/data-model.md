@@ -184,6 +184,8 @@ struct Mask {
 };
 ```
 
+`Layer::masks` 仍按数组序求值（小 index 先应用）。Inspector 列表**倒序**显示（`+` append，最上 = 最新）；可用 `MoveMaskCommand` 调序；「Mask N」按视觉序编号。
+
 **Transform**——每个 Layer 必有，含 5 个可动画属性：
 
 ```cpp

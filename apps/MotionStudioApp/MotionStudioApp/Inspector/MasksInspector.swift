@@ -3,7 +3,7 @@
 //  MotionStudioApp
 //
 //  Path mask list editor: mode, inverted, opacity/feather/expansion with
-//  keyframe toggles.
+//  keyframe toggles. List is reversed (newest on top), matching Fills/Strokes.
 //
 
 import MotionStudioBridging
@@ -26,6 +26,8 @@ struct MasksInspector: View {
         // Re-render on any document mutation; bridge reads don't trigger observation.
         let _ = core.panelRevision
         let count = core.maskCount(layerID: layerID)
+        // Newest / last-applied mask first (matches Fills: list top = append end).
+        let masks = Array((0 ..< count).reversed())
         HStack {
             Text("Masks")
                 .font(.subheadline)
@@ -38,18 +40,18 @@ struct MasksInspector: View {
             }
             .disabled(!isEditable)
         }
-        ForEach(0 ..< count, id: \.self) { index in
-            maskRow(index: index)
+        ForEach(Array(masks.enumerated()), id: \.element) { position, index in
+            maskRow(index: index, visualPosition: position)
                 .disabled(!isEditable)
         }
     }
 
     @ViewBuilder
-    private func maskRow(index: Int) -> some View {
+    private func maskRow(index: Int, visualPosition: Int) -> some View {
         let inverted = core.maskInverted(layerID: layerID, index: index)
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text("Mask \(index + 1)")
+                Text("Mask \(visualPosition + 1)")
                     .font(.callout)
                 Picker("", selection: modeBinding(index: index)) {
                     ForEach(MS_MASK.allCases) { mode in
@@ -81,6 +83,20 @@ struct MasksInspector: View {
                 }
                 .buttonStyle(.plain)
                 .help("Invert mask")
+                Button {
+                    moveMask(index: index, visuallyUp: true)
+                } label: {
+                    Image(systemName: "chevron.up")
+                }
+                .disabled(!isEditable || !canMoveMask(index: index, visuallyUp: true))
+                .help("Move mask up")
+                Button {
+                    moveMask(index: index, visuallyUp: false)
+                } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .disabled(!isEditable || !canMoveMask(index: index, visuallyUp: false))
+                .help("Move mask down")
                 Spacer(minLength: 0)
                 pathKeyframeButton(index: index)
                 Button(role: .destructive) {
@@ -205,6 +221,26 @@ struct MasksInspector: View {
         guard isEditable else { return }
         perform("Remove Mask") {
             core.removeMask(layerID: layerID, index: index)
+        }
+    }
+
+    private func canMoveMask(index: Int, visuallyUp: Bool) -> Bool {
+        let count = core.maskCount(layerID: layerID)
+        guard count > 0, index >= 0, index < count else { return false }
+        if visuallyUp {
+            return index + 1 < count
+        }
+        return index > 0
+    }
+
+    private func moveMask(index: Int, visuallyUp: Bool) {
+        guard isEditable else { return }
+        let count = core.maskCount(layerID: layerID)
+        guard count > 0, index >= 0, index < count else { return }
+        let toIndex = visuallyUp ? index + 1 : index - 1
+        guard toIndex >= 0, toIndex < count else { return }
+        perform("Move Mask") {
+            core.moveMask(layerID: layerID, fromIndex: index, toIndex: toIndex)
         }
     }
 }
