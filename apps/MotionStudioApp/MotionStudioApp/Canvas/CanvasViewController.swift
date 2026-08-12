@@ -328,7 +328,6 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard let canvas else { return }
         updateSelectionOutline()
         ms_canvas_set_preview_backdrop(canvas, previewBackdrop)
-        ms_canvas_set_content_revision(canvas, UInt64(document.core.revision))
         ms_canvas_set_draw_mode(canvas, isPlaying ? .PLAYBACK : .EDIT)
         let profile: CanvasFrameProfile
         if isPlaying {
@@ -430,6 +429,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
 
     @objc private func handleCanvasTap(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else { return }
+        guard !isPlaying else { return }
         // Pen tool owns press/drag via penPressGesture; ignore taps.
         guard editorState.tool != .pen else { return }
         let viewPoint = gesture.location(in: view)
@@ -454,6 +454,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     // MARK: - Canvas view transform (zoom & pan)
 
     @objc private func handleCanvasDoubleTap(_ gesture: UITapGestureRecognizer) {
+        guard !isPlaying else { return }
         guard editorState.tool == .select else {
             return
         }
@@ -938,6 +939,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func hitTestLayer(at viewPoint: CGPoint) -> UInt64? {
+        guard !isPlaying else { return nil }
         guard let scenePoint = scenePoint(fromViewPoint: viewPoint) else {
             return nil
         }

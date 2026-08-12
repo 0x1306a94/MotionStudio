@@ -267,6 +267,9 @@ void Execute(MSDocument *handle, std::unique_ptr<motion::Command> command) {
         return;
     }
     handle->undoManager->execute(*handle->document, std::move(command));
+    // Model changed; drop SceneState so the next EnsurePreviewScene re-evaluates.
+    // App still pushes contentRevision for FrameCommandCache invalidation.
+    handle->previewSceneCache.clear();
 }
 
 PropertyPath MakePath(uint64_t entityId, const char *path) {

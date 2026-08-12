@@ -1788,6 +1788,7 @@ final class MotionDocumentCore {
 
     private func changed() {
         revision += 1
+        ms_document_set_content_revision(handle, UInt64(revision))
         onDidChange?()
     }
 

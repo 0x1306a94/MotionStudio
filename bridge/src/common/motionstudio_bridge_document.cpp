@@ -169,6 +169,7 @@ bool ms_document_undo(MSDocument *document) {
         return false;
     }
     document->undoManager->undo(*document->document);
+    document->previewSceneCache.clear();
     return true;
 }
 
@@ -178,6 +179,7 @@ bool ms_document_redo(MSDocument *document) {
         return false;
     }
     document->undoManager->redo(*document->document);
+    document->previewSceneCache.clear();
     return true;
 }
 

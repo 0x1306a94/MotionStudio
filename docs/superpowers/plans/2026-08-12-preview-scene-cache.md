@@ -21,6 +21,7 @@
 - 编码规范：禁异常、禁 `dynamic_cast`、错误用 `Expected`；bridge 无业务逻辑膨胀，只做缓存与指针传递。
 - C++17：无 `std::bit_cast`，用 `memcpy` 把 `PreviewTime`（`double`）转为 `uint64_t` 键。
 - **不做：** Core `SceneEvaluator` 内缓存、evaluate 次次 atomic++、增量求值、GPU snapshot。
+- 模型变更时：`Execute` / `ms_document_undo` / `ms_document_redo` **clear** `previewSceneCache`（不依赖 App revision）；`FrameCommandCache` 仍靠 Document `contentRevision`。
 
 ---
 
@@ -408,7 +409,7 @@ EOF
 
 ### Task 4: Canvas 侧 path / gradient / motion-path hit 接入 EnsurePreviewScene
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/src/common/motionstudio_bridge_canvas.cpp`（约 `ms_canvas_hit_path_edit` / `ms_canvas_hit_gradient_edit` / `ms_canvas_hit_motion_path`）
@@ -417,7 +418,7 @@ EOF
 - Consumes: `bridge::EnsurePreviewScene`
 - Produces: 无新 API；行为不变，少重复 evaluate
 
-- [ ] **Step 1: 替换三处 EvaluatePreview**
+- [x] **Step 1: 替换三处 EvaluatePreview**
 
 在已有 `DocumentLock` 内：
 
@@ -431,7 +432,7 @@ const motion::SceneState &state = ensured.value()->state;
 
 勿对这三处调用 `EnsureSceneCommands`。
 
-- [ ] **Step 2: 编译 bridge_test 并跑 canvas/composition 相关测试**
+- [x] **Step 2: 编译 bridge_test 并跑 canvas/composition 相关测试**
 
 Run:
 ```bash
@@ -440,7 +441,7 @@ ctest --test-dir build -R 'Bridge' --output-on-failure
 ```
 Expected: PASS
 
-- [ ] **Step 3: 更新 plan 勾选并 commit**
+- [x] **Step 3: 更新 plan 勾选并 commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -454,7 +455,7 @@ EOF
 
 ### Task 5: App — Document revision 推送 + 播放跳过 hit-test
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`
@@ -464,7 +465,7 @@ EOF
 - Consumes: `ms_document_set_content_revision`
 - Produces: 播放时不调用 `ms_composition_hit_test_layer`
 
-- [ ] **Step 1: MotionDocumentCore.changed() 推送 revision**
+- [x] **Step 1: MotionDocumentCore.changed() 推送 revision**
 
 ```swift
 private func changed() {
@@ -476,7 +477,7 @@ private func changed() {
 
 确认 `handle` 非 nil（与其它 bridge 调用一致）。
 
-- [ ] **Step 2: CanvasViewController 去掉 canvas revision；播放跳过 hit-test**
+- [x] **Step 2: CanvasViewController 去掉 canvas revision；播放跳过 hit-test**
 
 1. 删除所有 `ms_canvas_set_content_revision(...)`。
 2. `hitTestLayer(at:)`：
@@ -491,12 +492,12 @@ private func hitTestLayer(at viewPoint: CGPoint) -> UInt64? {
 
 3. `handleCanvasTap` / `handleCanvasDoubleTap` 入口增加 `guard !isPlaying else { return }`（双保险；与 pan 一致）。
 
-- [ ] **Step 3: Xcode 编译**
+- [x] **Step 3: Xcode 编译**
 
 优先 Xcode MCP `BuildProject`；失败则 `GetBuildLog`。  
 Expected: BUILD SUCCEEDED
 
-- [ ] **Step 4: 更新 plan 勾选并 commit**
+- [x] **Step 4: 更新 plan 勾选并 commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'

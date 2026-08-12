@@ -20,7 +20,6 @@
 #include "MotionStudio/render/MotionPathChrome.h"
 #include "MotionStudio/render/PathEditHandles.h"
 #include "MotionStudio/render/PathOverlay.h"
-#include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 
 using motion::EntityId;
@@ -194,11 +193,11 @@ MSPathEditHit ms_canvas_hit_path_edit(MSCanvas *canvas, MSDocument *document, ui
         return hit;
     }
     DocumentLock guard(document);
-    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return hit;
     }
-    motion::SceneState &state = result.value();
+    const motion::SceneState &state = ensured.value()->state;
     motion::PathEditHandles handles;
     if (!motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
         return hit;
@@ -239,11 +238,11 @@ MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *doc
         return MS_GRADIENT_HANDLE_NONE;
     }
     DocumentLock guard(document);
-    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return MS_GRADIENT_HANDLE_NONE;
     }
-    motion::SceneState &state = result.value();
+    const motion::SceneState &state = ensured.value()->state;
     motion::GradientEditHandles handles;
     if (!motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
         return MS_GRADIENT_HANDLE_NONE;
@@ -288,11 +287,11 @@ MSMotionPathHit ms_canvas_hit_motion_path(MSCanvas *canvas, MSDocument *document
         return hit;
     }
     DocumentLock guard(document);
-    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return hit;
     }
-    motion::SceneState &state = result.value();
+    const motion::SceneState &state = ensured.value()->state;
     const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
     const float handleRadius = 8.0f * viewUnit;
 
