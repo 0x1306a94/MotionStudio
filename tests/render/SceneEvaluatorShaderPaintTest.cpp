@@ -104,8 +104,7 @@ TEST(SceneEvaluatorShaderPaintTest, MissingShaderSkipsStyle) {
     ASSERT_NE(scene.fill, nullptr);
     scene.fill->shaderId = EntityId{999999};
 
-    Expected<SceneState, std::string> result =
-        SceneEvaluator::Evaluate(scene.document, scene.composition->id, 0);
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(scene.document, scene.composition->id, 0);
     ASSERT_TRUE(result.hasValue());
     // Rect with no successful styles emits neither shapeItems nor shapeNetwork.
     EXPECT_TRUE(result->layers.empty());
@@ -113,8 +112,7 @@ TEST(SceneEvaluatorShaderPaintTest, MissingShaderSkipsStyle) {
 
 TEST(SceneEvaluatorShaderPaintTest, PreviewFillsFrameContextFields) {
     ShaderFillScene scene;
-    Expected<SceneState, std::string> result =
-        SceneEvaluator::EvaluatePreview(scene.document, scene.composition->id, 15.0);
+    Expected<SceneState, std::string> result = SceneEvaluator::EvaluatePreview(scene.document, scene.composition->id, 15.0);
     ASSERT_TRUE(result.hasValue());
     EXPECT_FLOAT_EQ(result->frameRate, 30.f);
     EXPECT_EQ(result->frameIndex, 15);

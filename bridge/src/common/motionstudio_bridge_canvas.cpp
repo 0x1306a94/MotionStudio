@@ -259,8 +259,7 @@ MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *doc
         return MS_GRADIENT_HANDLE_NONE;
     }
     DocumentLock guard(document);
-    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId},
-                                                          motion::PreviewTime(frameTime));
+    auto result = motion::SceneEvaluator::EvaluatePreview(*document->document, EntityId{compositionId}, motion::PreviewTime(frameTime));
     if (!result.hasValue()) {
         return MS_GRADIENT_HANDLE_NONE;
     }

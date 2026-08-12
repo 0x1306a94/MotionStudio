@@ -253,8 +253,7 @@ bool ms_composition_selection_handles(MSDocument *document, uint64_t composition
     if (doc == nullptr || (count > 0 && layerIds == nullptr)) {
         return false;
     }
-    auto result =
-        SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
+    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
     if (!result.hasValue()) {
         return false;
     }
