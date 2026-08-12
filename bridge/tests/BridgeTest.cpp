@@ -750,6 +750,29 @@ TEST(BridgeDocumentTest, ContentRevisionApi) {
     ms_document_destroy(document);
 }
 
+TEST(BridgePreviewSceneTest, HitTestReusesCachedSceneState) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+    ms_document_set_content_revision(document, 1);
+
+    const float x = ms_composition_width(document, compositionId) * 0.5f;
+    const float y = ms_composition_height(document, compositionId) * 0.5f;
+
+    EXPECT_EQ(ms_composition_hit_test_layer(document, compositionId, 0.0, x, y, 0), layerId);
+    EXPECT_EQ(document->previewSceneCache.size(), 1u);
+
+    EXPECT_EQ(ms_composition_hit_test_layer(document, compositionId, 0.0, x, y, 0), layerId);
+    EXPECT_EQ(document->previewSceneCache.size(), 1u);
+
+    ms_document_set_content_revision(document, 2);
+    EXPECT_EQ(ms_composition_hit_test_layer(document, compositionId, 0.0, x, y, 0), layerId);
+    EXPECT_EQ(document->previewSceneCache.size(), 1u);
+    EXPECT_EQ(document->previewSceneCache.revision(), 2u);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, StrokeStyleLifecycle) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

@@ -13,13 +13,12 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/render/HitTest.h"
-#include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/SelectionHandles.h"
 
 #include "BridgeInternals.h"
 #include "DocumentLock.h"
 #include "MSDocument.h"
-#include "ProfileClock.h"
+#include "PreviewEnsure.h"
 
 using namespace bridge;
 
@@ -29,7 +28,6 @@ using motion::EntityId;
 using motion::FrameTime;
 using motion::Layer;
 using motion::Mat3;
-using motion::SceneEvaluator;
 using motion::Vec2;
 
 /* ============================ composition queries ============================ */
@@ -113,16 +111,14 @@ float ms_composition_corner_radius(MSDocument *document, uint64_t compositionId)
 
 uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositionId, double frameTime, float x, float y, float tolerance) {
     DocumentLock guard(document);
-    Document *doc = Doc(document);
-    if (doc == nullptr) {
+    if (Doc(document) == nullptr) {
         return 0;
     }
-    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return 0;
     }
-    motion::SceneState &state = result.value();
-    ResolvePointTextContainerSizes(state);
+    const motion::SceneState &state = ensured.value()->state;
     // Locked layers remain hittable/selectable; transform edits still refuse locks in the app.
     for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
         if (motion::HitTestLayer(*it, Vec2{x, y}, tolerance)) {
@@ -135,16 +131,14 @@ uint64_t ms_composition_hit_test_layer(MSDocument *document, uint64_t compositio
 bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
                                  float *minX, float *minY, float *maxX, float *maxY) {
     DocumentLock guard(document);
-    Document *doc = Doc(document);
-    if (doc == nullptr) {
+    if (Doc(document) == nullptr) {
         return false;
     }
-    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return false;
     }
-    motion::SceneState &state = result.value();
-    ResolvePointTextContainerSizes(state);
+    const motion::SceneState &state = ensured.value()->state;
     for (const motion::EvaluatedLayer &layer : state.layers) {
         if (layer.id.value != layerId) {
             continue;
@@ -207,16 +201,14 @@ bool ms_layer_map_composition_delta(MSDocument *document, uint64_t compositionId
 bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_t layerId, double frameTime,
                            float *minX, float *minY, float *maxX, float *maxY) {
     DocumentLock guard(document);
-    Document *doc = Doc(document);
-    if (doc == nullptr) {
+    if (Doc(document) == nullptr) {
         return false;
     }
-    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return false;
     }
-    motion::SceneState &state = result.value();
-    ResolvePointTextContainerSizes(state);
+    const motion::SceneState &state = ensured.value()->state;
     for (const motion::EvaluatedLayer &layer : state.layers) {
         if (layer.id.value != layerId) {
             continue;
@@ -250,16 +242,14 @@ bool ms_composition_selection_handles(MSDocument *document, uint64_t composition
         *out = {};
     }
     DocumentLock guard(document);
-    Document *doc = Doc(document);
-    if (doc == nullptr || (count > 0 && layerIds == nullptr)) {
+    if (Doc(document) == nullptr || (count > 0 && layerIds == nullptr)) {
         return false;
     }
-    auto result = SceneEvaluator::EvaluatePreview(*doc, EntityId{compositionId}, motion::PreviewTime(frameTime));
-    if (!result.hasValue()) {
+    auto ensured = EnsurePreviewScene(document, compositionId, motion::PreviewTime(frameTime));
+    if (!ensured.hasValue()) {
         return false;
     }
-    motion::SceneState &state = result.value();
-    ResolvePointTextContainerSizes(state);
+    const motion::SceneState &state = ensured.value()->state;
     std::vector<EntityId> selected;
     selected.reserve(count);
     for (size_t index = 0; index < count; ++index) {

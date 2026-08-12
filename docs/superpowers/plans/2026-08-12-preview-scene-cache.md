@@ -205,7 +205,7 @@ EOF
 
 ### Task 2: EnsurePreviewScene + composition / hit-test 接入
 
-**Status:** ⏳ Pending
+**Status:** ✅ Done
 
 **Files:**
 - Create: `bridge/src/common/PreviewEnsure.h`
@@ -225,7 +225,7 @@ EnsurePreviewScene(MSDocument *handle, uint64_t compositionId, motion::PreviewTi
 ```
 调用方须已持 `DocumentLock`。`handle`/`document` 非空由调用方保证；composition 缺失返回 `Unexpected`。
 
-- [ ] **Step 1: 写失败集成测试**
+- [x] **Step 1: 写失败集成测试**
 
 ```cpp
 TEST(BridgePreviewSceneTest, HitTestReusesCachedSceneState) {
@@ -256,7 +256,7 @@ TEST(BridgePreviewSceneTest, HitTestReusesCachedSceneState) {
 
 （`BridgeTest` 已能 `#include "MSDocument.h"` / 访问内部；若 `ms_composition_size` 签名不同，改用现有 composition 宽高 API。）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run:
 ```bash
@@ -264,7 +264,7 @@ Run:
 ```
 Expected: FAIL（仍直接 Evaluate，或 cache size 为 0）。
 
-- [ ] **Step 3: 实现 EnsurePreviewScene 并切换 composition API**
+- [x] **Step 3: 实现 EnsurePreviewScene 并切换 composition API**
 
 `PreviewEnsure.cpp` 按 spec 伪代码实现；**不要**调用 `BuildCommands`。
 
@@ -288,7 +288,7 @@ const motion::SceneState &state = ensured.value()->state;
 
 删除 hit-test 的 `ProfileClock` / `printf` 调试日志（及若仅为此引入且无其它引用的 include）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run:
 ```bash
@@ -302,7 +302,7 @@ Expected: PASS
 ./build/bridge/bridge_test --gtest_filter='*HitTest*'
 ```
 
-- [ ] **Step 5: 更新 plan 勾选并 commit**
+- [x] **Step 5: 更新 plan 勾选并 commit**
 
 ```bash
 git commit -m "$(cat <<'EOF'
