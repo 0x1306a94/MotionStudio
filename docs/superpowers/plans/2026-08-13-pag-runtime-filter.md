@@ -276,7 +276,7 @@ git commit -m "Add RenderCache storage for RuntimeFilter GPU resources."
 
 ### Task 3: RuntimeFilter + BrightnessContrast + 像素测试
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `adapter/tgfx/src/effects/RuntimeFilter.h`
@@ -295,7 +295,7 @@ git commit -m "Add RenderCache storage for RuntimeFilter GPU resources."
 
 对照源：`third_party/libpag/src/rendering/filters/RuntimeFilter.{h,cpp}` 与 `BrightnessContrastFilter.{h,cpp}`。`ToVertexPoint` / `ToTexturePoint` 写在 `RuntimeFilter.cpp` 匿名命名空间，不拆 FilterHelper。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `adapter/tgfx/tests/BrightnessContrastFilterTest.mm`。夹具用 Task 1 的 `tgfx_test`，不要再复制 `TgfxTestGPUEnvironment`。
 
@@ -444,6 +444,8 @@ TEST(BrightnessContrastFilterTest, SharesPipelineAcrossInstances) {
     canvas->clear();
     canvas->drawImage(first);
     canvas->drawImage(second);
+    Pixel center = {};
+    ASSERT_TRUE(ReadCenter(env->surface(), kSize, &center));
 
     auto probe = std::make_shared<BrightnessContrastFilter>(&cache, 0.f, 0.f);
     auto *resources = cache.findFilterResources(probe->typeId());
@@ -459,7 +461,7 @@ TEST(BrightnessContrastFilterTest, ApplyNullInputReturnsNull) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -467,7 +469,7 @@ cmake --build build --target tgfx_adapter_test
 
 预期：编译失败（找不到 `BrightnessContrastFilter.h`）。
 
-- [ ] **Step 3: 实现 RuntimeFilter**
+- [x] **Step 3: 实现 RuntimeFilter**
 
 `adapter/tgfx/src/effects/RuntimeFilter.h`：
 
@@ -596,7 +598,7 @@ tgfx::Point ToVertexPoint(const tgfx::Texture *target, const tgfx::Point &point)
 
 需要的 tgfx 头（按编译补齐）：`Attribute.h`、`CommandEncoder.h`、`GPU.h`、`GPUBuffer.h`、`PixelFormat.h`、`RenderPass.h`、`RenderPipeline.h`、`Sampler.h`、`ShaderModule.h`、`ShaderStage.h`、`Texture.h`、`Rect.h`、`Point.h`、`Color.h`（MSAA `PMColor::Transparent`）。
 
-- [ ] **Step 4: 实现 BrightnessContrastFilter**
+- [x] **Step 4: 实现 BrightnessContrastFilter**
 
 `adapter/tgfx/src/effects/BrightnessContrastFilter.h`：
 
@@ -665,7 +667,7 @@ renderPass->setUniformBuffer(0, slice.buffer, slice.offset, sizeof(Uniforms));
 
 include：`BrightnessContrastFilter.h`、`RenderCache.h`、`<cstring>`、`tgfx/core/ImageFilter.h`、`tgfx/gpu/GPU.h`、`tgfx/gpu/GPUBuffer.h`、`tgfx/gpu/RenderPass.h`。
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -674,7 +676,7 @@ cmake --build build --target tgfx_adapter_test
 
 预期：全部 PASS。若 Identity 差 1–2 属 GPU 量化，断言已是 `<= 2`。若 Contrast 方向反了，先核对 uniform 映射是否与 PAG 一致，禁止改 shader 凑测试。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 同步本 plan Task 3 checkbox 与 `**Status:** ✅ Done`。
 
