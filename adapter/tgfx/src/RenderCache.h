@@ -12,6 +12,7 @@ class RenderPipeline;
 class GPUBuffer;
 class Context;
 class GPU;
+class Sampler;
 };  // namespace tgfx
 
 namespace motion {
@@ -25,10 +26,16 @@ struct UniformBufferSlice {
     size_t offset = 0;
 };
 
+struct FilterResources {
+    std::shared_ptr<tgfx::RenderPipeline> pipeline = nullptr;
+    std::shared_ptr<tgfx::Sampler> sampler = nullptr;
+};
+
 /**
- * Per-context GPU cache for ColorSourceEffect: shared pipelines keyed by
- * document shader EntityId, and a shared fullscreen triangle VBO.
- * Uniform uploads go through tgfx GlobalCache via acquireUniformSlice().
+ * Per-context GPU cache for ColorSourceEffect and RuntimeFilter: shared
+ * pipelines keyed by document shader EntityId or filterType, and a shared
+ * fullscreen triangle VBO. Uniform uploads go through tgfx GlobalCache via
+ * acquireUniformSlice().
  */
 class RenderCache {
 
@@ -47,6 +54,9 @@ class RenderCache {
     std::shared_ptr<tgfx::RenderPipeline> findColorSourcePipeline(EntityId shaderId) const;
 
     void addColorSourcePipeline(EntityId shaderId, std::shared_ptr<tgfx::RenderPipeline> pipeline);
+
+    FilterResources *findFilterResources(uint32_t type) const;
+    void addFilterResources(uint32_t type, std::unique_ptr<FilterResources> resources);
 
     // Drops the cached pipeline for shaderId. Call after the shader source or
     // uniform layout changes so the next draw recompiles.
@@ -71,6 +81,7 @@ class RenderCache {
     tgfx::Context *context_ = nullptr;
     std::unordered_map<EntityId, std::shared_ptr<tgfx::RenderPipeline>> colorSourcePipelineMap_ = {};
     std::unordered_map<EntityId, std::string> colorSourceSourceKeys_ = {};
+    std::unordered_map<uint32_t, std::unique_ptr<FilterResources>> filterResourcesMap_ = {};
     std::shared_ptr<tgfx::GPUBuffer> fullscreenVertexBuffer_ = nullptr;
 };
 };  // namespace motion

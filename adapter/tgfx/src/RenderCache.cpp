@@ -63,6 +63,21 @@ void RenderCache::addColorSourcePipeline(EntityId shaderId, std::shared_ptr<tgfx
     colorSourcePipelineMap_[shaderId] = std::move(pipeline);
 }
 
+FilterResources *RenderCache::findFilterResources(uint32_t type) const {
+    auto result = filterResourcesMap_.find(type);
+    if (result != filterResourcesMap_.end()) {
+        return result->second.get();
+    }
+    return nullptr;
+}
+
+void RenderCache::addFilterResources(uint32_t type, std::unique_ptr<FilterResources> resources) {
+    if (resources == nullptr) {
+        return;
+    }
+    filterResourcesMap_[type] = std::move(resources);
+}
+
 void RenderCache::invalidateColorSourcePipeline(EntityId shaderId) {
     if (!shaderId.isValid()) {
         return;
@@ -116,6 +131,7 @@ std::shared_ptr<tgfx::GPUBuffer> RenderCache::getFullscreenVertexBuffer(tgfx::GP
 void RenderCache::releaseAll() {
     colorSourcePipelineMap_.clear();
     colorSourceSourceKeys_.clear();
+    filterResourcesMap_.clear();
     fullscreenVertexBuffer_ = nullptr;
     contextID_ = 0;
 }

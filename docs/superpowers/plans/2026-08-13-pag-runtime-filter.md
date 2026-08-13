@@ -152,7 +152,7 @@ git commit -m "Share Metal test fixtures across tgfx adapter tests."
 
 ### Task 2: RenderCache FilterResources
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/RenderCache.h`
@@ -165,7 +165,7 @@ git commit -m "Share Metal test fixtures across tgfx adapter tests."
 - Produces: `void addFilterResources(uint32_t type, unique_ptr<FilterResources> resources)`
 - Produces: `releaseAll()` 同时清空 `filterResourcesMap_`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `adapter/tgfx/tests/RenderCacheTest.cpp`：
 
@@ -196,7 +196,7 @@ TEST(RenderCacheTest, StoresAndClearsFilterResources) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -205,7 +205,7 @@ cmake --build build --target tgfx_adapter_test
 
 若二进制不在该路径，用 `find build -name tgfx_adapter_test` 定位。预期：FAIL（`FilterResources` / `findFilterResources` 未声明）。
 
-- [ ] **Step 3: 实现 RenderCache 增量**
+- [x] **Step 3: 实现 RenderCache 增量**
 
 `RenderCache.h`：在 `namespace tgfx` 前向声明加 `class Sampler;`。在 `UniformBufferSlice` 后、`class RenderCache` 前插入：
 
@@ -252,7 +252,7 @@ void RenderCache::addFilterResources(uint32_t type, std::unique_ptr<FilterResour
 
 `releaseAll()` 里在 `colorSourceSourceKeys_.clear();` 之后加 `filterResourcesMap_.clear();`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -261,7 +261,7 @@ cmake --build build --target tgfx_adapter_test
 
 预期：PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 同步本 plan Task 2 checkbox 为 `[x]`、`**Status:** ✅ Done`。spec/plan 已在 Task 1 入库则不必再 add spec。
 
