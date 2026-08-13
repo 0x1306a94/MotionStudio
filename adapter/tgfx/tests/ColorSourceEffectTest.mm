@@ -1,24 +1,19 @@
 #include <cmath>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
 
-#import <Metal/Metal.h>
-
 #include <gtest/gtest.h>
 
 #include "RenderCache.h"
+#include "TgfxTestGPUEnvironment.h"
 #include "effects/ColorSourceEffect.h"
 #include "effects/Uniform.h"
 
 #include "MotionStudio/common/EntityId.h"
 
-#include <tgfx/core/Bitmap.h>
 #include <tgfx/core/Canvas.h>
-#include <tgfx/core/EncodedFormat.h>
 #include <tgfx/core/ImageInfo.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Path.h>
@@ -26,7 +21,6 @@
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/GPU.h>
-#include <tgfx/gpu/metal/MetalDevice.h>
 
 using motion::ColorSourceEffect;
 using motion::ColorSourceFrameContext;
@@ -34,6 +28,9 @@ using motion::EntityId;
 using motion::RenderCache;
 using motion::Uniform;
 using motion::UniformFormat;
+using tgfx_test::OutputPath;
+using tgfx_test::SaveWebp;
+using tgfx_test::TgfxTestGPUEnvironment;
 
 namespace {
 
@@ -320,58 +317,6 @@ vec4 mainImage(vec2 uv) {
 }
 )GLSL";
 
-// Standalone tgfx Metal environment modeled on TgfxRenderAdapter::RecreateTarget:
-// owns the Metal device and a Surface with a readable RGBA8 target. The tgfx
-// context lock is non-reentrant, so callers hold it for the whole draw+read via
-// lockContext/unlockContext rather than nesting per-operation locks.
-class TestEnvironment {
-  public:
-    static std::unique_ptr<TestEnvironment> Make(int width, int height) {
-        auto env = std::unique_ptr<TestEnvironment>(new TestEnvironment());
-        env->mtlDevice_ = MTLCreateSystemDefaultDevice();
-        if (!env->mtlDevice_) {
-            return nullptr;
-        }
-        env->device_ = tgfx::MetalDevice::MakeFrom((__bridge void *)env->mtlDevice_);
-        if (!env->device_) {
-            return nullptr;
-        }
-        auto *context = env->device_->lockContext();
-        if (!context) {
-            return nullptr;
-        }
-        env->surface_ = tgfx::Surface::Make(context, width, height, tgfx::ColorType::RGBA_8888);
-        env->device_->unlock();
-        if (!env->surface_) {
-            return nullptr;
-        }
-        env->width_ = width;
-        env->height_ = height;
-        return env;
-    }
-
-    // Locks the context for a draw+read batch. Returns nullptr if the device
-    // is lost; caller must pair with unlockContext().
-    tgfx::Context *lockContext() {
-        return device_->lockContext();
-    }
-
-    void unlockContext() {
-        device_->unlock();
-    }
-
-    tgfx::Surface *surface() {
-        return surface_.get();
-    }
-
-  private:
-    id<MTLDevice> mtlDevice_ = nil;
-    std::shared_ptr<tgfx::Device> device_;
-    std::shared_ptr<tgfx::Surface> surface_;
-    int width_ = 0;
-    int height_ = 0;
-};
-
 // Builds a five-pointed star path centered at (cx, cy) with alternating outer
 // and inner vertices, starting with the top point.
 tgfx::Path MakeFivePointStar(float cx, float cy, float outerRadius, float innerRadius) {
@@ -392,43 +337,11 @@ tgfx::Path MakeFivePointStar(float cx, float cy, float outerRadius, float innerR
     path.close();
     return path;
 }
-
-// Encodes RGBA8 premultiplied pixels to a webp file at path. Uses tgfx's own
-// Bitmap encode, which handles color-type conversion to its native layout.
-bool SaveWebp(const std::vector<uint8_t> &rgba, int width, int height, const std::string &path) {
-    tgfx::Bitmap bitmap(width, height, false, false);
-    if (bitmap.isEmpty()) {
-        return false;
-    }
-    auto info = tgfx::ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
-    if (!bitmap.writePixels(info, rgba.data())) {
-        return false;
-    }
-    auto data = bitmap.encode(tgfx::EncodedFormat::WEBP, 100);
-    if (!data) {
-        return false;
-    }
-    std::filesystem::path fsPath(path);
-    if (fsPath.has_parent_path()) {
-        std::filesystem::create_directories(fsPath.parent_path());
-    }
-    std::ofstream out(path, std::ios::binary);
-    if (!out) {
-        return false;
-    }
-    out.write(reinterpret_cast<const char *>(data->data()), static_cast<std::streamsize>(data->size()));
-    return out.good();
-}
-
-std::string OutputPath(const std::string &fileName) {
-    return (std::filesystem::path(__FILE__).parent_path() / "out" / fileName).string();
-}
-
 }  // namespace
 
 TEST(ColorSourceEffectTest, FillsStarPathWithEffect) {
     constexpr int kSize = 256;
-    auto env = TestEnvironment::Make(kSize, kSize);
+    auto env = TgfxTestGPUEnvironment::Make(kSize, kSize);
     if (!env) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
@@ -490,7 +403,7 @@ TEST(ColorSourceEffectTest, FillsStarPathWithEffect) {
 TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
     constexpr int kWidth = 1600;
     constexpr int kHeight = 900;
-    auto env = TestEnvironment::Make(kWidth, kHeight);
+    auto env = TgfxTestGPUEnvironment::Make(kWidth, kHeight);
     if (!env) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
@@ -555,7 +468,7 @@ TEST(ColorSourceEffectTest, RendersShadertoyXs3GWjFrames) {
 TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
     constexpr int kWidth = 1600;
     constexpr int kHeight = 900;
-    auto env = TestEnvironment::Make(kWidth, kHeight);
+    auto env = TgfxTestGPUEnvironment::Make(kWidth, kHeight);
     if (!env) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
@@ -610,7 +523,7 @@ TEST(ColorSourceEffectTest, RendersShadertoyCloudsFrames) {
 TEST(ColorSourceEffectTest, SharesPipelineAcrossTwoEffectInstances) {
     constexpr int kWidth = 256;
     constexpr int kHeight = 256;
-    auto env = TestEnvironment::Make(kWidth, kHeight);
+    auto env = TgfxTestGPUEnvironment::Make(kWidth, kHeight);
     if (!env) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
@@ -673,7 +586,7 @@ vec4 mainImage(vec2 uv) {
 TEST(ColorSourceEffectTest, ClippedDrawKeepsLogicalUvMapping) {
     constexpr int kWidth = 128;
     constexpr int kHeight = 128;
-    auto env = TestEnvironment::Make(kWidth, kHeight);
+    auto env = TgfxTestGPUEnvironment::Make(kWidth, kHeight);
     if (!env) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
@@ -717,7 +630,7 @@ TEST(ColorSourceEffectTest, ClippedDrawKeepsLogicalUvMapping) {
 TEST(ColorSourceEffectTest, InvalidatesPipelineAfterShaderEdit) {
     constexpr int kWidth = 64;
     constexpr int kHeight = 64;
-    auto env = TestEnvironment::Make(kWidth, kHeight);
+    auto env = TgfxTestGPUEnvironment::Make(kWidth, kHeight);
     if (!env) {
         GTEST_SKIP() << "Metal is unavailable on this machine";
     }
