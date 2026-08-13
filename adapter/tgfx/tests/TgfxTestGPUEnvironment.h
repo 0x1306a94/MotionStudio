@@ -1,5 +1,7 @@
 #pragma once
 
+#include "RenderCache.h"
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -9,23 +11,24 @@
 #include <tgfx/core/Image.h>
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Context.h>
+#include <tgfx/gpu/Device.h>
 
 namespace tgfx_test {
 
 class TgfxTestGPUEnvironment {
   public:
     static std::unique_ptr<TgfxTestGPUEnvironment> Make(int width, int height);
-    ~TgfxTestGPUEnvironment();
 
     tgfx::Context *lockContext();
     void unlockContext();
     tgfx::Surface *surface();
+    motion::RenderCache *renderCache();
 
   private:
-    TgfxTestGPUEnvironment();
+    TgfxTestGPUEnvironment() = default;
 
-    struct Data;
-    std::unique_ptr<Data> data_ = nullptr;
+    std::shared_ptr<tgfx::Device> device_ = nullptr;
+    std::shared_ptr<tgfx::Surface> surface_ = nullptr;
 };
 
 struct Pixel {

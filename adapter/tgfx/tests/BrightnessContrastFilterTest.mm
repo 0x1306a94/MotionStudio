@@ -29,14 +29,13 @@ TEST(BrightnessContrastFilterTest, IdentityLeavesOpaqueColorUnchanged) {
     auto *context = env->lockContext();
     ASSERT_NE(context, nullptr);
 
-    RenderCache cache;
-    cache.attachToContext(context);
+    auto *cache = env->renderCache();
     const tgfx::Color fill{128.f / 255.f, 64.f / 255.f, 32.f / 255.f, 1.f};
     auto input = MakeSolidImage(context, kSize, fill);
     ASSERT_NE(input, nullptr);
 
     tgfx::Point offset = {};
-    auto filtered = BrightnessContrastFilter::Apply(input, &cache, 0.f, 0.f, &offset);
+    auto filtered = BrightnessContrastFilter::Apply(input, cache, 0.f, 0.f, &offset);
     ASSERT_NE(filtered, nullptr);
 
     auto *canvas = env->surface()->getCanvas();
@@ -61,14 +60,13 @@ TEST(BrightnessContrastFilterTest, PositiveBrightnessRaisesValue) {
     auto *context = env->lockContext();
     ASSERT_NE(context, nullptr);
 
-    RenderCache cache;
-    cache.attachToContext(context);
+    auto *cache = env->renderCache();
     const tgfx::Color fill{128.f / 255.f, 64.f / 255.f, 32.f / 255.f, 1.f};
     auto input = MakeSolidImage(context, kSize, fill);
     ASSERT_NE(input, nullptr);
 
     tgfx::Point offset = {};
-    auto filtered = BrightnessContrastFilter::Apply(input, &cache, 100.f, 0.f, &offset);
+    auto filtered = BrightnessContrastFilter::Apply(input, cache, 100.f, 0.f, &offset);
     ASSERT_NE(filtered, nullptr);
 
     auto *canvas = env->surface()->getCanvas();
@@ -91,14 +89,13 @@ TEST(BrightnessContrastFilterTest, PositiveContrastPushesAwayFromMidGrey) {
     auto *context = env->lockContext();
     ASSERT_NE(context, nullptr);
 
-    RenderCache cache;
-    cache.attachToContext(context);
+    auto *cache = env->renderCache();
     const tgfx::Color fill{64.f / 255.f, 64.f / 255.f, 64.f / 255.f, 1.f};
     auto input = MakeSolidImage(context, kSize, fill);
     ASSERT_NE(input, nullptr);
 
     tgfx::Point offset = {};
-    auto filtered = BrightnessContrastFilter::Apply(input, &cache, 0.f, 100.f, &offset);
+    auto filtered = BrightnessContrastFilter::Apply(input, cache, 0.f, 100.f, &offset);
     ASSERT_NE(filtered, nullptr);
 
     auto *canvas = env->surface()->getCanvas();
@@ -122,15 +119,14 @@ TEST(BrightnessContrastFilterTest, SharesPipelineAcrossInstances) {
     auto *context = env->lockContext();
     ASSERT_NE(context, nullptr);
 
-    RenderCache cache;
-    cache.attachToContext(context);
+    auto *cache = env->renderCache();
     const tgfx::Color fill{128.f / 255.f, 64.f / 255.f, 32.f / 255.f, 1.f};
     auto input = MakeSolidImage(context, kSize, fill);
     ASSERT_NE(input, nullptr);
 
     tgfx::Point offset = {};
-    auto first = BrightnessContrastFilter::Apply(input, &cache, 0.f, 0.f, &offset);
-    auto second = BrightnessContrastFilter::Apply(input, &cache, 100.f, 0.f, &offset);
+    auto first = BrightnessContrastFilter::Apply(input, cache, 0.f, 0.f, &offset);
+    auto second = BrightnessContrastFilter::Apply(input, cache, 100.f, 0.f, &offset);
     ASSERT_NE(first, nullptr);
     ASSERT_NE(second, nullptr);
 
@@ -141,8 +137,8 @@ TEST(BrightnessContrastFilterTest, SharesPipelineAcrossInstances) {
     Pixel center = {};
     ASSERT_TRUE(ReadCenter(env->surface(), kSize, &center));
 
-    auto probe = std::make_shared<BrightnessContrastFilter>(&cache, 0.f, 0.f);
-    auto *resources = cache.findFilterResources(probe->typeId());
+    auto probe = std::make_shared<BrightnessContrastFilter>(cache, 0.f, 0.f);
+    auto *resources = cache->findFilterResources(probe->typeId());
     ASSERT_NE(resources, nullptr);
     ASSERT_NE(resources->pipeline, nullptr);
     env->unlockContext();

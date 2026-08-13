@@ -4,66 +4,71 @@
 #include <filesystem>
 #include <fstream>
 
-#import <Metal/Metal.h>
-
 #include <tgfx/core/Bitmap.h>
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/EncodedFormat.h>
 #include <tgfx/core/ImageInfo.h>
-#include <tgfx/gpu/Device.h>
 #include <tgfx/gpu/metal/MetalDevice.h>
 
 namespace tgfx_test {
 
-struct TgfxTestGPUEnvironment::Data {
-    id<MTLDevice> mtlDevice = nil;
-    std::shared_ptr<tgfx::Device> device = nullptr;
-    std::shared_ptr<tgfx::Surface> surface = nullptr;
-};
+namespace {
 
-TgfxTestGPUEnvironment::TgfxTestGPUEnvironment()
-    : data_(std::make_unique<Data>()) {
+thread_local std::shared_ptr<tgfx::Device> cachedDevice = nullptr;
+thread_local motion::RenderCache cachedRenderCache;
+
+std::shared_ptr<tgfx::Device> SharedDevice() {
+    if (cachedDevice == nullptr) {
+        cachedDevice = tgfx::MetalDevice::Make();
+    }
+    return cachedDevice;
 }
 
-TgfxTestGPUEnvironment::~TgfxTestGPUEnvironment() = default;
+}  // namespace
 
 std::unique_ptr<TgfxTestGPUEnvironment> TgfxTestGPUEnvironment::Make(int width, int height) {
+    auto device = SharedDevice();
+    if (device == nullptr) {
+        return nullptr;
+    }
+    auto *context = device->lockContext();
+    if (context == nullptr) {
+        return nullptr;
+    }
+    auto surface = tgfx::Surface::Make(context, width, height, tgfx::ColorType::RGBA_8888);
+    cachedRenderCache.attachToContext(context);
+    device->unlock();
+    if (surface == nullptr) {
+        return nullptr;
+    }
     auto env = std::unique_ptr<TgfxTestGPUEnvironment>(new TgfxTestGPUEnvironment());
-    env->data_->mtlDevice = MTLCreateSystemDefaultDevice();
-    if (!env->data_->mtlDevice) {
-        return nullptr;
-    }
-    env->data_->device = tgfx::MetalDevice::MakeFrom((__bridge void *)env->data_->mtlDevice);
-    if (!env->data_->device) {
-        return nullptr;
-    }
-    auto *context = env->data_->device->lockContext();
-    if (!context) {
-        return nullptr;
-    }
-    env->data_->surface = tgfx::Surface::Make(context, width, height, tgfx::ColorType::RGBA_8888);
-    env->data_->device->unlock();
-    if (!env->data_->surface) {
-        return nullptr;
-    }
+    env->device_ = std::move(device);
+    env->surface_ = std::move(surface);
     return env;
 }
 
 tgfx::Context *TgfxTestGPUEnvironment::lockContext() {
-    return data_->device->lockContext();
+    auto *context = device_->lockContext();
+    if (context != nullptr) {
+        cachedRenderCache.attachToContext(context);
+    }
+    return context;
 }
 
 void TgfxTestGPUEnvironment::unlockContext() {
-    data_->device->unlock();
+    device_->unlock();
 }
 
 tgfx::Surface *TgfxTestGPUEnvironment::surface() {
-    return data_->surface.get();
+    return surface_.get();
+}
+
+motion::RenderCache *TgfxTestGPUEnvironment::renderCache() {
+    return &cachedRenderCache;
 }
 
 Pixel PixelAt(const std::vector<uint8_t> &pixels, int width, int x, int y) {
-    const size_t offset =
-        (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
+    const size_t offset = (static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)) * 4;
     return {pixels[offset], pixels[offset + 1], pixels[offset + 2], pixels[offset + 3]};
 }
 
@@ -81,8 +86,7 @@ std::shared_ptr<tgfx::Image> MakeSolidImage(tgfx::Context *context, int size, tg
 }
 
 bool ReadCenter(tgfx::Surface *surface, int size, Pixel *out) {
-    tgfx::ImageInfo info =
-        tgfx::ImageInfo::Make(size, size, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+    tgfx::ImageInfo info = tgfx::ImageInfo::Make(size, size, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
     std::vector<uint8_t> pixels(static_cast<size_t>(info.rowBytes() * info.height()));
     if (!surface->readPixels(info, pixels.data())) {
         return false;
