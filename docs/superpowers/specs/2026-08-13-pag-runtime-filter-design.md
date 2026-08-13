@@ -1,7 +1,7 @@
 # PAG RuntimeFilter 架构 + BrightnessContrast — 设计说明
 
 日期：2026-08-13  
-状态：待实现  
+状态：已实现（plan Tasks 1–4）  
 范围：adapter 侧图层后处理滤镜基类 + 移植一个 PAG effect；**不**改 Core / DrawCommand / App UI
 
 相关：[`docs/color-source-effect.md`](../../color-source-effect.md)（过程色 fill，职责不同）、libpag `third_party/libpag/src/rendering/filters/`

@@ -692,7 +692,7 @@ git commit -m "Port RuntimeFilter and BrightnessContrast from PAG."
 
 ### Task 4: 文档
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `docs/pag-runtime-filter.md`
@@ -703,7 +703,7 @@ git commit -m "Port RuntimeFilter and BrightnessContrast from PAG."
 - Consumes: Task 3 的 `Apply` / `typeId` / `filterType` 缓存键
 - Produces: 调用约定文档，对标 `docs/color-source-effect.md`
 
-- [ ] **Step 1: 写 `docs/pag-runtime-filter.md`**
+- [x] **Step 1: 写 `docs/pag-runtime-filter.md`**
 
 内容必须包含：
 
@@ -721,7 +721,7 @@ canvas->drawImage(image);
 5. UBO 走 `acquireUniformSlice`。
 6. 本阶段未接入 `endLayer` / Core effects。
 
-- [ ] **Step 2: 更新 `docs/README.md` 索引**
+- [x] **Step 2: 更新 `docs/README.md` 索引**
 
 在 `color-source-effect.md` 那一行后面插入：
 
@@ -731,7 +731,7 @@ canvas->drawImage(image);
 
 spec 文首「状态：待实现」改为「状态：已实现（plan Tasks 1–4）」。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 同步本 plan Task 4 为 ✅ Done。
 
