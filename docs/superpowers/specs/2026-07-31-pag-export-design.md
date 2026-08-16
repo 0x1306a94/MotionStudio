@@ -373,7 +373,7 @@ ID：导出时分配稳定 `pag::ID`（可用递增计数器）；**不要求**�
 | MotionStudio | PAG | 说明 |
 | --- | --- | --- |
 | `Composition` | `VectorComposition` | width/height/duration/frameRate/background |
-| `LayerType::Shape` | `ShapeLayer` | contents 见 §3.3 |
+| `LayerType::Shape` | `SolidLayer` 或 `ShapeLayer` | 仅一个静态 Color Fill 的直角矩形 → `SolidLayer`（宽高取 size 四舍五入；anchor 补偿矩形中心；fill alpha 乘进图层 opacity）。其余仍 `ShapeLayer`，contents 见 §3.3 |
 | `LayerType::Text` | `TextLayer` | `sourceText`；尽量进入 `editableTexts` |
 | `LayerType::Image` | `ImageLayer` + `ImageBytes` | asset 读入；尽量 `editableImages` |
 | `LayerType::Group` | `NullLayer` | 见 §3.5 |
@@ -615,7 +615,7 @@ Encode(file)
 
 | 用例 | 期望 |
 | --- | --- |
-| Shape Rect/Ellipse/Path + Transform KF | Load 成功；ShapeLayer；关键帧数量符合 |
+| Shape Rect/Ellipse/Path + Transform KF | Load 成功；合格 Color 直角矩形为 SolidLayer，其余 ShapeLayer；关键帧数量符合 |
 | Fill + Stroke + Trim | shape contents 含对应元素 |
 | Fill + Inside/Outside Stroke | 主 ShapeLayer（Path+Fill）+ 两个平行 outline ShapeLayer；有 `StrokePositionBaked` warning |
 | 双 Trim Center Stroke + TrackMatte | 根合成一个 `PreComposeLayer` 挂 matte；内合成含两条 Stroke；`StrokeSiblingsWrappedForTrackMatte` |

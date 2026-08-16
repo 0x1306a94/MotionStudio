@@ -85,6 +85,87 @@ bool TrimIsDefault(const StrokeStyle &stroke) {
         stroke.trimOffset.staticValue() == 0.0f;
 }
 
+bool CanExportShapeAsSolidLayer(const Layer &layer) {
+    if (layer.type() != LayerType::Shape || layer.content == nullptr) {
+        return false;
+    }
+    if (layer.styles.size() != 1 || layer.styles[0] == nullptr) {
+        return false;
+    }
+    if (layer.styles[0]->type() != LayerStyleType::Fill) {
+        return false;
+    }
+    const auto &fill = static_cast<const FillStyle &>(*layer.styles[0]);
+    if (fill.paintMode != StylePaintMode::Color || fill.color.isAnimated()) {
+        return false;
+    }
+    if (fill.blendMode != BlendMode::Normal) {
+        return false;
+    }
+    const auto &content = static_cast<const ShapeContent &>(*layer.content);
+    if (content.geometry == nullptr || content.geometry->type() != ShapeType::Rect) {
+        return false;
+    }
+    const auto &rect = static_cast<const ShapeRect &>(*content.geometry);
+    if (rect.position.isAnimated() || rect.size.isAnimated() || rect.cornerRadius.isAnimated()) {
+        return false;
+    }
+    if (rect.cornerRadius.staticValue() != 0.0f) {
+        return false;
+    }
+    const Vec2 size = rect.size.staticValue();
+    const int32_t width = static_cast<int32_t>(std::lround(size.x));
+    const int32_t height = static_cast<int32_t>(std::lround(size.y));
+    return width > 0 && height > 0;
+}
+
+void OffsetPointProperty(pag::Property<pag::Point> *property, float dx, float dy) {
+    if (property == nullptr || (dx == 0.0f && dy == 0.0f)) {
+        return;
+    }
+    if (!property->animatable()) {
+        property->value.x += dx;
+        property->value.y += dy;
+        return;
+    }
+    auto *animated = static_cast<pag::AnimatableProperty<pag::Point> *>(property);
+    for (pag::Keyframe<pag::Point> *keyframe : animated->keyframes) {
+        keyframe->startValue.x += dx;
+        keyframe->startValue.y += dy;
+        keyframe->endValue.x += dx;
+        keyframe->endValue.y += dy;
+    }
+    animated->value.x += dx;
+    animated->value.y += dy;
+}
+
+pag::Opacity ScaleOpacity(pag::Opacity value, float scale) {
+    float scaled = static_cast<float>(value) * scale;
+    if (scaled < 0.0f) {
+        scaled = 0.0f;
+    }
+    if (scaled > 255.0f) {
+        scaled = 255.0f;
+    }
+    return static_cast<pag::Opacity>(std::lround(scaled));
+}
+
+void ScaleOpacityProperty(pag::Property<pag::Opacity> *property, float scale) {
+    if (property == nullptr || scale == 1.0f) {
+        return;
+    }
+    if (!property->animatable()) {
+        property->value = ScaleOpacity(property->value, scale);
+        return;
+    }
+    auto *animated = static_cast<pag::AnimatableProperty<pag::Opacity> *>(property);
+    for (pag::Keyframe<pag::Opacity> *keyframe : animated->keyframes) {
+        keyframe->startValue = ScaleOpacity(keyframe->startValue, scale);
+        keyframe->endValue = ScaleOpacity(keyframe->endValue, scale);
+    }
+    animated->value = ScaleOpacity(animated->value, scale);
+}
+
 pag::LineCap MapLineCap(LineCap cap) {
     switch (cap) {
         case LineCap::Butt:
@@ -1605,8 +1686,49 @@ Expected<pag::PreComposeLayer *, PagExportError> PagFileBuilder::buildPrecompLay
     return pagLayer;
 }
 
+Expected<pag::SolidLayer *, PagExportError> PagFileBuilder::buildSolidLayer(const Layer &layer) {
+    const auto &content = static_cast<const ShapeContent &>(*layer.content);
+    const auto &rect = static_cast<const ShapeRect &>(*content.geometry);
+    const auto &fill = static_cast<const FillStyle &>(*layer.styles[0]);
+    const Vec2 size = rect.size.staticValue();
+    const Vec2 shapePosition = rect.position.staticValue();
+    const Color fillColor = fill.color.staticValue();
+
+    auto *pagLayer = new pag::SolidLayer();
+    Expected<void, PagExportError> filled = fillCommonLayer(pagLayer, layer);
+    if (!filled.hasValue()) {
+        delete pagLayer;
+        return Unexpected(filled.error());
+    }
+
+    pagLayer->width = static_cast<int32_t>(std::lround(size.x));
+    pagLayer->height = static_cast<int32_t>(std::lround(size.y));
+    pagLayer->solidColor = ToPagColor(fillColor);
+
+    // Solid draws [0,w]x[0,h]; MS ShapeRect is centered on shape.position.
+    const float dx = static_cast<float>(pagLayer->width) * 0.5f - shapePosition.x;
+    const float dy = static_cast<float>(pagLayer->height) * 0.5f - shapePosition.y;
+    OffsetPointProperty(pagLayer->transform->anchorPoint, dx, dy);
+    ScaleOpacityProperty(pagLayer->transform->opacity, fillColor.a);
+
+    Expected<void, PagExportError> postProcess = appendLayerPostProcess(pagLayer, layer);
+    if (!postProcess.hasValue()) {
+        delete pagLayer;
+        return Unexpected(postProcess.error());
+    }
+    return pagLayer;
+}
+
 Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLayers(
     const Layer &layer) {
+    if (CanExportShapeAsSolidLayer(layer)) {
+        Expected<pag::SolidLayer *, PagExportError> solid = buildSolidLayer(layer);
+        if (!solid.hasValue()) {
+            return Unexpected(solid.error());
+        }
+        return std::vector<pag::Layer *>{solid.value()};
+    }
+
     const auto &content = static_cast<const ShapeContent &>(*layer.content);
     if (content.geometry == nullptr) {
         return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "", "PAG export mapping failed"));

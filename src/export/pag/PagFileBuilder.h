@@ -53,6 +53,7 @@ class PagFileBuilder {
     Expected<pag::Layer *, PagExportError> buildFallbackLayer(const Layer &layer,
                                                               const Composition &hostComposition);
     Expected<std::vector<pag::Layer *>, PagExportError> buildShapeLayers(const Layer &layer);
+    Expected<pag::SolidLayer *, PagExportError> buildSolidLayer(const Layer &layer);
     Expected<pag::ShapeLayer *, PagExportError> buildPositionedStrokeLayer(
         const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke);
     // Center stroke with Trim — own layer so TrimPaths cannot clip the main Fill.

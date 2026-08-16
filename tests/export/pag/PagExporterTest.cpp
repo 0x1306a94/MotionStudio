@@ -232,22 +232,12 @@ TEST(PagExporterTest, FillColorAlphaMapsToOpacity) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_FALSE(shapeLayer->contents.empty());
-    auto *group = static_cast<pag::ShapeGroupElement *>(shapeLayer->contents[0]);
-    pag::FillElement *pagFill = nullptr;
-    for (pag::ShapeElement *element : group->elements) {
-        if (element->type() == pag::ShapeType::Fill) {
-            pagFill = static_cast<pag::FillElement *>(element);
-            break;
-        }
-    }
-    ASSERT_NE(pagFill, nullptr);
-    ASSERT_NE(pagFill->opacity, nullptr);
-    EXPECT_EQ(pagFill->opacity->value, 26);
-    EXPECT_EQ(pagFill->color->value.red, 228);
-    EXPECT_EQ(pagFill->color->value.green, 245);
-    EXPECT_EQ(pagFill->color->value.blue, 252);
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Solid);
+    auto *solid = static_cast<pag::SolidLayer *>(vector->layers[0]);
+    EXPECT_EQ(solid->solidColor.red, 228);
+    EXPECT_EQ(solid->solidColor.green, 245);
+    EXPECT_EQ(solid->solidColor.blue, 252);
+    EXPECT_EQ(solid->transform->opacity->value, 26);
 }
 
 TEST(PagExporterTest, ShapeRectStaticTransform) {
@@ -266,14 +256,13 @@ TEST(PagExporterTest, ShapeRectStaticTransform) {
     ASSERT_EQ(file->compositions.size(), 1u);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
     ASSERT_EQ(vector->layers.size(), 2u);
-    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Solid);
     EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_FALSE(shapeLayer->contents.empty());
-    EXPECT_FLOAT_EQ(shapeLayer->transform->position->value.x, 10.0f);
-    EXPECT_FLOAT_EQ(shapeLayer->transform->position->value.y, 20.0f);
-    EXPECT_FLOAT_EQ(shapeLayer->transform->rotation->value, 15.0f);
-    EXPECT_EQ(shapeLayer->transform->opacity->value, 128);
+    pag::Layer *pagLayer = vector->layers[0];
+    EXPECT_FLOAT_EQ(pagLayer->transform->position->value.x, 10.0f);
+    EXPECT_FLOAT_EQ(pagLayer->transform->position->value.y, 20.0f);
+    EXPECT_FLOAT_EQ(pagLayer->transform->rotation->value, 15.0f);
+    EXPECT_EQ(pagLayer->transform->opacity->value, 128);
 }
 
 TEST(PagExporterTest, PositionKeyframes) {
@@ -296,10 +285,11 @@ TEST(PagExporterTest, PositionKeyframes) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_TRUE(shapeLayer->transform->position->animatable());
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_TRUE(pagLayer->transform->position->animatable());
     auto *animated =
-        static_cast<pag::AnimatableProperty<pag::Point> *>(shapeLayer->transform->position);
+        static_cast<pag::AnimatableProperty<pag::Point> *>(pagLayer->transform->position);
     ASSERT_EQ(animated->keyframes.size(), 1u);
     EXPECT_EQ(animated->keyframes[0]->startTime, 0);
     EXPECT_EQ(animated->keyframes[0]->endTime, 30);
@@ -326,8 +316,8 @@ TEST(PagExporterTest, GroupParent) {
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions[0]);
     ASSERT_EQ(vector->layers.size(), 3u);
-    // Top-first PAG order: child Shape above Null group; backdrop last.
-    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+    // Top-first PAG order: child Solid above Null group; backdrop last.
+    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Solid);
     EXPECT_EQ(vector->layers[1]->type(), pag::LayerType::Null);
     EXPECT_EQ(vector->layers[0]->parent, vector->layers[1]);
     EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
@@ -1541,10 +1531,11 @@ TEST(PagExporterTest, BrightnessContrastExportsAsPagEffect) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->effects.size(), 1u);
-    ASSERT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::BrightnessContrast);
-    auto *pagEffect = static_cast<pag::BrightnessContrastEffect *>(shapeLayer->effects[0]);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->effects.size(), 1u);
+    ASSERT_EQ(pagLayer->effects[0]->type(), pag::EffectType::BrightnessContrast);
+    auto *pagEffect = static_cast<pag::BrightnessContrastEffect *>(pagLayer->effects[0]);
     ASSERT_NE(pagEffect->brightness, nullptr);
     ASSERT_NE(pagEffect->contrast, nullptr);
     ASSERT_NE(pagEffect->useOldVersion, nullptr);
@@ -1567,10 +1558,11 @@ TEST(PagExporterTest, GaussianBlurExportsAsFastBlur) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->effects.size(), 1u);
-    ASSERT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::FastBlur);
-    auto *pagEffect = static_cast<pag::FastBlurEffect *>(shapeLayer->effects[0]);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->effects.size(), 1u);
+    ASSERT_EQ(pagLayer->effects[0]->type(), pag::EffectType::FastBlur);
+    auto *pagEffect = static_cast<pag::FastBlurEffect *>(pagLayer->effects[0]);
     ASSERT_NE(pagEffect->blurriness, nullptr);
     ASSERT_NE(pagEffect->blurDimensions, nullptr);
     ASSERT_NE(pagEffect->repeatEdgePixels, nullptr);
@@ -1596,9 +1588,10 @@ TEST(PagExporterTest, DisabledEffectIsSkipped) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->effects.size(), 1u);
-    EXPECT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::FastBlur);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->effects.size(), 1u);
+    EXPECT_EQ(pagLayer->effects[0]->type(), pag::EffectType::FastBlur);
 }
 
 TEST(PagExporterTest, IdentityBrightnessContrastStillExports) {
@@ -1612,9 +1605,10 @@ TEST(PagExporterTest, IdentityBrightnessContrastStillExports) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->effects.size(), 1u);
-    EXPECT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::BrightnessContrast);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->effects.size(), 1u);
+    EXPECT_EQ(pagLayer->effects[0]->type(), pag::EffectType::BrightnessContrast);
 }
 
 TEST(PagExporterTest, BrightnessContrastKeyframes) {
@@ -1638,9 +1632,10 @@ TEST(PagExporterTest, BrightnessContrastKeyframes) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->effects.size(), 1u);
-    auto *pagEffect = static_cast<pag::BrightnessContrastEffect *>(shapeLayer->effects[0]);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->effects.size(), 1u);
+    auto *pagEffect = static_cast<pag::BrightnessContrastEffect *>(pagLayer->effects[0]);
     ASSERT_TRUE(pagEffect->brightness->animatable());
     auto *animated = static_cast<pag::AnimatableProperty<float> *>(pagEffect->brightness);
     ASSERT_EQ(animated->keyframes.size(), 1u);
@@ -1815,10 +1810,11 @@ TEST(PagExporterTest, DropShadowExportsAsPagLayerStyle) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->layerStyles.size(), 1u);
-    ASSERT_EQ(shapeLayer->layerStyles[0]->type(), pag::LayerStyleType::DropShadow);
-    auto *pagStyle = static_cast<pag::DropShadowStyle *>(shapeLayer->layerStyles[0]);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->layerStyles.size(), 1u);
+    ASSERT_EQ(pagLayer->layerStyles[0]->type(), pag::LayerStyleType::DropShadow);
+    auto *pagStyle = static_cast<pag::DropShadowStyle *>(pagLayer->layerStyles[0]);
     ASSERT_NE(pagStyle->blendMode, nullptr);
     ASSERT_NE(pagStyle->color, nullptr);
     ASSERT_NE(pagStyle->opacity, nullptr);
@@ -1852,10 +1848,11 @@ TEST(PagExporterTest, OuterGlowExportsAsPagLayerStyle) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->layerStyles.size(), 1u);
-    ASSERT_EQ(shapeLayer->layerStyles[0]->type(), pag::LayerStyleType::OuterGlow);
-    auto *pagStyle = static_cast<pag::OuterGlowStyle *>(shapeLayer->layerStyles[0]);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->layerStyles.size(), 1u);
+    ASSERT_EQ(pagLayer->layerStyles[0]->type(), pag::LayerStyleType::OuterGlow);
+    auto *pagStyle = static_cast<pag::OuterGlowStyle *>(pagLayer->layerStyles[0]);
     ASSERT_NE(pagStyle->blendMode, nullptr);
     ASSERT_NE(pagStyle->color, nullptr);
     ASSERT_NE(pagStyle->opacity, nullptr);
@@ -1899,11 +1896,12 @@ TEST(PagExporterTest, LayerStrokePositionMapsToPagOrder) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->layerStyles.size(), 3u);
-    auto *centerStyle = static_cast<pag::StrokeStyle *>(shapeLayer->layerStyles[0]);
-    auto *insideStyle = static_cast<pag::StrokeStyle *>(shapeLayer->layerStyles[1]);
-    auto *outsideStyle = static_cast<pag::StrokeStyle *>(shapeLayer->layerStyles[2]);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->layerStyles.size(), 3u);
+    auto *centerStyle = static_cast<pag::StrokeStyle *>(pagLayer->layerStyles[0]);
+    auto *insideStyle = static_cast<pag::StrokeStyle *>(pagLayer->layerStyles[1]);
+    auto *outsideStyle = static_cast<pag::StrokeStyle *>(pagLayer->layerStyles[2]);
     EXPECT_EQ(centerStyle->position->value, pag::StrokePosition::Center);
     EXPECT_EQ(insideStyle->position->value, pag::StrokePosition::Inside);
     EXPECT_EQ(outsideStyle->position->value, pag::StrokePosition::Outside);
@@ -1928,9 +1926,10 @@ TEST(PagExporterTest, DisabledLayerStyleIsSkipped) {
     auto file = DecodeBytes(result.value().bytes);
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
-    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
-    ASSERT_EQ(shapeLayer->layerStyles.size(), 1u);
-    EXPECT_EQ(shapeLayer->layerStyles[0]->type(), pag::LayerStyleType::OuterGlow);
+    pag::Layer *pagLayer = vector->layers[0];
+    ASSERT_EQ(pagLayer->type(), pag::LayerType::Solid);
+    ASSERT_EQ(pagLayer->layerStyles.size(), 1u);
+    EXPECT_EQ(pagLayer->layerStyles[0]->type(), pag::LayerStyleType::OuterGlow);
 }
 
 TEST(PagExporterTest, SplitStrokesWrapForLayerStyles) {
@@ -2036,6 +2035,109 @@ TEST(PagExporterTest, LayerBmpDoesNotAttachLayerStyles) {
     auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
     ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
     EXPECT_TRUE(main->layers[0]->layerStyles.empty());
+}
+
+TEST(PagExporterTest, ColorRectFillExportsAsSolidLayer) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    layer->transform.position.setStaticValue(Vec2{200, 150});
+    auto *fill = static_cast<FillStyle *>(layer->styles[0].get());
+    fill->color.setStaticValue(Color{1.0f, 0.0f, 0.0f, 1.0f});
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Solid);
+    auto *solid = static_cast<pag::SolidLayer *>(vector->layers[0]);
+    EXPECT_EQ(solid->width, 120);
+    EXPECT_EQ(solid->height, 80);
+    EXPECT_EQ(solid->solidColor.red, 255);
+    EXPECT_EQ(solid->solidColor.green, 0);
+    EXPECT_EQ(solid->solidColor.blue, 0);
+    EXPECT_FLOAT_EQ(solid->transform->position->value.x, 200.0f);
+    EXPECT_FLOAT_EQ(solid->transform->position->value.y, 150.0f);
+    EXPECT_FLOAT_EQ(solid->transform->anchorPoint->value.x, 60.0f);
+    EXPECT_FLOAT_EQ(solid->transform->anchorPoint->value.y, 40.0f);
+}
+
+TEST(PagExporterTest, RoundedRectStaysShapeLayer) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    auto *rect = static_cast<ShapeRect *>(static_cast<ShapeContent *>(layer->content.get())->geometry.get());
+    rect->cornerRadius.setStaticValue(8.0f);
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+}
+
+TEST(PagExporterTest, EllipseStaysShapeLayer) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "Ellipse";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto ellipse = std::make_unique<ShapeEllipse>();
+    ellipse->size.setStaticValue(Vec2{80, 80});
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(ellipse);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0, 1, 0, 1});
+    layer->styles.push_back(std::move(fill));
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+}
+
+TEST(PagExporterTest, StrokePlusFillStaysShapeLayer) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(Color{0, 0, 0, 1});
+    stroke->width.setStaticValue(2.0f);
+    layer->styles.push_back(std::move(stroke));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+}
+
+TEST(PagExporterTest, AnimatedFillColorStaysShapeLayer) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    auto *fill = static_cast<FillStyle *>(layer->styles[0].get());
+    Keyframe<Color> from;
+    from.time = 0;
+    from.value = Color{1, 0, 0, 1};
+    Keyframe<Color> to;
+    to.time = 15;
+    to.value = Color{0, 0, 1, 1};
+    fill->color.addKeyframe(from);
+    fill->color.addKeyframe(to);
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
 }
 
 #if defined(__APPLE__)
