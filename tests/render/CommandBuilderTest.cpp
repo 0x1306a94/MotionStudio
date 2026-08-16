@@ -2,6 +2,7 @@
 
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -18,6 +19,7 @@ using motion::BuildSelectionOutlineCommands;
 using motion::Color;
 using motion::DrawCommand;
 using motion::DrawCommandType;
+using motion::DropShadowStyle;
 using motion::EntityId;
 using motion::EvaluatedImageItem;
 using motion::EvaluatedLayer;
@@ -26,6 +28,7 @@ using motion::EvaluatedShapeItem;
 using motion::EvaluatedTextItem;
 using motion::GaussianBlurEffect;
 using motion::LayerEffectType;
+using motion::LayerFxType;
 using motion::LineCap;
 using motion::LineJoin;
 using motion::MakePathGeometry;
@@ -468,4 +471,52 @@ TEST(CommandBuilderTest, MaskCommandsStayBeforeEndLayerEffects) {
     ASSERT_NE(endLayer, nullptr);
     ASSERT_EQ(endLayer->effects.size(), 1u);
     EXPECT_EQ(endLayer->effects[0]->type(), LayerEffectType::BrightnessContrast);
+}
+
+TEST(CommandBuilderTest, LayerFxForcesIsolationAndRidesOnEndLayer) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem());
+    layer.layerStyles.push_back(std::make_shared<DropShadowStyle>());
+    state.layers.push_back(std::move(layer));
+
+    const auto commands = BuildCommands(state);
+    bool sawBegin = false;
+    const DrawCommand *endLayer = nullptr;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginLayer) {
+            sawBegin = true;
+        }
+        if (command.type == DrawCommandType::EndLayer) {
+            endLayer = &command;
+        }
+    }
+    EXPECT_TRUE(sawBegin);
+    ASSERT_NE(endLayer, nullptr);
+    ASSERT_EQ(endLayer->layerStyles.size(), 1u);
+    EXPECT_EQ(endLayer->layerStyles[0]->type(), LayerFxType::DropShadow);
+}
+
+TEST(CommandBuilderTest, LayerFxAndEffectBothRideOnEndLayer) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem());
+    auto blur = std::make_shared<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(8.0f);
+    layer.effects.push_back(std::move(blur));
+    layer.layerStyles.push_back(std::make_shared<DropShadowStyle>());
+    state.layers.push_back(std::move(layer));
+
+    const auto commands = BuildCommands(state);
+    const DrawCommand *endLayer = nullptr;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::EndLayer) {
+            endLayer = &command;
+        }
+    }
+    ASSERT_NE(endLayer, nullptr);
+    ASSERT_EQ(endLayer->effects.size(), 1u);
+    ASSERT_EQ(endLayer->layerStyles.size(), 1u);
+    EXPECT_EQ(endLayer->effects[0]->type(), LayerEffectType::GaussianBlur);
+    EXPECT_EQ(endLayer->layerStyles[0]->type(), LayerFxType::DropShadow);
 }

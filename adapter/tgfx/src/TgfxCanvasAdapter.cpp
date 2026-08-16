@@ -630,7 +630,8 @@ void TgfxCanvasAdapter::beginLayer() {
 }
 
 void TgfxCanvasAdapter::endLayer(
-    const std::vector<std::shared_ptr<const LayerEffect>> &effects) {
+    const std::vector<std::shared_ptr<const LayerEffect>> &effects,
+    const std::vector<std::shared_ptr<const LayerFx>> & /*layerStyles*/) {
     if (isolationStack_ == nullptr || isolationStack_->layers.empty() || surface_ == nullptr) {
         return;
     }

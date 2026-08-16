@@ -16,6 +16,7 @@
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PrecompContent.h"
@@ -87,6 +88,11 @@ void FillCommonLayerFields(const Document &document, const Layer &layer, Preview
     for (const auto &effect : layer.effects) {
         if (std::shared_ptr<const LayerEffect> snap = effect->snapshot(time)) {
             evaluated.effects.push_back(std::move(snap));
+        }
+    }
+    for (const auto &style : layer.layerStyles) {
+        if (std::shared_ptr<const LayerFx> snap = style->snapshot(time)) {
+            evaluated.layerStyles.push_back(std::move(snap));
         }
     }
 }

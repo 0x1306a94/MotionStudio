@@ -10,6 +10,7 @@
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/DrawCommand.h"
 #include "MotionStudio/render/MaskApplyMode.h"
@@ -73,9 +74,11 @@ class RenderAdapter {
     // Begins an offscreen layer for content that will be masked.
     virtual void beginLayer() = 0;
 
-    // Ends the offscreen layer, applies baked effects in order, then composites.
+    // Ends the offscreen layer, applies baked effects then layer styles, then composites.
     // effects: baked layer effects from EndLayer; empty when isolation is mask-only.
-    virtual void endLayer(const std::vector<std::shared_ptr<const LayerEffect>> &effects) = 0;
+    // layerStyles: baked layer styles from EndLayer; empty when none are visible.
+    virtual void endLayer(const std::vector<std::shared_ptr<const LayerEffect>> &effects,
+                          const std::vector<std::shared_ptr<const LayerFx>> &layerStyles) = 0;
 
     // Begins recording coverage for the current offscreen layer.
     // mode: how EndMask should interpret the recorded coverage.

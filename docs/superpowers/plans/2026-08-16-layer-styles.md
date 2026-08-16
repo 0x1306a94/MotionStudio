@@ -280,7 +280,7 @@ git commit --only include/MotionStudio/undo/ src/undo/ tests/undo/LayerFxCommand
 
 ### Task 4: 求值 + EndLayer 签名
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/EvaluatedLayer.h`
@@ -298,17 +298,17 @@ git commit --only include/MotionStudio/undo/ src/undo/ tests/undo/LayerFxCommand
 - Produces: `RenderAdapter::endLayer(effects, layerStyles)`
 - Produces: `needsIsolation` 含 `!layer.layerStyles.empty()`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 默认 DropShadow 的 Shape 层：`Evaluate` 后 `evaluated.layerStyles.size()==1`。`enabled=false` 不进。Precomp 层带 DropShadow：子层列表无该 style、无组级 BeginLayer。
 
 CommandBuilder：仅 layerStyles → 有 Begin/EndLayer，`EndLayer.layerStyles.size()==1`。同时有 GaussianBlur + DropShadow → EndLayer 两个向量都非空。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: FAIL（没有 `layerStyles` 字段）
 
-- [ ] **Step 3: 接线**
+- [x] **Step 3: 接线**
 
 `FillCommonLayerFields` 在 effects 循环后：
 
@@ -324,7 +324,7 @@ for (const auto &style : layer.layerStyles) {
 
 `TgfxCanvasAdapter::endLayer` 先加第二参数，暂不使用（现有 effect 路径保持）。所有 override 一起改。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='LayerFxEvaluateTest.*:CommandBuilder*LayerFx*'
@@ -333,7 +333,7 @@ cmake --build build --target tgfx_adapter_test
 
 Expected: core PASS；adapter 仍能编过
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/render/ src/render/ adapter/tgfx/include/TgfxCanvasAdapter.h \

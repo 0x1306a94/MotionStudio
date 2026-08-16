@@ -12,6 +12,7 @@
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
@@ -62,6 +63,7 @@ struct DrawCommand {
     ImageScaleMode imageScaleMode = ImageScaleMode::LetterBox;  // DrawImage
     TextDrawParams textParams;                                  // DrawText
     std::vector<std::shared_ptr<const LayerEffect>> effects;    // EndLayer
+    std::vector<std::shared_ptr<const LayerFx>> layerStyles;    // EndLayer
 };
 
 using DrawCommandList = std::vector<DrawCommand>;

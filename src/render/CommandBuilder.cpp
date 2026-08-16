@@ -191,7 +191,8 @@ DrawCommandList BuildCommands(const SceneState &state) {
 
         const bool needsIsolation = !layer.masks.empty() ||
             layer.trackMatteType != TrackMatteType::None ||
-            !layer.effects.empty();
+            !layer.effects.empty() ||
+            !layer.layerStyles.empty();
         if (needsIsolation) {
             DrawCommand beginLayer;
             beginLayer.type = DrawCommandType::BeginLayer;
@@ -213,6 +214,7 @@ DrawCommandList BuildCommands(const SceneState &state) {
             DrawCommand endLayer;
             endLayer.type = DrawCommandType::EndLayer;
             endLayer.effects = layer.effects;
+            endLayer.layerStyles = layer.layerStyles;
             commands.push_back(std::move(endLayer));
         }
 
