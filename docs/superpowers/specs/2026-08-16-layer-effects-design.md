@@ -17,7 +17,7 @@
 ## 非目标
 
 - Precomp / Group 的组级 isolation（预合成仍拍平；挂在它们上的 effect **静默忽略**）
-- SwiftUI Inspector / 时间轴 effect 行（本阶段 Bridge + Undo 可建数据，UI 另开）
+- SwiftUI Inspector / 时间轴 effect 行（已另开：[Layer Effects UI](2026-08-16-layer-effects-ui-design.md)）
 - AE Layer Style（DropShadow / OuterGlow / Stroke Style）
 - 其余 PAG Effect（RadialBlur / Glow / HueSaturation / Mosaic / DisplacementMap / …）
 - Lottie / PAG 导出写入 Effect 块
@@ -307,7 +307,7 @@ void ms_command_set_layer_effect_enabled(MSDocument *, uint64_t layerId, int ind
 void ms_command_set_gaussian_blur_repeat_edge(MSDocument *, uint64_t layerId, int index, bool repeat);
 ```
 
-Swift `CaseIterable` / `Identifiable` 扩展按 [bridge-swift-enums](../../../.claude/rules/bridge-swift-enums.md)。本阶段**不**做 Inspector UI。
+Swift `CaseIterable` / `Identifiable` 扩展按 [bridge-swift-enums](../../../.claude/rules/bridge-swift-enums.md)。Inspector / 时间轴见 [Layer Effects UI](2026-08-16-layer-effects-ui-design.md)。
 
 ---
 
@@ -379,7 +379,7 @@ Swift `CaseIterable` / `Identifiable` 扩展按 [bridge-swift-enums](../../../.c
 ## 后续（明确不做）
 
 1. Precomp / Group 组级 isolation（拍平改为「子层先离屏再滤」）
-2. Inspector / 时间轴
+2. Inspector / 时间轴 → [Layer Effects UI](2026-08-16-layer-effects-ui-design.md)
 3. RadialBlur、Glow、HueSaturation、…
 4. AE Layer Style
 5. 导出 Effect
