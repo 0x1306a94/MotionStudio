@@ -53,7 +53,7 @@ class TgfxCanvasAdapter : public PreviewCanvasAdapter {
                     const StrokeOptions &options) override;
     void clipPath(const ShapeGeometry &geometry, FillRule rule) override;
     void beginLayer() override;
-    void endLayer() override;
+    void endLayer(const std::vector<std::shared_ptr<const LayerEffect>> &effects) override;
     void beginMask(MaskApplyMode mode) override;
     void endMask() override;
     void drawMaskPath(const ShapeGeometry &geometry, MaskMode mode, float opacity, bool inverted,

@@ -42,7 +42,7 @@ void PlayCommands(const DrawCommandList &commands, RenderAdapter &adapter) {
                 break;
             }
             case DrawCommandType::EndLayer: {
-                adapter.endLayer();
+                adapter.endLayer(command.effects);
                 break;
             }
             case DrawCommandType::BeginMask: {

@@ -588,7 +588,8 @@ void TgfxCanvasAdapter::beginLayer() {
     layer.contentCanvas = layer.contentRecorder.beginRecording();
 }
 
-void TgfxCanvasAdapter::endLayer() {
+void TgfxCanvasAdapter::endLayer(
+    const std::vector<std::shared_ptr<const LayerEffect>> & /*effects*/) {
     if (isolationStack_ == nullptr || isolationStack_->layers.empty() || surface_ == nullptr) {
         return;
     }

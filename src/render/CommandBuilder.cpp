@@ -189,7 +189,9 @@ DrawCommandList BuildCommands(const SceneState &state) {
         blend.blendMode = layer.blendMode;
         commands.push_back(blend);
 
-        const bool needsIsolation = !layer.masks.empty() || layer.trackMatteType != TrackMatteType::None;
+        const bool needsIsolation = !layer.masks.empty() ||
+            layer.trackMatteType != TrackMatteType::None ||
+            !layer.effects.empty();
         if (needsIsolation) {
             DrawCommand beginLayer;
             beginLayer.type = DrawCommandType::BeginLayer;
@@ -210,7 +212,8 @@ DrawCommandList BuildCommands(const SceneState &state) {
         if (needsIsolation) {
             DrawCommand endLayer;
             endLayer.type = DrawCommandType::EndLayer;
-            commands.push_back(endLayer);
+            endLayer.effects = layer.effects;
+            commands.push_back(std::move(endLayer));
         }
 
         DrawCommand restore;

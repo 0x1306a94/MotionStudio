@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -8,6 +9,7 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/DrawCommand.h"
 #include "MotionStudio/render/MaskApplyMode.h"
@@ -71,8 +73,9 @@ class RenderAdapter {
     // Begins an offscreen layer for content that will be masked.
     virtual void beginLayer() = 0;
 
-    // Ends the offscreen layer and composites it with accumulated coverage.
-    virtual void endLayer() = 0;
+    // Ends the offscreen layer, applies baked effects in order, then composites.
+    // effects: baked layer effects from EndLayer; empty when isolation is mask-only.
+    virtual void endLayer(const std::vector<std::shared_ptr<const LayerEffect>> &effects) = 0;
 
     // Begins recording coverage for the current offscreen layer.
     // mode: how EndMask should interpret the recorded coverage.

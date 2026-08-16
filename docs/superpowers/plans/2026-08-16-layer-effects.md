@@ -543,7 +543,7 @@ git commit --only include/MotionStudio/render/EvaluatedLayer.h \
 
 ### Task 5: CommandBuilder + EndLayer 签名
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/DrawCommand.h`
@@ -560,7 +560,7 @@ git commit --only include/MotionStudio/render/EvaluatedLayer.h \
 - Produces: `needsIsolation |= !evaluated.effects.empty()`；`EndLayer` 拷贝 `evaluated.effects`
 - Task 6 之前 adapter **忽略** effects，仍 `drawPicture`（保证现有 mask 测试可编过）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/render/CommandBuilderTest.cpp`：
 
@@ -610,7 +610,7 @@ TEST(CommandBuilderTest, MaskCommandsStayBeforeEndLayerEffects) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='CommandBuilderTest.*Effect*'
@@ -618,7 +618,7 @@ TEST(CommandBuilderTest, MaskCommandsStayBeforeEndLayerEffects) {
 
 Expected: FAIL。
 
-- [ ] **Step 3: 改指令与签名**
+- [x] **Step 3: 改指令与签名**
 
 `DrawCommand.h`：`#include <memory>` + `LayerEffect.h`，加 `effects` 字段。
 
@@ -640,7 +640,7 @@ commands.push_back(std::move(endLayer));
 
 `TgfxCanvasAdapter`：签名跟上，函数体仍是当前 `drawPicture` 路径（先不读 `effects`）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target core_tests tgfx_adapter_test
@@ -649,7 +649,7 @@ cmake --build build --target core_tests tgfx_adapter_test
 
 Expected: PASS。adapter 目标必须能编过。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/render/DrawCommand.h \

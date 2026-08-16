@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/model/ImageScaleMode.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -15,6 +16,7 @@ using motion::BlendMode;
 using motion::BuildCommands;
 using motion::BuildSelectionOutlineCommands;
 using motion::Color;
+using motion::DrawCommand;
 using motion::DrawCommandType;
 using motion::EntityId;
 using motion::EvaluatedImageItem;
@@ -22,6 +24,8 @@ using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
 using motion::EvaluatedTextItem;
+using motion::GaussianBlurEffect;
+using motion::LayerEffectType;
 using motion::LineCap;
 using motion::LineJoin;
 using motion::MakePathGeometry;
@@ -395,4 +399,73 @@ TEST(CommandBuilderTest, TextLayerEmitsDrawText) {
     EXPECT_TRUE(commands[4].textParams.styles[1].isStroke);
     EXPECT_FLOAT_EQ(commands[4].textParams.styles[1].strokeWidth, 1.5f);
     EXPECT_FALSE(commands[4].textParams.textPathEnabled);
+}
+
+TEST(CommandBuilderTest, EffectsForceIsolationAndRideOnEndLayer) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem());
+    auto blur = std::make_shared<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(8.0f);
+    layer.effects.push_back(std::move(blur));
+    state.layers.push_back(std::move(layer));
+
+    const auto commands = BuildCommands(state);
+    bool sawBegin = false;
+    const DrawCommand *endLayer = nullptr;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginLayer) {
+            sawBegin = true;
+        }
+        if (command.type == DrawCommandType::EndLayer) {
+            endLayer = &command;
+        }
+    }
+    EXPECT_TRUE(sawBegin);
+    ASSERT_NE(endLayer, nullptr);
+    ASSERT_EQ(endLayer->effects.size(), 1u);
+    EXPECT_EQ(endLayer->effects[0]->type(), LayerEffectType::GaussianBlur);
+}
+
+TEST(CommandBuilderTest, IdentitySkippedEffectsDoNotIsolate) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem());
+    state.layers.push_back(std::move(layer));
+    const auto commands = BuildCommands(state);
+    for (const auto &command : commands) {
+        EXPECT_NE(command.type, DrawCommandType::BeginLayer);
+        EXPECT_NE(command.type, DrawCommandType::EndLayer);
+    }
+}
+
+TEST(CommandBuilderTest, MaskCommandsStayBeforeEndLayerEffects) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.shapeItems.push_back(MakeFillItem());
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Add;
+    BezierPath path = MakeSingleContour({{{0, 0}, {}, {}}, {{5, 0}, {}, {}}}, true);
+    mask.path = path;
+    layer.masks.push_back(mask);
+    auto brightnessContrast = std::make_shared<motion::BrightnessContrastEffect>();
+    brightnessContrast->brightness.setStaticValue(20.0f);
+    layer.effects.push_back(std::move(brightnessContrast));
+    state.layers.push_back(std::move(layer));
+
+    const auto commands = BuildCommands(state);
+    bool sawBeginMask = false;
+    const DrawCommand *endLayer = nullptr;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginMask) {
+            sawBeginMask = true;
+        }
+        if (command.type == DrawCommandType::EndLayer) {
+            endLayer = &command;
+        }
+    }
+    EXPECT_TRUE(sawBeginMask);
+    ASSERT_NE(endLayer, nullptr);
+    ASSERT_EQ(endLayer->effects.size(), 1u);
+    EXPECT_EQ(endLayer->effects[0]->type(), LayerEffectType::BrightnessContrast);
 }

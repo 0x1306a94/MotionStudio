@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/ImageScaleMode.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/Paint.h"
@@ -59,6 +61,7 @@ struct DrawCommand {
     Vec2 imageIntrinsicSize;                                    // DrawImage
     ImageScaleMode imageScaleMode = ImageScaleMode::LetterBox;  // DrawImage
     TextDrawParams textParams;                                  // DrawText
+    std::vector<std::shared_ptr<const LayerEffect>> effects;    // EndLayer
 };
 
 using DrawCommandList = std::vector<DrawCommand>;
