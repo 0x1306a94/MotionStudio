@@ -12,6 +12,7 @@
 #include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/FollowPath.h"
 #include "MotionStudio/model/LayerContent.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -76,6 +77,7 @@ class Layer {
     TrackMatteType trackMatteType = TrackMatteType::None;
     FollowPath followPath;
     std::vector<std::unique_ptr<LayerStyle>> styles;
+    std::vector<std::unique_ptr<LayerEffect>> effects;
 
   private:
     Mat3 worldTransform(FrameTime time, const Document &document, int depth) const;
