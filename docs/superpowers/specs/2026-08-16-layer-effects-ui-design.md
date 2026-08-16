@@ -1,7 +1,7 @@
 # Layer Effects UI（Inspector + 时间轴）— 设计说明
 
 日期：2026-08-16  
-状态：草稿  
+状态：已批准  
 前置：[Layer Effects](2026-08-16-layer-effects-design.md)（模型 / 求值 / adapter / Bridge 命令已落地）  
 相关：[bridge-swift-enums](../../../.claude/rules/bridge-swift-enums.md)
 
