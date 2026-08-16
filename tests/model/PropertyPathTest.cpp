@@ -12,6 +12,7 @@
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PropertyPath.h"
@@ -30,6 +31,7 @@ using motion::BrightnessContrastEffect;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::DropShadowStyle;
 using motion::EnsureDefaultGradient;
 using motion::FillStyle;
 using motion::Layer;
@@ -168,6 +170,17 @@ TEST(ResolveAnimatableTest, ResolvesEffectBrightness) {
     EXPECT_EQ(brightness, static_cast<AnimatableBase *>(&brightnessContrast->brightness));
     EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "effects[0].blurriness"}),
               nullptr);
+}
+
+TEST(PropertyPathTest, ResolvesLayerStyleDistance) {
+    ShapeScene scene;
+    auto style = std::make_unique<DropShadowStyle>();
+    DropShadowStyle *shadow = style.get();
+    scene.layer->layerStyles.push_back(std::move(style));
+
+    AnimatableBase *distance =
+        ResolveAnimatable(scene.document, {scene.layer->id, "layerStyles[0].distance"});
+    EXPECT_EQ(distance, static_cast<AnimatableBase *>(&shadow->distance));
 }
 
 TEST(ResolveAnimatableTest, ResolvesMaskProperties) {

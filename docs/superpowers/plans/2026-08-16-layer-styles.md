@@ -183,7 +183,7 @@ git commit --only include/MotionStudio/model/LayerFx.h src/model/LayerFx.cpp \
 
 ### Task 2: 序列化 + PropertyPath
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/serialization/Serializer.cpp`（`LayerFxToJson` / `LayerFxFromJson`，`LayerToJson` / `LayerFromJson`）
@@ -196,13 +196,13 @@ git commit --only include/MotionStudio/model/LayerFx.h src/model/LayerFx.cpp \
 - Produces: JSON `type` = `dropShadow` / `outerGlow` / `stroke`
 - Produces: `ResolveAnimatable` 识别 `layerStyles[i].color|opacity|size|angle|distance|spread|range`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/serialization/LayerFxSerializerTest.cpp`：建 Shape 层，push 默认 DropShadow + OuterGlow + LayerStrokeStyle，`Serialize` / `Deserialize`，断言三字段与 `blendMode` / `position` round-trip。再测 JSON 无 `layerStyles` 的旧文档 `layerStyles.empty()`。再测 `"type":"nope"` 被跳过、另外两项仍在。
 
 PropertyPath：`ResolveAnimatable(doc, {layerId, "layerStyles[0].distance"})` 指向 DropShadow 的 distance。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='LayerFxSerializerTest.*:PropertyPathTest.ResolvesLayerStyleDistance'
@@ -210,17 +210,17 @@ PropertyPath：`ResolveAnimatable(doc, {layerId, "layerStyles[0].distance"})` �
 
 Expected: FAIL
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `LayerFxToJson` / `LayerFxFromJson` 对齐 `LayerEffectToJson`（约 `Serializer.cpp:1665`）。`blendMode` 用 `dto::ToString` / `blendModeFromString`；`position` 用 `dto::ToString` / `strokePositionFromString`。未知 type 返回空 `unique_ptr`（不是 error）。`LayerToJson` 在 `effects` 后写 `layerStyles`；`LayerFromJson` 同样跳过非数组。
 
 `PropertyPath.cpp` 在 `effects` 分支旁加 `layerStyles`，`switch (fx->type())` 返回对应 `Animatable*`。`color` 是 `Animatable<Color>`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \

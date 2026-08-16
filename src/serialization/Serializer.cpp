@@ -23,6 +23,7 @@
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/NullContent.h"
@@ -1742,6 +1743,178 @@ Expected<std::unique_ptr<LayerEffect>, std::string> LayerEffectFromJson(const js
     return effect;
 }
 
+json LayerFxToJson(const LayerFx &style) {
+    json node{{"id", IdToString(style.id)}, {"enabled", style.enabled}};
+    switch (style.type()) {
+        case LayerFxType::DropShadow: {
+            const auto &shadow = static_cast<const DropShadowStyle &>(style);
+            node["type"] = "dropShadow";
+            node["blendMode"] = dto::ToString(shadow.blendMode);
+            node["color"] = AnimatableToJson(shadow.color);
+            node["opacity"] = AnimatableToJson(shadow.opacity);
+            node["angle"] = AnimatableToJson(shadow.angle);
+            node["distance"] = AnimatableToJson(shadow.distance);
+            node["size"] = AnimatableToJson(shadow.size);
+            node["spread"] = AnimatableToJson(shadow.spread);
+            break;
+        }
+        case LayerFxType::OuterGlow: {
+            const auto &glow = static_cast<const OuterGlowStyle &>(style);
+            node["type"] = "outerGlow";
+            node["blendMode"] = dto::ToString(glow.blendMode);
+            node["color"] = AnimatableToJson(glow.color);
+            node["opacity"] = AnimatableToJson(glow.opacity);
+            node["size"] = AnimatableToJson(glow.size);
+            node["spread"] = AnimatableToJson(glow.spread);
+            node["range"] = AnimatableToJson(glow.range);
+            break;
+        }
+        case LayerFxType::Stroke: {
+            const auto &stroke = static_cast<const LayerStrokeStyle &>(style);
+            node["type"] = "stroke";
+            node["blendMode"] = dto::ToString(stroke.blendMode);
+            node["color"] = AnimatableToJson(stroke.color);
+            node["opacity"] = AnimatableToJson(stroke.opacity);
+            node["size"] = AnimatableToJson(stroke.size);
+            node["position"] = dto::ToString(stroke.position);
+            break;
+        }
+    }
+    return node;
+}
+
+Expected<void, std::string> ApplyLayerFxCommon(const json &node, LayerFx &style, BlendMode &blendMode) {
+    Expected<EntityId, std::string> id = IdField(node, "id");
+    if (!id) {
+        return Unexpected(id.error());
+    }
+    style.id = *id;
+    if (const json *enabledNode = FindChild(node, "enabled")) {
+        if (enabledNode->is_boolean()) {
+            style.enabled = enabledNode->get<bool>();
+        }
+    }
+    Expected<std::string, std::string> blendText = ParseField<std::string>(node, "blendMode");
+    if (blendText) {
+        Expected<BlendMode, std::string> parsed = dto::blendModeFromString(*blendText);
+        if (!parsed) {
+            return Unexpected(parsed.error());
+        }
+        blendMode = *parsed;
+    }
+    return {};
+}
+
+Expected<std::unique_ptr<LayerFx>, std::string> LayerFxFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Unexpected(typeText.error());
+    }
+    if (*typeText != "dropShadow" && *typeText != "outerGlow" && *typeText != "stroke") {
+        return std::unique_ptr<LayerFx>{};
+    }
+
+    if (*typeText == "dropShadow") {
+        auto shadow = std::make_unique<DropShadowStyle>();
+        const std::pair<const char *, Animatable<float> *> floatFields[] = {
+            {"opacity", &shadow->opacity},
+            {"angle", &shadow->angle},
+            {"distance", &shadow->distance},
+            {"size", &shadow->size},
+            {"spread", &shadow->spread},
+        };
+        Expected<const json *, std::string> colorNode = Child(node, "color");
+        if (!colorNode) {
+            return Unexpected(std::string("DropShadow style is missing color"));
+        }
+        Expected<void, std::string> result = AnimatableFromJson(**colorNode, shadow->color);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        for (const auto &[fieldName, target] : floatFields) {
+            Expected<const json *, std::string> fieldNode = Child(node, fieldName);
+            if (!fieldNode) {
+                return Unexpected(std::string("DropShadow style is missing fields"));
+            }
+            result = AnimatableFromJson(**fieldNode, *target);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+        }
+        result = ApplyLayerFxCommon(node, *shadow, shadow->blendMode);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        return std::unique_ptr<LayerFx>(std::move(shadow));
+    }
+
+    if (*typeText == "outerGlow") {
+        auto glow = std::make_unique<OuterGlowStyle>();
+        const std::pair<const char *, Animatable<float> *> floatFields[] = {
+            {"opacity", &glow->opacity},
+            {"size", &glow->size},
+            {"spread", &glow->spread},
+            {"range", &glow->range},
+        };
+        Expected<const json *, std::string> colorNode = Child(node, "color");
+        if (!colorNode) {
+            return Unexpected(std::string("OuterGlow style is missing color"));
+        }
+        Expected<void, std::string> result = AnimatableFromJson(**colorNode, glow->color);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        for (const auto &[fieldName, target] : floatFields) {
+            Expected<const json *, std::string> fieldNode = Child(node, fieldName);
+            if (!fieldNode) {
+                return Unexpected(std::string("OuterGlow style is missing fields"));
+            }
+            result = AnimatableFromJson(**fieldNode, *target);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+        }
+        result = ApplyLayerFxCommon(node, *glow, glow->blendMode);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        return std::unique_ptr<LayerFx>(std::move(glow));
+    }
+
+    auto stroke = std::make_unique<LayerStrokeStyle>();
+    Expected<const json *, std::string> colorNode = Child(node, "color");
+    Expected<const json *, std::string> opacityNode = Child(node, "opacity");
+    Expected<const json *, std::string> sizeNode = Child(node, "size");
+    if (!colorNode || !opacityNode || !sizeNode) {
+        return Unexpected(std::string("Stroke layer style is missing fields"));
+    }
+    Expected<void, std::string> result = AnimatableFromJson(**colorNode, stroke->color);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    result = AnimatableFromJson(**opacityNode, stroke->opacity);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    result = AnimatableFromJson(**sizeNode, stroke->size);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    Expected<std::string, std::string> positionText = ParseField<std::string>(node, "position");
+    if (positionText) {
+        Expected<StrokePosition, std::string> position = dto::strokePositionFromString(*positionText);
+        if (!position) {
+            return Unexpected(position.error());
+        }
+        stroke->position = *position;
+    }
+    result = ApplyLayerFxCommon(node, *stroke, stroke->blendMode);
+    if (!result) {
+        return Unexpected(result.error());
+    }
+    return std::unique_ptr<LayerFx>(std::move(stroke));
+}
+
 json ContentToJson(const LayerContent &content) {
     json node{{"type", dto::ToString(content.type())}};
     switch (content.type()) {
@@ -2037,6 +2210,11 @@ json LayerToJson(const Layer &layer) {
         effects.push_back(LayerEffectToJson(*effect));
     }
     node["effects"] = std::move(effects);
+    json layerStyles = json::array();
+    for (const auto &style : layer.layerStyles) {
+        layerStyles.push_back(LayerFxToJson(*style));
+    }
+    node["layerStyles"] = std::move(layerStyles);
     return node;
 }
 
@@ -2223,6 +2401,20 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
                 }
                 if (*effect) {
                     layer->effects.push_back(std::move(*effect));
+                }
+            }
+        }
+    }
+
+    if (const json *layerStylesNode = FindChild(node, "layerStyles")) {
+        if (layerStylesNode->is_array()) {
+            for (const json &styleNode : *layerStylesNode) {
+                Expected<std::unique_ptr<LayerFx>, std::string> style = LayerFxFromJson(styleNode);
+                if (!style) {
+                    return Unexpected(style.error());
+                }
+                if (*style) {
+                    layer->layerStyles.push_back(std::move(*style));
                 }
             }
         }

@@ -7,6 +7,7 @@
 #include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -354,6 +355,70 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
                     auto *blur = static_cast<GaussianBlurEffect *>(effect);
                     if (name == "blurriness") {
                         return &blur->blurriness;
+                    }
+                    break;
+                }
+            }
+            return nullptr;
+        }
+        if (first.name == "layerStyles" && first.index >= 0 && segments.size() == 2) {
+            if (first.index >= static_cast<int>(layer->layerStyles.size())) {
+                return nullptr;
+            }
+            LayerFx *style = layer->layerStyles[static_cast<size_t>(first.index)].get();
+            const std::string &name = segments[1].name;
+            switch (style->type()) {
+                case LayerFxType::DropShadow: {
+                    auto *shadow = static_cast<DropShadowStyle *>(style);
+                    if (name == "color") {
+                        return &shadow->color;
+                    }
+                    if (name == "opacity") {
+                        return &shadow->opacity;
+                    }
+                    if (name == "angle") {
+                        return &shadow->angle;
+                    }
+                    if (name == "distance") {
+                        return &shadow->distance;
+                    }
+                    if (name == "size") {
+                        return &shadow->size;
+                    }
+                    if (name == "spread") {
+                        return &shadow->spread;
+                    }
+                    break;
+                }
+                case LayerFxType::OuterGlow: {
+                    auto *glow = static_cast<OuterGlowStyle *>(style);
+                    if (name == "color") {
+                        return &glow->color;
+                    }
+                    if (name == "opacity") {
+                        return &glow->opacity;
+                    }
+                    if (name == "size") {
+                        return &glow->size;
+                    }
+                    if (name == "spread") {
+                        return &glow->spread;
+                    }
+                    if (name == "range") {
+                        return &glow->range;
+                    }
+                    break;
+                }
+                case LayerFxType::Stroke: {
+                    auto *stroke = static_cast<LayerStrokeStyle *>(style);
+                    if (name == "color") {
+                        return &stroke->color;
+                    }
+                    if (name == "opacity") {
+                        return &stroke->opacity;
+                    }
+                    if (name == "size") {
+                        return &stroke->size;
                     }
                     break;
                 }
