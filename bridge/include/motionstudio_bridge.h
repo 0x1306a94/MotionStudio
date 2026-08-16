@@ -76,6 +76,14 @@ typedef CF_CLOSED_ENUM(int, MS_EFFECT) {
     MS_EFFECT_GAUSSIAN_BLUR = 1,
 };
 
+// Layer style (fx) type tag, mirrors motion::LayerFxType. Not MS_STYLE.
+typedef CF_CLOSED_ENUM(int, MS_LAYER_FX) {
+    MS_LAYER_FX_INVALID = -1,
+    MS_LAYER_FX_DROP_SHADOW = 0,
+    MS_LAYER_FX_OUTER_GLOW = 1,
+    MS_LAYER_FX_STROKE = 2,
+};
+
 // Path mask mode tag, mirrors motion::MaskMode.
 typedef CF_CLOSED_ENUM(int, MS_MASK) {
     MS_MASK_INVALID = -1,
@@ -432,6 +440,17 @@ MS_EFFECT ms_layer_effect_type_at(MSDocument *document, uint64_t layerId, int in
 bool ms_layer_effect_enabled_at(MSDocument *document, uint64_t layerId, int index);
 // Gaussian Blur repeatEdgePixels at index; false when out of range or not a blur.
 bool ms_layer_effect_repeat_edge_at(MSDocument *document, uint64_t layerId, int index);
+
+// Number of layer styles (drop shadow / glow / stroke); 0 when the layer does not exist.
+int ms_layer_fx_count(MSDocument *document, uint64_t layerId);
+// Style type tag (MS_LAYER_FX_*) at index, MS_LAYER_FX_INVALID when out of range.
+MS_LAYER_FX ms_layer_fx_type_at(MSDocument *document, uint64_t layerId, int index);
+// Whether the style at index is enabled; false when out of range.
+bool ms_layer_fx_enabled_at(MSDocument *document, uint64_t layerId, int index);
+// Blend mode of the style at index; MS_BLEND_NORMAL when out of range.
+MS_BLEND ms_layer_fx_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
+// Stroke position at index; MS_STROKE_POSITION_INVALID when out of range or not a stroke.
+MS_STROKE_POSITION ms_layer_fx_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
 
 // Path masks on a layer.
 int ms_layer_mask_count(MSDocument *document, uint64_t layerId);
@@ -806,6 +825,16 @@ void ms_command_set_layer_effect_enabled(MSDocument *document, uint64_t layerId,
 // Only applies to GaussianBlur; other types are a no-op.
 void ms_command_set_gaussian_blur_repeat_edge(MSDocument *document, uint64_t layerId, int index,
                                               bool repeatEdgePixels);
+
+void ms_command_add_layer_fx_drop_shadow(MSDocument *document, uint64_t layerId);
+void ms_command_add_layer_fx_outer_glow(MSDocument *document, uint64_t layerId);
+void ms_command_add_layer_fx_stroke(MSDocument *document, uint64_t layerId);
+void ms_command_remove_layer_fx(MSDocument *document, uint64_t layerId, int index);
+void ms_command_move_layer_fx(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex);
+void ms_command_set_layer_fx_enabled(MSDocument *document, uint64_t layerId, int index, bool enabled);
+void ms_command_set_layer_fx_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode);
+void ms_command_set_layer_fx_stroke_position(MSDocument *document, uint64_t layerId, int index,
+                                             MS_STROKE_POSITION position);
 
 // Appends a path mask (Add mode) baked from the layer's shape at `frame`.
 // Non-shape layers fall back to a 200x200 centered rectangle.

@@ -5,6 +5,7 @@
 
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 
 #include "BridgeInternals.h"
@@ -146,6 +147,79 @@ bool ms_layer_effect_repeat_edge_at(MSDocument *document, uint64_t layerId, int 
         return false;
     }
     return static_cast<const motion::GaussianBlurEffect &>(effect).repeatEdgePixels;
+}
+
+int ms_layer_fx_count(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? static_cast<int>(layer->layerStyles.size()) : 0;
+}
+
+MS_LAYER_FX ms_layer_fx_type_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->layerStyles.size()) {
+        return MS_LAYER_FX_INVALID;
+    }
+    switch (layer->layerStyles[static_cast<size_t>(index)]->type()) {
+        case motion::LayerFxType::DropShadow: {
+            return MS_LAYER_FX_DROP_SHADOW;
+        }
+        case motion::LayerFxType::OuterGlow: {
+            return MS_LAYER_FX_OUTER_GLOW;
+        }
+        case motion::LayerFxType::Stroke: {
+            return MS_LAYER_FX_STROKE;
+        }
+    }
+    return MS_LAYER_FX_INVALID;
+}
+
+bool ms_layer_fx_enabled_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->layerStyles.size()) {
+        return false;
+    }
+    return layer->layerStyles[static_cast<size_t>(index)]->enabled;
+}
+
+MS_BLEND ms_layer_fx_blend_mode_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->layerStyles.size()) {
+        return MS_BLEND_NORMAL;
+    }
+    const motion::LayerFx &style = *layer->layerStyles[static_cast<size_t>(index)];
+    switch (style.type()) {
+        case motion::LayerFxType::DropShadow: {
+            return static_cast<MS_BLEND>(static_cast<const motion::DropShadowStyle &>(style).blendMode);
+        }
+        case motion::LayerFxType::OuterGlow: {
+            return static_cast<MS_BLEND>(static_cast<const motion::OuterGlowStyle &>(style).blendMode);
+        }
+        case motion::LayerFxType::Stroke: {
+            return static_cast<MS_BLEND>(static_cast<const motion::LayerStrokeStyle &>(style).blendMode);
+        }
+    }
+    return MS_BLEND_NORMAL;
+}
+
+MS_STROKE_POSITION ms_layer_fx_stroke_position_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->layerStyles.size()) {
+        return MS_STROKE_POSITION_INVALID;
+    }
+    const motion::LayerFx &style = *layer->layerStyles[static_cast<size_t>(index)];
+    if (style.type() != motion::LayerFxType::Stroke) {
+        return MS_STROKE_POSITION_INVALID;
+    }
+    return static_cast<MS_STROKE_POSITION>(static_cast<const motion::LayerStrokeStyle &>(style).position);
 }
 
 MS_BLEND ms_layer_blend_mode(MSDocument *document, uint64_t layerId) {

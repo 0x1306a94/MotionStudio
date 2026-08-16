@@ -79,6 +79,29 @@ extension MS_EFFECT: @retroactive CaseIterable, @retroactive Identifiable {
     }
 }
 
+extension MS_LAYER_FX: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_LAYER_FX] {
+        [.DROP_SHADOW, .OUTER_GLOW, .STROKE]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .DROP_SHADOW:
+            "Drop Shadow"
+        case .OUTER_GLOW:
+            "Outer Glow"
+        case .STROKE:
+            "Stroke"
+        case .INVALID:
+            "Invalid"
+        }
+    }
+}
+
 extension MS_MASK: @retroactive CaseIterable, @retroactive Identifiable {
     public static var allCases: [MS_MASK] {
         [.ADD, .SUBTRACT, .INTERSECT]

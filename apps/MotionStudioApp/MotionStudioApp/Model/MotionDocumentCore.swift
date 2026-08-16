@@ -746,6 +746,28 @@ final class MotionDocumentCore {
         ms_layer_effect_repeat_edge_at(handle, layerID, Int32(index))
     }
 
+    // MARK: - Layer style (fx) queries
+
+    func layerFxCount(layerID: UInt64) -> Int {
+        Int(ms_layer_fx_count(handle, layerID))
+    }
+
+    func layerFxType(layerID: UInt64, index: Int) -> MS_LAYER_FX {
+        ms_layer_fx_type_at(handle, layerID, Int32(index))
+    }
+
+    func layerFxEnabled(layerID: UInt64, index: Int) -> Bool {
+        ms_layer_fx_enabled_at(handle, layerID, Int32(index))
+    }
+
+    func layerFxBlendMode(layerID: UInt64, index: Int) -> MS_BLEND {
+        ms_layer_fx_blend_mode_at(handle, layerID, Int32(index))
+    }
+
+    func layerFxStrokePosition(layerID: UInt64, index: Int) -> MS_STROKE_POSITION {
+        ms_layer_fx_stroke_position_at(handle, layerID, Int32(index))
+    }
+
     // MARK: - Mask / track matte queries
 
     func maskCount(layerID: UInt64) -> Int {
@@ -1714,6 +1736,46 @@ final class MotionDocumentCore {
 
     func setGaussianBlurRepeatEdge(layerID: UInt64, index: Int, repeatEdge: Bool) {
         ms_command_set_gaussian_blur_repeat_edge(handle, layerID, Int32(index), repeatEdge)
+        changed()
+    }
+
+    func addDropShadowLayerFx(layerID: UInt64) {
+        ms_command_add_layer_fx_drop_shadow(handle, layerID)
+        changed()
+    }
+
+    func addOuterGlowLayerFx(layerID: UInt64) {
+        ms_command_add_layer_fx_outer_glow(handle, layerID)
+        changed()
+    }
+
+    func addStrokeLayerFx(layerID: UInt64) {
+        ms_command_add_layer_fx_stroke(handle, layerID)
+        changed()
+    }
+
+    func removeLayerFx(layerID: UInt64, index: Int) {
+        ms_command_remove_layer_fx(handle, layerID, Int32(index))
+        changed()
+    }
+
+    func moveLayerFx(layerID: UInt64, from fromIndex: Int, to toIndex: Int) {
+        ms_command_move_layer_fx(handle, layerID, Int32(fromIndex), Int32(toIndex))
+        changed()
+    }
+
+    func setLayerFxEnabled(layerID: UInt64, index: Int, enabled: Bool) {
+        ms_command_set_layer_fx_enabled(handle, layerID, Int32(index), enabled)
+        changed()
+    }
+
+    func setLayerFxBlendMode(layerID: UInt64, index: Int, blendMode: MS_BLEND) {
+        ms_command_set_layer_fx_blend_mode(handle, layerID, Int32(index), blendMode)
+        changed()
+    }
+
+    func setLayerFxStrokePosition(layerID: UInt64, index: Int, position: MS_STROKE_POSITION) {
+        ms_command_set_layer_fx_stroke_position(handle, layerID, Int32(index), position)
         changed()
     }
 

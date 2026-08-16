@@ -328,6 +328,43 @@ TEST(BridgeCommandTest, LayerEffectLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeTest, LayerFxDropShadowRoundTrip) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+
+    EXPECT_EQ(ms_layer_fx_count(document, layerId), 0);
+    EXPECT_EQ(ms_layer_fx_type_at(document, layerId, 0), MS_LAYER_FX_INVALID);
+    EXPECT_FALSE(ms_layer_fx_enabled_at(document, layerId, 0));
+    EXPECT_EQ(ms_layer_fx_blend_mode_at(document, layerId, 0), MS_BLEND_NORMAL);
+    EXPECT_EQ(ms_layer_fx_stroke_position_at(document, layerId, 0), MS_STROKE_POSITION_INVALID);
+
+    ms_command_add_layer_fx_drop_shadow(document, layerId);
+    ASSERT_EQ(ms_layer_fx_count(document, layerId), 1);
+    EXPECT_EQ(ms_layer_fx_type_at(document, layerId, 0), MS_LAYER_FX_DROP_SHADOW);
+    EXPECT_TRUE(ms_layer_fx_enabled_at(document, layerId, 0));
+    EXPECT_EQ(ms_layer_fx_blend_mode_at(document, layerId, 0), MS_BLEND_MULTIPLY);
+
+    ms_command_set_layer_fx_enabled(document, layerId, 0, false);
+    EXPECT_FALSE(ms_layer_fx_enabled_at(document, layerId, 0));
+
+    ms_command_add_layer_fx_outer_glow(document, layerId);
+    ms_command_add_layer_fx_stroke(document, layerId);
+    ASSERT_EQ(ms_layer_fx_count(document, layerId), 3);
+    EXPECT_EQ(ms_layer_fx_type_at(document, layerId, 1), MS_LAYER_FX_OUTER_GLOW);
+    EXPECT_EQ(ms_layer_fx_type_at(document, layerId, 2), MS_LAYER_FX_STROKE);
+    EXPECT_EQ(ms_layer_fx_stroke_position_at(document, layerId, 2), MS_STROKE_POSITION_OUTSIDE);
+
+    ms_command_set_layer_fx_stroke_position(document, layerId, 2, MS_STROKE_POSITION_INSIDE);
+    EXPECT_EQ(ms_layer_fx_stroke_position_at(document, layerId, 2), MS_STROKE_POSITION_INSIDE);
+
+    ms_command_remove_layer_fx(document, layerId, 0);
+    ASSERT_EQ(ms_layer_fx_count(document, layerId), 2);
+    EXPECT_EQ(ms_layer_fx_type_at(document, layerId, 0), MS_LAYER_FX_OUTER_GLOW);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, LayerEffectRepeatEdgeQuery) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

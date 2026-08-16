@@ -12,20 +12,24 @@
 #include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerEffectCommand.h"
+#include "MotionStudio/undo/AddLayerFxCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/MoveLayerEffectCommand.h"
+#include "MotionStudio/undo/MoveLayerFxCommand.h"
 #include "MotionStudio/undo/MoveLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
 #include "MotionStudio/undo/RemoveLayerEffectCommand.h"
+#include "MotionStudio/undo/RemoveLayerFxCommand.h"
 #include "MotionStudio/undo/RemoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetCompositionBackgroundColorCommand.h"
@@ -36,6 +40,9 @@
 #include "MotionStudio/undo/SetGaussianBlurRepeatEdgeCommand.h"
 #include "MotionStudio/undo/SetLayerBlendModeCommand.h"
 #include "MotionStudio/undo/SetLayerEffectEnabledCommand.h"
+#include "MotionStudio/undo/SetLayerFxBlendModeCommand.h"
+#include "MotionStudio/undo/SetLayerFxEnabledCommand.h"
+#include "MotionStudio/undo/SetLayerFxStrokePositionCommand.h"
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerNameCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
@@ -397,6 +404,47 @@ void ms_command_set_gaussian_blur_repeat_edge(MSDocument *document, uint64_t lay
                                               bool repeatEdgePixels) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetGaussianBlurRepeatEdgeCommand>(EntityId{layerId}, index, repeatEdgePixels));
+}
+
+void ms_command_add_layer_fx_drop_shadow(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerFxCommand>(EntityId{layerId}, std::make_unique<motion::DropShadowStyle>()));
+}
+
+void ms_command_add_layer_fx_outer_glow(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerFxCommand>(EntityId{layerId}, std::make_unique<motion::OuterGlowStyle>()));
+}
+
+void ms_command_add_layer_fx_stroke(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerFxCommand>(EntityId{layerId}, std::make_unique<motion::LayerStrokeStyle>()));
+}
+
+void ms_command_remove_layer_fx(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveLayerFxCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_move_layer_fx(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::MoveLayerFxCommand>(EntityId{layerId}, fromIndex, toIndex));
+}
+
+void ms_command_set_layer_fx_enabled(MSDocument *document, uint64_t layerId, int index, bool enabled) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerFxEnabledCommand>(EntityId{layerId}, index, enabled));
+}
+
+void ms_command_set_layer_fx_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerFxBlendModeCommand>(EntityId{layerId}, index, MakeBlendMode(blendMode)));
+}
+
+void ms_command_set_layer_fx_stroke_position(MSDocument *document, uint64_t layerId, int index,
+                                             MS_STROKE_POSITION position) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerFxStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
 }
 
 void ms_command_add_mask(MSDocument *document, uint64_t layerId, int64_t frame) {

@@ -482,7 +482,7 @@ git commit --only adapter/tgfx/src/effects/ adapter/tgfx/src/TgfxCanvasAdapter.c
 
 ### Task 7: Bridge
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`
@@ -496,11 +496,11 @@ git commit --only adapter/tgfx/src/effects/ adapter/tgfx/src/TgfxCanvasAdapter.c
 - Produces: count / type / enabled / blend / stroke_position 查询
 - Produces: add 三条、remove、move、set enabled、set blend、set stroke position
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `BridgeTest.LayerFxDropShadowRoundTrip`：add drop shadow → count 1、type DROP_SHADOW、enabled true、blend MULTIPLY。set enabled false。add outer glow、add stroke → count 3。stroke position 默认 OUTSIDE，set INSIDE。remove index 0。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/bridge/bridge_test --gtest_filter='BridgeTest.LayerFx*'
@@ -508,7 +508,7 @@ git commit --only adapter/tgfx/src/effects/ adapter/tgfx/src/TgfxCanvasAdapter.c
 
 Expected: 编译失败
 
-- [ ] **Step 3: 实现 Bridge + Core 包装**
+- [x] **Step 3: 实现 Bridge + Core 包装**
 
 命令内部 `document.execute(make_unique<AddLayerFxCommand>(...))`。查询越界：type INVALID、enabled false、blend NORMAL、position INVALID。
 
@@ -523,11 +523,11 @@ var label: String { /* Drop Shadow / Outer Glow / Stroke */ }
 
 `MotionDocumentCore` 薄包装一律 `changed()`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only bridge/ apps/MotionStudioApp/MotionStudioApp/Bridge/ \
