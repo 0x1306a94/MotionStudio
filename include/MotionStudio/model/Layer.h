@@ -13,6 +13,7 @@
 #include "MotionStudio/model/FollowPath.h"
 #include "MotionStudio/model/LayerContent.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/TrackMatteType.h"
@@ -78,6 +79,7 @@ class Layer {
     FollowPath followPath;
     std::vector<std::unique_ptr<LayerStyle>> styles;
     std::vector<std::unique_ptr<LayerEffect>> effects;
+    std::vector<std::unique_ptr<LayerFx>> layerStyles;
 
   private:
     Mat3 worldTransform(FrameTime time, const Document &document, int depth) const;

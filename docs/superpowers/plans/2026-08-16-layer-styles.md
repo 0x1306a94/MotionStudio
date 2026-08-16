@@ -48,7 +48,7 @@
 
 ### Task 1: LayerFx 模型 + snapshot
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/model/LayerFx.h`
@@ -63,7 +63,7 @@
 - Produces: `LayerFx::drawPosition() const` 默认 Behind；`LayerStrokeStyle` 覆盖为 Above
 - Produces: `Layer::layerStyles` 为 `vector<unique_ptr<LayerFx>>`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/model/LayerFxTest.cpp`：
 
@@ -137,7 +137,7 @@ TEST(LayerFxTest, LayerHoldsLayerStylesVector) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filter='LayerFxTest.*'
@@ -145,7 +145,7 @@ cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filt
 
 Expected: 编译失败（找不到 `LayerFx.h`）
 
-- [ ] **Step 3: 实现模型**
+- [x] **Step 3: 实现模型**
 
 `LayerFx.h` 按 spec §1 写出三个子类。`snapshot` 规则：
 
@@ -162,7 +162,7 @@ Expected: 编译失败（找不到 `LayerFx.h`）
 std::vector<std::unique_ptr<LayerFx>> layerStyles;
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filter='LayerFxTest.*'
@@ -170,7 +170,7 @@ cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filt
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/model/LayerFx.h src/model/LayerFx.cpp \
