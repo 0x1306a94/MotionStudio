@@ -673,6 +673,9 @@ TEST(PagExporterTest, TextPathExportsPathOption) {
     ASSERT_NE(pagText->sourceText, nullptr);
     ASSERT_NE(pagText->sourceText->value, nullptr);
     EXPECT_FALSE(pagText->sourceText->value->boxText);
+    // Path is already in text-local space; do not apply the point-text top→baseline shift.
+    EXPECT_FLOAT_EQ(pagText->transform->position->value.x, 40.0f);
+    EXPECT_FLOAT_EQ(pagText->transform->position->value.y, 80.0f);
 }
 
 TEST(PagExporterTest, TextPathUnresolvedWarns) {
@@ -703,6 +706,8 @@ TEST(PagExporterTest, TextPathUnresolvedWarns) {
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
     auto *pagText = static_cast<pag::TextLayer *>(vector->layers[0]);
     EXPECT_EQ(pagText->pathOption, nullptr);
+    // Unresolved path falls back to ordinary point text, including the ascent shift.
+    EXPECT_FLOAT_EQ(pagText->transform->position->value.y, 24.0f * 0.8f);
 }
 
 TEST(PagExporterTest, TextPointUsesResolvedAscent) {

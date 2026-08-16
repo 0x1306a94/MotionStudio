@@ -1472,8 +1472,9 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
     }
 
     // Point text: MS position is the content top; PAG position is the first baseline.
-    // Valid textPath also exports as point text (boxTextMode ignored for layout).
-    if (forcePointText && pagLayer->transform != nullptr &&
+    // textPath already bakes the path into text-local space and places the baseline on
+    // the path — do not also shift the layer, or the whole path+text moves in world space.
+    if (forcePointText && pagLayer->pathOption == nullptr && pagLayer->transform != nullptr &&
         pagLayer->transform->position != nullptr) {
         const float ascent = ResolveTextAscent(options_, content.fontFamily, content.fontStyle,
                                                content.fontSize);
