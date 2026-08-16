@@ -232,7 +232,7 @@ git commit --only \
 
 ### Task 2: EffectsInspector
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/EffectsInspector.swift`
@@ -242,7 +242,7 @@ git commit --only \
 - Consumes: Task 1 的 `MotionDocumentCore` effect API、`EffectProperty`、`MS_EFFECT.label` / `allCases`、`NumberPropertyRow`
 - Produces: `struct EffectsInspector: View`（`core` / `layerID` / `isEditable` / `perform`）
 
-- [ ] **Step 1: 新建 `EffectsInspector.swift`**
+- [x] **Step 1: 新建 `EffectsInspector.swift`**
 
 完整文件：
 
@@ -474,7 +474,7 @@ struct EffectsInspector: View {
 }
 ```
 
-- [ ] **Step 2: 挂进 `InspectorView`**
+- [x] **Step 2: 挂进 `InspectorView`**
 
 在 `TrackMatteInspector(...)` 之后、`VStack` 结束之前插入：
 
@@ -490,7 +490,7 @@ struct EffectsInspector: View {
                         }
 ```
 
-- [ ] **Step 3: 编译 App 确认通过**
+- [x] **Step 3: 编译 App 确认通过**
 
 优先 Xcode MCP：`user-xcode` ready 则 `XcodeListWindows` 拿到 `MotionStudio.xcworkspace` 的 `tabIdentifier`，再 `BuildProject`。MCP 不可用则：
 
@@ -501,7 +501,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 
 Expected: BUILD SUCCEEDED。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 勾选本 Task checkbox，`**Status:** ✅ Done`，然后：
 

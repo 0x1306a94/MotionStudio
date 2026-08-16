@@ -162,6 +162,16 @@ struct InspectorView: View {
                                             layerID: layerID,
                                             isEditable: isEditable,
                                             perform: perform)
+
+                        if core.layerType(layerID) == .SHAPE ||
+                            core.layerType(layerID) == .IMAGE ||
+                            core.layerType(layerID) == .TEXT
+                        {
+                            EffectsInspector(core: core,
+                                             layerID: layerID,
+                                             isEditable: isEditable,
+                                             perform: perform)
+                        }
                     }
                     .padding(10)
                     .padding(.bottom, inspectorKeyboardOverlap(keyboardFrame: keyboardFrame, in: proxy))
