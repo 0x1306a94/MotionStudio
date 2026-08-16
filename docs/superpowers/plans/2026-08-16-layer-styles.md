@@ -233,7 +233,7 @@ git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
 
 ### Task 3: Undo 命令
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/undo/CommandKind.h`（加 `AddLayerFx` `RemoveLayerFx` `MoveLayerFx` `SetLayerFxEnabled` `SetLayerFxBlendMode` `SetLayerFxStrokePosition`）
@@ -246,21 +246,21 @@ git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
 - Produces: `MoveLayerFxCommand(EntityId, int fromIndex, int toIndex)`（可 merge）
 - Produces: `SetLayerFxEnabledCommand` / `SetLayerFxBlendModeCommand` / `SetLayerFxStrokePositionCommand`（可 merge；非 Stroke 的 position 命令 `execute` 空操作）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 抄 `AddLayerEffectCommand`：`execute` append，`undo` 按 `id` 拔出；Remove 插回原下标；Move 交换；Enabled / BlendMode / Position 改完 undo 恢复。`SetLayerFxStrokePositionCommand` 打在 DropShadow 上不改任何字段。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: 编译失败
 
-- [ ] **Step 3: 实现命令**
+- [x] **Step 3: 实现命令**
 
 `AddLayerFxCommand` 与 `src/undo/AddLayerEffectCommand.cpp` 相同，只把 `effects` 换成 `layerStyles`。`describe()`：`Add Layer Style` / `Remove Layer Style` / `Move Layer Style` / `Set Layer Style Enabled` / `Set Layer Style Blend Mode` / `Set Layer Style Position`。
 
 CMake glob 会收新文件。若有命令工厂 / switch(CommandKind) 注册表，一并加上新 kind。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='LayerFxCommandTest.*'
@@ -268,7 +268,7 @@ CMake glob 会收新文件。若有命令工厂 / switch(CommandKind) 注册表�
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/undo/ src/undo/ tests/undo/LayerFxCommandTest.cpp \
