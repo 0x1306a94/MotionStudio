@@ -50,7 +50,7 @@
 - Mask 模式 Lighten / Darken / Difference
 - Set Matte 效果、跨 composition 引用 matte
 - schema 版本升级 / 旧文档迁移（开发阶段，直接改当前格式）
-- Lottie 导出 masks/matte（另里程碑；导出仍走模型直转）
+- PAG 导出 masks/matte（另里程碑；导出仍走模型直转）
 
 ---
 

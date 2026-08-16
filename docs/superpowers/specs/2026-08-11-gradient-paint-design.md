@@ -25,7 +25,6 @@
 
 ## 非目标
 
-- Lottie 渐变导出
 - PAG `Angle` / `Reflected`；PAG `Diamond`（file.h 标注 not supported）
 - stop midpoint（AE 风格）
 - 画布上直接拖 stop 色标
@@ -226,11 +225,11 @@ Color 色板仅 Color mode 显示。
 
 ## 5. 导出
 
-| Paint | PAG | Lottie | BMP |
-|---|---|---|---|
-| Linear / Radial Gradient | → `GradientFill` / `GradientStroke`（start/end + colors） | 本轮不做 | 用户自选 |
-| Conic / Diamond | **跳过该 paint** | 本轮不做 | 用户自选 |
-| Shader | 仍跳过 | 本轮不做 | 用户自选 |
+| Paint | PAG | BMP |
+|---|---|---|
+| Linear / Radial Gradient | → `GradientFill` / `GradientStroke`（start/end + colors） | 用户自选 |
+| Conic / Diamond | **跳过该 paint** | 用户自选 |
+| Shader | 仍跳过 | 用户自选 |
 
 导出 UI：遇到不可导出 paint 时提示可用 BMP；**不**自动改文档、**不**静默栅格进 PAG。
 

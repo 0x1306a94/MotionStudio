@@ -124,7 +124,7 @@ typedef CF_CLOSED_ENUM(int, MS_TEXT_ALIGN) {
     MS_TEXT_ALIGN_RIGHT = 2,
 };
 
-// Blend mode tag, mirrors motion::BlendMode ordinals (Lottie "bm" value set).
+// Blend mode tag, mirrors motion::BlendMode ordinals.
 typedef CF_CLOSED_ENUM(int, MS_BLEND) {
     MS_BLEND_INVALID = -1,
     MS_BLEND_NORMAL = 0,
@@ -175,7 +175,7 @@ typedef CF_CLOSED_ENUM(int, MS_PREVIEWER_BACKDROP) {
     MS_PREVIEWER_BACKDROP_TRANSPARENT = 1,
 };
 
-// One BezierPath vertex using the Lottie tangent convention (offsets from point).
+// One BezierPath vertex; tangents are offsets from the point.
 typedef struct MSBezierVertex {
     float pointX;
     float pointY;
@@ -209,7 +209,7 @@ typedef struct MSVectorNetworkVertex {
     MS_VERTEX_MIRROR mirrorMode;
 } MSVectorNetworkVertex;
 
-// One directed cubic edge; tangents are Lottie-relative offsets from endpoints.
+// One directed cubic edge; tangents are offsets from the endpoints.
 typedef struct MSVectorNetworkEdge {
     uint32_t id;
     uint32_t start;

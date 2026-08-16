@@ -16,7 +16,7 @@
 ## 非目标
 
 - 新 effect 类型、Group / Precomp 组级 isolation 或 Effects UI
-- Lottie / PAG 导出 Effect
+- PAG 导出 Effect
 - 命中 / 选中框随 blur 扩张
 - 改现有 add / remove / move / set 命令语义
 - 升 `schemaVersion`

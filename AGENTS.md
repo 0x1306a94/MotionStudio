@@ -98,7 +98,6 @@ CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ni
 - **所有权是树，引用走 `EntityId`**；`EntityIndex` 提供 O(1) 寻址，undo 命令只持 ID 不持指针，安全解析目标（目标已删除时静默跳过）。
 - **属性双态**：`Animatable<T>` 要么静态值，要么关键帧序列。
 - **undo/redo = Command 模式**：支持合并（拖拽收敛为一个 undo 单元，`ms_document_end_merge_group` 关闭窗口）与组合；历史不持久化。
-- **Lottie 导出是渲染管线的例外**：直接从模型转换以保留关键帧结构，而非消费 `DrawCommand`。
 - **`transform.position` 双语义**：数据层存 AE 锚点位置；App UI 展示/编辑为局部 AABB 左上角布局坐标（换算只在 App，不改 Core）。详见 [`docs/data-model.md`](docs/data-model.md)「Position：数据层 vs UI 层」。
 
 ## 项目规范

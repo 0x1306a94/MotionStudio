@@ -27,7 +27,7 @@
 | 关键帧 / morph | 对 `VectorNetwork` 插值（同拓扑）；**不对**编译后 Path 插值 |
 | 异拓扑关键帧 | 不插值（hold） |
 | 渲染结构 | Network（权威）+ 多轮廓 `BezierPath`（编译产物） |
-| 导出 Lottie/PAG | 拍平为 Path（无 Network）；**多关键帧**优先 `CompileStrokeEdges` 供 PAG morph；**静态**优先 `CompileFillFaces`；丢失共享点语义 |
+| 导出 PAG | 拍平为 Path（无 Network）；**多关键帧**优先 `CompileStrokeEdges` 供 PAG morph；**静态**优先 `CompileFillFaces`；丢失共享点语义 |
 | Schema | **不升** `schemaVersion`；同版本双读静默转换旧 `BezierPath` |
 | 提交 | 本文档与后续实现均按指示提交；**本阶段不自动 commit** |
 
@@ -76,7 +76,7 @@ struct VectorNetwork {
         uint32_t id = 0;
         uint32_t start = 0;  // vertex id
         uint32_t end = 0;    // vertex id
-        // Lottie 风格：相对端点的 handle 偏移
+        // 相对端点的 handle 偏移
         // 三次贝塞尔控制点 = start.point + startTangent, end.point + endTangent
         Vec2 startTangent;
         Vec2 endTangent;
@@ -238,7 +238,7 @@ SceneEvaluator
 
 ## 导出
 
-Lottie / PAG 无 Vector Network，写出前必须拍平为 `PathData`（共享点拆成轮廓副本，可接受）：
+PAG 无 Vector Network，写出前必须拍平为 `PathData`（共享点拆成轮廓副本，可接受）：
 
 - **静态 / 单关键帧**：`CompileFillFaces`（空则 `CompileStrokeEdges`）——对齐编辑器填面，含共享点多面网络
 - **多关键帧动画**：优先 `CompileStrokeEdges`（空则 FillFaces）——保留立方拓扑与顶点对应，供 PAG `PathData::interpolate` morph；**禁止**对 `CompileFillFaces` 采样折线做跨关键帧 morph（相位易错位，见 Path 19）

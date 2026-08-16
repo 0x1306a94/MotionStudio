@@ -1,6 +1,6 @@
 # Figma → MotionStudio 对照换算
 
-手抄或对照 Figma Design / Motion 旋转与时间到本项目时的换算约定。Core 语义对齐 AE / Lottie，**不会**为对齐 Figma 面板去改内部模型。
+手抄或对照 Figma Design / Motion 旋转与时间到本项目时的换算约定。Core 语义对齐 AE，**不会**为对齐 Figma 面板去改内部模型。
 
 相关：时间模型见 [`data-model.md`](data-model.md) §1；Transform 见同页。
 
@@ -55,7 +55,7 @@ frame = round(figmaMs * fps / 1000)
 |---|---|---|
 | Figma **Design** 面板 / Plugin `rotation` | 逆时针为正 | Design 里 `+90` ≈ 逆时针 90° |
 | Figma **Dev Mode** CSS `rotate()` | 顺时针为正（与 Design 相反） | Design `90°` → CSS 常为 `rotate(-90deg)` |
-| MotionStudio / AE / Lottie | 顺时针为正（屏幕 Y 向下） | `Mat3::Rotate(+90)`：`(1,0) → (0,1)` |
+| MotionStudio / AE | 顺时针为正（屏幕 Y 向下） | `Mat3::Rotate(+90)`：`(1,0) → (0,1)` |
 
 相对 Figma Design / Motion **面板读数**：
 

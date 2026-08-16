@@ -247,4 +247,4 @@ UI：
 | 无效/自引用 no-op | 3, 4 |
 | 序列化 | 4 |
 | Bridge / Inspector / 时间轴 | 5, 6 |
-| 非目标（mask / wrap / Lottie） | 不做 |
+| 非目标（mask / wrap） | 不做 |

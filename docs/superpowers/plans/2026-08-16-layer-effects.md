@@ -16,7 +16,7 @@
 - 不引入 `EvaluatedEffect` / `std::variant` / 拍平参数 struct
 - 分发用 `type()` + `static_cast`；禁止 `dynamic_cast` 与 C++ 异常
 - 不升 `schemaVersion`；`effects` 缺省 = `[]`；未知 JSON `type` 跳过该项
-- 不做 Inspector / 时间轴 UI、Lottie/PAG 导出 Effect、AE Layer Style、其余 PAG Effect
+- 不做 Inspector / 时间轴 UI、PAG 导出 Effect、AE Layer Style、其余 PAG Effect
 - 不改 `ColorSourceEffect` 生产代码
 - 命中 / 选中框不随 blur 扩张
 - `if` / `switch` 分支必须 `{}`；成员 `= {}` 初始化

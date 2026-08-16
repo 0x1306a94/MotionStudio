@@ -7,7 +7,7 @@
 
 所有向用户**展示 / 编辑**的 `transform.position` 数字，语义为：图层**局部 AABB 左上角**在父空间中的位置（接近 Figma / Sketch 的布局坐标）。
 
-底层存储、渲染矩阵、序列化、Lottie / PAG 导出保持现有 AE 语义不变：
+底层存储、渲染矩阵、序列化、PAG 导出保持现有 AE 语义不变：
 
 ```
 local = T(position) · R(rotation) · S(scale) · T(-anchorPoint)

@@ -41,7 +41,6 @@
 - 框文本 + 路径、垂直文本
 - 路径层自动隐藏 / 专用引导层类型（用户可手动隐藏路径层；隐藏后布局仍有效，见 §1）
 - Text Animator；完整 AE tracking 对齐
-- Lottie 路径文本
 - 逐 glyph 精确 hit-test（MVP 用 AABB）
 - 与 PAGViewer 自动化像素回归（可手工验收）
 - **不链入** libpag 渲染层 `TextPathRender` / 整库 rendering（libpag 渲染层尚无 Metal 后端；MS 预览走预编译 Metal tgfx。算法可对照参考，实现放在 MS `adapter/textlayout` + tgfx `PathMeasure`）

@@ -195,7 +195,7 @@ struct Transform {
     Animatable<Vec2>  anchorPoint{{0, 0}};
     Animatable<Vec2>  position{{0, 0}};
     Animatable<Vec2>  scale{{1, 1}};
-    Animatable<float> rotation{0};      // 度；正角度对齐 AE/Lottie（屏幕 Y 向下时视觉为顺时针）
+    Animatable<float> rotation{0};      // 度；正角度对齐 AE（屏幕 Y 向下时视觉为顺时针）
     Animatable<float> opacity{1};       // 0.0 ~ 1.0
 };
 ```
@@ -226,7 +226,7 @@ Mat3 Layer::worldTransform(FrameTime t, const Document& doc) const {
 
 | 层 | 含义 | 落点 |
 |---|---|---|
-| **数据层（存储 / Bridge / 导出）** | AE 语义：`position` = **锚点**在父空间中的位置 | `Transform.position`、序列化、Lottie/PAG、FreeTransform 等内部写回 |
+| **数据层（存储 / Bridge / 导出）** | AE 语义：`position` = **锚点**在父空间中的位置 | `Transform.position`、序列化、PAG、FreeTransform 等内部写回 |
 | **UI 层（Inspector / 关键帧数值）** | 布局语义：数字 = 局部 AABB **左上角**（`localBounds.min`）在父空间中的位置 | App：`LayoutPosition` + `MotionDocumentCore.evaluateLayoutPosition` / `writeLayoutPosition` |
 
 换算（不改存储模型；`anchor` / `scale` / `rotation` / `localBounds` 取当前帧）：

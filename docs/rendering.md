@@ -20,7 +20,7 @@ FrameTime t
          ▼
 ┌──────────────────┐
 │ RenderAdapter    │  Metal 实时预览 / CoreGraphics 离屏 / 未来的 GL、Vulkan
-│ 或 Exporter      │  Lottie 导出（见 §5，不走此路径）
+│ 或 Exporter      │  PAG 导出（见 §5，模型直转）
 └──────────────────┘
 ```
 
@@ -179,24 +179,11 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 ## 5. 导出器边界
 
-**Lottie 导出不走 DrawCommand 路径**。原因：DrawCommand 是单帧烘焙结果，丢失了关键帧结构；而 Lottie 文件格式本身描述的就是关键帧动画，必须从 Document 模型直接转换：
-
-```cpp
-class LottieExporter {
-public:
-    // Document 模型 → Lottie JSON（保留关键帧/缓动，不烘焙）
-    static nlohmann::json exportToLottie(const Document& doc,
-                                         EntityId compositionId);
-};
-```
-
-模型映射（Motion Studio → Lottie）：Composition → `comp`，Layer → `layer`，Transform 五属性 → `ks`，Shape 元素 → `it` 数组，Easing → `o/i` 贝塞尔手柄。
-
-**一致性验证**：导出后用 `SceneEvaluator` 对原场景逐帧求值渲染，与 Lottie 参考渲染器（lottie-web）的输出做像素对比，验收标准为视觉一致性 > 95%。
+**PAG 导出不走 DrawCommand 路径**。DrawCommand 是单帧烘焙结果，丢失了关键帧结构；PAG 文件描述的是关键帧动画，必须从 Document 模型直接转换（`PagExporter`）。
 
 **序列帧 PNG 导出**：走渲染路径——Metal offscreen（`MTLTexture` render target）逐帧渲染 `SceneState` 后回读像素编码 PNG。
 
-**MP4（H.264）导出**走渲染路径：`VideoExporter` 逐帧 `Evaluate → BuildCommands → PlayCommands`，经可替换 `VideoEncoder` 封装。Apple 默认 `TgfxVideoFrameSource`（CVPixelBuffer 零拷贝）+ `AvfVideoEncoder`（`AVAssetWriter`）。导出强制 `cornerRadius = 0`、不透明背景（MP4 无透明轨）；音轨接口预留，首版无声。桥接 API：`ms_video_export`。Lottie 仍为模型直转例外。
+**MP4（H.264）导出**走渲染路径：`VideoExporter` 逐帧 `Evaluate → BuildCommands → PlayCommands`，经可替换 `VideoEncoder` 封装。Apple 默认 `TgfxVideoFrameSource`（CVPixelBuffer 零拷贝）+ `AvfVideoEncoder`（`AVAssetWriter`）。导出强制 `cornerRadius = 0`、不透明背景（MP4 无透明轨）；音轨接口预留，首版无声。桥接 API：`ms_video_export`。
 
 ## 6. 线程模型
 

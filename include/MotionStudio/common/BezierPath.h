@@ -6,10 +6,9 @@
 
 namespace motion {
 
-// Bezier path using the Lottie tangent convention: tangents are offsets
-// relative to the vertex — control points are (point + outTangent) for the
-// outgoing handle and (nextVertex.point + nextVertex.inTangent) for the
-// incoming handle.
+// Bezier path whose tangents are offsets relative to the vertex — control
+// points are (point + outTangent) for the outgoing handle and
+// (nextVertex.point + nextVertex.inTangent) for the incoming handle.
 struct BezierPath {
     // A single path vertex with optional cubic tangent handles.
     struct Vertex {

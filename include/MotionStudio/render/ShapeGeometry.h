@@ -25,7 +25,7 @@ struct ShapeGeometry {
     // (CompileStrokeEdges). Empty means stroke falls back to `path`.
     BezierPath strokePath;
 
-    // Meaningful when kind == Rect or Ellipse (Lottie center + size).
+    // Meaningful when kind == Rect or Ellipse (center + size).
     Vec2 center{};
     Vec2 size{};
 

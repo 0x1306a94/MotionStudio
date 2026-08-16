@@ -22,7 +22,7 @@
 | 内置 Shadertoy uniform | 不进 scheme；仍由 adapter `onDraw` 注入 |
 | 删 shader | 仍被引用则拒绝删除 |
 | EntityIndex | v1 扫 `Document.shaders`（同 Asset）；不强制扩索引 |
-| 导出 | Lottie / PAG **本阶段不支持**过程色（实现计划再定跳过或栅格） |
+| 导出 | PAG **本阶段不支持**过程色（实现计划再定跳过或栅格） |
 
 ## 非目标
 
@@ -226,7 +226,7 @@ v1：**不**扩展 `EntityIndex`；`findShader(id)` 扫 `Document.shaders`（与
 
 - 求值管线对 Shader 模式携带：`shaderId`、`mainImage`、scheme、本帧已求值的用户 uniform。
 - `sourceBounds` 仍由形状 AABB 决定（与现 ColorSourceEffect 一致）。
-- **Lottie / PAG 导出**：本阶段不支持过程色（跳过或后续栅格；非本设计实现范围）。
+- **PAG 导出**：本阶段不支持过程色（跳过或后续栅格；非本设计实现范围）。
 
 ---
 

@@ -53,7 +53,7 @@
 | `docs/data-model.md` / `docs/color-source-effect.md` | 同步模型与包文件说明 |
 | Spec | 状态改为实现中 |
 
-**本 plan 明确不包含：** 任何 UI、App / Swift / Inspector、`MotionProjectDocument` 包读写、SceneEvaluator→ColorSourceEffect 预览接线、Lottie/PAG 导出（均属后续计划）。
+**本 plan 明确不包含：** 任何 UI、App / Swift / Inspector、`MotionProjectDocument` 包读写、SceneEvaluator→ColorSourceEffect 预览接线、PAG 导出（均属后续计划）。
 
 ---
 
@@ -552,7 +552,7 @@ git commit -m "Document color-source Core storage after implementation."
 1. **预览接线：** SceneEvaluator / DrawCommand 携带 shader 快照 → adapter `ColorSourceEffect`；改定义时 invalidate。  
 2. **App 包（非本 plan）：** `MotionProjectDocument` 读写 `shader.json`。  
 3. **Inspector UI（非本 plan）：** 模式切换、uniform 编辑、源码编辑。  
-4. **导出：** PAG/Lottie 明确跳过或栅格。
+4. **导出：** PAG 明确跳过或栅格。
 
 ---
 

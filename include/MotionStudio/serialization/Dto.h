@@ -20,9 +20,9 @@
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TrackMatteType.h"
 
-// Enum ↔ string mappings for the JSON v1 schema (camelCase, aligned with the
-// Lottie ecosystem). File layout is defined in Serializer.cpp; migration
-// operates purely on JSON and does not depend on runtime model types.
+// Enum ↔ string mappings for the JSON v1 schema (camelCase). File layout is
+// defined in Serializer.cpp; migration operates purely on JSON and does not
+// depend on runtime model types.
 namespace motion::dto {
 
 inline constexpr int SCHEMA_VERSION = 1;

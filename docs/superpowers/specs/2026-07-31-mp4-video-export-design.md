@@ -19,7 +19,7 @@
 | `SceneEvaluator` → `BuildCommands` → `PlayCommands` | 已有 |
 | `TgfxRenderAdapter` | 离屏 `MTLTexture` + `ReadPixels`（有 CPU 拷贝） |
 | `export/` 模块 | 架构文档已规划，**目录尚未落地** |
-| Lottie 导出 | 模型直转，不走 DrawCommand；与视频导出路径不同 |
+| PAG 导出 | 模型直转，不走 DrawCommand；与视频导出路径不同 |
 | 序列帧 PNG | 文档描述走离屏 + 回读；可与视频共享 FrameSource 思路 |
 | 视频 / AVAssetWriter | **无** |
 

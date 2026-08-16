@@ -50,7 +50,7 @@
 | `bridge/include/motionstudio_bridge.h` | `MSVectorNetwork` + 编辑命令 |
 | `bridge/src/common/motionstudio_bridge_path_edit.cpp` | 命令写回 |
 | App Swift 钢笔手势 / `PathEditTarget` | `activeVertexId` + `drawing` 会话 |
-| 导出（Lottie/PAG） | Network 拍平为 Path（动画→StrokeEdges；静态→FillFaces） |
+| 导出（PAG） | Network 拍平为 Path（动画→StrokeEdges；静态→FillFaces） |
 | `tests/common/`、`tests/animation/`、`tests/serialization/`、`tests/render/`、`bridge/tests/` | 各 Task 覆盖测试 |
 
 `src/common/`、`tests/common/` 由 CMake 按扩展名自动收集——新增 `.cpp` **无需**改 CMake 列表。
@@ -504,7 +504,7 @@ Canvas hit：尽量返回 vertex id / edge id，而非仅顶点下标。
 **Status:** ✅ Done
 
 **Files:**
-- Modify: 读取 ShapePath::path / mask path 的 Lottie/PAG 导出路径
+- Modify: 读取 ShapePath::path / mask path 的 PAG 导出路径
 - Test: 更新既有导出测试夹具为 Network
 
 **行为：** 输出格式中不保留 Network。静态：`CompileFillFaces`（空则 StrokeEdges）。多关键帧：优先 `CompileStrokeEdges` 以保持 PAG path morph 顶点对应（禁止对 FillFaces 采样折线 morph）。

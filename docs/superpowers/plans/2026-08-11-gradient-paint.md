@@ -21,7 +21,7 @@
 - App / Xcode：优先 Xcode MCP `BuildProject`；不可用再 `xcodebuild`（见 `AGENTS.md`）。
 - 编码规范：禁异常、禁 `dynamic_cast`、错误用 `Expected`、禁 lambda 优先显式函数（测试与现有 SceneEvaluator 局部 lambda 除外，跟文件既有风格）。
 - Core **不**链接 tgfx；渐变 GPU 创建仅在 `adapter/tgfx`。
-- **不做：** Lottie 渐变、PAG Angle/Reflected/Diamond、stop midpoint、画布拖 stop、渐变库资源化。
+- **不做：** PAG Angle/Reflected/Diamond、stop midpoint、画布拖 stop、渐变库资源化。
 
 ---
 

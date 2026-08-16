@@ -2,7 +2,7 @@
 
 namespace motion {
 
-// Compositing blend mode for a layer. Matches the Lottie "bm" value set.
+// Compositing blend mode for a layer.
 enum class BlendMode {
     Normal,
     Multiply,

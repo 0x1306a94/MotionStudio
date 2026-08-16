@@ -20,11 +20,11 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具，定�
 ┌───────────────────────┴────────────────────────────┐
 │  适配器（平台相关）                                    │
 │  TgfxRenderAdapter（离屏）/ TgfxOnScreenAdapter      │
-│  （MTKView 直渲）/ LottieExporter / 序列帧            │
+│  （MTKView 直渲）/ PagExporter / 序列帧               │
 └────────────────────────────────────────────────────┘
 ```
 
-**核心原则**：Core 层不知道任何渲染后端的存在。它在指定时间对场景求值，输出扁平化的绘制命令（`DrawCommandList`），由适配器消费。这样同一份动画数据可以对接 Metal 实时预览、Lottie 导出、未来的 OpenGL/Vulkan 渲染器。
+**核心原则**：Core 层不知道任何渲染后端的存在。它在指定时间对场景求值，输出扁平化的绘制命令（`DrawCommandList`），由适配器消费。这样同一份动画数据可以对接 Metal 实时预览、PAG 导出、未来的 OpenGL/Vulkan 渲染器。
 
 ## 模块划分
 
@@ -37,7 +37,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具，定�
 | `animation/` | `Animatable<T>`、`Keyframe`、`Easing`、贝塞尔缓动求值、插值策略 |
 | `undo/` | `Command` 接口、`UndoManager`、内置命令集 |
 | `render/` | `SceneEvaluator`、`SceneState`、`DrawCommand`、`RenderAdapter` 接口 |
-| `export/` | `LottieExporter`、序列帧导出 |
+| `export/` | `PagExporter`、序列帧 / MP4 导出 |
 | `serialization/` | `Serializer`、DTO（与运行时模型解耦的文件格式）、`SchemaMigrator` |
 
 模块依赖方向（单向，禁止反向依赖）：
@@ -64,7 +64,7 @@ motionstudio/
 │   ├── animation/                  # Animatable.h Keyframe.h Easing.h Interpolator.h
 │   ├── undo/                       # Command.h UndoManager.h AddKeyframeCommand.h ...
 │   ├── render/                     # RenderAdapter.h SceneEvaluator.h DrawCommand.h ...
-│   ├── export/                     # LottieExporter.h
+│   ├── export/                     # PagExporter.h
 │   └── serialization/              # Serializer.h SchemaMigrator.h Dto.h
 ├── src/                            # 实现文件（与 include/ 同构，按模块分子目录）
 │   ├── CMakeLists.txt              # core 静态库（libmotionstudio_core.a）

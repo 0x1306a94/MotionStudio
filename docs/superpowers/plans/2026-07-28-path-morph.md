@@ -538,4 +538,4 @@ git commit --only \
 
 ## 本计划不做
 
-Trim Path、Motion Path 可视化、Follow Path、顶点对应 UI、Lottie 导出完善。
+Trim Path、Motion Path 可视化、Follow Path、顶点对应 UI。

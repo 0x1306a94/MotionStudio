@@ -1021,7 +1021,7 @@ TEST(VideoExportBridgeTest, NullDocumentFails) {
 
 在 §5 增加段落：
 
-> **MP4（H.264）导出**走渲染路径：`VideoExporter` 逐帧 `Evaluate → BuildCommands → PlayCommands`，经可替换 `VideoEncoder` 封装。Apple 默认 `TgfxVideoFrameSource`（CVPixelBuffer 零拷贝）+ `AvfVideoEncoder`。导出强制 `cornerRadius=0`、不透明背景；音轨接口预留。Lottie 仍为模型直转例外。
+> **MP4（H.264）导出**走渲染路径：`VideoExporter` 逐帧 `Evaluate → BuildCommands → PlayCommands`，经可替换 `VideoEncoder` 封装。Apple 默认 `TgfxVideoFrameSource`（CVPixelBuffer 零拷贝）+ `AvfVideoEncoder`。导出强制 `cornerRadius=0`、不透明背景；音轨接口预留。PAG 为模型直转。
 
 - [x] **Step 5: 全量相关测试**
 

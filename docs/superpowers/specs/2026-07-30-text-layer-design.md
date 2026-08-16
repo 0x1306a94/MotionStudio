@@ -24,7 +24,7 @@
 - 垂直对齐、字距 / 行距、富文本 span
 - CoreText / HarfBuzz（首版用自研框排版 + tgfx 量字）
 - 项目内嵌 Font Asset（用户自行安装系统字体）
-- Lottie / PAG 文本导出
+- PAG 文本导出
 - 复杂文种双向排版
 
 ---

@@ -10,7 +10,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [data-model.md](data-model.md) | 动画数据结构：时间表示、EntityId、Document→Composition→Layer→Shape 层级、`Animatable<T>`、Transform 与父子继承、Command 模式 undo/redo、序列化与 DTO |
 | [figma-to-motionstudio.md](figma-to-motionstudio.md) | Figma Design / Motion → MotionStudio：毫秒↔帧、旋转符号与 Design+Motion 关键帧 |
 | [timeline-evaluation.md](timeline-evaluation.md) | 时间轴与曲线求值：关键帧求值流程、贝塞尔缓动（牛顿+二分）、空间插值、Precomp 时间映射、缓存策略 |
-| [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、Lottie/序列帧导出边界、线程模型 |
+| [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、PAG/序列帧/MP4 导出边界、线程模型 |
 | [color-source-effect.md](color-source-effect.md) | ColorSourceEffect / RenderCache：过程色填充、离屏路径、pipeline 指纹与 UBO 三缓冲、调用约定 |
 | [pag-runtime-filter.md](pag-runtime-filter.md) | RuntimeFilter / BrightnessContrast / GaussianBlur：图层后处理滤镜基类、pipeline 缓存、endLayer 链 |
 | [superpowers/specs/2026-08-16-layer-effects-design.md](superpowers/specs/2026-08-16-layer-effects-design.md) | Layer effects：叶子层后处理链、求值快照、BeginLayer/EndLayer isolation |
@@ -37,5 +37,5 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 - **所有权是树，引用走 EntityId**；`EntityIndex` 提供 O(1) 寻址，支撑 undo 命令安全解析目标
 - **属性双态**：`Animatable<T>` 要么静态值，要么关键帧序列；插值策略由 `Interpolator<T>` trait 注入
 - **undo/redo = Command 模式**：命令只持 ID 不持指针，支持合并（拖拽收敛为一个 undo 单元）与组合，历史不持久化
-- **核心渲染无关**：Core 输出扁平 `DrawCommandList`，Metal/导出器均为适配器；Lottie 导出例外——直接从模型转换以保留关键帧结构
+- **核心渲染无关**：Core 输出扁平 `DrawCommandList`，Metal/导出器均为适配器；PAG 导出从模型直转以保留关键帧结构
 - **Swift 桥接用 extern "C"**：薄、可调试、未来 WASM/移动端可复用

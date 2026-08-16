@@ -15,7 +15,7 @@ enum class VertexMirrorMode : uint8_t {
 };
 
 // Authoring graph for pen paths: shared vertices connected by cubic edges.
-// Tangents live on edges (Lottie-relative offsets from the endpoint).
+// Tangents live on edges (offsets relative to the endpoint).
 struct VectorNetwork {
     struct Vertex {
         uint32_t id = 0;

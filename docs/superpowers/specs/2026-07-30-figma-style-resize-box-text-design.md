@@ -18,7 +18,7 @@
 
 - 属性面板以外的临时「按住修饰键改 scale」手势
 - Precomp / Null 层的特殊 resize 语义（无内容尺寸时：多选中只更新 position，或跳过无 bounds 对象）
-- Lottie 导出对 `boxTextMode` 的完整映射（可后续跟进）
+- PAG 导出对 `boxTextMode` 的完整映射（可后续跟进）
 - 改动旋转 / 移动 / 锚点拖动手势（保持现状）
 
 ---

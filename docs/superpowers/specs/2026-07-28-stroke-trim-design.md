@@ -26,7 +26,7 @@
 
 ## 非目标（后置）
 
-- `ShapeTrimPath` 形状修饰器（裁剪 Fill+Stroke 的 AE/Lottie 语义）  
+- `ShapeTrimPath` 形状修饰器（裁剪 Fill+Stroke 的 AE 语义）  
 - Core 自研弧长测长 / 把 trim 挪出适配器  
 - 新 App UI  
 

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 不改 Core `Transform`、文件格式、序列化、Lottie/PAG 导出。
+- 不改 Core `Transform`、文件格式、序列化、PAG 导出。
 - 不改 `ShapeProperty.position`；不改 FreeTransform / 锚点补偿 / recenter 的存储坐标写回。
 - 左上角 = `localBounds.min`；无 bounds 或空 rect → `offset = 0`。
 - UI offset = `R·S·(anchor − bounds.min)`；`layout = stored − offset`。旋转缩放与 `AnchorPreset.compensatedPosition` 同序：先 scale 再旋转。

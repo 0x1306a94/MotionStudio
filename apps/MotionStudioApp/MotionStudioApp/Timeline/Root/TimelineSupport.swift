@@ -272,7 +272,7 @@ func timelineX(for frame: CGFloat, pointsPerFrame: CGFloat = pixelsPerFrame) -> 
 }
 
 /// Last seekable / drawable frame for a composition with `duration` frames
-/// (AE/Lottie half-open range `[0, duration)`).
+/// (AE half-open range `[0, duration)`).
 func timelineLastInclusiveFrame(_ duration: Int64) -> Int64 {
     max(duration - 1, 0)
 }

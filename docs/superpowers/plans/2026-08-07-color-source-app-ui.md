@@ -20,7 +20,7 @@
 - Core / bridge / adapter 宣称完成前优先 ASan：`cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON && cmake --build build`。
 - App / Xcode：优先 Xcode MCP `BuildProject`；不可用再 `xcodebuild`（见 `AGENTS.md`）。
 - 遵守编码规范（禁异常、禁 `dynamic_cast`、错误用 `Expected`）；Bridge 只做类型转换与命令转发。
-- **不做：** 语法高亮、编译诊断 UI、sampler/iChannel、Lottie/PAG 过程色导出、从 GLSL 推断 scheme。
+- **不做：** 语法高亮、编译诊断 UI、sampler/iChannel、PAG 过程色导出、从 GLSL 推断 scheme。
 - 新建 shader 默认 `mainImage`：
 
 ```glsl

@@ -20,7 +20,6 @@
 - SwiftUI Inspector / 时间轴 effect 行（已另开：[Layer Effects UI](2026-08-16-layer-effects-ui-design.md)）
 - AE Layer Style → [Layer Styles](2026-08-16-layer-styles-design.md)（Drop Shadow / Outer Glow / Stroke；Gradient Overlay 另开）
 - 其余 PAG Effect（RadialBlur / Glow / HueSaturation / Mosaic / DisplacementMap / …）
-- Lottie 导出写入 Effect 块
 - 改 `ColorSourceEffect`（过程色 fill，不是后处理）
 - 命中检测 / 选中框随 blur 扩张（仍用未滤几何 bounds）
 - 升 `schemaVersion`
@@ -382,5 +381,4 @@ Swift `CaseIterable` / `Identifiable` 扩展按 [bridge-swift-enums](../../../.c
 2. Inspector / 时间轴 → [Layer Effects UI](2026-08-16-layer-effects-ui-design.md)
 3. RadialBlur、Glow、HueSaturation、…
 4. AE Layer Style → [Layer Styles](2026-08-16-layer-styles-design.md)（Drop Shadow / Outer Glow / Stroke）
-5. Lottie 导出 Effect
-6. hit-test 随 blur 扩 bounds
+5. hit-test 随 blur 扩 bounds

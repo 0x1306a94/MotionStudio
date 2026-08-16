@@ -12,7 +12,7 @@ Motion Studio 分 5 个里程碑推进，总计约 18 周。每个里程碑有�
 | M1 | 4 周 | 数据模型 + Undo | 1000 次随机操作 + undo/redo 无崩溃无泄漏（ASan） |
 | M2 | 3 周 | Timeline 求值 | 缓动曲线与 CSS 参考误差 < 1e-5；100 图层单帧求值 < 2ms |
 | M3 | 6 周 | macOS + iPadOS UI 壳 | 关键帧动画播放；拖拽编辑 + undo/redo 正确 |
-| M4 | 3 周 | 导出 | Lottie 在 lottiefiles 播放器正确播放；视觉一致性 > 95% |
+| M4 | 3 周 | 导出 | PAG 导出可解码回放；序列帧 / MP4 无错帧 |
 
 ---
 
@@ -93,13 +93,12 @@ cmake -B build -G Ninja && cmake --build build && cd build && ctest   # 全绿
 ## M4 — 导出（3 周）
 
 **交付物**
-- `export/`：LottieExporter（Document → Lottie JSON，保留关键帧结构）
+- `export/`：`PagExporter`（Document → PAG，保留关键帧结构）
 - 序列帧 PNG 导出（`TgfxRenderAdapter` 离屏渲染逐帧 `ReadPixels`，tgfx 自带 PNG 编码）
-- 一致性验证工具：同一场景，内部渲染 vs lottie-web 渲染逐帧像素对比
+- MP4（H.264）导出（`VideoExporter` 逐帧渲染）
 
 **验收**
-- 导出的 JSON 在 lottiefiles.com 播放器正确播放（矩形/椭圆动画、缓动、图层变换用例集）
-- 像素对比视觉一致性 > 95%
+- 导出的 PAG 可解码回放（矩形/椭圆动画、缓动、图层变换用例集）
 - 序列帧导出 1080p × 3s @ 30fps 无错帧
 
 ---
@@ -109,7 +108,7 @@ cmake -B build -G Ninja && cmake --build build && cd build && ctest   # 全绿
 | # | 风险 | 级别 | 缓解 |
 |---|---|---|---|
 | 1 | Undo 一致性：undo 时目标实体可能已被删除 | 高 | 命令经 EntityIndex 校验存在性，不存在则跳过；Remove 命令持有 `unique_ptr` 所有权转移；debug 下序列化 hash 比对 |
-| 2 | BezierPath 关键帧顶点数不匹配无法插值 | 中 | M1 强制一致，M2 实现顶点插入匹配（AE/Lottie 标准做法） |
+| 2 | BezierPath 关键帧顶点数不匹配无法插值 | 中 | M1 强制一致，M2 实现顶点插入匹配（AE 标准做法） |
 | 3 | 桥接层函数膨胀 | 中 | 桥接层保持极薄（仅类型转换，无业务逻辑），按模块分头文件；简单值类型（Vec2/Color）后续可用 Swift C++ interop 补充 |
 | 4 | 渲染抽象的栈式假设限制未来后端 | 中 | 覆盖 Metal/GL/CoreGraphics/Skia 已足够；Vulkan 类后端出现时再演化（YAGNI） |
 | 5 | UI 线程与求值竞争 | 中 | 首版主线程同步；优化阶段用 SceneState 值快照双缓冲，Document 不加锁 |
@@ -126,4 +125,4 @@ cmake -B build -G Ninja && cmake --build build && cd build && ctest   # 全绿
 
 ## M4 之后的候选方向（未排期）
 
-Web/Android UI 壳、表达式/脚本、渐变与图像填充、遮罩与混合模式完整集、Lottie 导入、协同编辑。
+Web/Android UI 壳、表达式/脚本、渐变与图像填充、遮罩与混合模式完整集、协同编辑。

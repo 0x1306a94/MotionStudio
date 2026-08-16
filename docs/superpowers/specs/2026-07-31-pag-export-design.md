@@ -23,7 +23,6 @@
 | 模型 | Shape / Text / Image / Group / Precomp；Transform KF；Mask；TrackMatte；FollowPath；Fill/Stroke styles |
 | 渲染 | `SceneEvaluator` → `BuildCommands` → `PlayCommands`；tgfx Metal 预编译 + adapter |
 | `export/` | 已有视频导出与矢量 `PagExporter`；Bitmap 策略按 2026-08-10 修订切换为显式 `_bmp` |
-| Lottie | 架构规划「模型直转」；与 PAG 同属保留关键帧路径，实现可并行 |
 | tgfx | **唯一源码**：`third_party/libpag/third_party/tgfx`；MS 用 `cmake/BuildTgfx.cmake` 预编译 **Metal** `tgfx.a` |
 | libpag / pag_codec | DEPS 拉 `third_party/libpag`；**不** `add_subdirectory(libpag)`；`adapter/pag_codec` 只编 base+codec |
 | AE exporter | `PAGExport` → `ExportComposition` / `ExportLayers` → `pag::File` → `Codec::Encode` + `File::Load` 自检 |
@@ -167,7 +166,7 @@ ${CMAKE_BINARY_DIR}/tgfx_prebuilt/<Config>/<mac|ios|catalyst>/<arch>/tgfx.a
 
 ## §1 架构与职责
 
-采用 **方案 A：直接模型映射**（对齐 AE exporter / Lottie「模型直转」；不走逐帧求值重建矢量）。
+采用 **方案 A：直接模型映射**（对齐 AE exporter「模型直转」；不走逐帧求值重建矢量）。
 
 ```
 Document + PagExportOptions

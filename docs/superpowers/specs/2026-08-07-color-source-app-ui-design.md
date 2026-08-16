@@ -29,7 +29,7 @@
 - 语法高亮 / 补全 / 实时小窗预览
 - Int / Mat / Sampler / iChannel 编辑
 - 从 GLSL 自动生成 scheme
-- Lottie / PAG 导出过程色
+- PAG 导出过程色
 - 编译错误诊断 UI
 - 拖拽 shader 到画布、库多选、缩略图预览
 

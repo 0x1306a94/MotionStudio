@@ -38,8 +38,6 @@
 - Follow Path（Phase D）
 - 顶点自动对应的可视化编辑
 - 多子路径 / compound path
-- Lottie 导出完善（可后续跟）
-
 ## 架构
 
 ```

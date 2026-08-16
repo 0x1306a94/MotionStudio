@@ -33,7 +33,7 @@
 ## 非目标
 
 - 多选顶点批量设 mode
-- 导出保留 `mirrorMode`（PAG/Lottie 仍拍平 Path）
+- 导出保留 `mirrorMode`（PAG 仍拍平 Path）
 - Corner radius 等其它 Figma Vector 字段
 - 升 `schemaVersion`
 - 强制 App UI 自动化单测（人机验收即可）
