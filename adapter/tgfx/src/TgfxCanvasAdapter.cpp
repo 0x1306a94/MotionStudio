@@ -9,6 +9,7 @@
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/ColorFilter.h>
+#include <tgfx/core/ColorType.h>
 #include <tgfx/core/Font.h>
 #include <tgfx/core/Image.h>
 #include <tgfx/core/ImageFilter.h>
@@ -76,11 +77,11 @@ void NoteIsolationContentBounds(IsolationLayer &layer, tgfx::Canvas *canvas,
     }
 }
 
-std::shared_ptr<tgfx::Image> PictureToImage(tgfx::Context *context,
+std::shared_ptr<tgfx::Image> PictureToImage(RenderCache *cache,
                                             const std::shared_ptr<tgfx::Picture> &picture,
                                             const tgfx::Rect &contentBounds,
                                             const tgfx::Paint *paint) {
-    if (context == nullptr || picture == nullptr || contentBounds.isEmpty()) {
+    if (cache == nullptr || picture == nullptr || contentBounds.isEmpty()) {
         return nullptr;
     }
     tgfx::Rect bounds = contentBounds;
@@ -88,8 +89,7 @@ std::shared_ptr<tgfx::Image> PictureToImage(tgfx::Context *context,
     const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
     const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
     // Color, not alpha-only: isolation snapshots carry fill/image RGB.
-    std::shared_ptr<tgfx::Surface> surface =
-        tgfx::Surface::Make(context, width, height, tgfx::ColorType::RGBA_8888);
+    std::shared_ptr<tgfx::Surface> surface = cache->acquireSurface(width, height, tgfx::ColorType::RGBA_8888);
     if (surface == nullptr) {
         return nullptr;
     }
@@ -106,14 +106,11 @@ std::shared_ptr<tgfx::Image> ApplyLayerEffect(const LayerEffect &effect,
     switch (effect.type()) {
         case LayerEffectType::BrightnessContrast: {
             const auto &brightnessContrast = static_cast<const BrightnessContrastEffect &>(effect);
-            return BrightnessContrastFilter::Apply(input, cache,
-                                                   brightnessContrast.brightness.evaluate(0),
-                                                   brightnessContrast.contrast.evaluate(0), offset);
+            return BrightnessContrastFilter::Apply(input, cache, brightnessContrast.brightness.evaluate(0), brightnessContrast.contrast.evaluate(0), offset);
         }
         case LayerEffectType::GaussianBlur: {
             const auto &blur = static_cast<const GaussianBlurEffect &>(effect);
-            return GaussianBlurFilter::Apply(input, cache, blur.blurriness.evaluate(0),
-                                             blur.repeatEdgePixels, offset);
+            return GaussianBlurFilter::Apply(input, cache, blur.blurriness.evaluate(0), blur.repeatEdgePixels, offset);
         }
     }
     return input;
@@ -300,15 +297,13 @@ std::optional<std::shared_ptr<tgfx::Shader>> MakePaintImageShader(
     if (renderCache == nullptr || !paint.shader.shaderId.isValid() || paint.shader.mainImage.empty()) {
         return std::shared_ptr<tgfx::Shader>{};
     }
-    renderCache->invalidateColorSourcePipelineIfSourceChanged(paint.shader.shaderId,
-                                                              BuildColorSourceSourceKey(paint.shader));
+    renderCache->invalidateColorSourcePipelineIfSourceChanged(paint.shader.shaderId, BuildColorSourceSourceKey(paint.shader));
     std::vector<Uniform> decls;
     decls.reserve(paint.shader.uniforms.size());
     for (const ShaderUniformDecl &decl : paint.shader.uniforms) {
         decls.emplace_back(decl.name, decl.format, decl.count);
     }
-    auto effect = ColorSourceEffect::Make(paint.shader.shaderId, paint.shader.mainImage,
-                                          std::move(decls), sourceBounds, renderCache);
+    auto effect = ColorSourceEffect::Make(paint.shader.shaderId, paint.shader.mainImage, std::move(decls), sourceBounds, renderCache);
     if (effect == nullptr) {
         return std::shared_ptr<tgfx::Shader>{};
     }
@@ -391,6 +386,7 @@ void TgfxCanvasAdapter::beginFrame(int width, int height, Color backgroundColor,
     }
     if (renderCache_ != nullptr) {
         renderCache_->attachToContext(surface_->getContext());
+        renderCache_->beginFrame();
     }
     tgfx::Canvas *canvas = surface_->getCanvas();
     frameRestore_ = std::make_unique<tgfx::AutoCanvasRestore>(canvas);
@@ -509,10 +505,8 @@ void TgfxCanvasAdapter::drawPath(const ShapeGeometry &geometry, const Paint &pai
     tgfxPaint.setAntiAlias(true);
     tgfxPaint.setStyle(tgfx::PaintStyle::Fill);
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-    const ColorSourceFrameContext frameContext{colorSourceTimeSeconds_, colorSourceFrameIndex_,
-                                               colorSourceFrameRate_};
-    const std::optional<std::shared_ptr<tgfx::Shader>> shader =
-        MakePaintImageShader(paint, path.getBounds(), renderCache_.get(), frameContext);
+    const ColorSourceFrameContext frameContext{colorSourceTimeSeconds_, colorSourceFrameIndex_, colorSourceFrameRate_};
+    const std::optional<std::shared_ptr<tgfx::Shader>> shader = MakePaintImageShader(paint, path.getBounds(), renderCache_.get(), frameContext);
     if (shader.has_value()) {
         if (*shader == nullptr) {
             return;
@@ -556,8 +550,7 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
         if (trimWindow.start == trimWindow.end) {
             return;
         }
-        strokeGeometry =
-            pathCache_->ResolveTrimmed(strokeSource, paint.fillRule, trimWindow, strokeGeometry);
+        strokeGeometry = pathCache_->ResolveTrimmed(strokeSource, paint.fillRule, trimWindow, strokeGeometry);
     }
     if (strokeGeometry.isEmpty()) {
         return;
@@ -571,12 +564,9 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
     tgfx::Paint tgfxPaint;
     tgfxPaint.setAntiAlias(true);
     tgfxPaint.setBlendMode(ToTgfxBlendMode(blendMode_));
-    const ColorSourceFrameContext frameContext{colorSourceTimeSeconds_, colorSourceFrameIndex_,
-                                               colorSourceFrameRate_};
-    const tgfx::Rect shaderBounds =
-        options.position == StrokePosition::Center ? bounds : fullPath.getBounds();
-    const std::optional<std::shared_ptr<tgfx::Shader>> shader =
-        MakePaintImageShader(paint, shaderBounds, renderCache_.get(), frameContext);
+    const ColorSourceFrameContext frameContext{colorSourceTimeSeconds_, colorSourceFrameIndex_, colorSourceFrameRate_};
+    const tgfx::Rect shaderBounds = options.position == StrokePosition::Center ? bounds : fullPath.getBounds();
+    const std::optional<std::shared_ptr<tgfx::Shader>> shader = MakePaintImageShader(paint, shaderBounds, renderCache_.get(), frameContext);
     if (shader.has_value()) {
         if (*shader == nullptr) {
             return;
@@ -605,8 +595,7 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
     // Inside/outside: cache the boolean outline so PathRef identity stays
     // stable and tgfx GPU shape proxies can hit across frames.
     // fullPath is the fill silhouette; strokeGeometry is the edge set.
-    const tgfx::Path outline = pathCache_->ResolvePositionedOutline(
-        strokeSource, paint.fillRule, hasTrim, trimWindow, options, fullPath, strokeGeometry);
+    const tgfx::Path outline = pathCache_->ResolvePositionedOutline(strokeSource, paint.fillRule, hasTrim, trimWindow, options, fullPath, strokeGeometry);
     if (outline.isEmpty()) {
         return;
     }
@@ -660,15 +649,14 @@ void TgfxCanvasAdapter::endLayer(
         tgfx::Context *context = surface_->getContext();
         CoverageImage combined = coverages.front();
         for (size_t i = 1; i < coverages.size(); ++i) {
-            CoverageImage intersected = IntersectCoverageImages(context, combined, coverages[i]);
+            CoverageImage intersected = IntersectCoverageImages(context, renderCache_.get(), combined, coverages[i]);
             if (intersected.image == nullptr) {
                 continue;
             }
             combined = std::move(intersected);
         }
         if (combined.image != nullptr) {
-            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal,
-                                                        tgfx::TileMode::Decal);
+            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal, tgfx::TileMode::Decal);
             if (shader != nullptr) {
                 shader = shader->makeWithMatrix(combined.localMatrix);
                 maskPaint.setMaskFilter(tgfx::MaskFilter::MakeShader(shader, combined.invertAlpha));
@@ -692,17 +680,14 @@ void TgfxCanvasAdapter::endLayer(
     tgfx::Rect bounds = contentBounds;
     bounds.roundOut();
     if (hasEffects) {
-        tgfx::Context *context = surface_->getContext();
-        const tgfx::Paint *rasterPaint =
-            maskPaint.getMaskFilter() != nullptr ? &maskPaint : nullptr;
-        filtered = PictureToImage(context, content, contentBounds, rasterPaint);
+        const tgfx::Paint *rasterPaint = maskPaint.getMaskFilter() != nullptr ? &maskPaint : nullptr;
+        filtered = PictureToImage(renderCache_.get(), content, contentBounds, rasterPaint);
         if (filtered != nullptr) {
             for (const auto &effect : effects) {
                 if (effect == nullptr) {
                     continue;
                 }
-                std::shared_ptr<tgfx::Image> next =
-                    ApplyLayerEffect(*effect, filtered, renderCache_.get(), &offset);
+                std::shared_ptr<tgfx::Image> next = ApplyLayerEffect(*effect, filtered, renderCache_.get(), &offset);
                 if (next == nullptr) {
                     break;
                 }
@@ -745,11 +730,12 @@ void TgfxCanvasAdapter::beginMask(MaskApplyMode mode) {
         bounds.roundOut();
         const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
         const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
-        tgfx::Context *context = surface_->getContext();
-        std::shared_ptr<tgfx::Surface> maskSurface =
-            tgfx::Surface::Make(context, width, height, true);
-        if (maskSurface == nullptr) {
-            maskSurface = tgfx::Surface::Make(context, width, height);
+        std::shared_ptr<tgfx::Surface> maskSurface = nullptr;
+        if (renderCache_ != nullptr) {
+            maskSurface = renderCache_->acquireSurface(width, height, tgfx::ColorType::ALPHA_8);
+            if (maskSurface == nullptr) {
+                maskSurface = renderCache_->acquireSurface(width, height, tgfx::ColorType::RGBA_8888);
+            }
         }
         if (maskSurface != nullptr) {
             layer.maskSurface = maskSurface;
@@ -895,8 +881,7 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
     }
     Vec2 resolvedIntrinsic = intrinsicSize;
     if (resolvedIntrinsic.x <= 0.0f || resolvedIntrinsic.y <= 0.0f) {
-        resolvedIntrinsic = {static_cast<float>(image->width()),
-                             static_cast<float>(image->height())};
+        resolvedIntrinsic = {static_cast<float>(image->width()), static_cast<float>(image->height())};
     }
     const ImageRect destination = ComputeImageDestinationRect(containerSize, resolvedIntrinsic, mode);
     if (destination.isEmpty()) {
@@ -910,13 +895,11 @@ void TgfxCanvasAdapter::drawImage(const std::string &path, Vec2 containerSize, V
 
     tgfx::AutoCanvasRestore restore(canvas);
     canvas->clipRect(tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
-    const tgfx::Rect src = tgfx::Rect::MakeWH(static_cast<float>(image->width()),
-                                              static_cast<float>(image->height()));
+    const tgfx::Rect src = tgfx::Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
     const tgfx::Rect dst = tgfx::Rect::MakeXYWH(destination.x, destination.y, destination.width, destination.height);
     canvas->drawImageRect(image, src, dst, tgfx::SamplingOptions(), &paint);
     if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
-        NoteIsolationContentBounds(*layer, canvas,
-                                   tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
+        NoteIsolationContentBounds(*layer, canvas, tgfx::Rect::MakeWH(containerSize.x, containerSize.y));
     }
 }
 
@@ -956,8 +939,7 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
         if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
             const Vec2 &min = textPathCacheResult_.boundsMin;
             const Vec2 &max = textPathCacheResult_.boundsMax;
-            NoteIsolationContentBounds(
-                *layer, canvas, tgfx::Rect::MakeLTRB(min.x, min.y, max.x, max.y));
+            NoteIsolationContentBounds(*layer, canvas, tgfx::Rect::MakeLTRB(min.x, min.y, max.x, max.y));
         }
         return;
     }
@@ -1028,9 +1010,7 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
     }
     if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
         if (boxTextMode) {
-            NoteIsolationContentBounds(
-                *layer, canvas,
-                tgfx::Rect::MakeWH(params.containerSize.x, params.containerSize.y));
+            NoteIsolationContentBounds(*layer, canvas, tgfx::Rect::MakeWH(params.containerSize.x, params.containerSize.y));
         } else {
             tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
             for (const textlayout::TextLine &line : layout.lines) {
@@ -1039,8 +1019,7 @@ void TgfxCanvasAdapter::drawText(const TextDrawParams &params) {
                 }
                 const float width = line.width > 0.0f ? line.width : layout.appliedFontSize;
                 const float height = layout.appliedFontSize;
-                const tgfx::Rect lineBounds =
-                    tgfx::Rect::MakeXYWH(line.x, line.y - height, width, height);
+                const tgfx::Rect lineBounds = tgfx::Rect::MakeXYWH(line.x, line.y - height, width, height);
                 if (textBounds.isEmpty()) {
                     textBounds = lineBounds;
                 } else {

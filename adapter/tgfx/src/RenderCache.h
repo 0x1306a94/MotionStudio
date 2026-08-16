@@ -6,6 +6,9 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+#include <tgfx/core/ColorType.h>
 
 namespace tgfx {
 class RenderPipeline;
@@ -13,6 +16,7 @@ class GPUBuffer;
 class Context;
 class GPU;
 class Sampler;
+class Surface;
 };  // namespace tgfx
 
 namespace motion {
@@ -74,14 +78,28 @@ class RenderCache {
     // Shared clip-space fullscreen triangle VBO for the current context. Created lazily.
     std::shared_ptr<tgfx::GPUBuffer> getFullscreenVertexBuffer(tgfx::GPU *gpu);
 
+    // Returns a pooled offscreen of this size and colorType. Same key is not
+    // reused twice in one frame (avoids tgfx snapshot COW). Call beginFrame()
+    // to mark all slots free. Requires attachToContext. Groups keep at most four.
+    std::shared_ptr<tgfx::Surface> acquireSurface(int width, int height, tgfx::ColorType colorType);
+
+    // Marks every pooled surface free for the next frame.
+    void beginFrame();
+
     void releaseAll();
 
   private:
+    struct SurfacePoolSlot {
+        std::shared_ptr<tgfx::Surface> surface = nullptr;
+        bool borrowedThisFrame = false;
+    };
+
     uint32_t contextID_ = 0;
     tgfx::Context *context_ = nullptr;
     std::unordered_map<EntityId, std::shared_ptr<tgfx::RenderPipeline>> colorSourcePipelineMap_ = {};
     std::unordered_map<EntityId, std::string> colorSourceSourceKeys_ = {};
     std::unordered_map<uint32_t, std::unique_ptr<FilterResources>> filterResourcesMap_ = {};
     std::shared_ptr<tgfx::GPUBuffer> fullscreenVertexBuffer_ = nullptr;
+    std::unordered_map<uint64_t, std::vector<SurfacePoolSlot>> surfacePool_ = {};
 };
 };  // namespace motion

@@ -22,6 +22,8 @@ class Surface;
 
 namespace motion {
 
+class RenderCache;
+
 struct CoverageImage {
     std::shared_ptr<tgfx::Image> image;
     tgfx::Matrix localMatrix = tgfx::Matrix::I();
@@ -51,7 +53,7 @@ struct TgfxIsolationStack {
 };
 
 tgfx::BlendMode ToMaskBlendMode(MaskMode mode);
-CoverageImage IntersectCoverageImages(tgfx::Context *context, const CoverageImage &base,
-                                      const CoverageImage &next);
+CoverageImage IntersectCoverageImages(tgfx::Context *context, RenderCache *cache,
+                                      const CoverageImage &base, const CoverageImage &next);
 
 }  // namespace motion

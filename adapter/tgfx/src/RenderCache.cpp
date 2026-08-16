@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/GPU.h>
 #include <tgfx/gpu/GPUBuffer.h>
@@ -17,6 +18,15 @@ constexpr float FULLSCREEN_TRIANGLE_VERTICES[] = {
     3.0f, -1.0f,   // clip (3,-1)  → uv (2,0)
     -1.0f, 3.0f,   // clip (-1,3)  → uv (0,2)
 };
+
+constexpr size_t MaxSurfacesPerKey = 4;
+
+uint64_t MakeSurfacePoolKey(int width, int height, tgfx::ColorType colorType) {
+    const uint64_t packedWidth = static_cast<uint64_t>(width) & 0xFFFFFull;
+    const uint64_t packedHeight = static_cast<uint64_t>(height) & 0xFFFFFull;
+    const uint64_t packedColor = static_cast<uint64_t>(colorType) & 0xFFull;
+    return (packedColor << 40) | (packedWidth << 20) | packedHeight;
+}
 
 }  // namespace
 
@@ -128,11 +138,46 @@ std::shared_ptr<tgfx::GPUBuffer> RenderCache::getFullscreenVertexBuffer(tgfx::GP
     return fullscreenVertexBuffer_;
 }
 
+std::shared_ptr<tgfx::Surface> RenderCache::acquireSurface(int width, int height,
+                                                           tgfx::ColorType colorType) {
+    if (context_ == nullptr || width <= 0 || height <= 0) {
+        return nullptr;
+    }
+    const uint64_t key = MakeSurfacePoolKey(width, height, colorType);
+    std::vector<SurfacePoolSlot> &group = surfacePool_[key];
+    for (SurfacePoolSlot &slot : group) {
+        if (!slot.borrowedThisFrame && slot.surface != nullptr) {
+            slot.borrowedThisFrame = true;
+            return slot.surface;
+        }
+    }
+    std::shared_ptr<tgfx::Surface> surface = tgfx::Surface::Make(context_, width, height, colorType);
+    if (surface == nullptr) {
+        return nullptr;
+    }
+    if (group.size() < MaxSurfacesPerKey) {
+        SurfacePoolSlot slot;
+        slot.surface = surface;
+        slot.borrowedThisFrame = true;
+        group.push_back(slot);
+    }
+    return surface;
+}
+
+void RenderCache::beginFrame() {
+    for (auto &entry : surfacePool_) {
+        for (SurfacePoolSlot &slot : entry.second) {
+            slot.borrowedThisFrame = false;
+        }
+    }
+}
+
 void RenderCache::releaseAll() {
     colorSourcePipelineMap_.clear();
     colorSourceSourceKeys_.clear();
     filterResourcesMap_.clear();
     fullscreenVertexBuffer_ = nullptr;
+    surfacePool_.clear();
     contextID_ = 0;
 }
 

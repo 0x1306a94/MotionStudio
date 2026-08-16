@@ -5,10 +5,13 @@
 
 #include <tgfx/core/BlendMode.h>
 #include <tgfx/core/Canvas.h>
+#include <tgfx/core/ColorType.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Rect.h>
 #include <tgfx/core/Surface.h>
 #include <tgfx/gpu/Context.h>
+
+#include "RenderCache.h"
 
 namespace motion {
 
@@ -27,8 +30,8 @@ tgfx::BlendMode ToMaskBlendMode(MaskMode mode) {
     return tgfx::BlendMode::SrcOver;
 }
 
-CoverageImage IntersectCoverageImages(tgfx::Context *context, const CoverageImage &base,
-                                      const CoverageImage &next) {
+CoverageImage IntersectCoverageImages(tgfx::Context *context, RenderCache *cache,
+                                      const CoverageImage &base, const CoverageImage &next) {
     CoverageImage result;
     if (context == nullptr || base.image == nullptr || next.image == nullptr) {
         return result;
@@ -44,7 +47,10 @@ CoverageImage IntersectCoverageImages(tgfx::Context *context, const CoverageImag
     bounds.roundOut();
     const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
     const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
-    auto surface = tgfx::Surface::Make(context, width, height);
+    std::shared_ptr<tgfx::Surface> surface = nullptr;
+    if (cache != nullptr) {
+        surface = cache->acquireSurface(width, height, tgfx::ColorType::RGBA_8888);
+    }
     if (surface == nullptr) {
         return result;
     }
