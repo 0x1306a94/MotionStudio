@@ -39,9 +39,11 @@
 #include "TgfxProfileTiming.h"
 #include "TgfxTextTypeface.h"
 #include "TgfxTypeConvert.h"
+#include "effects/AlphaEdgeDetectFilter.h"
 #include "effects/BrightnessContrastFilter.h"
 #include "effects/ColorSourceEffect.h"
 #include "effects/GaussianBlurFilter.h"
+#include "effects/SolidStrokeFilter.h"
 #include "effects/Uniform.h"
 
 #include "MotionStudio/model/LayerEffect.h"
@@ -123,38 +125,102 @@ tgfx::Color LayerFxRgb(const Color &color) {
     return ToTgfxColor(Color{color.r, color.g, color.b, 1.0f});
 }
 
-std::shared_ptr<tgfx::ImageFilter> MakeLayerFxFilter(const LayerFx &style) {
+std::shared_ptr<tgfx::ImageFilter> MakeDropShadowFilter(float offsetX, float offsetY, float blur,
+                                                        const Color &color) {
+    return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blur, blur, LayerFxRgb(color));
+}
+
+std::shared_ptr<tgfx::ImageFilter> MakeSolidStroke(RenderCache *cache, const Color &color,
+                                                   float spreadSize, float offsetX, float offsetY,
+                                                   SolidStrokeMode mode,
+                                                   std::optional<StrokePosition> position,
+                                                   std::shared_ptr<tgfx::Image> originalImage) {
+    SolidStrokeOption option;
+    option.color = Color{color.r, color.g, color.b, 1.0f};
+    option.spreadSizeX = spreadSize;
+    option.spreadSizeY = spreadSize;
+    option.offsetX = offsetX;
+    option.offsetY = offsetY;
+    option.position = position;
+    return SolidStrokeFilter::Create(cache, option, mode, std::move(originalImage));
+}
+
+std::shared_ptr<tgfx::ImageFilter> MakeLayerFxFilter(const LayerFx &style, RenderCache *cache,
+                                                     const std::shared_ptr<tgfx::Image> &image) {
     switch (style.type()) {
         case LayerFxType::DropShadow: {
             const auto &shadow = static_cast<const DropShadowStyle &>(style);
             const float spread = shadow.spread.evaluate(0);
-            if (spread != 0.0f) {
-                return nullptr;
-            }
             const float angle = shadow.angle.evaluate(0);
             const float distance = shadow.distance.evaluate(0);
             const float size = shadow.size.evaluate(0);
+            const Color color = shadow.color.evaluate(0);
             const float radians = (angle - 180.0f) * (kPi / 180.0f);
             const float offsetX = std::cos(radians) * distance;
             const float offsetY = -std::sin(radians) * distance;
-            const float blur = size * 0.5f;
-            return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blur, blur,
-                                                     LayerFxRgb(shadow.color.evaluate(0)));
+            const SolidStrokeMode mode = size * spread >= STROKE_SPREAD_MIN_THICK_SIZE
+                ? SolidStrokeMode::Thick
+                : SolidStrokeMode::Normal;
+            if (spread == 0.0f) {
+                return MakeDropShadowFilter(offsetX, offsetY, size * 0.5f, color);
+            }
+            if (spread == 1.0f) {
+                return MakeSolidStroke(cache, color, size, offsetX, offsetY, mode, std::nullopt, nullptr);
+            }
+            auto stroke = MakeSolidStroke(cache, color, size * spread, offsetX, offsetY, mode,
+                                          std::nullopt, nullptr);
+            auto blur = MakeDropShadowFilter(0.0f, 0.0f, size * (1.0f - spread) * 0.5f, color);
+            if (stroke == nullptr || blur == nullptr) {
+                return nullptr;
+            }
+            return tgfx::ImageFilter::Compose(stroke, blur);
         }
         case LayerFxType::OuterGlow: {
             const auto &glow = static_cast<const OuterGlowStyle &>(style);
             const float spread = glow.spread.evaluate(0);
-            if (spread != 0.0f) {
-                return nullptr;
-            }
             const float size = glow.size.evaluate(0);
             const float range = glow.range.evaluate(0);
-            const float blur = size / range * 0.5f;
-            return tgfx::ImageFilter::DropShadowOnly(0.0f, 0.0f, blur, blur,
-                                                     LayerFxRgb(glow.color.evaluate(0)));
+            const Color color = glow.color.evaluate(0);
+            const SolidStrokeMode mode =
+                size >= STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Thick : SolidStrokeMode::Normal;
+            if (spread == 0.0f) {
+                return MakeDropShadowFilter(0.0f, 0.0f, size / range * 0.5f, color);
+            }
+            if (spread == 1.0f) {
+                return MakeSolidStroke(cache, color, spread * size / range, 0.0f, 0.0f, mode,
+                                       std::nullopt, nullptr);
+            }
+            auto stroke = MakeSolidStroke(cache, color, spread * size / range, 0.0f, 0.0f, mode,
+                                          std::nullopt, nullptr);
+            auto blur = MakeDropShadowFilter(0.0f, 0.0f, size * (1.0f - spread) / range * 0.5f, color);
+            if (stroke == nullptr || blur == nullptr) {
+                return nullptr;
+            }
+            return tgfx::ImageFilter::Compose(stroke, blur);
         }
         case LayerFxType::Stroke: {
-            return nullptr;
+            const auto &stroke = static_cast<const LayerStrokeStyle &>(style);
+            const float size = stroke.size.evaluate(0);
+            const Color color = stroke.color.evaluate(0);
+            const SolidStrokeMode mode =
+                size >= STROKE_SPREAD_MIN_THICK_SIZE ? SolidStrokeMode::Thick : SolidStrokeMode::Normal;
+            float spreadSize = size;
+            if (stroke.position == StrokePosition::Center) {
+                spreadSize *= 0.4f;
+            } else if (stroke.position == StrokePosition::Inside) {
+                spreadSize *= 0.8f;
+            }
+            if (stroke.position == StrokePosition::Outside) {
+                return MakeSolidStroke(cache, color, spreadSize, 0.0f, 0.0f, mode, stroke.position,
+                                       nullptr);
+            }
+            auto strokeFilter = MakeSolidStroke(cache, color, spreadSize, 0.0f, 0.0f, mode,
+                                                stroke.position, image);
+            if (strokeFilter == nullptr || cache == nullptr) {
+                return nullptr;
+            }
+            auto edge = tgfx::ImageFilter::Runtime(std::make_shared<AlphaEdgeDetectFilter>(cache));
+            return tgfx::ImageFilter::Compose(edge, strokeFilter);
         }
     }
     return nullptr;
@@ -190,12 +256,12 @@ BlendMode LayerFxBlendMode(const LayerFx &style) {
     return BlendMode::Normal;
 }
 
-void ApplyLayerFx(tgfx::Canvas *canvas, const std::shared_ptr<tgfx::Image> &image,
+void ApplyLayerFx(tgfx::Canvas *canvas, RenderCache *cache, const std::shared_ptr<tgfx::Image> &image,
                   const LayerFx &style, float originX, float originY) {
     if (canvas == nullptr || image == nullptr) {
         return;
     }
-    std::shared_ptr<tgfx::ImageFilter> filter = MakeLayerFxFilter(style);
+    std::shared_ptr<tgfx::ImageFilter> filter = MakeLayerFxFilter(style, cache, image);
     if (filter == nullptr) {
         return;
     }
@@ -212,7 +278,8 @@ void ApplyLayerFx(tgfx::Canvas *canvas, const std::shared_ptr<tgfx::Image> &imag
 }
 
 tgfx::Rect LayerFxUnionBounds(const std::shared_ptr<tgfx::Image> &image,
-                              const std::vector<std::shared_ptr<const LayerFx>> &layerStyles) {
+                              const std::vector<std::shared_ptr<const LayerFx>> &layerStyles,
+                              RenderCache *cache) {
     tgfx::Rect bounds = tgfx::Rect::MakeWH(static_cast<float>(image->width()),
                                            static_cast<float>(image->height()));
     const tgfx::Rect source = bounds;
@@ -220,7 +287,7 @@ tgfx::Rect LayerFxUnionBounds(const std::shared_ptr<tgfx::Image> &image,
         if (style == nullptr) {
             continue;
         }
-        std::shared_ptr<tgfx::ImageFilter> filter = MakeLayerFxFilter(*style);
+        std::shared_ptr<tgfx::ImageFilter> filter = MakeLayerFxFilter(*style, cache, image);
         if (filter == nullptr) {
             continue;
         }
@@ -813,7 +880,7 @@ void TgfxCanvasAdapter::endLayer(
     }
 
     if (filtered != nullptr && hasStyles) {
-        const tgfx::Rect unionBounds = LayerFxUnionBounds(filtered, layerStyles);
+        const tgfx::Rect unionBounds = LayerFxUnionBounds(filtered, layerStyles, renderCache_.get());
         const int width = std::max(static_cast<int>(std::ceil(unionBounds.width())), 1);
         const int height = std::max(static_cast<int>(std::ceil(unionBounds.height())), 1);
         std::shared_ptr<tgfx::Surface> surface =
@@ -827,7 +894,7 @@ void TgfxCanvasAdapter::endLayer(
                 if (style == nullptr || style->drawPosition() != LayerFxDrawPosition::Behind) {
                     continue;
                 }
-                ApplyLayerFx(canvas, filtered, *style, originX, originY);
+                ApplyLayerFx(canvas, renderCache_.get(), filtered, *style, originX, originY);
             }
             tgfx::Paint sourcePaint;
             sourcePaint.setAntiAlias(true);
@@ -836,7 +903,7 @@ void TgfxCanvasAdapter::endLayer(
                 if (style == nullptr || style->drawPosition() != LayerFxDrawPosition::Above) {
                     continue;
                 }
-                ApplyLayerFx(canvas, filtered, *style, originX, originY);
+                ApplyLayerFx(canvas, renderCache_.get(), filtered, *style, originX, originY);
             }
             filtered = surface->makeImageSnapshot();
             offset.x += unionBounds.left;

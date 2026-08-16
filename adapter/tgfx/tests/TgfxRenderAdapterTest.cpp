@@ -47,6 +47,7 @@ using motion::FillStyle;
 using motion::GaussianBlurEffect;
 using motion::GradientType;
 using motion::Layer;
+using motion::LayerStrokeStyle;
 using motion::LayerType;
 using motion::LineCap;
 using motion::MakePathGeometry;
@@ -1187,4 +1188,86 @@ TEST(TgfxRenderAdapterTest, LayerOpacityFadesDropShadow) {
     const Pixel full = render(1.0f);
     const Pixel faded = render(0.5f);
     EXPECT_NEAR(static_cast<int>(faded.a), static_cast<int>(full.a) / 2, 20);
+}
+
+TEST(TgfxRenderAdapterTest, DropShadowSpreadChangesPixels) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    auto render = [&](float spread) {
+        SceneState state = MakeCenteredWhiteRect();
+        auto shadow = std::make_shared<DropShadowStyle>();
+        shadow->distance.setStaticValue(0.0f);
+        shadow->size.setStaticValue(8.0f);
+        shadow->spread.setStaticValue(spread);
+        shadow->color.setStaticValue(Color{1, 0, 0, 1});
+        state.layers[0].layerStyles.push_back(std::move(shadow));
+        adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+        PlayCommands(BuildCommands(state), *adapter);
+        adapter->endFrame();
+        std::vector<uint8_t> pixels;
+        EXPECT_TRUE(adapter->ReadPixels(pixels));
+        return pixels;
+    };
+
+    const std::vector<uint8_t> none = render(0.0f);
+    const std::vector<uint8_t> full = render(1.0f);
+    EXPECT_NE(none, full);
+}
+
+TEST(TgfxRenderAdapterTest, StrokeOutsideDrawsAroundRect) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state = MakeCenteredWhiteRect();
+    auto stroke = std::make_shared<LayerStrokeStyle>();
+    stroke->size.setStaticValue(6.0f);
+    state.layers[0].layerStyles.push_back(std::move(stroke));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_GT(center.r, 200);
+    EXPECT_GT(center.g, 200);
+    EXPECT_GT(center.b, 200);
+    const Pixel ring = PixelAt(pixels, 100, 63, 50);
+    EXPECT_GT(static_cast<int>(ring.r), static_cast<int>(ring.g) + 20);
+    EXPECT_GT(static_cast<int>(ring.r), static_cast<int>(ring.b) + 20);
+}
+
+TEST(TgfxRenderAdapterTest, BlurThenDropShadowHasShadowInBleed) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state = MakeCenteredWhiteRect();
+    auto blur = std::make_shared<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(16.0f);
+    state.layers[0].effects.push_back(std::move(blur));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> blurPixels;
+    ASSERT_TRUE(adapter->ReadPixels(blurPixels));
+    const Pixel blurOnly = PixelAt(blurPixels, 100, 68, 50);
+
+    auto shadow = std::make_shared<DropShadowStyle>();
+    shadow->color.setStaticValue(Color{1, 0, 0, 1});
+    state.layers[0].layerStyles.push_back(std::move(shadow));
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> bothPixels;
+    ASSERT_TRUE(adapter->ReadPixels(bothPixels));
+    const Pixel withShadow = PixelAt(bothPixels, 100, 68, 50);
+    EXPECT_NE(blurOnly.r, withShadow.r);
 }

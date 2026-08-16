@@ -422,7 +422,7 @@ git commit --only adapter/tgfx/src/TgfxCanvasAdapter.cpp adapter/tgfx/tests/Tgfx
 
 ### Task 6: SolidStroke + AlphaEdgeDetect + Stroke + spread
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `adapter/tgfx/src/effects/SolidStrokeFilter.{h,cpp}`
@@ -436,7 +436,7 @@ git commit --only adapter/tgfx/src/TgfxCanvasAdapter.cpp adapter/tgfx/tests/Tgfx
 - Consumes: PAG 常量 `STROKE_MAX_SPREAD_SIZE=25`、`STROKE_SPREAD_MIN_THICK_SIZE=12`
 - Consumes: PAG shader 原文（`SolidStrokeFilter.cpp` / `AlphaEdgeDetectFilter.cpp`），UBO 改走 `acquireUniformSlice`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `DropShadowSpreadChangesPixels`：同一白块，Shadow `spread=0` vs `spread=1`（size=8, distance=0），`readPixels` 不全等。
 
@@ -444,11 +444,11 @@ git commit --only adapter/tgfx/src/TgfxCanvasAdapter.cpp adapter/tgfx/tests/Tgfx
 
 `BlurThenDropShadowHasShadowInBleed`：先 GaussianBlur 16 再默认 Shadow。模糊渗出区（已有 `BlurBleedsOutsideAddMask` 的采样点思路）也有阴影分量。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: FAIL（spread 被当成 0；Stroke 被跳过）
 
-- [ ] **Step 3: 移植滤镜并接线**
+- [x] **Step 3: 移植滤镜并接线**
 
 从 `third_party/libpag/src/rendering/filters/layerstyle/SolidStrokeFilter.cpp` 拷 Normal / Thick shader 与 `filterBounds` / `computeVertices`。`onUpdateUniforms` 用 `RenderCache::acquireUniformSlice`，不要 `gpu->createBuffer`。`position` Invalid 时三个 isOutside/Center/Inside 都为 0。
 
@@ -461,7 +461,7 @@ Expected: FAIL（spread 被当成 0；Stroke 被跳过）
 
 Shadow thick：`size * spread >= 12`。Glow / Stroke thick：`size >= 12`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxRenderAdapterTest.DropShadow*:TgfxRenderAdapterTest.OuterGlow*:TgfxRenderAdapterTest.Stroke*:TgfxRenderAdapterTest.BlurThenDropShadow*:TgfxRenderAdapterTest.LayerOpacityFadesDropShadow'
@@ -469,7 +469,7 @@ Shadow thick：`size * spread >= 12`。Glow / Stroke thick：`size >= 12`。
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/src/effects/ adapter/tgfx/src/TgfxCanvasAdapter.cpp \

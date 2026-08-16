@@ -278,6 +278,10 @@ bool RuntimeFilter::onDraw(tgfx::CommandEncoder *encoder, const std::vector<std:
     for (size_t i = 1; i < inputTextures.size(); i++) {
         renderPass->setTexture(static_cast<unsigned>(i), inputTextures[i], resources->sampler);
     }
+    const std::vector<tgfx::BindingEntry> samplers = textureSamplers();
+    for (size_t i = inputTextures.size(); i < samplers.size(); i++) {
+        renderPass->setTexture(static_cast<unsigned>(i), inputTextures[0], resources->sampler);
+    }
 
     onUpdateUniforms(renderPass.get(), gpu, inputTextures, offset);
 
