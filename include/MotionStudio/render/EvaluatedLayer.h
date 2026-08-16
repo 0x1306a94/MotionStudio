@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -8,6 +9,7 @@
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/BlendMode.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedMask.h"
@@ -31,6 +33,7 @@ struct EvaluatedLayer {
     std::optional<EvaluatedImageItem> imageItem;
     std::optional<EvaluatedTextItem> textItem;
     std::vector<EvaluatedMask> masks;
+    std::vector<std::shared_ptr<const LayerEffect>> effects;
     TrackMatteType trackMatteType = TrackMatteType::None;
     EntityId matteSourceId;
     // True when another evaluated layer uses this layer as its track matte;

@@ -446,7 +446,7 @@ git commit --only include/MotionStudio/undo/CommandKind.h \
 
 ### Task 4: SceneEvaluator 快照进 EvaluatedLayer
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/EvaluatedLayer.h`
@@ -458,7 +458,7 @@ git commit --only include/MotionStudio/undo/CommandKind.h \
 - Consumes: `LayerEffect::snapshot`
 - Precomp 仍在 `FillCommonLayerFields` 前 `return`，不带预合成自己的 effect
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 用现有 `RectScene`：
 
@@ -499,7 +499,7 @@ TEST(SceneEvaluatorTest, PrecompEffectsAreIgnored) {
 
 Precomp 用例：`Document` 两个 composition；外层 `LayerType::Precomp` 的 `PrecompContent::compositionId` 指向内层；外层 `effects` 推一个非恒等 GaussianBlur。断言 `state.layers.size()==1` 且 `effects.empty()`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SceneEvaluatorTest.*Effect*'
@@ -507,7 +507,7 @@ Precomp 用例：`Document` 两个 composition；外层 `LayerType::Precomp` 的
 
 Expected: 编译失败（无 `effects` 字段）。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `EvaluatedLayer.h`：`#include <memory>` + `LayerEffect.h`，加 `std::vector<std::shared_ptr<const LayerEffect>> effects;`
 
@@ -521,7 +521,7 @@ for (const auto &effect : layer.effects) {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target core_tests
@@ -530,7 +530,7 @@ cmake --build build --target core_tests
 
 Expected: 全绿（含旧用例）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/render/EvaluatedLayer.h \

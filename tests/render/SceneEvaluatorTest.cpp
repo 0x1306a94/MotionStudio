@@ -6,8 +6,10 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
@@ -19,6 +21,7 @@
 
 using motion::BezierPath;
 using motion::BezierPathToVectorNetwork;
+using motion::BrightnessContrastEffect;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -26,10 +29,13 @@ using motion::EntityId;
 using motion::EvaluatedShapeItem;
 using motion::Expected;
 using motion::FillStyle;
+using motion::GaussianBlurEffect;
 using motion::Layer;
+using motion::LayerEffectType;
 using motion::LayerType;
 using motion::MakeSingleContour;
 using motion::Mat3;
+using motion::PrecompContent;
 using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
@@ -595,4 +601,62 @@ TEST(SceneEvaluatorTest, TriangleFanFillAndStrokeContours) {
         EXPECT_GE(contour.vertices.size(), 3u);
     }
     EXPECT_EQ(strokeItem.geometry.strokePath.contours.size(), 6u);
+}
+
+TEST(SceneEvaluatorTest, SkipsIdentityAndDisabledEffects) {
+    RectScene scene;
+    auto identity = std::make_unique<BrightnessContrastEffect>();
+    auto disabled = std::make_unique<GaussianBlurEffect>();
+    disabled->blurriness.setStaticValue(8.0f);
+    disabled->enabled = false;
+    scene.layer->effects.push_back(std::move(identity));
+    scene.layer->effects.push_back(std::move(disabled));
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_TRUE(result->layers[0].effects.empty());
+}
+
+TEST(SceneEvaluatorTest, KeepsNonIdentityEffectsInOrder) {
+    RectScene scene;
+    auto brightnessContrast = std::make_unique<BrightnessContrastEffect>();
+    brightnessContrast->brightness.setStaticValue(20.0f);
+    auto blur = std::make_unique<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(6.0f);
+    scene.layer->effects.push_back(std::move(brightnessContrast));
+    scene.layer->effects.push_back(std::move(blur));
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers[0].effects.size(), 2u);
+    EXPECT_EQ(result->layers[0].effects[0]->type(), LayerEffectType::BrightnessContrast);
+    EXPECT_EQ(result->layers[0].effects[1]->type(), LayerEffectType::GaussianBlur);
+}
+
+TEST(SceneEvaluatorTest, PrecompEffectsAreIgnored) {
+    Document document;
+    Composition *inner = document.addComposition(std::make_unique<Composition>());
+    inner->duration = 100;
+    Layer *rect = document.addLayer(inner->id, std::make_unique<Layer>(LayerType::Shape));
+    rect->outPoint = 100;
+    auto *content = static_cast<ShapeContent *>(rect->content.get());
+    auto rectElement = std::make_unique<ShapeRect>();
+    rectElement->position.setStaticValue(Vec2{0, 0});
+    rectElement->size.setStaticValue(Vec2{10, 10});
+    content->geometry = std::move(rectElement);
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{1, 0, 0, 1});
+    rect->styles.push_back(std::move(fill));
+
+    Composition *main = document.addComposition(std::make_unique<Composition>());
+    main->duration = 100;
+    Layer *precomp = document.addLayer(main->id, std::make_unique<Layer>(LayerType::Precomp));
+    precomp->outPoint = 100;
+    static_cast<PrecompContent *>(precomp->content.get())->compositionId = inner->id;
+    auto blur = std::make_unique<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(8.0f);
+    precomp->effects.push_back(std::move(blur));
+
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers.size(), 1u);
+    EXPECT_TRUE(result->layers[0].effects.empty());
 }

@@ -15,6 +15,7 @@
 #include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PrecompContent.h"
@@ -81,6 +82,11 @@ void FillCommonLayerFields(const Document &document, const Layer &layer, Preview
         if (document.entityIndex().findLayer(layer.trackMatteLayerId) != nullptr) {
             evaluated.trackMatteType = layer.trackMatteType;
             evaluated.matteSourceId = layer.trackMatteLayerId;
+        }
+    }
+    for (const auto &effect : layer.effects) {
+        if (std::shared_ptr<const LayerEffect> snap = effect->snapshot(time)) {
+            evaluated.effects.push_back(std::move(snap));
         }
     }
 }
