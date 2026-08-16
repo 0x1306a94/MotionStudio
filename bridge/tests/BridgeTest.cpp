@@ -328,6 +328,25 @@ TEST(BridgeCommandTest, LayerEffectLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, LayerEffectRepeatEdgeQuery) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+
+    EXPECT_FALSE(ms_layer_effect_repeat_edge_at(document, layerId, 0));
+
+    ms_command_add_gaussian_blur_effect(document, layerId);
+    EXPECT_FALSE(ms_layer_effect_repeat_edge_at(document, layerId, 0));
+
+    ms_command_set_gaussian_blur_repeat_edge(document, layerId, 0, true);
+    EXPECT_TRUE(ms_layer_effect_repeat_edge_at(document, layerId, 0));
+
+    ms_command_add_brightness_contrast_effect(document, layerId);
+    EXPECT_FALSE(ms_layer_effect_repeat_edge_at(document, layerId, 1));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, MoveLayerStyleReorder) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

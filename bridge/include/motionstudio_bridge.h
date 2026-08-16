@@ -430,6 +430,8 @@ int ms_layer_effect_count(MSDocument *document, uint64_t layerId);
 MS_EFFECT ms_layer_effect_type_at(MSDocument *document, uint64_t layerId, int index);
 // Whether the effect at index is enabled; false when out of range.
 bool ms_layer_effect_enabled_at(MSDocument *document, uint64_t layerId, int index);
+// Gaussian Blur repeatEdgePixels at index; false when out of range or not a blur.
+bool ms_layer_effect_repeat_edge_at(MSDocument *document, uint64_t layerId, int index);
 
 // Path masks on a layer.
 int ms_layer_mask_count(MSDocument *document, uint64_t layerId);

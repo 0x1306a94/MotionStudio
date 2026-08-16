@@ -134,6 +134,20 @@ bool ms_layer_effect_enabled_at(MSDocument *document, uint64_t layerId, int inde
     return layer->effects[static_cast<size_t>(index)]->enabled;
 }
 
+bool ms_layer_effect_repeat_edge_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->effects.size()) {
+        return false;
+    }
+    const motion::LayerEffect &effect = *layer->effects[static_cast<size_t>(index)];
+    if (effect.type() != motion::LayerEffectType::GaussianBlur) {
+        return false;
+    }
+    return static_cast<const motion::GaussianBlurEffect &>(effect).repeatEdgePixels;
+}
+
 MS_BLEND ms_layer_blend_mode(MSDocument *document, uint64_t layerId) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);

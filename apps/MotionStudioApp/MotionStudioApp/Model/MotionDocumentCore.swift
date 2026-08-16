@@ -728,6 +728,24 @@ final class MotionDocumentCore {
         ms_layer_style_stroke_position_at(handle, layerID, Int32(index))
     }
 
+    // MARK: - Layer effect queries
+
+    func effectCount(layerID: UInt64) -> Int {
+        Int(ms_layer_effect_count(handle, layerID))
+    }
+
+    func effectType(layerID: UInt64, index: Int) -> MS_EFFECT {
+        ms_layer_effect_type_at(handle, layerID, Int32(index))
+    }
+
+    func effectEnabled(layerID: UInt64, index: Int) -> Bool {
+        ms_layer_effect_enabled_at(handle, layerID, Int32(index))
+    }
+
+    func gaussianBlurRepeatEdge(layerID: UInt64, index: Int) -> Bool {
+        ms_layer_effect_repeat_edge_at(handle, layerID, Int32(index))
+    }
+
     // MARK: - Mask / track matte queries
 
     func maskCount(layerID: UInt64) -> Int {
@@ -1666,6 +1684,36 @@ final class MotionDocumentCore {
 
     func addStrokeStyle(layerID: UInt64) {
         ms_command_add_stroke_style(handle, layerID)
+        changed()
+    }
+
+    func addBrightnessContrastEffect(layerID: UInt64) {
+        ms_command_add_brightness_contrast_effect(handle, layerID)
+        changed()
+    }
+
+    func addGaussianBlurEffect(layerID: UInt64) {
+        ms_command_add_gaussian_blur_effect(handle, layerID)
+        changed()
+    }
+
+    func removeLayerEffect(layerID: UInt64, index: Int) {
+        ms_command_remove_layer_effect(handle, layerID, Int32(index))
+        changed()
+    }
+
+    func moveLayerEffect(layerID: UInt64, from fromIndex: Int, to toIndex: Int) {
+        ms_command_move_layer_effect(handle, layerID, Int32(fromIndex), Int32(toIndex))
+        changed()
+    }
+
+    func setLayerEffectEnabled(layerID: UInt64, index: Int, enabled: Bool) {
+        ms_command_set_layer_effect_enabled(handle, layerID, Int32(index), enabled)
+        changed()
+    }
+
+    func setGaussianBlurRepeatEdge(layerID: UInt64, index: Int, repeatEdge: Bool) {
+        ms_command_set_gaussian_blur_repeat_edge(handle, layerID, Int32(index), repeatEdge)
         changed()
     }
 

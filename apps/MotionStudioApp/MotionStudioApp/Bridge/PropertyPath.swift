@@ -116,6 +116,27 @@ enum MaskProperty: String, CaseIterable {
     }
 }
 
+enum EffectProperty: String, CaseIterable {
+    case brightness
+    case contrast
+    case blurriness
+
+    func path(at index: Int) -> String {
+        "effects[\(index)].\(rawValue)"
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .brightness:
+            "Brightness"
+        case .contrast:
+            "Contrast"
+        case .blurriness:
+            "Blurriness"
+        }
+    }
+}
+
 enum StyleProperty: String, CaseIterable {
     case color
     case width

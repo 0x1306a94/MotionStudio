@@ -45,7 +45,7 @@
 
 ### Task 1: Bridge repeat-edge 查询 + App 封装
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（`ms_layer_effect_enabled_at` 后）
@@ -60,7 +60,7 @@
 - Produces: `enum EffectProperty { brightness, contrast, blurriness }` + `path(at:)` / `actionLabel`
 - Produces: `MotionDocumentCore.effectCount` / `effectType` / `effectEnabled` / `gaussianBlurRepeatEdge` 与对应命令方法
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `bridge/tests/BridgeTest.cpp` 的 `TEST(BridgeCommandTest, LayerEffectLifecycle)` 之后插入：
 
@@ -85,7 +85,7 @@ TEST(BridgeCommandTest, LayerEffectRepeatEdgeQuery) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target bridge_test
@@ -94,7 +94,7 @@ ctest --test-dir build -R LayerEffectRepeatEdgeQuery --output-on-failure
 
 Expected: 编译失败，找不到 `ms_layer_effect_repeat_edge_at`。
 
-- [ ] **Step 3: 声明并实现查询**
+- [x] **Step 3: 声明并实现查询**
 
 `bridge/include/motionstudio_bridge.h` 在 `ms_layer_effect_enabled_at` 后加：
 
@@ -121,7 +121,7 @@ bool ms_layer_effect_repeat_edge_at(MSDocument *document, uint64_t layerId, int 
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target bridge_test
@@ -130,7 +130,7 @@ ctest --test-dir build -R 'LayerEffectLifecycle|LayerEffectRepeatEdgeQuery' --ou
 
 Expected: 两测全绿。
 
-- [ ] **Step 5: 加 `EffectProperty` 与 `MotionDocumentCore` 包装**
+- [x] **Step 5: 加 `EffectProperty` 与 `MotionDocumentCore` 包装**
 
 `PropertyPath.swift` 在 `enum MaskProperty` 之后、`enum StyleProperty` 之前插入：
 
@@ -213,7 +213,7 @@ enum EffectProperty: String, CaseIterable {
     }
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 把本 Task 全部 checkbox 改为 `[x]`，`**Status:**` 改为 `✅ Done`，然后：
 
