@@ -6,6 +6,7 @@
 #include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -17,20 +18,25 @@
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
+#include "MotionStudio/undo/AddLayerEffectCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveLayerEffectCommand.h"
 #include "MotionStudio/undo/MoveLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveLayerEffectCommand.h"
 #include "MotionStudio/undo/RemoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetFollowPathCommand.h"
+#include "MotionStudio/undo/SetGaussianBlurRepeatEdgeCommand.h"
 #include "MotionStudio/undo/SetLayerBlendModeCommand.h"
+#include "MotionStudio/undo/SetLayerEffectEnabledCommand.h"
 #include "MotionStudio/undo/SetLayerNameCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
@@ -44,11 +50,13 @@
 
 using motion::AddKeyframeCommand;
 using motion::AddLayerCommand;
+using motion::AddLayerEffectCommand;
 using motion::AddLayerStyleCommand;
 using motion::AddMaskCommand;
 using motion::Animatable;
 using motion::BezierPath;
 using motion::BezierPathToVectorNetwork;
+using motion::BrightnessContrastEffect;
 using motion::Color;
 using motion::CompileFillFaces;
 using motion::Composition;
@@ -57,6 +65,7 @@ using motion::Document;
 using motion::Easing;
 using motion::EntityId;
 using motion::FillStyle;
+using motion::GaussianBlurEffect;
 using motion::Keyframe;
 using motion::KeyframeData;
 using motion::Layer;
@@ -66,17 +75,21 @@ using motion::Mask;
 using motion::MaskMode;
 using motion::MoveKeyframeCommand;
 using motion::MoveLayerCommand;
+using motion::MoveLayerEffectCommand;
 using motion::MoveLayerStyleCommand;
 using motion::MoveMaskCommand;
 using motion::PropertyPath;
 using motion::PropertyValue;
 using motion::RemoveKeyframeCommand;
 using motion::RemoveLayerCommand;
+using motion::RemoveLayerEffectCommand;
 using motion::RemoveMaskCommand;
 using motion::RemoveStyleCommand;
 using motion::SetEasingCommand;
 using motion::SetFollowPathCommand;
+using motion::SetGaussianBlurRepeatEdgeCommand;
 using motion::SetLayerBlendModeCommand;
+using motion::SetLayerEffectEnabledCommand;
 using motion::SetLayerNameCommand;
 using motion::SetMaskInvertedCommand;
 using motion::SetMaskModeCommand;
@@ -1075,4 +1088,143 @@ TEST(SetSpatialTangentsCommandTest, SetAndUndo) {
     EXPECT_FALSE(scene.layer->transform.position.keyframes()[1].spatialInTangent.has_value());
     scene.undo.undo(scene.document);  // clear frame 0 out
     EXPECT_FALSE(scene.layer->transform.position.keyframes()[0].spatialOutTangent.has_value());
+}
+
+TEST(AddLayerEffectCommandTest, AddUndoRedoKeepsId) {
+    Scene scene;
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    const EntityId effectId = effect->id;
+    scene.execute<AddLayerEffectCommand>(scene.layer->id, std::move(effect));
+    ASSERT_EQ(scene.layer->effects.size(), 1u);
+    EXPECT_EQ(scene.layer->effects[0]->id, effectId);
+
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->effects.empty());
+
+    scene.undo.redo(scene.document);
+    ASSERT_EQ(scene.layer->effects.size(), 1u);
+    EXPECT_EQ(scene.layer->effects[0]->id, effectId);
+}
+
+TEST(AddLayerEffectCommandTest, ExecuteSkipsMissingLayer) {
+    Scene scene;
+    scene.execute<AddLayerEffectCommand>(EntityId{999},
+                                         std::make_unique<BrightnessContrastEffect>());
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->effects.empty());
+}
+
+TEST(RemoveLayerEffectCommandTest, RemoveUndoRedoRestoresIndex) {
+    Scene scene;
+    auto first = std::make_unique<BrightnessContrastEffect>();
+    auto second = std::make_unique<GaussianBlurEffect>();
+    const EntityId firstId = first->id;
+    const EntityId secondId = second->id;
+    scene.layer->effects.push_back(std::move(first));
+    scene.layer->effects.push_back(std::move(second));
+
+    scene.execute<RemoveLayerEffectCommand>(scene.layer->id, 0);
+    ASSERT_EQ(scene.layer->effects.size(), 1u);
+    EXPECT_EQ(scene.layer->effects[0]->id, secondId);
+
+    scene.undo.undo(scene.document);
+    ASSERT_EQ(scene.layer->effects.size(), 2u);
+    EXPECT_EQ(scene.layer->effects[0]->id, firstId);
+    EXPECT_EQ(scene.layer->effects[1]->id, secondId);
+}
+
+TEST(RemoveLayerEffectCommandTest, OutOfRangeAndMissingLayerAreNoOp) {
+    Scene scene;
+    scene.layer->effects.push_back(std::make_unique<GaussianBlurEffect>());
+    scene.execute<RemoveLayerEffectCommand>(scene.layer->id, 5);
+    EXPECT_EQ(scene.layer->effects.size(), 1u);
+    scene.execute<RemoveLayerEffectCommand>(EntityId{999}, 0);
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->effects.size(), 1u);
+}
+
+TEST(MoveLayerEffectCommandTest, ReordersAndUndoRestores) {
+    Scene scene;
+    auto brightnessContrast = std::make_unique<BrightnessContrastEffect>();
+    auto blur = std::make_unique<GaussianBlurEffect>();
+    const EntityId brightnessId = brightnessContrast->id;
+    const EntityId blurId = blur->id;
+    scene.layer->effects.push_back(std::move(brightnessContrast));
+    scene.layer->effects.push_back(std::move(blur));
+
+    scene.execute<MoveLayerEffectCommand>(scene.layer->id, 0, 1);
+    EXPECT_EQ(scene.layer->effects[0]->id, blurId);
+    EXPECT_EQ(scene.layer->effects[1]->id, brightnessId);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->effects[0]->id, brightnessId);
+    EXPECT_EQ(scene.layer->effects[1]->id, blurId);
+}
+
+TEST(MoveLayerEffectCommandTest, MergesChainedMoves) {
+    Scene scene;
+    scene.layer->effects.push_back(std::make_unique<BrightnessContrastEffect>());
+    scene.layer->effects.push_back(std::make_unique<GaussianBlurEffect>());
+    const EntityId firstId = scene.layer->effects[0]->id;
+
+    scene.execute<MoveLayerEffectCommand>(scene.layer->id, 0, 1);
+    scene.execute<MoveLayerEffectCommand>(scene.layer->id, 1, 0);
+    EXPECT_EQ(scene.layer->effects[0]->id, firstId);
+    EXPECT_TRUE(scene.undo.canUndo());
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(scene.layer->effects[0]->id, firstId);
+    EXPECT_FALSE(scene.undo.canUndo());
+}
+
+TEST(SetLayerEffectEnabledCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->effects.push_back(std::make_unique<BrightnessContrastEffect>());
+    EXPECT_TRUE(scene.layer->effects[0]->enabled);
+
+    scene.execute<SetLayerEffectEnabledCommand>(scene.layer->id, 0, false);
+    EXPECT_FALSE(scene.layer->effects[0]->enabled);
+
+    scene.undo.undo(scene.document);
+    EXPECT_TRUE(scene.layer->effects[0]->enabled);
+}
+
+TEST(SetGaussianBlurRepeatEdgeCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->effects.push_back(std::make_unique<GaussianBlurEffect>());
+    auto *blur = static_cast<GaussianBlurEffect *>(scene.layer->effects[0].get());
+    EXPECT_FALSE(blur->repeatEdgePixels);
+
+    scene.execute<SetGaussianBlurRepeatEdgeCommand>(scene.layer->id, 0, true);
+    EXPECT_TRUE(blur->repeatEdgePixels);
+
+    scene.undo.undo(scene.document);
+    EXPECT_FALSE(blur->repeatEdgePixels);
+}
+
+TEST(SetGaussianBlurRepeatEdgeCommandTest, SkipsBrightnessContrast) {
+    Scene scene;
+    auto blur = std::make_unique<GaussianBlurEffect>();
+    blur->repeatEdgePixels = false;
+    scene.layer->effects.push_back(std::make_unique<BrightnessContrastEffect>());
+    scene.layer->effects.push_back(std::move(blur));
+    auto *blurEffect = static_cast<GaussianBlurEffect *>(scene.layer->effects[1].get());
+
+    scene.execute<SetGaussianBlurRepeatEdgeCommand>(scene.layer->id, 0, true);
+    EXPECT_FALSE(blurEffect->repeatEdgePixels);
+}
+
+TEST(SetStaticValueCommandTest, SetsEffectBlurriness) {
+    Scene scene;
+    scene.layer->effects.push_back(std::make_unique<GaussianBlurEffect>());
+    PropertyPath path{scene.layer->id, "effects[0].blurriness"};
+
+    scene.execute<SetStaticValueCommand>(path, PropertyValue{8.0f});
+    EXPECT_FLOAT_EQ(static_cast<GaussianBlurEffect *>(scene.layer->effects[0].get())
+                        ->blurriness.evaluate(0),
+                    8.0f);
+
+    scene.undo.undo(scene.document);
+    EXPECT_FLOAT_EQ(static_cast<GaussianBlurEffect *>(scene.layer->effects[0].get())
+                        ->blurriness.evaluate(0),
+                    0.0f);
 }

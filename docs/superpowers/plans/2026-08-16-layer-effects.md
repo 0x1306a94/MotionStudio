@@ -366,7 +366,7 @@ git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
 
 ### Task 3: Undo 命令
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/undo/CommandKind.h`
@@ -385,7 +385,7 @@ git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
 - Produces: `SetGaussianBlurRepeatEdgeCommand(EntityId, int index, bool)` — 非 GaussianBlur 则 no-op
 - Produces: `CommandKind::{AddLayerEffect,RemoveLayerEffect,MoveLayerEffect,SetLayerEffectEnabled,SetGaussianBlurRepeatEdge}`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `tests/undo/CommandsTest.cpp` 用现有 `Scene` fixture：
 
@@ -398,7 +398,7 @@ git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
 - `SetGaussianBlurRepeatEdgeCommand`：true → undo false；对 BC 调用保持 `repeatEdgePixels` 不变
 - `SetStaticValueCommand` + `PropertyPath{id, "effects[0].blurriness"}`：改值 + undo 指纹回到操作前（用现有 `documentFingerprint` 若测试里已有）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='*LayerEffectCommand*'
@@ -406,7 +406,7 @@ git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
 
 Expected: 编译失败。
 
-- [ ] **Step 3: 实现五个命令**
+- [x] **Step 3: 实现五个命令**
 
 `AddLayerEffectCommand::execute`：找到 layer 后 `effects.push_back(std::move(effect_))`。`undo`：按 `effectId_` 找到并 `move` 回 `effect_`。缺层 return。
 
@@ -420,7 +420,7 @@ Expected: 编译失败。
 
 `describe()` 分别为 `"Add Effect"` / `"Remove Effect"` / `"Move Effect"` / `"Set Effect Enabled"` / `"Set Blur Repeat Edge"`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target core_tests
@@ -429,7 +429,7 @@ cmake --build build --target core_tests
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/undo/CommandKind.h \
