@@ -540,7 +540,7 @@ git commit --only bridge/ apps/MotionStudioApp/MotionStudioApp/Bridge/ \
 
 ### Task 8: Inspector + 时间轴
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `apps/MotionStudioApp/MotionStudioApp/Inspector/LayerStylesInspector.swift`
@@ -553,15 +553,15 @@ git commit --only bridge/ apps/MotionStudioApp/MotionStudioApp/Bridge/ \
 - Produces: `LayerStyleFxProperty.path(at:)` → `layerStyles[i].color|opacity|size|angle|distance|spread|range`
 - Produces: `timelineLayerStyleTracks` 挂进 `timelineAnimatedPropertyPaths` 与 `buildTimelineRows`
 
-- [ ] **Step 1: 写 Inspector**
+- [x] **Step 1: 写 Inspector**
 
 抄 `EffectsInspector.swift`：倒序列表、`+` 菜单 `MS_LAYER_FX.allCases`、enabled / 上下移 / 删除。ColorPicker 抄 `FillsInspector` 关键帧。Number 行抄 `effectRow`。Blend 抄 Fill。Stroke 另加 Position picker（`MS_STROKE_POSITION`，不要 INVALID）。
 
-- [ ] **Step 2: 挂 InspectorView**
+- [x] **Step 2: 挂 InspectorView**
 
 在 `EffectsInspector(...)` 之后再放 `LayerStylesInspector(...)`，同一叶子层条件。
 
-- [ ] **Step 3: 时间轴**
+- [x] **Step 3: 时间轴**
 
 ```swift
 enum LayerStyleFxProperty: String {
@@ -572,13 +572,13 @@ enum LayerStyleFxProperty: String {
 
 按 type 收集已有关键帧路径；label = `"\(type.label) \(actionLabel)"`。`timelineAnimatedPropertyPaths` 与 `buildTimelineRows` 都 `append(contentsOf: timelineLayerStyleTracks(...))`。
 
-- [ ] **Step 4: 用 Xcode MCP 编 MotionStudioApp**
+- [x] **Step 4: 用 Xcode MCP 编 MotionStudioApp**
 
 `user-xcode` ready 则 `XcodeListWindows` + `BuildProject`。失败用 `GetBuildLog`。
 
 Expected: BUILD SUCCEEDED
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only apps/MotionStudioApp/ \
@@ -590,7 +590,7 @@ git commit --only apps/MotionStudioApp/ \
 
 ### Task 9: 文档
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `docs/data-model.md`
@@ -598,14 +598,14 @@ git commit --only apps/MotionStudioApp/ \
 - Modify: `docs/pag-runtime-filter.md`
 - Modify: `docs/superpowers/specs/2026-08-16-layer-styles-design.md`（状态改为已实现）
 
-- [ ] **Step 1: 改文档**
+- [x] **Step 1: 改文档**
 
 `data-model.md`：`layerStyles[]` 与 `styles[]` / `effects[]` 职责表。  
 `rendering.md`：isolation 条件、EndLayer 两向量、Behind → 原图 → Above、再图层 opacity。  
 `pag-runtime-filter.md`：SolidStroke / AlphaEdgeDetect / 三种 style 调用链。  
 spec 状态：`已实现`。
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git commit --only docs/ \

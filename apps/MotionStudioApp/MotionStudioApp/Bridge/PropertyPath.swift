@@ -116,6 +116,39 @@ enum MaskProperty: String, CaseIterable {
     }
 }
 
+enum LayerStyleFxProperty: String {
+    case color
+    case opacity
+    case size
+    case angle
+    case distance
+    case spread
+    case range
+
+    func path(at index: Int) -> String {
+        "layerStyles[\(index)].\(rawValue)"
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .color:
+            "Color"
+        case .opacity:
+            "Opacity"
+        case .size:
+            "Size"
+        case .angle:
+            "Angle"
+        case .distance:
+            "Distance"
+        case .spread:
+            "Spread"
+        case .range:
+            "Range"
+        }
+    }
+}
+
 enum EffectProperty: String, CaseIterable {
     case brightness
     case contrast

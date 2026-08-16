@@ -171,6 +171,10 @@ struct InspectorView: View {
                                              layerID: layerID,
                                              isEditable: isEditable,
                                              perform: perform)
+                            LayerStylesInspector(core: core,
+                                                 layerID: layerID,
+                                                 isEditable: isEditable,
+                                                 perform: perform)
                         }
                     }
                     .padding(10)
