@@ -18,7 +18,7 @@
 
 - Precomp / Group 的组级 isolation（预合成仍拍平；挂在它们上的 effect **静默忽略**）
 - SwiftUI Inspector / 时间轴 effect 行（已另开：[Layer Effects UI](2026-08-16-layer-effects-ui-design.md)）
-- AE Layer Style（DropShadow / OuterGlow / Stroke Style）
+- AE Layer Style → [Layer Styles](2026-08-16-layer-styles-design.md)（Drop Shadow / Outer Glow / Stroke；Gradient Overlay 另开）
 - 其余 PAG Effect（RadialBlur / Glow / HueSaturation / Mosaic / DisplacementMap / …）
 - Lottie / PAG 导出写入 Effect 块
 - 改 `ColorSourceEffect`（过程色 fill，不是后处理）
@@ -381,6 +381,6 @@ Swift `CaseIterable` / `Identifiable` 扩展按 [bridge-swift-enums](../../../.c
 1. Precomp / Group 组级 isolation（拍平改为「子层先离屏再滤」）
 2. Inspector / 时间轴 → [Layer Effects UI](2026-08-16-layer-effects-ui-design.md)
 3. RadialBlur、Glow、HueSaturation、…
-4. AE Layer Style
+4. AE Layer Style → [Layer Styles](2026-08-16-layer-styles-design.md)（Drop Shadow / Outer Glow / Stroke）
 5. 导出 Effect
 6. hit-test 随 blur 扩 bounds

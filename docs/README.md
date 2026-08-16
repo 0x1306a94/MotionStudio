@@ -15,6 +15,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [pag-runtime-filter.md](pag-runtime-filter.md) | RuntimeFilter / BrightnessContrast / GaussianBlur：图层后处理滤镜基类、pipeline 缓存、endLayer 链 |
 | [superpowers/specs/2026-08-16-layer-effects-design.md](superpowers/specs/2026-08-16-layer-effects-design.md) | Layer effects：叶子层后处理链、求值快照、BeginLayer/EndLayer isolation |
 | [superpowers/specs/2026-08-16-layer-effects-ui-design.md](superpowers/specs/2026-08-16-layer-effects-ui-design.md) | Layer effects UI：Inspector Effects 段 + 时间轴关键帧行 |
+| [superpowers/specs/2026-08-16-layer-styles-design.md](superpowers/specs/2026-08-16-layer-styles-design.md) | Layer styles：Drop Shadow + Outer Glow + Stroke（Gradient Overlay 另开） |
 | [libpag-rendering-optimization-notes.md](libpag-rendering-optimization-notes.md) | libpag 渲染优化对照：contentVersion / 静帧缓存 / Snapshot / maxFrameRate 等，及对 MotionStudio 持续播放高 CPU 的改进建议 |
 | [edit-drag-responsiveness.md](edit-drag-responsiveness.md) | 编辑拖动跟手：`revision` vs `panelRevision`、Timeline merge 推迟、点文本缓存；SwiftUI→UIKit 后删除清单 |
 | [superpowers/specs/2026-07-31-pag-export-design.md](superpowers/specs/2026-07-31-pag-export-design.md) | PAG 导出设计；**§0 已落地**：唯一 tgfx 源 + Metal 预编译 + `pag_codec`（base+codec），及取舍原因 |
