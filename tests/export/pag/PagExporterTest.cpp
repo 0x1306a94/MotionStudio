@@ -832,6 +832,74 @@ TEST(PagExporterTest, ImageLayerExports) {
     EXPECT_FLOAT_EQ(imageLayer->transform->anchorPoint->value.y, 0.5f);
 }
 
+TEST(PagExporterTest, ImageMaskRemappedToSourceSpace) {
+    // MS masks live in container space; PAG ImageLayer masks live in source pixels.
+    // 1x1 source into 100x100 LetterBox → fit 100; (50,50) must become (0.5, 0.5).
+    static const unsigned char kPng[] = {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8,
+        0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0xC9, 0xFE, 0x92, 0xEF, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82};
+
+    const std::string dir = "/tmp/motionstudio_pag_export_mask_test";
+    std::error_code error;
+    std::filesystem::create_directories(dir + "/assets", error);
+    ASSERT_FALSE(error) << error.message();
+    const std::string relative = "assets/pixel.png";
+    {
+        std::ofstream output(dir + "/" + relative, std::ios::binary);
+        ASSERT_TRUE(output);
+        output.write(reinterpret_cast<const char *>(kPng), sizeof(kPng));
+    }
+
+    Document document = MakeEmptyDoc(400, 300, 30);
+    document.projectRoot = dir;
+    Asset asset;
+    asset.type = AssetType::Image;
+    asset.path = relative;
+    asset.width = 1;
+    asset.height = 1;
+    document.assets.push_back(asset);
+
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    layer->transform.anchorPoint.setStaticValue(Vec2{50, 50});
+    auto *content = static_cast<ImageContent *>(layer->content.get());
+    content->assetId = asset.id;
+    content->size = Vec2{100, 100};
+    content->scaleMode = ImageScaleMode::LetterBox;
+    Mask mask;
+    BezierPath path =
+        MakeSingleContour({{Vec2{0, 0}, {}, {}}, {Vec2{50, 0}, {}, {}}, {Vec2{50, 50}, {}, {}}}, true);
+    mask.path.setStaticValue(BezierPathToVectorNetwork(path));
+    mask.mode = MaskMode::Add;
+    layer->masks.push_back(mask);
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Image);
+    ASSERT_EQ(vector->layers[0]->masks.size(), 1u);
+    ASSERT_NE(vector->layers[0]->masks[0]->maskPath, nullptr);
+    const pag::PathHandle handle = vector->layers[0]->masks[0]->maskPath->value;
+    ASSERT_NE(handle, nullptr);
+    ASSERT_FALSE(handle->points.empty());
+    float maxX = handle->points[0].x;
+    float maxY = handle->points[0].y;
+    for (const pag::Point &point : handle->points) {
+        maxX = std::max(maxX, point.x);
+        maxY = std::max(maxY, point.y);
+    }
+    EXPECT_NEAR(maxX, 0.5f, 0.001f);
+    EXPECT_NEAR(maxY, 0.5f, 0.001f);
+}
+
 TEST(PagExporterTest, MaskExports) {
     Document document = MakeEmptyDoc(400, 300, 30);
     Composition *composition = Primary(document);

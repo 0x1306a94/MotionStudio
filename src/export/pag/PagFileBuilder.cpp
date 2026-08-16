@@ -455,6 +455,68 @@ void MultiplyPointProperty(pag::Property<pag::Point> *property, float scaleX, fl
     });
 }
 
+void ScaleFloatProperty(pag::Property<float> *property, float scale) {
+    if (property == nullptr) {
+        return;
+    }
+    if (!property->animatable()) {
+        property->value *= scale;
+        return;
+    }
+    auto *animated = static_cast<pag::AnimatableProperty<float> *>(property);
+    for (pag::Keyframe<float> *keyframe : animated->keyframes) {
+        keyframe->startValue *= scale;
+        keyframe->endValue *= scale;
+    }
+    animated->value *= scale;
+}
+
+void MapPathHandleToImageSpace(const pag::PathHandle &handle, float destX, float destY,
+                               float invFitX, float invFitY) {
+    if (handle == nullptr) {
+        return;
+    }
+    for (pag::Point &point : handle->points) {
+        point.x = (point.x - destX) * invFitX;
+        point.y = (point.y - destY) * invFitY;
+    }
+}
+
+void MapPathPropertyToImageSpace(pag::Property<pag::PathHandle> *property, float destX,
+                                 float destY, float invFitX, float invFitY) {
+    if (property == nullptr) {
+        return;
+    }
+    if (!property->animatable()) {
+        MapPathHandleToImageSpace(property->value, destX, destY, invFitX, invFitY);
+        return;
+    }
+    auto *animated = static_cast<pag::AnimatableProperty<pag::PathHandle> *>(property);
+    for (pag::Keyframe<pag::PathHandle> *keyframe : animated->keyframes) {
+        MapPathHandleToImageSpace(keyframe->startValue, destX, destY, invFitX, invFitY);
+        MapPathHandleToImageSpace(keyframe->endValue, destX, destY, invFitX, invFitY);
+    }
+    MapPathHandleToImageSpace(animated->value, destX, destY, invFitX, invFitY);
+}
+
+void RemapImageLayerMasksToSourceSpace(pag::Layer *pagLayer, float destX, float destY, float fitX,
+                                       float fitY) {
+    if (pagLayer == nullptr || fitX <= 0.0f || fitY <= 0.0f) {
+        return;
+    }
+    const float invFitX = 1.0f / fitX;
+    const float invFitY = 1.0f / fitY;
+    const float expansionScale = (invFitX + invFitY) * 0.5f;
+    for (pag::MaskData *mask : pagLayer->masks) {
+        if (mask == nullptr) {
+            continue;
+        }
+        MapPathPropertyToImageSpace(mask->maskPath, destX, destY, invFitX, invFitY);
+        MultiplyPointProperty(mask->maskFeather, invFitX, invFitY);
+        ScaleFloatProperty(mask->maskExpansion, expansionScale);
+    }
+}
+
 void DeleteCompositions(std::vector<pag::Composition *> *compositions) {
     if (compositions == nullptr) {
         return;
@@ -852,10 +914,12 @@ void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Lay
     }
 
     // AE model: ImageBytes stays at source size; container fit is baked into Transform.
+    // Masks were written in MS container space and must follow the same remap.
     MultiplyPointProperty(pagLayer->transform->scale, fitX, fitY);
     MapPointProperty(pagLayer->transform->anchorPoint, [&](pag::Point point) {
         return pag::Point::Make((point.x - destination.x) / fitX, (point.y - destination.y) / fitY);
     });
+    RemapImageLayerMasksToSourceSpace(pagLayer, destination.x, destination.y, fitX, fitY);
 
     const bool overflows = destination.x < -0.001f || destination.y < -0.001f ||
         destination.x + destination.width > container.x + 0.001f ||
