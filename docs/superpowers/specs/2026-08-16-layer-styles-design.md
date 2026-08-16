@@ -21,7 +21,7 @@
 - Outer Glow 的 AE 扩展项：`noise`、渐变色、`technique`、`jitter`（PAG GPU 滤镜也不用）
 - 把 Layer Style 放进 `effects[]` 或现有 `styles[]`
 - Precomp / Group 组级 isolation（挂在它们上的 layer style **静默忽略**）
-- Lottie / PAG 导出写入 Layer Style 块
+- Lottie 导出写入 Layer Style 块
 - 命中 / 选中框随装饰扩张
 - 升 `schemaVersion`
 
@@ -457,5 +457,5 @@ void ms_command_set_layer_fx_stroke_position(MSDocument *, uint64_t layerId, int
 2. Inner Shadow / Inner Glow / Bevel
 3. Outer Glow 渐变色 / noise / technique / jitter
 4. Precomp / Group 组级 isolation
-5. 导出 Layer Style
+5. Lottie 导出 Layer Style
 6. hit-test 随装饰扩 bounds

@@ -58,9 +58,10 @@ class PagFileBuilder {
     // Center stroke with Trim — own layer so TrimPaths cannot clip the main Fill.
     Expected<pag::ShapeLayer *, PagExportError> buildCenterTrimStrokeLayer(
         const Layer &layer, const ShapeElement &geometry, const StrokeStyle &stroke);
-    // When one MS shape expands to ≥2 PAG layers AND has track matte or layer effects,
-    // wrap them in an export-only Precomp (MS has no container UI yet). Host keeps
-    // opacity / timing / masks / blend / parent / trackMatte / effects (spatial identity).
+    // When one MS shape expands to ≥2 PAG layers AND has track matte, effects, or
+    // layer styles, wrap them in an export-only Precomp (MS has no container UI yet).
+    // Host keeps opacity / timing / masks / blend / parent / trackMatte / effects /
+    // layer styles (spatial identity).
     // Inners keep spatial transform so nested composition clip [0,0,w,h] does not discard
     // negative local paths. Takes ownership of `siblings` on success.
     Expected<pag::PreComposeLayer *, PagExportError> wrapStrokeSiblingsForTrackMatte(
@@ -72,6 +73,8 @@ class PagFileBuilder {
     Expected<void, PagExportError> fillCommonLayer(pag::Layer *pagLayer, const Layer &layer);
     Expected<void, PagExportError> appendMasks(pag::Layer *pagLayer, const Layer &layer);
     Expected<void, PagExportError> appendEffects(pag::Layer *pagLayer, const Layer &layer);
+    Expected<void, PagExportError> appendLayerStyles(pag::Layer *pagLayer, const Layer &layer);
+    Expected<void, PagExportError> appendLayerPostProcess(pag::Layer *pagLayer, const Layer &layer);
     Expected<pag::ShapeElement *, PagExportError> buildGeometry(const ShapeElement &element,
                                                                 EntityId layerId);
     // Fill + Center strokes on the main shape layer (Inside/Outside become sibling layers).

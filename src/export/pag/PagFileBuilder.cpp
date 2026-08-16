@@ -22,6 +22,7 @@
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/LineCap.h"
@@ -47,6 +48,7 @@
 #include "PagBitmapSequenceEncode.h"
 #include "PagEffectConvert.h"
 #include "PagExportErrorUtil.h"
+#include "PagLayerStyleConvert.h"
 #include "PagStrokeOutline.h"
 #include "PagVideoFallback.h"
 #include "codec/utils/WebpDecoder.h"
@@ -189,6 +191,18 @@ bool LayerHasEnabledEffects(const Layer &layer) {
     }
     for (const auto &effect : layer.effects) {
         if (effect != nullptr && effect->enabled) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LayerHasEnabledLayerStyles(const Layer &layer) {
+    if (!LayerExportsEffects(layer)) {
+        return false;
+    }
+    for (const auto &style : layer.layerStyles) {
+        if (style != nullptr && style->enabled) {
             return true;
         }
     }
@@ -1323,10 +1337,10 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
         });
     }
     pagLayer->sourceText = buildSourceText(layer, content, forcePointText);
-    Expected<void, PagExportError> effects = appendEffects(pagLayer, layer);
-    if (!effects.hasValue()) {
+    Expected<void, PagExportError> postProcess = appendLayerPostProcess(pagLayer, layer);
+    if (!postProcess.hasValue()) {
         delete pagLayer;
-        return Unexpected(effects.error());
+        return Unexpected(postProcess.error());
     }
     return pagLayer;
 }
@@ -1500,10 +1514,10 @@ Expected<pag::ImageLayer *, PagExportError> PagFileBuilder::buildImageLayer(cons
     pagLayer->imageFillRule->scaleMode = MapScaleMode(content.scaleMode);
     applyImageContainerFit(pagLayer, layer, content, imageBytes.value()->width,
                            imageBytes.value()->height);
-    Expected<void, PagExportError> effects = appendEffects(pagLayer, layer);
-    if (!effects.hasValue()) {
+    Expected<void, PagExportError> postProcess = appendLayerPostProcess(pagLayer, layer);
+    if (!postProcess.hasValue()) {
         delete pagLayer;
-        return Unexpected(effects.error());
+        return Unexpected(postProcess.error());
     }
     return pagLayer;
 }
@@ -1618,12 +1632,13 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
 
     // PAG Codec::InstallReferences rebinds trackMatte to layers[index-1] only. Multiple
     // parallel stroke layers from one MS shape cannot all sit under the same matte source.
-    // Effects must cover the combined fill+stroke result, not each sibling independently.
-    // Wrap into an export-only Precomp; host alone carries matte / effects.
+    // Effects and layer styles must cover the combined fill+stroke result, not each sibling.
+    // Wrap into an export-only Precomp; host alone carries matte / effects / layer styles.
     const bool wrapForMatte = layers.size() > 1 && layer.trackMatteType != TrackMatteType::None &&
         layer.trackMatteLayerId.isValid();
     const bool wrapForEffects = layers.size() > 1 && LayerHasEnabledEffects(layer);
-    if (wrapForMatte || wrapForEffects) {
+    const bool wrapForLayerStyles = layers.size() > 1 && LayerHasEnabledLayerStyles(layer);
+    if (wrapForMatte || wrapForEffects || wrapForLayerStyles) {
         Expected<pag::PreComposeLayer *, PagExportError> wrapped =
             wrapStrokeSiblingsForTrackMatte(layer, std::move(layers));
         if (!wrapped.hasValue()) {
@@ -1640,20 +1655,25 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
                  "Multiple stroke layers wrapped in export-only Precomp so layer effects apply to "
                  "the combined result");
         }
-        Expected<void, PagExportError> effects = appendEffects(wrapped.value(), layer);
-        if (!effects.hasValue()) {
+        if (wrapForLayerStyles) {
+            Warn(&warnings_, layer.id, "StrokeSiblingsWrappedForLayerStyles",
+                 "Multiple stroke layers wrapped in export-only Precomp so layer styles apply to "
+                 "the combined result");
+        }
+        Expected<void, PagExportError> postProcess = appendLayerPostProcess(wrapped.value(), layer);
+        if (!postProcess.hasValue()) {
             delete wrapped.value();
-            return Unexpected(effects.error());
+            return Unexpected(postProcess.error());
         }
         return std::vector<pag::Layer *>{wrapped.value()};
     }
     if (!layers.empty()) {
-        Expected<void, PagExportError> effects = appendEffects(layers.front(), layer);
-        if (!effects.hasValue()) {
+        Expected<void, PagExportError> postProcess = appendLayerPostProcess(layers.front(), layer);
+        if (!postProcess.hasValue()) {
             for (pag::Layer *owned : layers) {
                 delete owned;
             }
-            return Unexpected(effects.error());
+            return Unexpected(postProcess.error());
         }
     }
     return layers;
@@ -2058,6 +2078,40 @@ Expected<void, PagExportError> PagFileBuilder::appendEffects(pag::Layer *pagLaye
         pagLayer->effects.push_back(pagEffect);
     }
     return Expected<void, PagExportError>();
+}
+
+Expected<void, PagExportError> PagFileBuilder::appendLayerStyles(pag::Layer *pagLayer,
+                                                                 const Layer &layer) {
+    if (!LayerExportsEffects(layer)) {
+        return Expected<void, PagExportError>();
+    }
+    for (const auto &stylePtr : layer.layerStyles) {
+        if (stylePtr == nullptr || !stylePtr->enabled) {
+            continue;
+        }
+        bool blendOk = true;
+        const pag::BlendMode blend =
+            mapBlendMode(LayerFxBlendMode(*stylePtr), layer.id, &blendOk);
+        if (!blendOk) {
+            return Unexpected(MakePagExportError(PagExportErrorKind::MappingFailed, {}, "", "",
+                                                 "PAG export mapping failed"));
+        }
+        pag::LayerStyle *pagStyle = ToPagLayerStyle(*stylePtr, blend, &warnings_, layer.id);
+        if (pagStyle == nullptr) {
+            continue;
+        }
+        pagLayer->layerStyles.push_back(pagStyle);
+    }
+    return Expected<void, PagExportError>();
+}
+
+Expected<void, PagExportError> PagFileBuilder::appendLayerPostProcess(pag::Layer *pagLayer,
+                                                                      const Layer &layer) {
+    Expected<void, PagExportError> effects = appendEffects(pagLayer, layer);
+    if (!effects.hasValue()) {
+        return Unexpected(effects.error());
+    }
+    return appendLayerStyles(pagLayer, layer);
 }
 
 pag::Transform2D *PagFileBuilder::buildTransform(const Transform &transform, EntityId layerId) {

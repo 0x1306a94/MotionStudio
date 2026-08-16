@@ -22,6 +22,7 @@
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/PrecompContent.h"
@@ -45,6 +46,7 @@ using motion::BrightnessContrastEffect;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::DropShadowStyle;
 using motion::Easing;
 using motion::EntityId;
 using motion::FakeBitmapFrameSource;
@@ -57,10 +59,12 @@ using motion::ImageContent;
 using motion::ImageScaleMode;
 using motion::Keyframe;
 using motion::Layer;
+using motion::LayerStrokeStyle;
 using motion::LayerType;
 using motion::MakeSingleContour;
 using motion::Mask;
 using motion::MaskMode;
+using motion::OuterGlowStyle;
 using motion::PagBmpSequenceType;
 using motion::PagExporter;
 using motion::PagExportError;
@@ -1723,6 +1727,247 @@ TEST(PagExporterTest, LayerBmpDoesNotAttachEffects) {
     auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
     ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
     EXPECT_TRUE(main->layers[0]->effects.empty());
+}
+
+TEST(PagExporterTest, DropShadowExportsAsPagLayerStyle) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto style = std::make_unique<DropShadowStyle>();
+    style->color.setStaticValue(Color{0.1f, 0.2f, 0.3f, 1.0f});
+    style->opacity.setStaticValue(0.5f);
+    style->angle.setStaticValue(90.0f);
+    style->distance.setStaticValue(12.0f);
+    style->size.setStaticValue(8.0f);
+    style->spread.setStaticValue(0.25f);
+    layer->layerStyles.push_back(std::move(style));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->layerStyles.size(), 1u);
+    ASSERT_EQ(shapeLayer->layerStyles[0]->type(), pag::LayerStyleType::DropShadow);
+    auto *pagStyle = static_cast<pag::DropShadowStyle *>(shapeLayer->layerStyles[0]);
+    ASSERT_NE(pagStyle->blendMode, nullptr);
+    ASSERT_NE(pagStyle->color, nullptr);
+    ASSERT_NE(pagStyle->opacity, nullptr);
+    ASSERT_NE(pagStyle->angle, nullptr);
+    ASSERT_NE(pagStyle->distance, nullptr);
+    ASSERT_NE(pagStyle->size, nullptr);
+    ASSERT_NE(pagStyle->spread, nullptr);
+    EXPECT_EQ(pagStyle->blendMode->value, pag::BlendMode::Multiply);
+    EXPECT_EQ(pagStyle->color->value.red, 26);
+    EXPECT_EQ(pagStyle->color->value.green, 51);
+    EXPECT_EQ(pagStyle->color->value.blue, 77);
+    EXPECT_EQ(pagStyle->opacity->value, 128);
+    EXPECT_FLOAT_EQ(pagStyle->angle->value, 90.0f);
+    EXPECT_FLOAT_EQ(pagStyle->distance->value, 12.0f);
+    EXPECT_FLOAT_EQ(pagStyle->size->value, 8.0f);
+    EXPECT_FLOAT_EQ(pagStyle->spread->value, 0.25f);
+}
+
+TEST(PagExporterTest, OuterGlowExportsAsPagLayerStyle) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto style = std::make_unique<OuterGlowStyle>();
+    style->size.setStaticValue(10.0f);
+    style->spread.setStaticValue(0.4f);
+    style->range.setStaticValue(0.8f);
+    layer->layerStyles.push_back(std::move(style));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->layerStyles.size(), 1u);
+    ASSERT_EQ(shapeLayer->layerStyles[0]->type(), pag::LayerStyleType::OuterGlow);
+    auto *pagStyle = static_cast<pag::OuterGlowStyle *>(shapeLayer->layerStyles[0]);
+    ASSERT_NE(pagStyle->blendMode, nullptr);
+    ASSERT_NE(pagStyle->color, nullptr);
+    ASSERT_NE(pagStyle->opacity, nullptr);
+    ASSERT_NE(pagStyle->size, nullptr);
+    ASSERT_NE(pagStyle->spread, nullptr);
+    ASSERT_NE(pagStyle->range, nullptr);
+    ASSERT_NE(pagStyle->noise, nullptr);
+    ASSERT_NE(pagStyle->colorType, nullptr);
+    ASSERT_NE(pagStyle->technique, nullptr);
+    ASSERT_NE(pagStyle->jitter, nullptr);
+    EXPECT_EQ(pagStyle->blendMode->value, pag::BlendMode::Screen);
+    EXPECT_EQ(pagStyle->opacity->value, 191);
+    EXPECT_FLOAT_EQ(pagStyle->size->value, 10.0f);
+    EXPECT_FLOAT_EQ(pagStyle->spread->value, 0.4f);
+    EXPECT_FLOAT_EQ(pagStyle->range->value, 0.8f);
+    EXPECT_FLOAT_EQ(pagStyle->noise->value, 0.0f);
+    EXPECT_EQ(pagStyle->colorType->value, pag::GlowColorType::SingleColor);
+    EXPECT_EQ(pagStyle->technique->value, pag::GlowTechniqueType::Softer);
+    EXPECT_FLOAT_EQ(pagStyle->jitter->value, 0.0f);
+}
+
+TEST(PagExporterTest, LayerStrokePositionMapsToPagOrder) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto center = std::make_unique<LayerStrokeStyle>();
+    center->position = StrokePosition::Center;
+    center->size.setStaticValue(2.0f);
+    layer->layerStyles.push_back(std::move(center));
+    auto inside = std::make_unique<LayerStrokeStyle>();
+    inside->position = StrokePosition::Inside;
+    inside->size.setStaticValue(3.0f);
+    layer->layerStyles.push_back(std::move(inside));
+    auto outside = std::make_unique<LayerStrokeStyle>();
+    outside->position = StrokePosition::Outside;
+    outside->size.setStaticValue(4.0f);
+    layer->layerStyles.push_back(std::move(outside));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->layerStyles.size(), 3u);
+    auto *centerStyle = static_cast<pag::StrokeStyle *>(shapeLayer->layerStyles[0]);
+    auto *insideStyle = static_cast<pag::StrokeStyle *>(shapeLayer->layerStyles[1]);
+    auto *outsideStyle = static_cast<pag::StrokeStyle *>(shapeLayer->layerStyles[2]);
+    EXPECT_EQ(centerStyle->position->value, pag::StrokePosition::Center);
+    EXPECT_EQ(insideStyle->position->value, pag::StrokePosition::Inside);
+    EXPECT_EQ(outsideStyle->position->value, pag::StrokePosition::Outside);
+    EXPECT_NE(static_cast<int>(StrokePosition::Center),
+              static_cast<int>(pag::StrokePosition::Center));
+}
+
+TEST(PagExporterTest, DisabledLayerStyleIsSkipped) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto disabled = std::make_unique<DropShadowStyle>();
+    disabled->enabled = false;
+    disabled->distance.setStaticValue(10.0f);
+    layer->layerStyles.push_back(std::move(disabled));
+    auto enabled = std::make_unique<OuterGlowStyle>();
+    enabled->size.setStaticValue(6.0f);
+    layer->layerStyles.push_back(std::move(enabled));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->layerStyles.size(), 1u);
+    EXPECT_EQ(shapeLayer->layerStyles[0]->type(), pag::LayerStyleType::OuterGlow);
+}
+
+TEST(PagExporterTest, SplitStrokesWrapForLayerStyles) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "PathDualStroke";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto path = std::make_unique<ShapePath>();
+    BezierPath geometry =
+        MakeSingleContour({{{-50, -50}, {}, {}}, {{50, -50}, {}, {}}, {{50, 50}, {}, {}}, {{-50, 50}, {}, {}}}, true);
+    path->path.setStaticValue(BezierPathToVectorNetwork(geometry));
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.2f, 0.6f, 0.4f, 1.0f});
+    layer->styles.push_back(std::move(fill));
+
+    auto outside = std::make_unique<StrokeStyle>();
+    outside->color.setStaticValue(Color{0, 0, 0, 1});
+    outside->width.setStaticValue(9.0f);
+    outside->position = StrokePosition::Outside;
+    layer->styles.push_back(std::move(outside));
+
+    auto style = std::make_unique<DropShadowStyle>();
+    style->distance.setStaticValue(8.0f);
+    layer->layerStyles.push_back(std::move(style));
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    bool wrapped = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "StrokeSiblingsWrappedForLayerStyles") {
+            wrapped = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(wrapped);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *root = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::PreComposeLayer *host = nullptr;
+    for (pag::Layer *pagLayer : root->layers) {
+        if (pagLayer->name == "PathDualStroke" && pagLayer->type() == pag::LayerType::PreCompose) {
+            host = static_cast<pag::PreComposeLayer *>(pagLayer);
+        }
+        EXPECT_EQ(pagLayer->name.find("PathDualStroke / Stroke"), std::string::npos);
+    }
+    ASSERT_NE(host, nullptr);
+    ASSERT_EQ(host->layerStyles.size(), 1u);
+    EXPECT_EQ(host->layerStyles[0]->type(), pag::LayerStyleType::DropShadow);
+    ASSERT_NE(host->composition, nullptr);
+    auto *inner = static_cast<pag::VectorComposition *>(host->composition);
+    ASSERT_GE(inner->layers.size(), 2u);
+    for (pag::Layer *innerLayer : inner->layers) {
+        EXPECT_TRUE(innerLayer->layerStyles.empty());
+    }
+}
+
+TEST(PagExporterTest, GroupLayerStylesAreSkipped) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto group = std::make_unique<Layer>(LayerType::Group);
+    group->name = "Group";
+    group->inPoint = 0;
+    group->outPoint = composition->duration;
+    group->layerStyles.push_back(std::make_unique<DropShadowStyle>());
+    document.addLayer(composition->id, std::move(group));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::Layer *groupLayer = nullptr;
+    for (pag::Layer *pagLayer : vector->layers) {
+        if (pagLayer->name == "Group") {
+            groupLayer = pagLayer;
+            break;
+        }
+    }
+    ASSERT_NE(groupLayer, nullptr);
+    EXPECT_TRUE(groupLayer->layerStyles.empty());
+}
+
+TEST(PagExporterTest, LayerBmpDoesNotAttachLayerStyles) {
+    Document document = MakeEmptyDoc(400, 300, 2);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 100});
+    layer->name = "Rect_bmp";
+    layer->layerStyles.push_back(std::make_unique<DropShadowStyle>());
+
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.allowBitmapExport = true;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    EXPECT_TRUE(main->layers[0]->layerStyles.empty());
 }
 
 #if defined(__APPLE__)
