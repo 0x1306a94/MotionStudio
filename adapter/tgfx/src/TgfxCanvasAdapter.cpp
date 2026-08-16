@@ -1,6 +1,7 @@
 #include "TgfxCanvasAdapter.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -37,8 +38,11 @@
 #include "TgfxProfileTiming.h"
 #include "TgfxTextTypeface.h"
 #include "TgfxTypeConvert.h"
+#include "effects/BrightnessContrastFilter.h"
 #include "effects/ColorSourceEffect.h"
 #include "effects/Uniform.h"
+
+#include "MotionStudio/model/LayerEffect.h"
 
 namespace motion {
 
@@ -69,6 +73,48 @@ void NoteIsolationContentBounds(IsolationLayer &layer, tgfx::Canvas *canvas,
     } else {
         layer.contentBounds.join(mapped);
     }
+}
+
+std::shared_ptr<tgfx::Image> PictureToImage(tgfx::Context *context,
+                                            const std::shared_ptr<tgfx::Picture> &picture,
+                                            const tgfx::Rect &contentBounds,
+                                            const tgfx::Paint *paint) {
+    if (context == nullptr || picture == nullptr || contentBounds.isEmpty()) {
+        return nullptr;
+    }
+    tgfx::Rect bounds = contentBounds;
+    bounds.roundOut();
+    const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
+    const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
+    std::shared_ptr<tgfx::Surface> surface = tgfx::Surface::Make(context, width, height, true);
+    if (surface == nullptr) {
+        surface = tgfx::Surface::Make(context, width, height);
+    }
+    if (surface == nullptr) {
+        return nullptr;
+    }
+    tgfx::Canvas *canvas = surface->getCanvas();
+    canvas->clear();
+    canvas->setMatrix(tgfx::Matrix::MakeTrans(-bounds.left, -bounds.top));
+    canvas->drawPicture(picture, nullptr, paint);
+    return surface->makeImageSnapshot();
+}
+
+std::shared_ptr<tgfx::Image> ApplyLayerEffect(const LayerEffect &effect,
+                                              std::shared_ptr<tgfx::Image> input,
+                                              RenderCache *cache, tgfx::Point *offset) {
+    switch (effect.type()) {
+        case LayerEffectType::BrightnessContrast: {
+            const auto &brightnessContrast = static_cast<const BrightnessContrastEffect &>(effect);
+            return BrightnessContrastFilter::Apply(input, cache,
+                                                   brightnessContrast.brightness.evaluate(0),
+                                                   brightnessContrast.contrast.evaluate(0), offset);
+        }
+        case LayerEffectType::GaussianBlur: {
+            return input;
+        }
+    }
+    return input;
 }
 
 IsolationLayer *TopIsolationLayer(const std::unique_ptr<TgfxIsolationStack> &stack) {
@@ -585,11 +631,15 @@ void TgfxCanvasAdapter::beginLayer() {
     // beginRecording().
     isolationStack_->layers.emplace_back();
     IsolationLayer &layer = isolationStack_->layers.back();
+    layer.compositeOpacity = opacity_;
+    layer.compositeBlend = blendMode_;
+    opacity_ = 1.0f;
+    blendMode_ = BlendMode::Normal;
     layer.contentCanvas = layer.contentRecorder.beginRecording();
 }
 
 void TgfxCanvasAdapter::endLayer(
-    const std::vector<std::shared_ptr<const LayerEffect>> & /*effects*/) {
+    const std::vector<std::shared_ptr<const LayerEffect>> &effects) {
     if (isolationStack_ == nullptr || isolationStack_->layers.empty() || surface_ == nullptr) {
         return;
     }
@@ -597,24 +647,29 @@ void TgfxCanvasAdapter::endLayer(
     IsolationLayer &layer = isolationStack_->layers.back();
     layer.contentCanvas = nullptr;
     std::shared_ptr<tgfx::Picture> content = layer.contentRecorder.finishRecordingAsPicture();
+    const float compositeOpacity = layer.compositeOpacity;
+    const BlendMode compositeBlend = layer.compositeBlend;
+    const tgfx::Rect contentBounds = layer.contentBounds;
+    std::vector<CoverageImage> coverages = std::move(layer.coverages);
 
-    tgfx::Paint paint;
-    paint.setAntiAlias(true);
-    if (!layer.coverages.empty()) {
+    tgfx::Paint maskPaint;
+    maskPaint.setAntiAlias(true);
+    if (!coverages.empty()) {
         tgfx::Context *context = surface_->getContext();
-        CoverageImage combined = layer.coverages.front();
-        for (size_t i = 1; i < layer.coverages.size(); ++i) {
-            CoverageImage intersected = IntersectCoverageImages(context, combined, layer.coverages[i]);
+        CoverageImage combined = coverages.front();
+        for (size_t i = 1; i < coverages.size(); ++i) {
+            CoverageImage intersected = IntersectCoverageImages(context, combined, coverages[i]);
             if (intersected.image == nullptr) {
                 continue;
             }
             combined = std::move(intersected);
         }
         if (combined.image != nullptr) {
-            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal, tgfx::TileMode::Decal);
+            auto shader = tgfx::Shader::MakeImageShader(combined.image, tgfx::TileMode::Decal,
+                                                        tgfx::TileMode::Decal);
             if (shader != nullptr) {
                 shader = shader->makeWithMatrix(combined.localMatrix);
-                paint.setMaskFilter(tgfx::MaskFilter::MakeShader(shader, combined.invertAlpha));
+                maskPaint.setMaskFilter(tgfx::MaskFilter::MakeShader(shader, combined.invertAlpha));
             }
         }
     }
@@ -624,7 +679,48 @@ void TgfxCanvasAdapter::endLayer(
     if (parent == nullptr || content == nullptr) {
         return;
     }
-    parent->drawPicture(content, nullptr, &paint);
+
+    tgfx::Paint compositePaint = maskPaint;
+    compositePaint.setAlpha(compositeOpacity);
+    compositePaint.setBlendMode(ToTgfxBlendMode(compositeBlend));
+
+    const bool hasEffects = !effects.empty();
+    std::shared_ptr<tgfx::Image> filtered;
+    tgfx::Point offset = {};
+    tgfx::Rect bounds = contentBounds;
+    bounds.roundOut();
+    if (hasEffects) {
+        tgfx::Context *context = surface_->getContext();
+        const tgfx::Paint *rasterPaint =
+            maskPaint.getMaskFilter() != nullptr ? &maskPaint : nullptr;
+        filtered = PictureToImage(context, content, contentBounds, rasterPaint);
+        if (filtered != nullptr) {
+            for (const auto &effect : effects) {
+                if (effect == nullptr) {
+                    continue;
+                }
+                std::shared_ptr<tgfx::Image> next =
+                    ApplyLayerEffect(*effect, filtered, renderCache_.get(), &offset);
+                if (next == nullptr) {
+                    break;
+                }
+                filtered = std::move(next);
+            }
+        }
+    }
+
+    if (filtered != nullptr) {
+        parent->save();
+        parent->concat(tgfx::Matrix::MakeTrans(bounds.left + offset.x, bounds.top + offset.y));
+        tgfx::Paint imagePaint;
+        imagePaint.setAntiAlias(true);
+        imagePaint.setAlpha(compositeOpacity);
+        imagePaint.setBlendMode(ToTgfxBlendMode(compositeBlend));
+        parent->drawImage(filtered, &imagePaint);
+        parent->restore();
+        return;
+    }
+    parent->drawPicture(content, nullptr, &compositePaint);
 }
 
 void TgfxCanvasAdapter::beginMask(MaskApplyMode mode) {

@@ -664,7 +664,7 @@ git commit --only include/MotionStudio/render/DrawCommand.h \
 
 ### Task 6: adapter isolation 快照 + BC 接线
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxIsolation.h`
@@ -677,7 +677,7 @@ git commit --only include/MotionStudio/render/DrawCommand.h \
 - Produces: effects 非空时 Picture→Image →（可选 mask）→ 链式 Apply → `drawImage`
 - Produces: 单个 `Apply` 返回 `nullptr` 则停链，用上一步 image；尚无 image 则退回 `drawPicture`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `adapter/tgfx/tests/TgfxRenderAdapterTest.cpp`（Metal 不可用则 `GTEST_SKIP`，与现有用例相同）：
 
@@ -698,7 +698,7 @@ TEST(TgfxRenderAdapterTest, LayerOpacityAppliesAfterBrightnessContrast) {
 
 构造：直接填 `EvaluatedLayer`（不必走 Document），`effects` 推 `shared_ptr<BrightnessContrastEffect>` 且已 `setStaticValue`。`PlayCommands(BuildCommands(state))`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -707,7 +707,7 @@ cmake --build build --target tgfx_adapter_test
 
 Expected: 中心 luma / alpha 与无滤镜几乎相同（effects 被忽略）。
 
-- [ ] **Step 3: 实现 endLayer 滤镜路径**
+- [x] **Step 3: 实现 endLayer 滤镜路径**
 
 `TgfxIsolation.h` 的 `IsolationLayer` 增加：
 
@@ -749,7 +749,7 @@ switch (effect.type()) {
 
 仅 mask、无 effect 的层也走步骤 3，opacity 改为 composite 时乘。现有 mask 测试默认 opacity=1，不应挂。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -758,7 +758,7 @@ cmake --build build --target tgfx_adapter_test
 
 Expected: 新用例 PASS；旧 mask / opacity 用例仍 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/src/TgfxIsolation.h adapter/tgfx/src/TgfxCanvasAdapter.cpp \

@@ -10,6 +10,7 @@
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/GradientType.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -30,6 +31,7 @@
 #include "TgfxRenderAdapter.h"
 
 using motion::BezierPath;
+using motion::BrightnessContrastEffect;
 using motion::BuildCommands;
 using motion::Color;
 using motion::Composition;
@@ -841,4 +843,76 @@ TEST(TgfxRenderAdapterTest, BadShaderSourceSkipsFill) {
     EXPECT_NEAR(center.r, 0, 8);
     EXPECT_NEAR(center.g, 0, 8);
     EXPECT_NEAR(center.b, 0, 8);
+}
+
+TEST(TgfxRenderAdapterTest, BrightnessContrastRaisesCenterLuma) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{40, 40});
+    item.paint = Paint{Color{0.5f, 0.5f, 0.5f, 1}};
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(layer);
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> plainPixels;
+    ASSERT_TRUE(adapter->ReadPixels(plainPixels));
+    const Pixel plain = PixelAt(plainPixels, 100, 50, 50);
+    const int plainLuma = static_cast<int>(plain.r) + static_cast<int>(plain.g) +
+        static_cast<int>(plain.b);
+
+    auto brightnessContrast = std::make_shared<BrightnessContrastEffect>();
+    brightnessContrast->brightness.setStaticValue(100.0f);
+    state.layers[0].effects.push_back(std::move(brightnessContrast));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> filteredPixels;
+    ASSERT_TRUE(adapter->ReadPixels(filteredPixels));
+    const Pixel filtered = PixelAt(filteredPixels, 100, 50, 50);
+    const int filteredLuma = static_cast<int>(filtered.r) + static_cast<int>(filtered.g) +
+        static_cast<int>(filtered.b);
+    EXPECT_GT(filteredLuma, plainLuma + 20);
+}
+
+TEST(TgfxRenderAdapterTest, LayerOpacityAppliesAfterBrightnessContrast) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 0};
+    EvaluatedLayer layer;
+    layer.opacity = 0.5f;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{40, 40});
+    item.paint = Paint{Color{1, 0, 0, 1}};
+    layer.shapeItems.push_back(item);
+    auto brightnessContrast = std::make_shared<BrightnessContrastEffect>();
+    brightnessContrast->brightness.setStaticValue(10.0f);
+    layer.effects.push_back(std::move(brightnessContrast));
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(center.a, 128, 20);
 }

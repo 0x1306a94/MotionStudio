@@ -10,6 +10,7 @@
 #include <tgfx/core/PictureRecorder.h>
 #include <tgfx/core/Rect.h>
 
+#include "MotionStudio/model/BlendMode.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/render/MaskApplyMode.h"
 
@@ -38,6 +39,8 @@ struct IsolationLayer {
     bool masking = false;
     MaskApplyMode maskApplyMode = MaskApplyMode::PathCoverage;
     float savedOpacity = 1.0f;
+    float compositeOpacity = 1.0f;
+    BlendMode compositeBlend = BlendMode::Normal;
     // Layer-local AABB of content drawn into contentRecorder; sizes maskSurface.
     tgfx::Rect contentBounds = tgfx::Rect::MakeEmpty();
     std::vector<CoverageImage> coverages;
