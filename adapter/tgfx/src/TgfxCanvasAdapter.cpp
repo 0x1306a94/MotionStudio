@@ -91,9 +91,6 @@ std::shared_ptr<tgfx::Image> PictureToImage(tgfx::Context *context,
     std::shared_ptr<tgfx::Surface> surface =
         tgfx::Surface::Make(context, width, height, tgfx::ColorType::RGBA_8888);
     if (surface == nullptr) {
-        surface = tgfx::Surface::Make(context, width, height);
-    }
-    if (surface == nullptr) {
         return nullptr;
     }
     tgfx::Canvas *canvas = surface->getCanvas();
