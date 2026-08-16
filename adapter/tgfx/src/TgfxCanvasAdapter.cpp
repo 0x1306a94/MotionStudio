@@ -87,7 +87,9 @@ std::shared_ptr<tgfx::Image> PictureToImage(tgfx::Context *context,
     bounds.roundOut();
     const int width = std::max(static_cast<int>(std::ceil(bounds.width())), 1);
     const int height = std::max(static_cast<int>(std::ceil(bounds.height())), 1);
-    std::shared_ptr<tgfx::Surface> surface = tgfx::Surface::Make(context, width, height, true);
+    // Color, not alpha-only: isolation snapshots carry fill/image RGB.
+    std::shared_ptr<tgfx::Surface> surface =
+        tgfx::Surface::Make(context, width, height, tgfx::ColorType::RGBA_8888);
     if (surface == nullptr) {
         surface = tgfx::Surface::Make(context, width, height);
     }

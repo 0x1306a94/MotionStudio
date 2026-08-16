@@ -957,6 +957,38 @@ TEST(TgfxRenderAdapterTest, GaussianBlurSoftensRectEdge) {
     EXPECT_GT(blurOutside.r, 8);
 }
 
+TEST(TgfxRenderAdapterTest, GaussianBlurKeepsFillColor) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{40, 40});
+    item.paint = Paint{Color{1, 0, 0, 1}};
+    layer.shapeItems.push_back(item);
+    auto blur = std::make_shared<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(16.0f);
+    layer.effects.push_back(std::move(blur));
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_GT(center.r, 200);
+    EXPECT_LT(center.g, 40);
+    EXPECT_LT(center.b, 40);
+}
+
 TEST(TgfxRenderAdapterTest, EffectOrderChangesHalfBlackHalfWhite) {
     auto adapter = TgfxRenderAdapter::Make(64, 64);
     if (!adapter) {
