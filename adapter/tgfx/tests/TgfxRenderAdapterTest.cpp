@@ -42,6 +42,7 @@ using motion::EvaluatedLayer;
 using motion::EvaluatedMask;
 using motion::EvaluatedShapeItem;
 using motion::FillStyle;
+using motion::GaussianBlurEffect;
 using motion::GradientType;
 using motion::Layer;
 using motion::LayerType;
@@ -915,4 +916,145 @@ TEST(TgfxRenderAdapterTest, LayerOpacityAppliesAfterBrightnessContrast) {
     ASSERT_TRUE(adapter->ReadPixels(pixels));
     const Pixel center = PixelAt(pixels, 100, 50, 50);
     EXPECT_NEAR(center.a, 128, 20);
+}
+
+TEST(TgfxRenderAdapterTest, GaussianBlurSoftensRectEdge) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{20, 20});
+    item.paint = Paint{Color{1, 1, 1, 1}};
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(layer);
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> plainPixels;
+    ASSERT_TRUE(adapter->ReadPixels(plainPixels));
+    const Pixel plainOutside = PixelAt(plainPixels, 100, 64, 50);
+    EXPECT_NEAR(plainOutside.a, 255, 8);
+    EXPECT_NEAR(plainOutside.r, 0, 8);
+
+    auto blur = std::make_shared<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(16.0f);
+    state.layers[0].effects.push_back(std::move(blur));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> blurPixels;
+    ASSERT_TRUE(adapter->ReadPixels(blurPixels));
+    const Pixel blurOutside = PixelAt(blurPixels, 100, 64, 50);
+    EXPECT_GT(blurOutside.r, 8);
+}
+
+TEST(TgfxRenderAdapterTest, EffectOrderChangesHalfBlackHalfWhite) {
+    auto adapter = TgfxRenderAdapter::Make(64, 64);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    auto makeHalf = []() {
+        SceneState state;
+        state.viewportWidth = 64;
+        state.viewportHeight = 64;
+        state.backgroundColor = Color{0, 0, 0, 1};
+        EvaluatedLayer layer;
+        EvaluatedShapeItem black;
+        black.geometry = MakeRectGeometry(Vec2{16, 32}, Vec2{32, 64});
+        black.paint = Paint{Color{0, 0, 0, 1}};
+        EvaluatedShapeItem white;
+        white.geometry = MakeRectGeometry(Vec2{48, 32}, Vec2{32, 64});
+        white.paint = Paint{Color{1, 1, 1, 1}};
+        layer.shapeItems.push_back(black);
+        layer.shapeItems.push_back(white);
+        state.layers.push_back(std::move(layer));
+        return state;
+    };
+
+    auto brightnessContrast = []() {
+        auto effect = std::make_shared<BrightnessContrastEffect>();
+        effect->contrast.setStaticValue(80.0f);
+        return effect;
+    };
+    auto blur = []() {
+        auto effect = std::make_shared<GaussianBlurEffect>();
+        effect->blurriness.setStaticValue(12.0f);
+        return effect;
+    };
+
+    SceneState first = makeHalf();
+    first.layers[0].effects.push_back(brightnessContrast());
+    first.layers[0].effects.push_back(blur());
+    adapter->beginFrame(64, 64, first.backgroundColor, first.cornerRadius);
+    PlayCommands(BuildCommands(first), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> firstPixels;
+    ASSERT_TRUE(adapter->ReadPixels(firstPixels));
+
+    SceneState second = makeHalf();
+    second.layers[0].effects.push_back(blur());
+    second.layers[0].effects.push_back(brightnessContrast());
+    adapter->beginFrame(64, 64, second.backgroundColor, second.cornerRadius);
+    PlayCommands(BuildCommands(second), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> secondPixels;
+    ASSERT_TRUE(adapter->ReadPixels(secondPixels));
+
+    ASSERT_EQ(firstPixels.size(), secondPixels.size());
+    EXPECT_NE(firstPixels, secondPixels);
+}
+
+TEST(TgfxRenderAdapterTest, BlurBleedsOutsideAddMask) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{80, 80});
+    item.paint = Paint{Color{1, 1, 1, 1}};
+    layer.shapeItems.push_back(item);
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Add;
+    BezierPath path =
+        MakeSingleContour({{{40, 40}, {}, {}}, {{60, 40}, {}, {}}, {{60, 60}, {}, {}}, {{40, 60}, {}, {}}},
+                          true);
+    mask.path = path;
+    layer.masks.push_back(mask);
+    state.layers.push_back(layer);
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> plainPixels;
+    ASSERT_TRUE(adapter->ReadPixels(plainPixels));
+    const Pixel plainBleed = PixelAt(plainPixels, 100, 68, 50);
+    EXPECT_NEAR(plainBleed.r, 0, 8);
+
+    auto blur = std::make_shared<GaussianBlurEffect>();
+    blur->blurriness.setStaticValue(16.0f);
+    state.layers[0].effects.push_back(std::move(blur));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> blurPixels;
+    ASSERT_TRUE(adapter->ReadPixels(blurPixels));
+    const Pixel blurBleed = PixelAt(blurPixels, 100, 68, 50);
+    EXPECT_GT(blurBleed.r, 8);
 }

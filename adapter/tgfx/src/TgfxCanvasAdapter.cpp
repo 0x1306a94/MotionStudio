@@ -40,6 +40,7 @@
 #include "TgfxTypeConvert.h"
 #include "effects/BrightnessContrastFilter.h"
 #include "effects/ColorSourceEffect.h"
+#include "effects/GaussianBlurFilter.h"
 #include "effects/Uniform.h"
 
 #include "MotionStudio/model/LayerEffect.h"
@@ -111,7 +112,9 @@ std::shared_ptr<tgfx::Image> ApplyLayerEffect(const LayerEffect &effect,
                                                    brightnessContrast.contrast.evaluate(0), offset);
         }
         case LayerEffectType::GaussianBlur: {
-            return input;
+            const auto &blur = static_cast<const GaussianBlurEffect &>(effect);
+            return GaussianBlurFilter::Apply(input, cache, blur.blurriness.evaluate(0),
+                                             blur.repeatEdgePixels, offset);
         }
     }
     return input;

@@ -771,7 +771,7 @@ git commit --only adapter/tgfx/src/TgfxIsolation.h adapter/tgfx/src/TgfxCanvasAd
 
 ### Task 7: GaussianBlur + 链序 / mask 渗出
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `adapter/tgfx/src/effects/GaussianBlurFilter.h`
@@ -784,7 +784,7 @@ git commit --only adapter/tgfx/src/TgfxIsolation.h adapter/tgfx/src/TgfxCanvasAd
 - 半径：`ImageFilter::Blur(blurriness/2, blurriness/2)`；`repeatEdgePixels==true` 时 `TileMode::Clamp` 且 clip 回输入 WH（对齐 PAG `GaussianBlurFilter`）
 - `cache` 本滤镜不用，签名保留
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(TgfxRenderAdapterTest, GaussianBlurSoftensRectEdge) {
@@ -804,7 +804,7 @@ TEST(TgfxRenderAdapterTest, BlurBleedsOutsideAddMask) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxRenderAdapterTest.GaussianBlur*:TgfxRenderAdapterTest.EffectOrder*:TgfxRenderAdapterTest.BlurBleed*'
@@ -812,7 +812,7 @@ TEST(TgfxRenderAdapterTest, BlurBleedsOutsideAddMask) {
 
 Expected: FAIL（`ApplyLayerEffect` 对 GaussianBlur 原样返回）。
 
-- [ ] **Step 3: 实现 GaussianBlur**
+- [x] **Step 3: 实现 GaussianBlur**
 
 `GaussianBlurFilter.h` / `.cpp`：
 
@@ -837,11 +837,11 @@ std::shared_ptr<tgfx::Image> GaussianBlurFilter::Apply(std::shared_ptr<tgfx::Ima
 
 `ApplyLayerEffect` 的 `GaussianBlur` 分支：`static_cast<const GaussianBlurEffect &>`，调 `Apply`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 跑 Task 6+7 全部新用例 + `TgfxRenderAdapterTest.*`。Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/src/effects/GaussianBlurFilter.h \
