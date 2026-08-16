@@ -346,7 +346,7 @@ git commit --only include/MotionStudio/render/ src/render/ adapter/tgfx/include/
 
 ### Task 5: adapter Behind/Above 合成 + Shadow/Glow spread=0
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxCanvasAdapter.cpp`（`endLayer`、`ApplyLayerFx`）
@@ -357,7 +357,7 @@ git commit --only include/MotionStudio/render/ src/render/ adapter/tgfx/include/
 - Produces: 无 layerStyles 时行为与现在相同
 - Produces: spread=0 的 Shadow / Glow 用 `ImageFilter::DropShadowOnly`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 抄 `GaussianBlurSoftensRectEdge`：100×100 黑底，20×20 白块居中。
 
@@ -367,7 +367,7 @@ git commit --only include/MotionStudio/render/ src/render/ adapter/tgfx/include/
 
 `LayerOpacityFadesDropShadow`：图层 opacity 0.5 + 默认 Shadow。阴影像素 alpha 约为 opacity 1 时的一半（容差 ±20）。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxRenderAdapterTest.DropShadow*:TgfxRenderAdapterTest.OuterGlow*:TgfxRenderAdapterTest.LayerOpacityFadesDropShadow'
@@ -375,7 +375,7 @@ git commit --only include/MotionStudio/render/ src/render/ adapter/tgfx/include/
 
 Expected: FAIL（layerStyles 被忽略）
 
-- [ ] **Step 3: 实现合成**
+- [x] **Step 3: 实现合成**
 
 `endLayer` 在 effect 链之后：
 
@@ -406,11 +406,11 @@ filter = tgfx::ImageFilter::DropShadowOnly(0, 0, size/range/2, size/range/2, ToT
 
 角度用现有工程里的 deg→rad 写法（搜 `DegreesToRadians` 或 `M_PI`）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Expected: PASS（无 Metal 则 SKIP）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only adapter/tgfx/src/TgfxCanvasAdapter.cpp adapter/tgfx/tests/TgfxRenderAdapterTest.cpp \

@@ -11,6 +11,7 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -36,6 +37,7 @@ using motion::BuildCommands;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::DropShadowStyle;
 using motion::EntityId;
 using motion::EvaluatedGradientStop;
 using motion::EvaluatedLayer;
@@ -52,6 +54,7 @@ using motion::MakeRectGeometry;
 using motion::MakeSingleContour;
 using motion::MaskMode;
 using motion::Mat3;
+using motion::OuterGlowStyle;
 using motion::Paint;
 using motion::PlayCommands;
 using motion::SceneEvaluator;
@@ -1089,4 +1092,99 @@ TEST(TgfxRenderAdapterTest, BlurBleedsOutsideAddMask) {
     ASSERT_TRUE(adapter->ReadPixels(blurPixels));
     const Pixel blurBleed = PixelAt(blurPixels, 100, 68, 50);
     EXPECT_GT(blurBleed.r, 8);
+}
+
+namespace {
+
+SceneState MakeCenteredWhiteRect() {
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(Vec2{50, 50}, Vec2{20, 20});
+    item.paint = Paint{Color{1, 1, 1, 1}};
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+    return state;
+}
+
+}  // namespace
+
+TEST(TgfxRenderAdapterTest, DropShadowKeepsFillAndCastsOffset) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state = MakeCenteredWhiteRect();
+    auto shadow = std::make_shared<DropShadowStyle>();
+    shadow->color.setStaticValue(Color{1, 0, 0, 1});
+    state.layers[0].layerStyles.push_back(std::move(shadow));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_GT(center.r, 200);
+    EXPECT_GT(center.g, 200);
+    EXPECT_GT(center.b, 200);
+    const Pixel offsetPixel = PixelAt(pixels, 100, 64, 64);
+    EXPECT_GT(static_cast<int>(offsetPixel.r) + static_cast<int>(offsetPixel.g) +
+                  static_cast<int>(offsetPixel.b),
+              8);
+}
+
+TEST(TgfxRenderAdapterTest, OuterGlowTintsAroundRect) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state = MakeCenteredWhiteRect();
+    state.layers[0].layerStyles.push_back(std::make_shared<OuterGlowStyle>());
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_GT(center.r, 200);
+    EXPECT_GT(center.g, 200);
+    const Pixel right = PixelAt(pixels, 100, 64, 50);
+    const Pixel left = PixelAt(pixels, 100, 36, 50);
+    const Pixel up = PixelAt(pixels, 100, 50, 36);
+    const Pixel down = PixelAt(pixels, 100, 50, 64);
+    EXPECT_GT(right.r + right.g, 8);
+    EXPECT_GT(left.r + left.g, 8);
+    EXPECT_GT(up.r + up.g, 8);
+    EXPECT_GT(down.r + down.g, 8);
+}
+
+TEST(TgfxRenderAdapterTest, LayerOpacityFadesDropShadow) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    auto render = [&](float opacity) {
+        SceneState state = MakeCenteredWhiteRect();
+        state.backgroundColor = Color{0, 0, 0, 0};
+        state.layers[0].opacity = opacity;
+        state.layers[0].layerStyles.push_back(std::make_shared<DropShadowStyle>());
+        adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+        PlayCommands(BuildCommands(state), *adapter);
+        adapter->endFrame();
+        std::vector<uint8_t> pixels;
+        EXPECT_TRUE(adapter->ReadPixels(pixels));
+        return PixelAt(pixels, 100, 64, 64);
+    };
+
+    const Pixel full = render(1.0f);
+    const Pixel faded = render(0.5f);
+    EXPECT_NEAR(static_cast<int>(faded.a), static_cast<int>(full.a) / 2, 20);
 }

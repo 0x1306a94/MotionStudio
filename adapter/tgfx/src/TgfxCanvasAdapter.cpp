@@ -45,6 +45,7 @@
 #include "effects/Uniform.h"
 
 #include "MotionStudio/model/LayerEffect.h"
+#include "MotionStudio/model/LayerFx.h"
 
 namespace motion {
 
@@ -114,6 +115,119 @@ std::shared_ptr<tgfx::Image> ApplyLayerEffect(const LayerEffect &effect,
         }
     }
     return input;
+}
+
+constexpr float kPi = 3.14159265358979323846f;
+
+tgfx::Color LayerFxRgb(const Color &color) {
+    return ToTgfxColor(Color{color.r, color.g, color.b, 1.0f});
+}
+
+std::shared_ptr<tgfx::ImageFilter> MakeLayerFxFilter(const LayerFx &style) {
+    switch (style.type()) {
+        case LayerFxType::DropShadow: {
+            const auto &shadow = static_cast<const DropShadowStyle &>(style);
+            const float spread = shadow.spread.evaluate(0);
+            if (spread != 0.0f) {
+                return nullptr;
+            }
+            const float angle = shadow.angle.evaluate(0);
+            const float distance = shadow.distance.evaluate(0);
+            const float size = shadow.size.evaluate(0);
+            const float radians = (angle - 180.0f) * (kPi / 180.0f);
+            const float offsetX = std::cos(radians) * distance;
+            const float offsetY = -std::sin(radians) * distance;
+            const float blur = size * 0.5f;
+            return tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blur, blur,
+                                                     LayerFxRgb(shadow.color.evaluate(0)));
+        }
+        case LayerFxType::OuterGlow: {
+            const auto &glow = static_cast<const OuterGlowStyle &>(style);
+            const float spread = glow.spread.evaluate(0);
+            if (spread != 0.0f) {
+                return nullptr;
+            }
+            const float size = glow.size.evaluate(0);
+            const float range = glow.range.evaluate(0);
+            const float blur = size / range * 0.5f;
+            return tgfx::ImageFilter::DropShadowOnly(0.0f, 0.0f, blur, blur,
+                                                     LayerFxRgb(glow.color.evaluate(0)));
+        }
+        case LayerFxType::Stroke: {
+            return nullptr;
+        }
+    }
+    return nullptr;
+}
+
+float LayerFxOpacity(const LayerFx &style) {
+    switch (style.type()) {
+        case LayerFxType::DropShadow: {
+            return static_cast<const DropShadowStyle &>(style).opacity.evaluate(0);
+        }
+        case LayerFxType::OuterGlow: {
+            return static_cast<const OuterGlowStyle &>(style).opacity.evaluate(0);
+        }
+        case LayerFxType::Stroke: {
+            return static_cast<const LayerStrokeStyle &>(style).opacity.evaluate(0);
+        }
+    }
+    return 1.0f;
+}
+
+BlendMode LayerFxBlendMode(const LayerFx &style) {
+    switch (style.type()) {
+        case LayerFxType::DropShadow: {
+            return static_cast<const DropShadowStyle &>(style).blendMode;
+        }
+        case LayerFxType::OuterGlow: {
+            return static_cast<const OuterGlowStyle &>(style).blendMode;
+        }
+        case LayerFxType::Stroke: {
+            return static_cast<const LayerStrokeStyle &>(style).blendMode;
+        }
+    }
+    return BlendMode::Normal;
+}
+
+void ApplyLayerFx(tgfx::Canvas *canvas, const std::shared_ptr<tgfx::Image> &image,
+                  const LayerFx &style, float originX, float originY) {
+    if (canvas == nullptr || image == nullptr) {
+        return;
+    }
+    std::shared_ptr<tgfx::ImageFilter> filter = MakeLayerFxFilter(style);
+    if (filter == nullptr) {
+        return;
+    }
+    tgfx::Point point = {};
+    std::shared_ptr<tgfx::Image> decorated = image->makeWithFilter(filter, &point);
+    if (decorated == nullptr) {
+        return;
+    }
+    tgfx::Paint paint;
+    paint.setAntiAlias(true);
+    paint.setAlpha(LayerFxOpacity(style));
+    paint.setBlendMode(ToTgfxBlendMode(LayerFxBlendMode(style)));
+    canvas->drawImage(decorated, originX + point.x, originY + point.y, &paint);
+}
+
+tgfx::Rect LayerFxUnionBounds(const std::shared_ptr<tgfx::Image> &image,
+                              const std::vector<std::shared_ptr<const LayerFx>> &layerStyles) {
+    tgfx::Rect bounds = tgfx::Rect::MakeWH(static_cast<float>(image->width()),
+                                           static_cast<float>(image->height()));
+    const tgfx::Rect source = bounds;
+    for (const auto &style : layerStyles) {
+        if (style == nullptr) {
+            continue;
+        }
+        std::shared_ptr<tgfx::ImageFilter> filter = MakeLayerFxFilter(*style);
+        if (filter == nullptr) {
+            continue;
+        }
+        bounds.join(filter->filterBounds(source));
+    }
+    bounds.roundOut();
+    return bounds;
 }
 
 IsolationLayer *TopIsolationLayer(const std::unique_ptr<TgfxIsolationStack> &stack) {
@@ -631,7 +745,7 @@ void TgfxCanvasAdapter::beginLayer() {
 
 void TgfxCanvasAdapter::endLayer(
     const std::vector<std::shared_ptr<const LayerEffect>> &effects,
-    const std::vector<std::shared_ptr<const LayerFx>> & /*layerStyles*/) {
+    const std::vector<std::shared_ptr<const LayerFx>> &layerStyles) {
     if (isolationStack_ == nullptr || isolationStack_->layers.empty() || surface_ == nullptr) {
         return;
     }
@@ -676,11 +790,12 @@ void TgfxCanvasAdapter::endLayer(
     compositePaint.setBlendMode(ToTgfxBlendMode(compositeBlend));
 
     const bool hasEffects = !effects.empty();
+    const bool hasStyles = !layerStyles.empty();
     std::shared_ptr<tgfx::Image> filtered;
     tgfx::Point offset = {};
     tgfx::Rect bounds = contentBounds;
     bounds.roundOut();
-    if (hasEffects) {
+    if (hasEffects || hasStyles) {
         const tgfx::Paint *rasterPaint = maskPaint.getMaskFilter() != nullptr ? &maskPaint : nullptr;
         filtered = PictureToImage(renderCache_.get(), content, contentBounds, rasterPaint);
         if (filtered != nullptr) {
@@ -694,6 +809,38 @@ void TgfxCanvasAdapter::endLayer(
                 }
                 filtered = std::move(next);
             }
+        }
+    }
+
+    if (filtered != nullptr && hasStyles) {
+        const tgfx::Rect unionBounds = LayerFxUnionBounds(filtered, layerStyles);
+        const int width = std::max(static_cast<int>(std::ceil(unionBounds.width())), 1);
+        const int height = std::max(static_cast<int>(std::ceil(unionBounds.height())), 1);
+        std::shared_ptr<tgfx::Surface> surface =
+            renderCache_->acquireSurface(width, height, tgfx::ColorType::RGBA_8888);
+        if (surface != nullptr) {
+            tgfx::Canvas *canvas = surface->getCanvas();
+            canvas->clear();
+            const float originX = -unionBounds.left;
+            const float originY = -unionBounds.top;
+            for (const auto &style : layerStyles) {
+                if (style == nullptr || style->drawPosition() != LayerFxDrawPosition::Behind) {
+                    continue;
+                }
+                ApplyLayerFx(canvas, filtered, *style, originX, originY);
+            }
+            tgfx::Paint sourcePaint;
+            sourcePaint.setAntiAlias(true);
+            canvas->drawImage(filtered, originX, originY, &sourcePaint);
+            for (const auto &style : layerStyles) {
+                if (style == nullptr || style->drawPosition() != LayerFxDrawPosition::Above) {
+                    continue;
+                }
+                ApplyLayerFx(canvas, filtered, *style, originX, originY);
+            }
+            filtered = surface->makeImageSnapshot();
+            offset.x += unionBounds.left;
+            offset.y += unionBounds.top;
         }
     }
 
