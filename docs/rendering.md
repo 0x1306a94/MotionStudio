@@ -87,7 +87,7 @@ enum class DrawCommandType {
     DrawImage,    // 图片层：path + container/intrinsic size + ImageScaleMode
     DrawText,     // 文本层：自包含排版输入（见 text* 字段）
     ClipPath,
-    BeginLayer, EndLayer,   // 离屏组（mask / track matte / effects）
+    BeginLayer, EndLayer,   // 离屏组（mask / track matte / effects / layerStyles）
     BeginMask, EndMask,     // coverage 记录与应用
     DrawMaskPath,           // PathCoverage 内单条 mask
 };
@@ -117,6 +117,7 @@ struct DrawCommand {
     std::string textFontStyle;
     std::vector<TextDrawStyle> textStyles;
     std::vector<std::shared_ptr<const LayerEffect>> effects;  // EndLayer
+    std::vector<std::shared_ptr<const LayerFx>> layerStyles;  // EndLayer
 };
 
 using DrawCommandList = std::vector<DrawCommand>;
@@ -149,7 +150,8 @@ public:
                           const std::vector<TextDrawStyle>& styles) = 0;
     virtual void clipPath(const BezierPath& path, FillRule rule) = 0;
     virtual void beginLayer() = 0;
-    virtual void endLayer(const std::vector<std::shared_ptr<const LayerEffect>> &effects) = 0;
+    virtual void endLayer(const std::vector<std::shared_ptr<const LayerEffect>> &effects,
+                          const std::vector<std::shared_ptr<const LayerFx>> &layerStyles) = 0;
 };
 
 // 播放器：把指令序列喂给任意适配器
@@ -158,7 +160,7 @@ void playCommands(const DrawCommandList& cmds, RenderAdapter& r);
 
 **为什么是 immediate-mode 而非 retained（场景图）**：动画工具每帧内容都在变，retained 模式的缓存价值很低；栈式接口与 Metal / CoreGraphics / Skia 的 API 形态天然对齐。Rive 的 Renderer 接口同此思路，已验证可行。
 
-有 mask / track matte / 非空 `EvaluatedLayer::effects` 时 `CommandBuilder` 包 `BeginLayer`/`EndLayer`。`endLayer` 先把 isolation Picture 栅格成 Image，再按数组序 `Apply`（mask 在滤镜前），最后用图层 opacity / blend 叠回。无 effect 且无 mask 则直画。GaussianBlur 半径为 `blurriness/2`，与 PAG 一致。
+有 mask / track matte / 非空 `EvaluatedLayer::effects` 或 `layerStyles` 时 `CommandBuilder` 包 `BeginLayer`/`EndLayer`。`endLayer` 先把 isolation Picture 栅格成 Image，再按数组序跑 effect（mask 在滤镜前），然后按 Behind 装饰 → 原图 → Above 装饰合成一张 `composited`，最后用图层 opacity / blend 叠回。无 effect、无 layerStyles 且无 mask 则直画。GaussianBlur 半径为 `blurriness/2`，与 PAG 一致。Layer style 公式见 [pag-runtime-filter.md](pag-runtime-filter.md)。
 
 ### 3.3 已实现后端：tgfx（Metal）
 

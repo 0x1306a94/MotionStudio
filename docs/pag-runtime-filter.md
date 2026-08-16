@@ -9,6 +9,8 @@
 - `adapter/tgfx/src/effects/RuntimeFilter.{h,cpp}`
 - `adapter/tgfx/src/effects/BrightnessContrastFilter.{h,cpp}`
 - `adapter/tgfx/src/effects/GaussianBlurFilter.{h,cpp}`
+- `adapter/tgfx/src/effects/SolidStrokeFilter.{h,cpp}`
+- `adapter/tgfx/src/effects/AlphaEdgeDetectFilter.{h,cpp}`
 - `adapter/tgfx/src/RenderCache.{h,cpp}`
 - `adapter/tgfx/tests/BrightnessContrastFilterTest.mm`
 - `adapter/tgfx/tests/RenderCacheTest.cpp`
@@ -60,14 +62,32 @@ BrightnessContrast 参数与 PAG 一致：`brightness` / `contrast` 为 AE 风�
 
 ## 5. 图层 effect 链
 
-`TgfxCanvasAdapter::endLayer` 在 isolation 内把 Picture 栅格成 Image，再按 `effects[]` 顺序调用：
+`TgfxCanvasAdapter::endLayer` 在 isolation 内把 Picture 栅格成 Image，再按 `effects[]` 顺序调用，然后合成 `layerStyles[]`：
 
 ```
 PictureToImage →（可选 mask）→ Apply(effects[0]) → Apply(effects[1]) → …
+    → Behind styles → 原图 → Above styles
     → drawImage（图层 opacity / blend）
 ```
 
 - BrightnessContrast：`BrightnessContrastFilter::Apply`（AE 风格数值，映射见上）
 - GaussianBlur：`GaussianBlurFilter::Apply`；半径 `ImageFilter::Blur(blurriness/2, blurriness/2)`；`repeatEdgePixels==true` 时 `TileMode::Clamp` 并 clip 回输入尺寸
 
-单个 `Apply` 返回 `nullptr` 则停链，保留上一张；栅格失败则退回 `drawPicture`。Core 模型与求值见 [data-model.md](data-model.md) / [layer-effects spec](superpowers/specs/2026-08-16-layer-effects-design.md)。App Inspector 与 PAG 导出 Effect 块仍未做。
+单个 `Apply` 返回 `nullptr` 则停链，保留上一张；栅格失败则退回 `drawPicture`。无 layerStyles 时不多一张合成离屏。Core 模型与求值见 [data-model.md](data-model.md) / [layer-effects spec](superpowers/specs/2026-08-16-layer-effects-design.md) / [layer-styles spec](superpowers/specs/2026-08-16-layer-styles-design.md)。
+
+## 6. Layer style 滤镜
+
+`MakeLayerFxFilter` 按类型分发。`color` 只用 RGB；装饰 `setAlpha(opacity)` + `style.blendMode`。
+
+| Style | 公式 |
+|---|---|
+| DropShadow `spread==0` | `DropShadowOnly(offsetX, offsetY, size/2)`；`offset = (cos(angle-180), -sin(angle-180)) * distance` |
+| OuterGlow `spread==0` | `DropShadowOnly(0, 0, size/range/2)` |
+| Shadow / Glow `spread==1` | `SolidStroke`（position 空 = PAG Invalid，三旗全 0） |
+| Shadow / Glow `0<spread<1` | `Compose(SolidStroke(size*spread), DropShadowOnly(剩余模糊))` |
+| Stroke Outside | `SolidStroke(..., original=null)` |
+| Stroke Inside / Center | `Compose(AlphaEdgeDetect, SolidStroke(..., original=image))`，spreadSize ×0.8 / ×0.4 |
+
+`SolidStrokeFilter` / `AlphaEdgeDetectFilter` 拷 PAG shader。UBO 走 `acquireUniformSlice`。`filterBounds` 外扩 `spreadSize`；`computeVertices` 按 PAG 把源图 1:1 映到扩张输出（UV 平移 `-spreadSize`）。隔离快照紧裁不透明内容时，Outside 对 UV 越界的 `srcColor` 清零，避免 ClampToEdge 把描边环当成内部。
+
+Shadow thick：`size * spread >= 12`。Glow / Stroke thick：`size >= 12`。`STROKE_MAX_SPREAD_SIZE=25`。

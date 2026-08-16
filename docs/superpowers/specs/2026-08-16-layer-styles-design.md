@@ -1,7 +1,7 @@
 # Layer Styles（Drop Shadow + Outer Glow + Stroke）— 设计说明
 
 日期：2026-08-16  
-状态：草案  
+状态：已实现  
 前置：[Layer Effects](2026-08-16-layer-effects-design.md)、[Layer Effects UI](2026-08-16-layer-effects-ui-design.md)、[PAG RuntimeFilter](2026-08-13-pag-runtime-filter-design.md)  
 相关：[rendering.md](../../rendering.md)、[data-model.md](../../data-model.md)、PAG `DropShadowFilter` / `OuterGlowFilter` / `StrokeFilter` / `SolidStrokeFilter`
 
