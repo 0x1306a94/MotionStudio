@@ -289,7 +289,7 @@ PropertyPath：仅 `content.text` 可动画。`fontSize` / `size` / `fontFamily`
 ### 3.5 Shape 模型
 
 每个 Shape Layer 持有**一个**几何（`ShapeContent::geometry`）。Fill/Stroke 在 `Layer::styles`。
-`Layer::effects[]` 是整层光栅结果的后处理链（BrightnessContrast / GaussianBlur），与 `styles[]` 并列、不参与内容绘制。求值时 `snapshot(time)` bake 成静态值；`!enabled` 或恒等参数丢掉。PropertyPath：`effects[i].brightness|contrast|blurriness`。`enabled` / `repeatEdgePixels` 走专用命令。Precomp / Group 上的 effect 可存盘，求值与绘制忽略。
+`Layer::effects[]` 是整层光栅结果的后处理链（BrightnessContrast / GaussianBlur），与 `styles[]` 并列、不参与内容绘制。求值时 `snapshot(time)` bake 成静态值；`!enabled` 或恒等参数丢掉。PropertyPath：`effects[i].brightness|contrast|blurriness`。`enabled` / `repeatEdgePixels` 走专用命令。Precomp / Group 上的 effect 可存盘，求值与绘制忽略。PAG 导出：Shape / Image / Text 写入 `pag::BrightnessContrastEffect` / `pag::FastBlurEffect`（`!enabled` 跳过；恒等仍导出；拆层包 Precomp 后挂 host；`_bmp` 不重复挂）。
 
 `Layer::layerStyles[]` 是 effect 之后的图层装饰（Drop Shadow / Outer Glow / Stroke），基类 `LayerFx`，不要和路径 `styles[]` / `MS_STYLE` 混用。求值同样 `snapshot(time)`；`!enabled` 或恒等参数丢掉。PropertyPath：`layerStyles[i].color|opacity|size|angle|distance|spread|range`。`enabled` / `blendMode` / Stroke `position` 走专用命令。仅 Shape / Image / Text 求值与绘制；Precomp / Group 上可存盘但忽略。
 需要共享 transform 的多几何用 `LayerType::Group` + `parentId` 组织，不在形状树内嵌套。

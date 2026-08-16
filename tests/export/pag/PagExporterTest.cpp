@@ -21,6 +21,7 @@
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/PrecompContent.h"
@@ -40,6 +41,7 @@ using motion::AssetType;
 using motion::BezierPath;
 using motion::BezierPathToVectorNetwork;
 using motion::BlendMode;
+using motion::BrightnessContrastEffect;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -48,6 +50,7 @@ using motion::EntityId;
 using motion::FakeBitmapFrameSource;
 using motion::FillStyle;
 using motion::FrameTime;
+using motion::GaussianBlurEffect;
 using motion::GradientStop;
 using motion::GradientType;
 using motion::ImageContent;
@@ -1450,6 +1453,276 @@ TEST(PagExporterTest, ConicGradientFillSkippedWithWarning) {
         EXPECT_NE(element->type(), pag::ShapeType::GradientFill);
         EXPECT_NE(element->type(), pag::ShapeType::Fill);
     }
+}
+
+TEST(PagExporterTest, BrightnessContrastExportsAsPagEffect) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    effect->brightness.setStaticValue(20.0f);
+    effect->contrast.setStaticValue(-10.0f);
+    layer->effects.push_back(std::move(effect));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->effects.size(), 1u);
+    ASSERT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::BrightnessContrast);
+    auto *pagEffect = static_cast<pag::BrightnessContrastEffect *>(shapeLayer->effects[0]);
+    ASSERT_NE(pagEffect->brightness, nullptr);
+    ASSERT_NE(pagEffect->contrast, nullptr);
+    ASSERT_NE(pagEffect->useOldVersion, nullptr);
+    EXPECT_FLOAT_EQ(pagEffect->brightness->value, 20.0f);
+    EXPECT_FLOAT_EQ(pagEffect->contrast->value, -10.0f);
+    EXPECT_FALSE(pagEffect->useOldVersion->value);
+}
+
+TEST(PagExporterTest, GaussianBlurExportsAsFastBlur) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto effect = std::make_unique<GaussianBlurEffect>();
+    effect->blurriness.setStaticValue(8.0f);
+    effect->repeatEdgePixels = true;
+    layer->effects.push_back(std::move(effect));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->effects.size(), 1u);
+    ASSERT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::FastBlur);
+    auto *pagEffect = static_cast<pag::FastBlurEffect *>(shapeLayer->effects[0]);
+    ASSERT_NE(pagEffect->blurriness, nullptr);
+    ASSERT_NE(pagEffect->blurDimensions, nullptr);
+    ASSERT_NE(pagEffect->repeatEdgePixels, nullptr);
+    EXPECT_FLOAT_EQ(pagEffect->blurriness->value, 8.0f);
+    EXPECT_EQ(pagEffect->blurDimensions->value, pag::BlurDimensionsDirection::All);
+    EXPECT_TRUE(pagEffect->repeatEdgePixels->value);
+}
+
+TEST(PagExporterTest, DisabledEffectIsSkipped) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    auto disabled = std::make_unique<BrightnessContrastEffect>();
+    disabled->enabled = false;
+    disabled->brightness.setStaticValue(40.0f);
+    layer->effects.push_back(std::move(disabled));
+    auto enabled = std::make_unique<GaussianBlurEffect>();
+    enabled->blurriness.setStaticValue(4.0f);
+    layer->effects.push_back(std::move(enabled));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->effects.size(), 1u);
+    EXPECT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::FastBlur);
+}
+
+TEST(PagExporterTest, IdentityBrightnessContrastStillExports) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{50, 60}, Vec2{120, 80});
+    layer->effects.push_back(std::make_unique<BrightnessContrastEffect>());
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->effects.size(), 1u);
+    EXPECT_EQ(shapeLayer->effects[0]->type(), pag::EffectType::BrightnessContrast);
+}
+
+TEST(PagExporterTest, BrightnessContrastKeyframes) {
+    Document document = MakeEmptyDoc(400, 300, 60);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{40, 40});
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    Keyframe<float> from;
+    from.time = 0;
+    from.value = 0.0f;
+    from.easing = Easing::EaseInOut();
+    Keyframe<float> to;
+    to.time = 30;
+    to.value = 50.0f;
+    effect->brightness.addKeyframe(from);
+    effect->brightness.addKeyframe(to);
+    layer->effects.push_back(std::move(effect));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    auto *shapeLayer = static_cast<pag::ShapeLayer *>(vector->layers[0]);
+    ASSERT_EQ(shapeLayer->effects.size(), 1u);
+    auto *pagEffect = static_cast<pag::BrightnessContrastEffect *>(shapeLayer->effects[0]);
+    ASSERT_TRUE(pagEffect->brightness->animatable());
+    auto *animated = static_cast<pag::AnimatableProperty<float> *>(pagEffect->brightness);
+    ASSERT_EQ(animated->keyframes.size(), 1u);
+    EXPECT_EQ(animated->keyframes[0]->startTime, 0);
+    EXPECT_EQ(animated->keyframes[0]->endTime, 30);
+    EXPECT_FLOAT_EQ(animated->keyframes[0]->startValue, 0.0f);
+    EXPECT_FLOAT_EQ(animated->keyframes[0]->endValue, 50.0f);
+}
+
+TEST(PagExporterTest, GroupEffectsAreSkipped) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto group = std::make_unique<Layer>(LayerType::Group);
+    group->name = "Group";
+    group->inPoint = 0;
+    group->outPoint = composition->duration;
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    effect->brightness.setStaticValue(20.0f);
+    group->effects.push_back(std::move(effect));
+    document.addLayer(composition->id, std::move(group));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::Layer *groupLayer = nullptr;
+    for (pag::Layer *pagLayer : vector->layers) {
+        if (pagLayer->name == "Group") {
+            groupLayer = pagLayer;
+            break;
+        }
+    }
+    ASSERT_NE(groupLayer, nullptr);
+    EXPECT_TRUE(groupLayer->effects.empty());
+}
+
+TEST(PagExporterTest, PrecompEffectsAreSkipped) {
+    Document document;
+    auto nested = std::make_unique<Composition>();
+    nested->width = 100;
+    nested->height = 80;
+    nested->duration = 20;
+    nested->frameRate = {30, 1};
+    Composition *nestedPtr = document.addComposition(std::move(nested));
+    AddShapeRect(document, nestedPtr, Vec2{0, 0}, Vec2{40, 40});
+
+    auto root = std::make_unique<Composition>();
+    root->width = 400;
+    root->height = 300;
+    root->duration = 30;
+    root->frameRate = {30, 1};
+    Composition *rootPtr = document.addComposition(std::move(root));
+
+    auto layer = std::make_unique<Layer>(LayerType::Precomp);
+    layer->name = "Precomp";
+    layer->inPoint = 0;
+    layer->outPoint = rootPtr->duration;
+    static_cast<PrecompContent *>(layer->content.get())->compositionId = nestedPtr->id;
+    auto effect = std::make_unique<GaussianBlurEffect>();
+    effect->blurriness.setStaticValue(6.0f);
+    layer->effects.push_back(std::move(effect));
+    document.addLayer(rootPtr->id, std::move(layer));
+
+    PagExportOptions options;
+    options.compositionId = rootPtr->id;
+    auto result = PagExporter::Export(document, options);
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    EXPECT_TRUE(main->layers[0]->effects.empty());
+}
+
+TEST(PagExporterTest, SplitStrokesWrapForEffects) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = "PathDualStroke";
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto path = std::make_unique<ShapePath>();
+    BezierPath geometry =
+        MakeSingleContour({{{-50, -50}, {}, {}}, {{50, -50}, {}, {}}, {{50, 50}, {}, {}}, {{-50, 50}, {}, {}}}, true);
+    path->path.setStaticValue(BezierPathToVectorNetwork(geometry));
+    static_cast<ShapeContent *>(layer->content.get())->geometry = std::move(path);
+
+    auto fill = std::make_unique<FillStyle>();
+    fill->color.setStaticValue(Color{0.2f, 0.6f, 0.4f, 1.0f});
+    layer->styles.push_back(std::move(fill));
+
+    auto outside = std::make_unique<StrokeStyle>();
+    outside->color.setStaticValue(Color{0, 0, 0, 1});
+    outside->width.setStaticValue(9.0f);
+    outside->position = StrokePosition::Outside;
+    layer->styles.push_back(std::move(outside));
+
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    effect->brightness.setStaticValue(15.0f);
+    layer->effects.push_back(std::move(effect));
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    bool wrapped = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "StrokeSiblingsWrappedForEffects") {
+            wrapped = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(wrapped);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *root = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::PreComposeLayer *host = nullptr;
+    for (pag::Layer *pagLayer : root->layers) {
+        if (pagLayer->name == "PathDualStroke" && pagLayer->type() == pag::LayerType::PreCompose) {
+            host = static_cast<pag::PreComposeLayer *>(pagLayer);
+        }
+        EXPECT_EQ(pagLayer->name.find("PathDualStroke / Stroke"), std::string::npos);
+    }
+    ASSERT_NE(host, nullptr);
+    ASSERT_EQ(host->effects.size(), 1u);
+    EXPECT_EQ(host->effects[0]->type(), pag::EffectType::BrightnessContrast);
+    ASSERT_NE(host->composition, nullptr);
+    auto *inner = static_cast<pag::VectorComposition *>(host->composition);
+    ASSERT_GE(inner->layers.size(), 2u);
+    for (pag::Layer *innerLayer : inner->layers) {
+        EXPECT_TRUE(innerLayer->effects.empty());
+    }
+}
+
+TEST(PagExporterTest, LayerBmpDoesNotAttachEffects) {
+    Document document = MakeEmptyDoc(400, 300, 2);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{100, 100});
+    layer->name = "Rect_bmp";
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    effect->brightness.setStaticValue(30.0f);
+    layer->effects.push_back(std::move(effect));
+
+    FakeBitmapFrameSource frameSource;
+    PagExportOptions options;
+    options.allowBitmapExport = true;
+    auto result = PagExporter::Export(document, options, &frameSource);
+    ASSERT_TRUE(result.hasValue()) << result.error().message;
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *main = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(main->layers[0]->type(), pag::LayerType::PreCompose);
+    EXPECT_TRUE(main->layers[0]->effects.empty());
 }
 
 #if defined(__APPLE__)

@@ -21,6 +21,7 @@
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/LineCap.h"
@@ -44,6 +45,7 @@
 #include "PagAnimatableConvert.h"
 #include "PagBitmapFallback.h"
 #include "PagBitmapSequenceEncode.h"
+#include "PagEffectConvert.h"
 #include "PagExportErrorUtil.h"
 #include "PagStrokeOutline.h"
 #include "PagVideoFallback.h"
@@ -174,6 +176,23 @@ pag::Ratio MakeStretchRatio(double stretch) {
         return pag::DefaultRatio;
     }
     return pag::Ratio{static_cast<int32_t>(std::lround(stretch * 1000.0)), 1000u};
+}
+
+bool LayerExportsEffects(const Layer &layer) {
+    return layer.type() == LayerType::Shape || layer.type() == LayerType::Image ||
+        layer.type() == LayerType::Text;
+}
+
+bool LayerHasEnabledEffects(const Layer &layer) {
+    if (!LayerExportsEffects(layer)) {
+        return false;
+    }
+    for (const auto &effect : layer.effects) {
+        if (effect != nullptr && effect->enabled) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Warn(std::vector<PagExportWarning> *warnings, EntityId entityId, const char *code,
@@ -1304,6 +1323,11 @@ Expected<pag::TextLayer *, PagExportError> PagFileBuilder::buildTextLayer(const 
         });
     }
     pagLayer->sourceText = buildSourceText(layer, content, forcePointText);
+    Expected<void, PagExportError> effects = appendEffects(pagLayer, layer);
+    if (!effects.hasValue()) {
+        delete pagLayer;
+        return Unexpected(effects.error());
+    }
     return pagLayer;
 }
 
@@ -1476,6 +1500,11 @@ Expected<pag::ImageLayer *, PagExportError> PagFileBuilder::buildImageLayer(cons
     pagLayer->imageFillRule->scaleMode = MapScaleMode(content.scaleMode);
     applyImageContainerFit(pagLayer, layer, content, imageBytes.value()->width,
                            imageBytes.value()->height);
+    Expected<void, PagExportError> effects = appendEffects(pagLayer, layer);
+    if (!effects.hasValue()) {
+        delete pagLayer;
+        return Unexpected(effects.error());
+    }
     return pagLayer;
 }
 
@@ -1589,16 +1618,43 @@ Expected<std::vector<pag::Layer *>, PagExportError> PagFileBuilder::buildShapeLa
 
     // PAG Codec::InstallReferences rebinds trackMatte to layers[index-1] only. Multiple
     // parallel stroke layers from one MS shape cannot all sit under the same matte source.
-    // Wrap into an export-only Precomp (no MS container UI required); host alone carries matte.
-    if (layers.size() > 1 && layer.trackMatteType != TrackMatteType::None &&
-        layer.trackMatteLayerId.isValid()) {
+    // Effects must cover the combined fill+stroke result, not each sibling independently.
+    // Wrap into an export-only Precomp; host alone carries matte / effects.
+    const bool wrapForMatte = layers.size() > 1 && layer.trackMatteType != TrackMatteType::None &&
+        layer.trackMatteLayerId.isValid();
+    const bool wrapForEffects = layers.size() > 1 && LayerHasEnabledEffects(layer);
+    if (wrapForMatte || wrapForEffects) {
         Expected<pag::PreComposeLayer *, PagExportError> wrapped =
             wrapStrokeSiblingsForTrackMatte(layer, std::move(layers));
         if (!wrapped.hasValue()) {
             // wrapStrokeSiblingsForTrackMatte always takes ownership of siblings.
             return Unexpected(wrapped.error());
         }
+        if (wrapForMatte) {
+            Warn(&warnings_, layer.id, "StrokeSiblingsWrappedForTrackMatte",
+                 "Multiple stroke layers wrapped in export-only Precomp so a single host can carry "
+                 "track matte (PAG binds matte to layers[index-1] only)");
+        }
+        if (wrapForEffects) {
+            Warn(&warnings_, layer.id, "StrokeSiblingsWrappedForEffects",
+                 "Multiple stroke layers wrapped in export-only Precomp so layer effects apply to "
+                 "the combined result");
+        }
+        Expected<void, PagExportError> effects = appendEffects(wrapped.value(), layer);
+        if (!effects.hasValue()) {
+            delete wrapped.value();
+            return Unexpected(effects.error());
+        }
         return std::vector<pag::Layer *>{wrapped.value()};
+    }
+    if (!layers.empty()) {
+        Expected<void, PagExportError> effects = appendEffects(layers.front(), layer);
+        if (!effects.hasValue()) {
+            for (pag::Layer *owned : layers) {
+                delete owned;
+            }
+            return Unexpected(effects.error());
+        }
     }
     return layers;
 }
@@ -1661,9 +1717,6 @@ Expected<pag::PreComposeLayer *, PagExportError> PagFileBuilder::wrapStrokeSibli
     SetTransformSpatialIdentity(host->transform);
 
     nestedCompositions_.push_back(inner);
-    Warn(&warnings_, layer.id, "StrokeSiblingsWrappedForTrackMatte",
-         "Multiple stroke layers wrapped in export-only Precomp so a single host can carry "
-         "track matte (PAG binds matte to layers[index-1] only)");
     return host;
 }
 
@@ -1985,6 +2038,24 @@ Expected<void, PagExportError> PagFileBuilder::appendMasks(pag::Layer *pagLayer,
             pagMask->maskFeather = ConvertPoint(featherPoint, &warnings_, layer.id);
         }
         pagLayer->masks.push_back(pagMask);
+    }
+    return Expected<void, PagExportError>();
+}
+
+Expected<void, PagExportError> PagFileBuilder::appendEffects(pag::Layer *pagLayer,
+                                                             const Layer &layer) {
+    if (!LayerExportsEffects(layer)) {
+        return Expected<void, PagExportError>();
+    }
+    for (const auto &effectPtr : layer.effects) {
+        if (effectPtr == nullptr || !effectPtr->enabled) {
+            continue;
+        }
+        pag::Effect *pagEffect = ToPagEffect(*effectPtr, &warnings_, layer.id);
+        if (pagEffect == nullptr) {
+            continue;
+        }
+        pagLayer->effects.push_back(pagEffect);
     }
     return Expected<void, PagExportError>();
 }
