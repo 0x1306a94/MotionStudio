@@ -61,6 +61,7 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     }
     paths.append(contentsOf: timelineStyleTracks(core: core, layerID: layerID).map(\.path))
     paths.append(contentsOf: timelineMaskTracks(core: core, layerID: layerID).map(\.path))
+    paths.append(contentsOf: timelineEffectTracks(core: core, layerID: layerID).map(\.path))
     return paths
 }
 
@@ -195,6 +196,35 @@ func timelineMaskTracks(core: MotionDocumentCore,
     return tracks
 }
 
+func timelineEffectTracks(core: MotionDocumentCore,
+                          layerID: UInt64) -> [(path: String, label: String)]
+{
+    let layerType = core.layerType(layerID)
+    guard layerType == .SHAPE || layerType == .IMAGE || layerType == .TEXT else {
+        return []
+    }
+    var tracks: [(path: String, label: String)] = []
+    for index in 0 ..< core.effectCount(layerID: layerID) {
+        let type = core.effectType(layerID: layerID, index: index)
+        let properties: [EffectProperty]
+        switch type {
+        case .BRIGHTNESS_CONTRAST:
+            properties = [.brightness, .contrast]
+        case .GAUSSIAN_BLUR:
+            properties = [.blurriness]
+        case .INVALID:
+            continue
+        }
+        for property in properties {
+            let path = property.path(at: index)
+            if !core.keyframeFrames(entityID: layerID, path: path).isEmpty {
+                tracks.append((path, "\(type.label) \(property.actionLabel)"))
+            }
+        }
+    }
+    return tracks
+}
+
 func timelineUsesManualKeyframeTrack(core: MotionDocumentCore, layerID: UInt64,
                                      path: String) -> Bool
 {
@@ -288,6 +318,12 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
                                             label: track.label))
         }
         for track in timelineMaskTracks(core: core, layerID: layerID) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: track.path,
+                                            label: track.label))
+        }
+        for track in timelineEffectTracks(core: core, layerID: layerID) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: track.path,

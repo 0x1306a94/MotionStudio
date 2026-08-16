@@ -517,7 +517,7 @@ git commit --only \
 
 ### Task 3: 时间轴 effect 行
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineSupport.swift`
@@ -527,7 +527,7 @@ git commit --only \
 - Consumes: `MotionDocumentCore.effectCount` / `effectType`、`EffectProperty.path(at:)` / `actionLabel`、`MS_EFFECT.label`
 - Produces: `timelineEffectTracks(core:layerID:) -> [(path: String, label: String)]`
 
-- [ ] **Step 1: 实现 `timelineEffectTracks`**
+- [x] **Step 1: 实现 `timelineEffectTracks`**
 
 在 `timelineMaskTracks` 之后插入：
 
@@ -579,7 +579,7 @@ func timelineEffectTracks(core: MotionDocumentCore,
         }
 ```
 
-- [ ] **Step 2: 编译 App 确认通过**
+- [x] **Step 2: 编译 App 确认通过**
 
 优先 Xcode MCP：`user-xcode` ready 则 `XcodeListWindows` 拿到 `MotionStudio.xcworkspace` 的 `tabIdentifier`，再 `BuildProject`。MCP 不可用则：
 
@@ -590,7 +590,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 
 Expected: BUILD SUCCEEDED。
 
-- [ ] **Step 3: 手测清单（实现者在 App 里点）**
+- [x] **Step 3: 手测清单（实现者在 App 里点）**
 
 1. Shape / Image / Text：`+` 能加 Brightness Contrast 与 Gaussian Blur；后加的在最上。
 2. 改 Brightness / Blurriness，画布跟着变；`enabled` 关掉则复原，参数仍能改。
@@ -598,7 +598,7 @@ Expected: BUILD SUCCEEDED。
 4. 菱形打关键帧后时间轴出现 `Brightness Contrast Brightness` 或 `Gaussian Blur Blurriness`；undo 能撤。
 5. Repeat Edge 开关能写回（边缘渗出 vs 钳制）。
 
-- [ ] **Step 4: 更新 spec 状态并 Commit**
+- [x] **Step 4: 更新 spec 状态并 Commit**
 
 `docs/superpowers/specs/2026-08-16-layer-effects-ui-design.md` 把 `状态：已批准` 改为 `状态：已实现`。
 
