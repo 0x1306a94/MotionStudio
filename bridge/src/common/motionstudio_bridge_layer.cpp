@@ -4,6 +4,7 @@
 #include <string>
 
 #include "MotionStudio/model/Composition.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 
 #include "BridgeInternals.h"
@@ -97,6 +98,40 @@ MS_STYLE ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int inde
         }
     }
     return MS_STYLE_INVALID;
+}
+
+int ms_layer_effect_count(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    return layer != nullptr ? static_cast<int>(layer->effects.size()) : 0;
+}
+
+MS_EFFECT ms_layer_effect_type_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->effects.size()) {
+        return MS_EFFECT_INVALID;
+    }
+    switch (layer->effects[static_cast<size_t>(index)]->type()) {
+        case motion::LayerEffectType::BrightnessContrast: {
+            return MS_EFFECT_BRIGHTNESS_CONTRAST;
+        }
+        case motion::LayerEffectType::GaussianBlur: {
+            return MS_EFFECT_GAUSSIAN_BLUR;
+        }
+    }
+    return MS_EFFECT_INVALID;
+}
+
+bool ms_layer_effect_enabled_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr || index < 0 ||
+        static_cast<size_t>(index) >= layer->effects.size()) {
+        return false;
+    }
+    return layer->effects[static_cast<size_t>(index)]->enabled;
 }
 
 MS_BLEND ms_layer_blend_mode(MSDocument *document, uint64_t layerId) {

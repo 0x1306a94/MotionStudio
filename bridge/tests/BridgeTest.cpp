@@ -285,6 +285,49 @@ TEST(BridgeCommandTest, FillStyleLifecycle) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, LayerEffectLifecycle) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t layerId = ms_command_add_rect_layer(document, compositionId);
+
+    EXPECT_EQ(ms_layer_effect_count(document, layerId), 0);
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 0), MS_EFFECT_INVALID);
+    EXPECT_EQ(ms_layer_effect_count(document, 0), 0);
+    EXPECT_EQ(ms_layer_effect_type_at(document, 0, 0), MS_EFFECT_INVALID);
+
+    ms_command_add_gaussian_blur_effect(document, layerId);
+    ASSERT_EQ(ms_layer_effect_count(document, layerId), 1);
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 0), MS_EFFECT_GAUSSIAN_BLUR);
+    EXPECT_TRUE(ms_layer_effect_enabled_at(document, layerId, 0));
+
+    ms_command_set_layer_effect_enabled(document, layerId, 0, false);
+    EXPECT_FALSE(ms_layer_effect_enabled_at(document, layerId, 0));
+
+    ms_command_add_brightness_contrast_effect(document, layerId);
+    ASSERT_EQ(ms_layer_effect_count(document, layerId), 2);
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 1), MS_EFFECT_BRIGHTNESS_CONTRAST);
+
+    ms_command_move_layer_effect(document, layerId, 0, 1);
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 0), MS_EFFECT_BRIGHTNESS_CONTRAST);
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 1), MS_EFFECT_GAUSSIAN_BLUR);
+
+    ms_command_remove_layer_effect(document, layerId, 0);
+    ASSERT_EQ(ms_layer_effect_count(document, layerId), 1);
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 0), MS_EFFECT_GAUSSIAN_BLUR);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    ASSERT_EQ(ms_layer_effect_count(document, layerId), 2);
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_EQ(ms_layer_effect_type_at(document, layerId, 0), MS_EFFECT_GAUSSIAN_BLUR);
+    EXPECT_TRUE(ms_document_undo(document));
+    ASSERT_EQ(ms_layer_effect_count(document, layerId), 1);
+    EXPECT_FALSE(ms_layer_effect_enabled_at(document, layerId, 0));
+    EXPECT_TRUE(ms_document_undo(document));
+    EXPECT_TRUE(ms_layer_effect_enabled_at(document, layerId, 0));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, MoveLayerStyleReorder) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

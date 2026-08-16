@@ -1,7 +1,7 @@
 # Layer Effects（图层后处理链）— 设计说明
 
 日期：2026-08-16  
-状态：待实现  
+状态：已实现  
 前置：[PAG RuntimeFilter](2026-08-13-pag-runtime-filter-design.md)（adapter 滤镜基类 + BrightnessContrast 已落地）  
 相关：[rendering.md](../../rendering.md)、[data-model.md](../../data-model.md)、[pag-runtime-filter.md](../../pag-runtime-filter.md)、[Layer Masks](2026-07-26-layer-masks-design.md)
 

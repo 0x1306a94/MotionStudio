@@ -856,7 +856,7 @@ git commit --only adapter/tgfx/src/effects/GaussianBlurFilter.h \
 
 ### Task 8: Bridge + 文档
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`
@@ -872,11 +872,11 @@ git commit --only adapter/tgfx/src/effects/GaussianBlurFilter.h \
 - Produces: `ms_layer_effect_count` / `type_at` / `enabled_at`
 - Produces: `ms_command_add_brightness_contrast_effect` / `add_gaussian_blur_effect` / `remove_layer_effect` / `move_layer_effect` / `set_layer_effect_enabled` / `set_gaussian_blur_repeat_edge`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `bridge/tests/BridgeTest.cpp`：建 shape 层，`add_gaussian_blur` 后 count==1、type==`GAUSSIAN_BLUR`、enabled true；`set_enabled(false)` 后 false；`add_brightness_contrast` count==2；`move 0→1`；`remove 0`；undo 各一步回到前态（走 document revision / 再查 count）。缺层返回 0 / `INVALID`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target bridge_test
@@ -885,7 +885,7 @@ cmake --build build --target bridge_test
 
 Expected: 编译失败。
 
-- [ ] **Step 3: 实现 Bridge + Swift 扩展 + 文档**
+- [x] **Step 3: 实现 Bridge + Swift 扩展 + 文档**
 
 查询放 `motionstudio_bridge_layer.cpp`，对标 `ms_layer_style_*`。命令放 `motionstudio_bridge_commands.cpp`，对标 `ms_command_add_fill_style`：`Execute(document, make_unique<AddLayerEffectCommand>(...))`。
 
@@ -900,7 +900,7 @@ extension MS_EFFECT: @retroactive CaseIterable, @retroactive Identifiable {
 
 文档按 spec §6 补 `Layer::effects[]`、isolation 条件、`endLayer` 链、GaussianBlur `Apply` 约定。spec 状态改为「已实现」。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target bridge_test core_tests tgfx_adapter_test
@@ -909,7 +909,7 @@ ctest --test-dir build --output-on-failure -E benchmark
 
 Expected: 全绿。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only bridge/include/motionstudio_bridge.h \

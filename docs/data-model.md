@@ -57,6 +57,7 @@ Document
      └─ Layer[]                （有序，index 0 = 最底层，向上渲染）
          ├─ Transform          （5 个可动画属性，必有）
          ├─ styles[]           （Fill / Stroke；Color / Gradient / Shader）
+         ├─ effects[]          （后处理：BrightnessContrast / GaussianBlur）
          └─ LayerContent       （多态：Shape / Image / Text / Null / Precomp）
              └─ ShapeElement[] （Shape 类型时：Path / Rect / Ellipse / TrimPath ...）
 ```
@@ -287,6 +288,7 @@ PropertyPath：仅 `content.text` 可动画。`fontSize` / `size` / `fontFamily`
 ### 3.5 Shape 模型
 
 每个 Shape Layer 持有**一个**几何（`ShapeContent::geometry`）。Fill/Stroke 在 `Layer::styles`。
+`Layer::effects[]` 是整层光栅结果的后处理链（BrightnessContrast / GaussianBlur），与 `styles[]` 并列、不参与内容绘制。求值时 `snapshot(time)` bake 成静态值；`!enabled` 或恒等参数丢掉。PropertyPath：`effects[i].brightness|contrast|blurriness`。`enabled` / `repeatEdgePixels` 走专用命令。Precomp / Group 上的 effect 可存盘，求值与绘制忽略。
 需要共享 transform 的多几何用 `LayerType::Group` + `parentId` 组织，不在形状树内嵌套。
 
 ```cpp

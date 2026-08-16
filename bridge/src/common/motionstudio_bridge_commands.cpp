@@ -11,17 +11,21 @@
 #include "MotionStudio/common/Vec3.h"
 #include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/model/Composition.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
+#include "MotionStudio/undo/AddLayerEffectCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/MoveLayerEffectCommand.h"
 #include "MotionStudio/undo/MoveLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
 #include "MotionStudio/undo/RemoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveLayerEffectCommand.h"
 #include "MotionStudio/undo/RemoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveStyleCommand.h"
 #include "MotionStudio/undo/SetCompositionBackgroundColorCommand.h"
@@ -29,7 +33,9 @@
 #include "MotionStudio/undo/SetCompositionSettingsCommand.h"
 #include "MotionStudio/undo/SetEasingCommand.h"
 #include "MotionStudio/undo/SetFollowPathCommand.h"
+#include "MotionStudio/undo/SetGaussianBlurRepeatEdgeCommand.h"
 #include "MotionStudio/undo/SetLayerBlendModeCommand.h"
+#include "MotionStudio/undo/SetLayerEffectEnabledCommand.h"
 #include "MotionStudio/undo/SetLayerLockedCommand.h"
 #include "MotionStudio/undo/SetLayerNameCommand.h"
 #include "MotionStudio/undo/SetLayerVisibleCommand.h"
@@ -358,6 +364,39 @@ void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
+}
+
+void ms_command_add_brightness_contrast_effect(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerEffectCommand>(EntityId{layerId}, std::make_unique<motion::BrightnessContrastEffect>()));
+}
+
+void ms_command_add_gaussian_blur_effect(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::AddLayerEffectCommand>(EntityId{layerId}, std::make_unique<motion::GaussianBlurEffect>()));
+}
+
+void ms_command_remove_layer_effect(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::RemoveLayerEffectCommand>(EntityId{layerId}, index));
+}
+
+void ms_command_move_layer_effect(MSDocument *document, uint64_t layerId, int fromIndex,
+                                  int toIndex) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::MoveLayerEffectCommand>(EntityId{layerId}, fromIndex, toIndex));
+}
+
+void ms_command_set_layer_effect_enabled(MSDocument *document, uint64_t layerId, int index,
+                                         bool enabled) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetLayerEffectEnabledCommand>(EntityId{layerId}, index, enabled));
+}
+
+void ms_command_set_gaussian_blur_repeat_edge(MSDocument *document, uint64_t layerId, int index,
+                                              bool repeatEdgePixels) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetGaussianBlurRepeatEdgeCommand>(EntityId{layerId}, index, repeatEdgePixels));
 }
 
 void ms_command_add_mask(MSDocument *document, uint64_t layerId, int64_t frame) {

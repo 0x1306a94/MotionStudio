@@ -58,6 +58,27 @@ extension MS_BLEND: @retroactive CaseIterable, @retroactive Identifiable {
     }
 }
 
+extension MS_EFFECT: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_EFFECT] {
+        [.BRIGHTNESS_CONTRAST, .GAUSSIAN_BLUR]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .BRIGHTNESS_CONTRAST:
+            "Brightness Contrast"
+        case .GAUSSIAN_BLUR:
+            "Gaussian Blur"
+        case .INVALID:
+            "Invalid"
+        }
+    }
+}
+
 extension MS_MASK: @retroactive CaseIterable, @retroactive Identifiable {
     public static var allCases: [MS_MASK] {
         [.ADD, .SUBTRACT, .INTERSECT]

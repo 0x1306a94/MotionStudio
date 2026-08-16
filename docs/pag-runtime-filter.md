@@ -8,6 +8,7 @@
 
 - `adapter/tgfx/src/effects/RuntimeFilter.{h,cpp}`
 - `adapter/tgfx/src/effects/BrightnessContrastFilter.{h,cpp}`
+- `adapter/tgfx/src/effects/GaussianBlurFilter.{h,cpp}`
 - `adapter/tgfx/src/RenderCache.{h,cpp}`
 - `adapter/tgfx/tests/BrightnessContrastFilterTest.mm`
 - `adapter/tgfx/tests/RenderCacheTest.cpp`
@@ -57,6 +58,16 @@ BrightnessContrast 参数与 PAG 一致：`brightness` / `contrast` 为 AE 风�
 
 `onUpdateUniforms` 经 `RenderCache::acquireUniformSlice` 写入 tgfx `GlobalCache` UBO 池，不每帧 `createBuffer`。帧推进与 ColorSourceEffect 相同，见 [color-source-effect.md](color-source-effect.md) §4.2。
 
-## 5. 本阶段边界
+## 5. 图层 effect 链
 
-未接入 `TgfxCanvasAdapter::endLayer`、Core `Layer::effects`、App UI、PAG 导出 Effect 块。预览/文档里暂时看不到滤镜效果；像素测试在 `tgfx_adapter_test`。
+`TgfxCanvasAdapter::endLayer` 在 isolation 内把 Picture 栅格成 Image，再按 `effects[]` 顺序调用：
+
+```
+PictureToImage →（可选 mask）→ Apply(effects[0]) → Apply(effects[1]) → …
+    → drawImage（图层 opacity / blend）
+```
+
+- BrightnessContrast：`BrightnessContrastFilter::Apply`（AE 风格数值，映射见上）
+- GaussianBlur：`GaussianBlurFilter::Apply`；半径 `ImageFilter::Blur(blurriness/2, blurriness/2)`；`repeatEdgePixels==true` 时 `TileMode::Clamp` 并 clip 回输入尺寸
+
+单个 `Apply` 返回 `nullptr` 则停链，保留上一张；栅格失败则退回 `drawPicture`。Core 模型与求值见 [data-model.md](data-model.md) / [layer-effects spec](superpowers/specs/2026-08-16-layer-effects-design.md)。App Inspector 与 PAG 导出 Effect 块仍未做。

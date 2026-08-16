@@ -69,6 +69,13 @@ typedef CF_CLOSED_ENUM(int, MS_STYLE) {
     MS_STYLE_STROKE = 1,
 };
 
+// Layer effect type tag, mirrors motion::LayerEffectType.
+typedef CF_CLOSED_ENUM(int, MS_EFFECT) {
+    MS_EFFECT_INVALID = -1,
+    MS_EFFECT_BRIGHTNESS_CONTRAST = 0,
+    MS_EFFECT_GAUSSIAN_BLUR = 1,
+};
+
 // Path mask mode tag, mirrors motion::MaskMode.
 typedef CF_CLOSED_ENUM(int, MS_MASK) {
     MS_MASK_INVALID = -1,
@@ -416,6 +423,13 @@ MS_STYLE ms_layer_style_type_at(MSDocument *document, uint64_t layerId, int inde
 // Blend mode tag (MS_BLEND_*) of the style at index; MS_BLEND_INVALID when
 // out of range.
 MS_BLEND ms_layer_style_blend_mode_at(MSDocument *document, uint64_t layerId, int index);
+
+// Number of post-process effects on the layer; 0 when the layer does not exist.
+int ms_layer_effect_count(MSDocument *document, uint64_t layerId);
+// Effect type tag (MS_EFFECT_*) at index, MS_EFFECT_INVALID when out of range.
+MS_EFFECT ms_layer_effect_type_at(MSDocument *document, uint64_t layerId, int index);
+// Whether the effect at index is enabled; false when out of range.
+bool ms_layer_effect_enabled_at(MSDocument *document, uint64_t layerId, int index);
 
 // Path masks on a layer.
 int ms_layer_mask_count(MSDocument *document, uint64_t layerId);
@@ -777,6 +791,19 @@ void ms_command_move_layer_style(MSDocument *document, uint64_t layerId, int fro
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode);
 // position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position);
+
+// Appends a default BrightnessContrast effect (identity parameters, enabled).
+void ms_command_add_brightness_contrast_effect(MSDocument *document, uint64_t layerId);
+// Appends a default GaussianBlur effect (blurriness 0, repeatEdgePixels false).
+void ms_command_add_gaussian_blur_effect(MSDocument *document, uint64_t layerId);
+// Removes the effect at index from the layer's effect list.
+void ms_command_remove_layer_effect(MSDocument *document, uint64_t layerId, int index);
+// Moves an effect to another index. Out of range is a no-op.
+void ms_command_move_layer_effect(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex);
+void ms_command_set_layer_effect_enabled(MSDocument *document, uint64_t layerId, int index, bool enabled);
+// Only applies to GaussianBlur; other types are a no-op.
+void ms_command_set_gaussian_blur_repeat_edge(MSDocument *document, uint64_t layerId, int index,
+                                              bool repeatEdgePixels);
 
 // Appends a path mask (Add mode) baked from the layer's shape at `frame`.
 // Non-shape layers fall back to a 200x200 centered rectangle.
