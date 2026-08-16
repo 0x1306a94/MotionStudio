@@ -11,6 +11,7 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/PropertyPath.h"
@@ -25,6 +26,7 @@ using motion::Animatable;
 using motion::AnimatableBase;
 using motion::AnimatableType;
 using motion::BindShaderPaint;
+using motion::BrightnessContrastEffect;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
@@ -153,6 +155,19 @@ TEST(ResolveAnimatableTest, ResolvesLayerStyleProperty) {
         ResolveAnimatable(scene.document, {scene.layer->id, "styles[1].width"});
     EXPECT_EQ(color, static_cast<AnimatableBase *>(&fillStyle->color));
     EXPECT_EQ(width, static_cast<AnimatableBase *>(&strokeStyle->width));
+}
+
+TEST(ResolveAnimatableTest, ResolvesEffectBrightness) {
+    ShapeScene scene;
+    auto effect = std::make_unique<BrightnessContrastEffect>();
+    BrightnessContrastEffect *brightnessContrast = effect.get();
+    scene.layer->effects.push_back(std::move(effect));
+
+    AnimatableBase *brightness =
+        ResolveAnimatable(scene.document, {scene.layer->id, "effects[0].brightness"});
+    EXPECT_EQ(brightness, static_cast<AnimatableBase *>(&brightnessContrast->brightness));
+    EXPECT_EQ(ResolveAnimatable(scene.document, {scene.layer->id, "effects[0].blurriness"}),
+              nullptr);
 }
 
 TEST(ResolveAnimatableTest, ResolvesMaskProperties) {

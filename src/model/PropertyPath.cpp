@@ -6,6 +6,7 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -329,6 +330,33 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             }
             if (segments.size() == 3 && segments[1].name == "uniformValues") {
                 return resolveStyleUniformProperty(style, segments[2].name);
+            }
+            return nullptr;
+        }
+        if (first.name == "effects" && first.index >= 0 && segments.size() == 2) {
+            if (first.index >= static_cast<int>(layer->effects.size())) {
+                return nullptr;
+            }
+            LayerEffect *effect = layer->effects[static_cast<size_t>(first.index)].get();
+            const std::string &name = segments[1].name;
+            switch (effect->type()) {
+                case LayerEffectType::BrightnessContrast: {
+                    auto *brightnessContrast = static_cast<BrightnessContrastEffect *>(effect);
+                    if (name == "brightness") {
+                        return &brightnessContrast->brightness;
+                    }
+                    if (name == "contrast") {
+                        return &brightnessContrast->contrast;
+                    }
+                    break;
+                }
+                case LayerEffectType::GaussianBlur: {
+                    auto *blur = static_cast<GaussianBlurEffect *>(effect);
+                    if (name == "blurriness") {
+                        return &blur->blurriness;
+                    }
+                    break;
+                }
             }
             return nullptr;
         }

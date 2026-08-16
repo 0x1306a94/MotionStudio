@@ -22,6 +22,7 @@
 #include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
 #include "MotionStudio/model/NullContent.h"
@@ -1661,6 +1662,86 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
     return style;
 }
 
+json LayerEffectToJson(const LayerEffect &effect) {
+    json node{{"id", IdToString(effect.id)}, {"enabled", effect.enabled}};
+    switch (effect.type()) {
+        case LayerEffectType::BrightnessContrast: {
+            const auto &brightnessContrast = static_cast<const BrightnessContrastEffect &>(effect);
+            node["type"] = "brightnessContrast";
+            node["brightness"] = AnimatableToJson(brightnessContrast.brightness);
+            node["contrast"] = AnimatableToJson(brightnessContrast.contrast);
+            break;
+        }
+        case LayerEffectType::GaussianBlur: {
+            const auto &blur = static_cast<const GaussianBlurEffect &>(effect);
+            node["type"] = "gaussianBlur";
+            node["blurriness"] = AnimatableToJson(blur.blurriness);
+            node["repeatEdgePixels"] = blur.repeatEdgePixels;
+            break;
+        }
+    }
+    return node;
+}
+
+Expected<std::unique_ptr<LayerEffect>, std::string> LayerEffectFromJson(const json &node) {
+    Expected<std::string, std::string> typeText = ParseField<std::string>(node, "type");
+    if (!typeText) {
+        return Unexpected(typeText.error());
+    }
+    if (*typeText != "brightnessContrast" && *typeText != "gaussianBlur") {
+        return std::unique_ptr<LayerEffect>{};
+    }
+
+    std::unique_ptr<LayerEffect> effect;
+    if (*typeText == "brightnessContrast") {
+        auto brightnessContrast = std::make_unique<BrightnessContrastEffect>();
+        Expected<const json *, std::string> brightnessNode = Child(node, "brightness");
+        Expected<const json *, std::string> contrastNode = Child(node, "contrast");
+        if (!brightnessNode || !contrastNode) {
+            return Unexpected(std::string("BrightnessContrast effect is missing fields"));
+        }
+        Expected<void, std::string> result =
+            AnimatableFromJson(**brightnessNode, brightnessContrast->brightness);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        result = AnimatableFromJson(**contrastNode, brightnessContrast->contrast);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        effect = std::move(brightnessContrast);
+    } else {
+        auto blur = std::make_unique<GaussianBlurEffect>();
+        Expected<const json *, std::string> blurrinessNode = Child(node, "blurriness");
+        if (!blurrinessNode) {
+            return Unexpected(std::string("GaussianBlur effect is missing blurriness"));
+        }
+        Expected<void, std::string> result =
+            AnimatableFromJson(**blurrinessNode, blur->blurriness);
+        if (!result) {
+            return Unexpected(result.error());
+        }
+        if (const json *repeatNode = FindChild(node, "repeatEdgePixels")) {
+            if (repeatNode->is_boolean()) {
+                blur->repeatEdgePixels = repeatNode->get<bool>();
+            }
+        }
+        effect = std::move(blur);
+    }
+
+    Expected<EntityId, std::string> id = IdField(node, "id");
+    if (!id) {
+        return Unexpected(id.error());
+    }
+    effect->id = *id;
+    if (const json *enabledNode = FindChild(node, "enabled")) {
+        if (enabledNode->is_boolean()) {
+            effect->enabled = enabledNode->get<bool>();
+        }
+    }
+    return effect;
+}
+
 json ContentToJson(const LayerContent &content) {
     json node{{"type", dto::ToString(content.type())}};
     switch (content.type()) {
@@ -1951,6 +2032,11 @@ json LayerToJson(const Layer &layer) {
         styles.push_back(LayerStyleToJson(*style));
     }
     node["styles"] = std::move(styles);
+    json effects = json::array();
+    for (const auto &effect : layer.effects) {
+        effects.push_back(LayerEffectToJson(*effect));
+    }
+    node["effects"] = std::move(effects);
     return node;
 }
 
@@ -2125,6 +2211,21 @@ Expected<std::unique_ptr<Layer>, std::string> LayerFromJson(const json &node) {
             return Unexpected(style.error());
         }
         layer->styles.push_back(std::move(*style));
+    }
+
+    if (const json *effectsNode = FindChild(node, "effects")) {
+        if (effectsNode->is_array()) {
+            for (const json &effectNode : *effectsNode) {
+                Expected<std::unique_ptr<LayerEffect>, std::string> effect =
+                    LayerEffectFromJson(effectNode);
+                if (!effect) {
+                    return Unexpected(effect.error());
+                }
+                if (*effect) {
+                    layer->effects.push_back(std::move(*effect));
+                }
+            }
+        }
     }
     return layer;
 }

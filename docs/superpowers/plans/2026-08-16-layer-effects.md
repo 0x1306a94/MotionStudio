@@ -229,7 +229,7 @@ git commit --only include/MotionStudio/model/LayerEffect.h src/model/LayerEffect
 
 ### Task 2: 序列化 + PropertyPath
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/serialization/Serializer.cpp`（`LayerToJson` / `LayerFromJson`）
@@ -242,7 +242,7 @@ git commit --only include/MotionStudio/model/LayerEffect.h src/model/LayerEffect
 - Produces: JSON `type` = `brightnessContrast` / `gaussianBlur`；未知 type 跳过
 - Produces: `ResolveAnimatable` 支持 `effects[i].brightness|contrast|blurriness`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/serialization/LayerEffectSerializerTest.cpp` 用与 `SceneEvaluatorTest` 相同的最小 Document（一个 Shape + Fill），再 `push_back` effect：
 
@@ -295,7 +295,7 @@ TEST(LayerEffectSerializerTest, ResolvesBrightnessPropertyPath) {
 
 旧文档路径：先 `serialize` 再 `erase("effects")`，不要手写残缺层 JSON。`ResolveAnimatable` 在 `MotionStudio/model/PropertyPath.h`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='LayerEffectSerializerTest.*:PropertyPathTest.ResolvesEffectBrightness'
@@ -303,7 +303,7 @@ TEST(LayerEffectSerializerTest, ResolvesBrightnessPropertyPath) {
 
 Expected: FAIL（JSON 无 `effects` 或 path 解析不到）。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `Serializer.cpp` 在 `LayerStyleToJson` 旁加 `LayerEffectToJson` / `LayerEffectFromJson`：
 
@@ -344,7 +344,7 @@ if (first.name == "effects" && first.index >= 0 && segments.size() == 2) {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target core_tests
@@ -353,7 +353,7 @@ cmake --build build --target core_tests
 
 Expected: PASS。再跑一遍现有 Serializer 回归：`./build/tests/core_tests --gtest_filter='SerializerTest.*'`。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/serialization/Serializer.cpp src/model/PropertyPath.cpp \
