@@ -35,10 +35,7 @@ final class TimelineTracksView: UIView {
     private let performEdit: (String, () -> Void) -> Void
     private let registerEdit: (String) -> Void
 
-    private let scrollView = UIScrollView()
-    private let contentView = UIView()
-    private var contentHeightConstraint: NSLayoutConstraint?
-    private var rowViews: [TimelineTrackRowView] = []
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private var rows: [TimelineRow] = []
     private var duration: Int64 = 0
     private var pointsPerFrame: CGFloat = pixelsPerFrame
@@ -59,7 +56,7 @@ final class TimelineTracksView: UIView {
         self.registerEdit = registerEdit
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        configureScroll()
+        configureTable()
     }
 
     @available(*, unavailable)
@@ -68,13 +65,13 @@ final class TimelineTracksView: UIView {
     }
 
     var contentOffsetY: CGFloat {
-        get { scrollView.contentOffset.y }
+        get { tableView.contentOffset.y }
         set {
-            guard abs(scrollView.contentOffset.y - newValue) > 0.5 else {
+            guard abs(tableView.contentOffset.y - newValue) > 0.5 else {
                 return
             }
             isSyncingOffset = true
-            scrollView.contentOffset = CGPoint(x: 0, y: newValue)
+            tableView.contentOffset = CGPoint(x: 0, y: newValue)
             isSyncingOffset = false
         }
     }
@@ -86,15 +83,15 @@ final class TimelineTracksView: UIView {
             return
         }
         let limits = verticalScrollLimits()
-        let proposed = scrollView.contentOffset.y - deltaY
+        let proposed = tableView.contentOffset.y - deltaY
         let next: CGFloat = if proposed < limits.min {
-            limits.min - rubberBand(overscroll: limits.min - proposed, dimension: scrollView.bounds.height)
+            limits.min - rubberBand(overscroll: limits.min - proposed, dimension: tableView.bounds.height)
         } else if proposed > limits.max {
-            limits.max + rubberBand(overscroll: proposed - limits.max, dimension: scrollView.bounds.height)
+            limits.max + rubberBand(overscroll: proposed - limits.max, dimension: tableView.bounds.height)
         } else {
             proposed
         }
-        guard abs(next - scrollView.contentOffset.y) > 0.05 else {
+        guard abs(next - tableView.contentOffset.y) > 0.05 else {
             return
         }
         contentOffsetY = next
@@ -104,7 +101,7 @@ final class TimelineTracksView: UIView {
     /// Springs content offset back into valid range after trackpad/wheel rubber-band.
     func endVerticalRubberBand() {
         let limits = verticalScrollLimits()
-        let current = scrollView.contentOffset.y
+        let current = tableView.contentOffset.y
         let clamped = min(max(current, limits.min), limits.max)
         guard abs(clamped - current) > 0.5 else {
             return
@@ -116,20 +113,20 @@ final class TimelineTracksView: UIView {
                        initialSpringVelocity: 0,
                        options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut])
         {
-            self.scrollView.contentOffset = CGPoint(x: 0, y: clamped)
+            self.tableView.contentOffset = CGPoint(x: 0, y: clamped)
         } completion: { _ in
             self.isSyncingOffset = false
-            self.delegate?.timelineTracksDidScroll(self, offsetY: self.scrollView.contentOffset.y)
+            self.delegate?.timelineTracksDidScroll(self, offsetY: self.tableView.contentOffset.y)
         }
         // Keep sidebar locked to the settled edge immediately (same final offset).
         delegate?.timelineTracksDidScroll(self, offsetY: clamped)
     }
 
     private func verticalScrollLimits() -> (min: CGFloat, max: CGFloat) {
-        let minOffset = -scrollView.adjustedContentInset.top
+        let minOffset = -tableView.adjustedContentInset.top
         let maxOffset = max(minOffset,
-                            scrollView.contentSize.height - scrollView.bounds.height
-                                + scrollView.adjustedContentInset.bottom)
+                            tableView.contentSize.height - tableView.bounds.height
+                                + tableView.adjustedContentInset.bottom)
         return (minOffset, maxOffset)
     }
 
@@ -140,7 +137,12 @@ final class TimelineTracksView: UIView {
         return (1 - (1 / ((overscroll * constant / limit) + 1))) * limit
     }
 
-    func reload(rows: [TimelineRow], duration: Int64, pointsPerFrame: CGFloat, scrollX: CGFloat) {
+    func reload(rows: [TimelineRow],
+                duration: Int64,
+                pointsPerFrame: CGFloat,
+                scrollX: CGFloat,
+                preserving anchor: TimelineScrollAnchor?)
+    {
         self.rows = rows
         self.duration = duration
         self.pointsPerFrame = pointsPerFrame
@@ -152,7 +154,39 @@ final class TimelineTracksView: UIView {
             needsReloadAfterInteraction = true
             return
         }
-        rebuildRows()
+        reloadData(preserving: anchor)
+    }
+
+    func refresh(rows: [TimelineRow], duration: Int64, pointsPerFrame: CGFloat, scrollX: CGFloat) {
+        self.rows = rows
+        self.duration = duration
+        self.pointsPerFrame = pointsPerFrame
+        self.scrollX = scrollX
+        if suspendsReload {
+            needsReloadAfterInteraction = true
+            return
+        }
+        for cell in tableView.visibleCells {
+            guard let trackCell = cell as? TimelineTrackCell,
+                  let indexPath = tableView.indexPath(for: trackCell),
+                  indexPath.row < rows.count
+            else {
+                continue
+            }
+            trackCell.refresh(row: rows[indexPath.row],
+                              duration: duration,
+                              pointsPerFrame: pointsPerFrame,
+                              scrollX: scrollX,
+                              viewportWidth: tableView.bounds.width)
+            wireActions(to: trackCell.rowView)
+        }
+    }
+
+    private func reloadData(preserving anchor: TimelineScrollAnchor?) {
+        isSyncingOffset = true
+        tableView.reloadData()
+        tableView.restoreTimelineScrollAnchor(anchor, rows: rows)
+        isSyncingOffset = false
     }
 
     func updateHorizontalMetrics(pointsPerFrame: CGFloat, scrollX: CGFloat) {
@@ -161,8 +195,11 @@ final class TimelineTracksView: UIView {
         guard !suspendsReload else {
             return
         }
-        for rowView in rowViews {
-            rowView.updateMetrics(pointsPerFrame: pointsPerFrame, scrollX: scrollX, duration: duration)
+        for rowView in visibleRowViews {
+            rowView.updateMetrics(pointsPerFrame: pointsPerFrame,
+                                  scrollX: scrollX,
+                                  duration: duration,
+                                  viewportWidth: tableView.bounds.width)
         }
     }
 
@@ -170,7 +207,7 @@ final class TimelineTracksView: UIView {
         guard !suspendsReload else {
             return
         }
-        for rowView in rowViews {
+        for rowView in visibleRowViews {
             rowView.refreshSelection()
         }
     }
@@ -183,126 +220,205 @@ final class TimelineTracksView: UIView {
         suspendsReload = false
         if needsReloadAfterInteraction {
             needsReloadAfterInteraction = false
-            rebuildRows()
+            reloadData(preserving: tableView.timelineScrollAnchor(rows: rows))
         }
     }
 
-    private func configureScroll() {
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.delegate = self
-        scrollView.alwaysBounceVertical = true
-        scrollView.bounces = true
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.backgroundColor = .clear
-        contentView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(scrollView)
-        scrollView.addSubview(contentView)
+    private var visibleRowViews: [TimelineTrackRowView] {
+        tableView.visibleCells.compactMap { ($0 as? TimelineTrackCell)?.rowView }
+    }
+
+    private func configureTable() {
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.alwaysBounceVertical = true
+        tableView.bounces = true
+        tableView.separatorStyle = .none
+        tableView.backgroundColor = .clear
+        tableView.allowsSelection = false
+        tableView.showsVerticalScrollIndicator = false
+        tableView.estimatedRowHeight = 0
+        addSubview(tableView)
+        let backgroundTap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
+        backgroundTap.cancelsTouchesInView = false
+        tableView.backgroundView = UIView()
+        tableView.backgroundView?.addGestureRecognizer(backgroundTap)
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            tableView.topAnchor.constraint(equalTo: topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
-        let clearTap = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
-        clearTap.cancelsTouchesInView = false
-        scrollView.addGestureRecognizer(clearTap)
     }
 
-    @objc private func handleBackgroundTap(_ recognizer: UITapGestureRecognizer) {
-        let point = recognizer.location(in: contentView)
-        if rowViews.contains(where: { $0.frame.contains(point) && $0.hitTest(contentView.convert(point, to: $0), with: nil) != nil }) {
-            return
-        }
+    @objc private func handleBackgroundTap() {
         editorState.clearLayerSelection()
     }
 
-    private func rebuildRows() {
-        rowViews.forEach { $0.removeFromSuperview() }
-        rowViews.removeAll()
-        var top: CGFloat = 0
-        for row in rows {
-            let rowView = TimelineTrackRowView(document: document,
-                                               editorState: editorState,
-                                               row: row,
-                                               duration: duration,
-                                               pointsPerFrame: pointsPerFrame,
-                                               scrollX: scrollX,
-                                               perform: performEdit,
-                                               registerEdit: registerEdit)
-            rowView.onTimeRangeDraggingChanged = { [weak self] isDragging in
-                guard let self else {
-                    return
-                }
-                if isDragging {
-                    beginInteractiveEdit()
-                } else {
-                    endInteractiveEdit()
-                }
-                delegate?.timelineTracksTimeRangeDraggingChanged(self, isDragging: isDragging)
+    private func wireActions(to rowView: TimelineTrackRowView) {
+        rowView.onTimeRangeDraggingChanged = { [weak self] isDragging in
+            guard let self else {
+                return
             }
-            rowView.onDragMoved = { [weak self, weak rowView] scope in
-                guard let self, let rowView else {
-                    return
-                }
-                let layerID = rowView.layerID
-                switch scope {
-                case .entireLayer:
-                    for view in rowViews where view.layerID == layerID {
-                        if view === rowView, view.isLayerRow {
-                            view.refreshTimeRangeOnly()
-                        } else if view === rowView {
-                            view.refreshContentPreservingGestures()
-                        } else {
-                            view.updateMetrics(pointsPerFrame: pointsPerFrame, scrollX: scrollX, duration: duration)
-                        }
-                    }
-                case .rowAndLayerBar:
-                    // Geometry only — full reloadContent risks cancelling property handle pan.
-                    rowView.refreshPropertySpanOnly()
-                    for view in rowViews where view.layerID == layerID && view.isLayerRow {
-                        view.refreshTimeRangeOnly()
-                    }
-                case .layerBarOnly:
-                    for view in rowViews where view.layerID == layerID && view.isLayerRow {
-                        view.refreshTimeRangeOnly()
-                    }
-                }
+            if isDragging {
+                beginInteractiveEdit()
+            } else {
+                endInteractiveEdit()
             }
-            rowView.onPresentEasing = { [weak self] request in
-                self?.onPresentEasing?(request)
-            }
-            rowView.translatesAutoresizingMaskIntoConstraints = false
-            contentView.addSubview(rowView)
-            NSLayoutConstraint.activate([
-                rowView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: top),
-                rowView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-                rowView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-                rowView.heightAnchor.constraint(equalToConstant: row.height),
-            ])
-            rowViews.append(rowView)
-            top += row.height
+            delegate?.timelineTracksTimeRangeDraggingChanged(self, isDragging: isDragging)
         }
-        if let contentHeightConstraint {
-            contentHeightConstraint.constant = max(top, 1)
-        } else {
-            let constraint = contentView.heightAnchor.constraint(equalToConstant: max(top, 1))
-            constraint.isActive = true
-            contentHeightConstraint = constraint
+        rowView.onDragMoved = { [weak self, weak rowView] scope in
+            guard let self, let rowView else {
+                return
+            }
+            let layerID = rowView.layerID
+            switch scope {
+            case .entireLayer:
+                for view in visibleRowViews where view.layerID == layerID {
+                    if view === rowView, view.isLayerRow {
+                        view.refreshTimeRangeOnly()
+                    } else if view === rowView {
+                        view.refreshContentPreservingGestures()
+                    } else {
+                        view.updateMetrics(pointsPerFrame: pointsPerFrame,
+                                           scrollX: scrollX,
+                                           duration: duration,
+                                           viewportWidth: tableView.bounds.width)
+                    }
+                }
+            case .rowAndLayerBar:
+                rowView.refreshPropertySpanOnly()
+                for view in visibleRowViews where view.layerID == layerID && view.isLayerRow {
+                    view.refreshTimeRangeOnly()
+                }
+            case .layerBarOnly:
+                for view in visibleRowViews where view.layerID == layerID && view.isLayerRow {
+                    view.refreshTimeRangeOnly()
+                }
+            }
+        }
+        rowView.onPresentEasing = { [weak self] request in
+            self?.onPresentEasing?(request)
         }
     }
 }
 
-extension TimelineTracksView: UIScrollViewDelegate {
+extension TimelineTracksView: UITableViewDataSource, UITableViewDelegate {
+    func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int {
+        rows.count
+    }
+
+    func tableView(_: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        rows[indexPath.row].height
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let row = rows[indexPath.row]
+        let cell: TimelineTrackCell
+        if let reusableCell = tableView.dequeueReusableCell(withIdentifier: TimelineTrackCell.reuseIdentifier) as? TimelineTrackCell {
+            cell = reusableCell
+            cell.configure(row: row,
+                           duration: duration,
+                           pointsPerFrame: pointsPerFrame,
+                           scrollX: scrollX,
+                           viewportWidth: tableView.bounds.width)
+        } else {
+            cell = TimelineTrackCell(document: document,
+                                     editorState: editorState,
+                                     row: row,
+                                     duration: duration,
+                                     pointsPerFrame: pointsPerFrame,
+                                     scrollX: scrollX,
+                                     viewportWidth: tableView.bounds.width,
+                                     perform: performEdit,
+                                     registerEdit: registerEdit)
+        }
+        wireActions(to: cell.rowView)
+        return cell
+    }
+
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         guard !isSyncingOffset else {
             return
         }
         delegate?.timelineTracksDidScroll(self, offsetY: scrollView.contentOffset.y)
+    }
+}
+
+@MainActor
+private final class TimelineTrackCell: UITableViewCell {
+    static let reuseIdentifier = "TimelineTrackCell"
+
+    let rowView: TimelineTrackRowView
+
+    init(document: MotionProjectState,
+         editorState: EditorState,
+         row: TimelineRow,
+         duration: Int64,
+         pointsPerFrame: CGFloat,
+         scrollX: CGFloat,
+         viewportWidth: CGFloat,
+         perform: @escaping (String, () -> Void) -> Void,
+         registerEdit: @escaping (String) -> Void)
+    {
+        rowView = TimelineTrackRowView(document: document,
+                                       editorState: editorState,
+                                       row: row,
+                                       duration: duration,
+                                       pointsPerFrame: pointsPerFrame,
+                                       scrollX: scrollX,
+                                       viewportWidth: viewportWidth,
+                                       perform: perform,
+                                       registerEdit: registerEdit)
+        super.init(style: .default, reuseIdentifier: Self.reuseIdentifier)
+        selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .clear
+        rowView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(rowView)
+        NSLayoutConstraint.activate([
+            rowView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            rowView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            rowView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            rowView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        nil
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        rowView.prepareForReuse()
+    }
+
+    func configure(row: TimelineRow,
+                   duration: Int64,
+                   pointsPerFrame: CGFloat,
+                   scrollX: CGFloat,
+                   viewportWidth: CGFloat)
+    {
+        rowView.configure(row: row,
+                          duration: duration,
+                          pointsPerFrame: pointsPerFrame,
+                          scrollX: scrollX,
+                          viewportWidth: viewportWidth)
+    }
+
+    func refresh(row: TimelineRow,
+                 duration: Int64,
+                 pointsPerFrame: CGFloat,
+                 scrollX: CGFloat,
+                 viewportWidth: CGFloat)
+    {
+        rowView.refresh(row: row,
+                        duration: duration,
+                        pointsPerFrame: pointsPerFrame,
+                        scrollX: scrollX,
+                        viewportWidth: viewportWidth)
     }
 }
 
@@ -313,6 +429,11 @@ private enum TimelineDragRefreshScope {
     case rowAndLayerBar
     /// Keyframe diamond pan: update envelope only (rebuilding diamonds would cancel the gesture).
     case layerBarOnly
+}
+
+private struct TimelineKeyframeSegmentID: Hashable {
+    let startFrame: Int64
+    let endFrame: Int64
 }
 
 @MainActor
@@ -334,17 +455,21 @@ private final class TimelineTrackRowView: UIView {
 
     private let document: MotionProjectState
     private let editorState: EditorState
-    private let row: TimelineRow
+    private var row: TimelineRow
     private var duration: Int64
     private var pointsPerFrame: CGFloat
     private var scrollX: CGFloat
+    private var viewportWidth: CGFloat
     private let performEdit: (String, () -> Void) -> Void
     private let registerEdit: (String) -> Void
 
     private let timeRangeBar = TimelineTimeRangeBarView()
     private let propertyBar = TimelinePropertyBarView()
-    private var segmentViews: [UIView] = []
-    private var diamondViews: [TimelineKeyframeDiamondView] = []
+    private var keyframes: [KeyframeInfo] = []
+    private var segmentViews: [TimelineKeyframeSegmentID: TimelineKeyframeSegmentView] = [:]
+    private var diamondViews: [Int64: TimelineKeyframeDiamondView] = [:]
+    private var reusableSegmentViews: [TimelineKeyframeSegmentView] = []
+    private var reusableDiamondViews: [TimelineKeyframeDiamondView] = []
 
     private var dragSession: TimelineDragSession?
     private var dragFrameOffset: Int64 = 0
@@ -358,6 +483,7 @@ private final class TimelineTrackRowView: UIView {
          duration: Int64,
          pointsPerFrame: CGFloat,
          scrollX: CGFloat,
+         viewportWidth: CGFloat,
          perform: @escaping (String, () -> Void) -> Void,
          registerEdit: @escaping (String) -> Void)
     {
@@ -367,6 +493,7 @@ private final class TimelineTrackRowView: UIView {
         self.duration = duration
         self.pointsPerFrame = pointsPerFrame
         self.scrollX = scrollX
+        self.viewportWidth = viewportWidth
         performEdit = perform
         self.registerEdit = registerEdit
         super.init(frame: .zero)
@@ -384,15 +511,64 @@ private final class TimelineTrackRowView: UIView {
         nil
     }
 
-    func updateMetrics(pointsPerFrame: CGFloat, scrollX: CGFloat, duration: Int64) {
+    func configure(row: TimelineRow,
+                   duration: Int64,
+                   pointsPerFrame: CGFloat,
+                   scrollX: CGFloat,
+                   viewportWidth: CGFloat)
+    {
+        propertyBar.onTap = nil
+        timeRangeBar.isHidden = true
+        propertyBar.isHidden = true
+        self.row = row
+        self.duration = duration
         self.pointsPerFrame = pointsPerFrame
         self.scrollX = scrollX
-        self.duration = duration
+        self.viewportWidth = viewportWidth
         reloadContent()
     }
 
+    func prepareForReuse() {
+        onTimeRangeDraggingChanged = nil
+        onDragMoved = nil
+        onPresentEasing = nil
+        propertyBar.onTap = nil
+        recycleKeyframeViews()
+    }
+
+    func refresh(row: TimelineRow,
+                 duration: Int64,
+                 pointsPerFrame: CGFloat,
+                 scrollX: CGFloat,
+                 viewportWidth: CGFloat)
+    {
+        self.row = row
+        self.duration = duration
+        self.pointsPerFrame = pointsPerFrame
+        self.scrollX = scrollX
+        self.viewportWidth = viewportWidth
+        if case let .keyframeTrack(path, _) = row.kind {
+            keyframes = document.core.keyframes(entityID: row.layerID, path: path).sorted { $0.frame < $1.frame }
+        } else {
+            keyframes.removeAll()
+        }
+        layoutContent()
+    }
+
+    func updateMetrics(pointsPerFrame: CGFloat,
+                       scrollX: CGFloat,
+                       duration: Int64,
+                       viewportWidth: CGFloat)
+    {
+        self.pointsPerFrame = pointsPerFrame
+        self.scrollX = scrollX
+        self.duration = duration
+        self.viewportWidth = viewportWidth
+        layoutContent()
+    }
+
     func refreshSelection() {
-        reloadContent()
+        layoutContent()
     }
 
     func refreshTimeRangeOnly() {
@@ -407,15 +583,20 @@ private final class TimelineTrackRowView: UIView {
     }
 
     func refreshContentPreservingGestures() {
-        reloadContent()
+        layoutContent()
     }
 
     private func reloadContent() {
-        segmentViews.forEach { $0.removeFromSuperview() }
-        segmentViews.removeAll()
-        diamondViews.forEach { $0.removeFromSuperview() }
-        diamondViews.removeAll()
-        // Do not hide timeRangeBar / propertyBar before relayout — toggling isHidden cancels an active pan.
+        recycleKeyframeViews()
+        if case let .keyframeTrack(path, _) = row.kind {
+            keyframes = document.core.keyframes(entityID: row.layerID, path: path).sorted { $0.frame < $1.frame }
+        } else {
+            keyframes.removeAll()
+        }
+        layoutContent()
+    }
+
+    private func layoutContent() {
         switch row.kind {
         case .layer:
             propertyBar.isHidden = true
@@ -473,31 +654,58 @@ private final class TimelineTrackRowView: UIView {
     }
 
     private func layoutKeyframeTrack(path: String) {
-        let keyframes = document.core.keyframes(entityID: row.layerID, path: path).sorted { $0.frame < $1.frame }
-        let segments = zip(keyframes, keyframes.dropFirst()).map(KeyframeSegment.init)
+        let indexes = timelineVisibleKeyframeIndexes(frames: keyframes.map(\.frame),
+                                                     pointsPerFrame: pointsPerFrame,
+                                                     scrollX: scrollX,
+                                                     viewportWidth: viewportWidth)
+        let visibleFrames = Set(indexes.diamonds.map { keyframes[$0].frame })
+        for frame in diamondViews.keys.filter({ !visibleFrames.contains($0) }) {
+            recycleDiamondView(at: frame)
+        }
+        let visibleSegments = Set(indexes.segments.map {
+            TimelineKeyframeSegmentID(startFrame: keyframes[$0].frame, endFrame: keyframes[$0 + 1].frame)
+        })
+        for identifier in segmentViews.keys.filter({ !visibleSegments.contains($0) }) {
+            recycleSegmentView(identifier: identifier)
+        }
+
         let trackSelected = editorState.isLayerSelected(row.layerID)
-        for segment in segments {
-            let startX = contentX(for: segment.start.frame)
-            let endX = contentX(for: segment.end.frame)
+        for index in indexes.segments {
+            let start = keyframes[index]
+            let end = keyframes[index + 1]
+            let identifier = TimelineKeyframeSegmentID(startFrame: start.frame, endFrame: end.frame)
+            let segmentView: TimelineKeyframeSegmentView
+            if let visibleView = segmentViews[identifier] {
+                segmentView = visibleView
+            } else {
+                segmentView = dequeueSegmentView()
+                segmentViews[identifier] = segmentView
+                addSubview(segmentView)
+            }
+            let startX = contentX(for: start.frame)
+            let endX = contentX(for: end.frame)
             let width = max(endX - startX, 2)
             let selected = trackSelected
                 || editorState.selectedTimelineSegment == TimelineSegmentSelection(layerID: row.layerID,
                                                                                    path: path,
-                                                                                   startFrame: segment.start.frame,
-                                                                                   endFrame: segment.end.frame)
-            let segmentView = TimelineKeyframeSegmentView(frame: CGRect(x: startX, y: 0, width: width, height: propertyRowHeight))
-            segmentView.configure(easing: segment.start.easing, isSelected: selected)
-            let tap = UITapGestureRecognizer(target: self, action: #selector(handleSegmentTap(_:)))
-            segmentView.addGestureRecognizer(tap)
-            segmentView.isUserInteractionEnabled = true
-            segmentView.accessibilityIdentifier = "\(segment.start.frame):\(segment.end.frame):\(path)"
-            addSubview(segmentView)
-            segmentViews.append(segmentView)
+                                                                                   startFrame: start.frame,
+                                                                                   endFrame: end.frame)
+            segmentView.frame = CGRect(x: startX, y: 0, width: width, height: propertyRowHeight)
+            segmentView.configure(easing: start.easing, isSelected: selected)
+            segmentView.accessibilityIdentifier = "\(start.frame):\(end.frame):\(path)"
         }
-        for (index, keyframe) in keyframes.enumerated() {
+
+        for index in indexes.diamonds {
+            let keyframe = keyframes[index]
             let frame = keyframe.frame
             let selected = trackSelected || isKeyframeSelected(frame, path: path)
-            let diamond = TimelineKeyframeDiamondView()
+            if let diamond = diamondViews[frame] {
+                diamond.configure(selected: selected)
+                diamond.center = CGPoint(x: contentX(for: frame), y: propertyRowHeight / 2)
+                continue
+            }
+            let diamond = dequeueDiamondView()
+            diamondViews[frame] = diamond
             diamond.configure(selected: selected)
             diamond.center = CGPoint(x: contentX(for: frame), y: propertyRowHeight / 2)
             let prev = index > 0 ? keyframes[index - 1].frame : nil as Int64?
@@ -533,7 +741,7 @@ private final class TimelineTrackRowView: UIView {
                     self.document.core.removeKeyframe(entityID: self.row.layerID, path: path, frame: current)
                 }
             }
-            diamond.onSelect = { [weak self] in
+            diamond.onSelect = { [weak self] sourceView in
                 guard let self else {
                     return
                 }
@@ -553,7 +761,7 @@ private final class TimelineTrackRowView: UIView {
                 onPresentEasing?(TimelineEasingPresentationRequest(
                     easing: keyframe.easing,
                     easingAffectsPlayback: hasOutgoing,
-                    sourceView: diamond,
+                    sourceView: sourceView,
                     onSetEasing: { easing in
                         self.document.core.setEasing(entityID: self.row.layerID, path: path, frame: current, easing: easing)
                     },
@@ -571,10 +779,51 @@ private final class TimelineTrackRowView: UIView {
                 ))
             }
             addSubview(diamond)
-            diamondViews.append(diamond)
         }
-        for diamond in diamondViews {
+        for diamond in diamondViews.values {
             bringSubviewToFront(diamond)
+        }
+    }
+
+    private func dequeueSegmentView() -> TimelineKeyframeSegmentView {
+        if let segmentView = reusableSegmentViews.popLast() {
+            return segmentView
+        }
+        let segmentView = TimelineKeyframeSegmentView(frame: .zero)
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleSegmentTap(_:)))
+        segmentView.addGestureRecognizer(tap)
+        segmentView.isUserInteractionEnabled = true
+        return segmentView
+    }
+
+    private func dequeueDiamondView() -> TimelineKeyframeDiamondView {
+        reusableDiamondViews.popLast() ?? TimelineKeyframeDiamondView()
+    }
+
+    private func recycleSegmentView(identifier: TimelineKeyframeSegmentID) {
+        guard let segmentView = segmentViews.removeValue(forKey: identifier) else {
+            return
+        }
+        segmentView.accessibilityIdentifier = nil
+        segmentView.removeFromSuperview()
+        reusableSegmentViews.append(segmentView)
+    }
+
+    private func recycleDiamondView(at frame: Int64) {
+        guard let diamondView = diamondViews.removeValue(forKey: frame) else {
+            return
+        }
+        diamondView.prepareForReuse()
+        diamondView.removeFromSuperview()
+        reusableDiamondViews.append(diamondView)
+    }
+
+    private func recycleKeyframeViews() {
+        for identifier in Array(segmentViews.keys) {
+            recycleSegmentView(identifier: identifier)
+        }
+        for frame in Array(diamondViews.keys) {
+            recycleDiamondView(at: frame)
         }
     }
 
@@ -844,22 +1093,17 @@ private final class TimelineTrackRowView: UIView {
 
     /// Reposition segment lines + diamonds from live document frames without recreating views.
     private func syncKeyframeTrackGeometry(path: String) {
-        let keyframes = document.core.keyframes(entityID: row.layerID, path: path).sorted { $0.frame < $1.frame }
-        guard diamondViews.count == keyframes.count,
-              segmentViews.count == max(keyframes.count - 1, 0)
-        else {
-            return
-        }
-        for (index, segmentView) in segmentViews.enumerated() {
-            let start = keyframes[index].frame
-            let end = keyframes[index + 1].frame
+        for (identifier, segmentView) in segmentViews {
+            let start = dragCurrentFrames[dragKey(path: path, origin: identifier.startFrame)] ?? identifier.startFrame
+            let end = dragCurrentFrames[dragKey(path: path, origin: identifier.endFrame)] ?? identifier.endFrame
             let startX = contentX(for: start)
             let endX = contentX(for: end)
             segmentView.frame = CGRect(x: startX, y: 0, width: max(endX - startX, 2), height: propertyRowHeight)
             segmentView.accessibilityIdentifier = "\(start):\(end):\(path)"
         }
-        for (index, diamond) in diamondViews.enumerated() {
-            diamond.center = CGPoint(x: contentX(for: keyframes[index].frame), y: propertyRowHeight / 2)
+        for (originFrame, diamond) in diamondViews {
+            let frame = dragCurrentFrames[dragKey(path: path, origin: originFrame)] ?? originFrame
+            diamond.center = CGPoint(x: contentX(for: frame), y: propertyRowHeight / 2)
         }
     }
 
@@ -1073,7 +1317,7 @@ private final class TimelineKeyframeDiamondView: UIView {
     var onMoved: ((CGFloat) -> Void)?
     var onMoveEnded: (() -> Void)?
     var onDelete: (() -> Void)?
-    var onSelect: (() -> Void)?
+    var onSelect: ((TimelineKeyframeDiamondView) -> Void)?
 
     private let imageView = UIImageView(image: UIImage(systemName: "diamond.fill"))
     private var didBeginDrag = false
@@ -1107,8 +1351,16 @@ private final class TimelineKeyframeDiamondView: UIView {
         imageView.tintColor = selected ? .tintColor : .secondaryLabel
     }
 
+    func prepareForReuse() {
+        onMoved = nil
+        onMoveEnded = nil
+        onDelete = nil
+        onSelect = nil
+        didBeginDrag = false
+    }
+
     @objc private func handleTap() {
-        onSelect?()
+        onSelect?(self)
     }
 
     @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {

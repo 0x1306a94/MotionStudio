@@ -65,12 +65,31 @@ final class TimelineSidebarView: UIView {
         }
     }
 
-    func reloadRows(_ rows: [TimelineRow]) {
+    func scrollAnchor() -> TimelineScrollAnchor? {
+        tableView.timelineScrollAnchor(rows: rows)
+    }
+
+    func reloadRows(_ rows: [TimelineRow], preserving anchor: TimelineScrollAnchor?) {
         self.rows = rows
         guard layerDragContext == nil else {
             return
         }
+        isSyncingOffset = true
         tableView.reloadData()
+        tableView.restoreTimelineScrollAnchor(anchor, rows: rows)
+        isSyncingOffset = false
+        refreshSelectionAppearance()
+        updatePlayheadBadges()
+    }
+
+    func refreshRows(_ rows: [TimelineRow]) {
+        self.rows = rows
+        for cell in tableView.visibleCells {
+            guard let indexPath = tableView.indexPath(for: cell), indexPath.row < rows.count else {
+                continue
+            }
+            configure(cell: cell, row: rows[indexPath.row])
+        }
         refreshSelectionAppearance()
         updatePlayheadBadges()
     }
@@ -146,6 +165,59 @@ final class TimelineSidebarView: UIView {
         }
     }
 
+    private func configure(cell: UITableViewCell, row: TimelineRow) {
+        let core = document.core
+        switch row.kind {
+        case .layer:
+            guard let layerCell = cell as? TimelineLayerCell else {
+                return
+            }
+            let visible = core.layerIsVisible(row.layerID)
+            let locked = core.layerIsLocked(row.layerID)
+            layerCell.configure(name: core.layerName(row.layerID),
+                                symbolName: layerSymbol(core.layerType(row.layerID)),
+                                visible: visible,
+                                locked: locked)
+            layerCell.onTap = { [weak self] in
+                self?.editorState.selectLayer(row.layerID, additive: KeyboardModifiers.shiftPressed)
+                self?.refreshSelectionAppearance()
+            }
+            layerCell.onToggleVisible = { [weak self] in
+                guard let self else {
+                    return
+                }
+                performEdit(visible ? "Hide Layer" : "Show Layer") {
+                    self.document.core.setLayerVisible(row.layerID, visible: !visible)
+                }
+            }
+            layerCell.onToggleLocked = { [weak self] in
+                guard let self else {
+                    return
+                }
+                performEdit(locked ? "Unlock Layer" : "Lock Layer") {
+                    self.document.core.setLayerLocked(row.layerID, locked: !locked)
+                }
+            }
+        case let .propertySpan(path, label), let .keyframeTrack(path, label):
+            guard let propertyCell = cell as? TimelinePropertyCell else {
+                return
+            }
+            let hasKeyframe = core.keyframes(entityID: row.layerID, path: path)
+                .contains { $0.frame == playheadClock.frame }
+            propertyCell.configure(label: label, hasKeyframeAtPlayhead: hasKeyframe)
+            propertyCell.onTap = { [weak self] in
+                guard let self else {
+                    return
+                }
+                editorState.selectedLayerID = row.layerID
+                editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: row.layerID, path: path)
+                editorState.selectedTimelineSegment = nil
+                refreshSelectionAppearance()
+            }
+        }
+        configureSelection(for: cell, row: row)
+    }
+
     private func layerSymbol(_ type: MS_LAYER) -> String {
         switch type {
         case .IMAGE:
@@ -173,55 +245,14 @@ extension TimelineSidebarView: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let row = rows[indexPath.row]
-        let core = document.core
-        switch row.kind {
+        let cell: UITableViewCell = switch row.kind {
         case .layer:
-            let cell = tableView.dequeueReusableCell(withIdentifier: TimelineLayerCell.reuseID, for: indexPath) as! TimelineLayerCell
-            let visible = core.layerIsVisible(row.layerID)
-            let locked = core.layerIsLocked(row.layerID)
-            cell.configure(name: core.layerName(row.layerID),
-                           symbolName: layerSymbol(core.layerType(row.layerID)),
-                           visible: visible,
-                           locked: locked)
-            cell.onTap = { [weak self] in
-                self?.editorState.selectLayer(row.layerID, additive: KeyboardModifiers.shiftPressed)
-                self?.refreshSelectionAppearance()
-            }
-            cell.onToggleVisible = { [weak self] in
-                guard let self else {
-                    return
-                }
-                performEdit(visible ? "Hide Layer" : "Show Layer") {
-                    self.document.core.setLayerVisible(row.layerID, visible: !visible)
-                }
-            }
-            cell.onToggleLocked = { [weak self] in
-                guard let self else {
-                    return
-                }
-                performEdit(locked ? "Unlock Layer" : "Lock Layer") {
-                    self.document.core.setLayerLocked(row.layerID, locked: !locked)
-                }
-            }
-            configureSelection(for: cell, row: row)
-            return cell
-        case let .propertySpan(path, label), let .keyframeTrack(path, label):
-            let cell = tableView.dequeueReusableCell(withIdentifier: TimelinePropertyCell.reuseID, for: indexPath) as! TimelinePropertyCell
-            let hasKeyframe = core.keyframes(entityID: row.layerID, path: path)
-                .contains { $0.frame == playheadClock.frame }
-            cell.configure(label: label, hasKeyframeAtPlayhead: hasKeyframe)
-            cell.onTap = { [weak self] in
-                guard let self else {
-                    return
-                }
-                editorState.selectedLayerID = row.layerID
-                editorState.selectedTimelineProperty = TimelinePropertySelection(layerID: row.layerID, path: path)
-                editorState.selectedTimelineSegment = nil
-                refreshSelectionAppearance()
-            }
-            configureSelection(for: cell, row: row)
-            return cell
+            tableView.dequeueReusableCell(withIdentifier: TimelineLayerCell.reuseID, for: indexPath)
+        case .propertySpan, .keyframeTrack:
+            tableView.dequeueReusableCell(withIdentifier: TimelinePropertyCell.reuseID, for: indexPath)
         }
+        configure(cell: cell, row: row)
+        return cell
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

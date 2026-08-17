@@ -6,6 +6,7 @@
 //
 
 import MotionStudioBridging
+import UIKit
 
 let minTimelinePointsPerFrame: CGFloat = 1
 let pixelsPerFrame: CGFloat = 6
@@ -21,6 +22,7 @@ let maxLayerColumnWidth: CGFloat = 400
 let layerActionIconSize: CGFloat = 16
 let layerActionButtonSize: CGFloat = 22
 let timelineEndpointHandleWidth: CGFloat = 11
+let timelineKeyframePrefetchWidth: CGFloat = 80
 /// Vertical ScrollView viewport for layer-list reorder auto-scroll.
 /// Must not collide with graphStrip's "timelineViewport" used by playhead drag.
 let timelineLayerListViewportCoordinateSpace = "timelineLayerListViewport"
@@ -301,6 +303,93 @@ func timelineFrame(atVisibleX visibleX: CGFloat, pointsPerFrame: CGFloat,
 {
     let frame = Int64(((visibleX - trackLeadingInset + scrollX) / pointsPerFrame).rounded())
     return min(max(frame, 0), timelineLastInclusiveFrame(duration))
+}
+
+struct TimelineVisibleKeyframeIndexes: Equatable {
+    let diamonds: Range<Int>
+    let segments: Range<Int>
+}
+
+struct TimelineScrollAnchor: Equatable {
+    let rowID: TimelineRow.RowID
+    let rowIndex: Int
+    let offsetY: CGFloat
+}
+
+func timelineScrollAnchorTargetIndex(_ anchor: TimelineScrollAnchor, rows: [TimelineRow]) -> Int? {
+    guard !rows.isEmpty else {
+        return nil
+    }
+    return rows.firstIndex { $0.id == anchor.rowID } ?? min(anchor.rowIndex, rows.count - 1)
+}
+
+extension UITableView {
+    func timelineScrollAnchor(rows: [TimelineRow]) -> TimelineScrollAnchor? {
+        guard let indexPath = indexPathsForVisibleRows?.min(by: { $0.row < $1.row }),
+              indexPath.row < rows.count
+        else {
+            return nil
+        }
+        return TimelineScrollAnchor(rowID: rows[indexPath.row].id,
+                                    rowIndex: indexPath.row,
+                                    offsetY: contentOffset.y - rectForRow(at: indexPath).minY)
+    }
+
+    func restoreTimelineScrollAnchor(_ anchor: TimelineScrollAnchor?, rows: [TimelineRow]) {
+        guard let anchor, let rowIndex = timelineScrollAnchorTargetIndex(anchor, rows: rows) else {
+            return
+        }
+        layoutIfNeeded()
+        let rowY = rectForRow(at: IndexPath(row: rowIndex, section: 0)).minY
+        let minimumOffset = -adjustedContentInset.top
+        let maximumOffset = max(minimumOffset,
+                                contentSize.height - bounds.height + adjustedContentInset.bottom)
+        let offsetY = min(max(rowY + anchor.offsetY, minimumOffset), maximumOffset)
+        contentOffset = CGPoint(x: contentOffset.x, y: offsetY)
+    }
+}
+
+func timelineVisibleKeyframeIndexes(frames: [Int64],
+                                    pointsPerFrame: CGFloat,
+                                    scrollX: CGFloat,
+                                    viewportWidth: CGFloat,
+                                    prefetchWidth: CGFloat = timelineKeyframePrefetchWidth) -> TimelineVisibleKeyframeIndexes
+{
+    guard !frames.isEmpty, pointsPerFrame > 0, viewportWidth > 0 else {
+        return TimelineVisibleKeyframeIndexes(diamonds: 0 ..< 0, segments: 0 ..< 0)
+    }
+    let minimumFrame = Int64(((scrollX - trackLeadingInset - prefetchWidth) / pointsPerFrame).rounded(.down))
+    let maximumFrame = Int64(((scrollX + viewportWidth - trackLeadingInset + prefetchWidth) / pointsPerFrame).rounded(.up))
+
+    var lower = 0
+    var upper = frames.count
+    while lower < upper {
+        let middle = lower + (upper - lower) / 2
+        if frames[middle] < minimumFrame {
+            lower = middle + 1
+        } else {
+            upper = middle
+        }
+    }
+    let firstDiamond = lower
+
+    lower = firstDiamond
+    upper = frames.count
+    while lower < upper {
+        let middle = lower + (upper - lower) / 2
+        if frames[middle] <= maximumFrame {
+            lower = middle + 1
+        } else {
+            upper = middle
+        }
+    }
+    let diamondIndexes = firstDiamond ..< lower
+    guard frames.count > 1 else {
+        return TimelineVisibleKeyframeIndexes(diamonds: diamondIndexes, segments: 0 ..< 0)
+    }
+    let firstSegment = max(0, firstDiamond - 1)
+    let segmentEnd = min(frames.count - 1, lower)
+    return TimelineVisibleKeyframeIndexes(diamonds: diamondIndexes, segments: firstSegment ..< segmentEnd)
 }
 
 func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [TimelineRow] {

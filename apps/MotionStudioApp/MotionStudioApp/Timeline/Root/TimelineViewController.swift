@@ -285,12 +285,24 @@ final class TimelineViewController: UIViewController {
         scrollCoordinator.duration = core.duration(compositionID: compositionID)
         let frameRate = core.frameRate(compositionID: compositionID)
         let layerIDs = Array(core.layerIDs(compositionID: compositionID).reversed())
-        timelineRows = buildTimelineRows(core: core, layerIDs: layerIDs)
-        sidebarView.reloadRows(timelineRows)
-        tracksView.reload(rows: timelineRows,
-                          duration: scrollCoordinator.duration,
-                          pointsPerFrame: scrollCoordinator.pointsPerFrame,
-                          scrollX: scrollCoordinator.scrollX)
+        let nextRows = buildTimelineRows(core: core, layerIDs: layerIDs)
+        let structureChanged = timelineRows.map(\.id) != nextRows.map(\.id)
+        let scrollAnchor = structureChanged ? sidebarView.scrollAnchor() : nil
+        timelineRows = nextRows
+        if structureChanged {
+            sidebarView.reloadRows(nextRows, preserving: scrollAnchor)
+            tracksView.reload(rows: nextRows,
+                              duration: scrollCoordinator.duration,
+                              pointsPerFrame: scrollCoordinator.pointsPerFrame,
+                              scrollX: scrollCoordinator.scrollX,
+                              preserving: scrollAnchor)
+        } else {
+            sidebarView.refreshRows(nextRows)
+            tracksView.refresh(rows: nextRows,
+                               duration: scrollCoordinator.duration,
+                               pointsPerFrame: scrollCoordinator.pointsPerFrame,
+                               scrollX: scrollCoordinator.scrollX)
+        }
         controlsView.reload(duration: scrollCoordinator.duration, frame: playheadClock.frame)
         refreshTrackChrome(updateControls: true, frameRate: frameRate)
     }

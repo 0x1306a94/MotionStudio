@@ -70,4 +70,69 @@ struct TimelineFrameClampTests {
         #expect(timelineEvaluationFrame(0, duration: 0) == 0)
         #expect(timelineLastInclusiveFrame(0) == 0)
     }
+
+    @Test
+    func `visible keyframe indexes include intersecting segments`() {
+        let indexes = timelineVisibleKeyframeIndexes(frames: [0, 10, 20, 30, 40],
+                                                     pointsPerFrame: 10,
+                                                     scrollX: 100,
+                                                     viewportWidth: 100,
+                                                     prefetchWidth: 0)
+        #expect(indexes.diamonds == 1 ..< 2)
+        #expect(indexes.segments == 0 ..< 2)
+    }
+
+    @Test
+    func `visible keyframe indexes clamp to available items`() {
+        let indexes = timelineVisibleKeyframeIndexes(frames: [0, 10, 20],
+                                                     pointsPerFrame: 10,
+                                                     scrollX: 0,
+                                                     viewportWidth: 100,
+                                                     prefetchWidth: 0)
+        #expect(indexes.diamonds == 0 ..< 1)
+        #expect(indexes.segments == 0 ..< 1)
+    }
+
+    @Test
+    func `visible keyframe indexes retain segment crossing viewport`() {
+        let indexes = timelineVisibleKeyframeIndexes(frames: [0, 100],
+                                                     pointsPerFrame: 10,
+                                                     scrollX: 400,
+                                                     viewportWidth: 100,
+                                                     prefetchWidth: 0)
+        #expect(indexes.diamonds.isEmpty)
+        #expect(indexes.segments == 0 ..< 1)
+    }
+
+    @Test
+    func `visible keyframe indexes are empty for invalid viewport`() {
+        let indexes = timelineVisibleKeyframeIndexes(frames: [0, 10],
+                                                     pointsPerFrame: 10,
+                                                     scrollX: 0,
+                                                     viewportWidth: 0)
+        #expect(indexes.diamonds.isEmpty)
+        #expect(indexes.segments.isEmpty)
+    }
+
+    @Test
+    func `scroll anchor follows surviving row identity`() {
+        let anchor = TimelineScrollAnchor(rowID: .layer(2), rowIndex: 1, offsetY: 7)
+        let rows = [
+            TimelineRow(id: .layer(2), layerID: 2, kind: .layer),
+            TimelineRow(id: .layer(1), layerID: 1, kind: .layer),
+        ]
+        #expect(timelineScrollAnchorTargetIndex(anchor, rows: rows) == 0)
+    }
+
+    @Test
+    func `scroll anchor falls back to nearest row index when removed`() {
+        let anchor = TimelineScrollAnchor(rowID: .keyframeTrack(1, "transform.position"),
+                                          rowIndex: 2,
+                                          offsetY: 5)
+        let rows = [
+            TimelineRow(id: .layer(1), layerID: 1, kind: .layer),
+            TimelineRow(id: .layer(2), layerID: 2, kind: .layer),
+        ]
+        #expect(timelineScrollAnchorTargetIndex(anchor, rows: rows) == 1)
+    }
 }
