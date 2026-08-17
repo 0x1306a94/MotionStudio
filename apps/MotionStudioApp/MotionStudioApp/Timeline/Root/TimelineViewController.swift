@@ -157,8 +157,9 @@ final class TimelineViewController: UIViewController {
         trackColumn.addSubview(tracksView)
         trackColumn.addSubview(playheadView)
         trackColumn.addSubview(pointerOverlay)
-        // Pinch on the column so iPad finger touches (which pass through the overlay) still zoom.
+        // Gestures live on the column so events passing through the overlay still reach them.
         pointerOverlay.attachPinch(to: trackColumn)
+        pointerOverlay.attachScroll(to: trackColumn)
         trackColumn.clipsToBounds = true
 
         let widthConstraint = leftColumn.widthAnchor.constraint(equalToConstant: scrollCoordinator.layerColumnWidth)
@@ -259,11 +260,8 @@ final class TimelineViewController: UIViewController {
         pointerOverlay.onPlayheadHoveringChanged = { [weak self] hovering in
             self?.playheadView.setHovering(hovering)
         }
-        pointerOverlay.onVerticalScroll = { [weak self] deltaY in
-            self?.tracksView.scrollVertically(by: deltaY)
-        }
-        pointerOverlay.onVerticalScrollEnded = { [weak self] in
-            self?.tracksView.endVerticalRubberBand()
+        pointerOverlay.onVerticalScrollSuppressionChanged = { [weak self] suppressed in
+            self?.tracksView.setVerticalScrollingEnabled(!suppressed)
         }
         tracksView.onPresentEasing = { [weak self] request in
             self?.presentEasingEditor(request)

@@ -12,10 +12,7 @@ import UIKit
 @MainActor
 final class TimelinePointerInputOverlay: UIView {
     var onPlayheadHoveringChanged: ((Bool) -> Void)?
-    /// Trackpad / mouse wheel vertical delta in points (positive = fingers/content move down).
-    var onVerticalScroll: ((CGFloat) -> Void)?
-    /// Fired when a vertical trackpad/wheel gesture ends so the tracks can spring back.
-    var onVerticalScrollEnded: (() -> Void)?
+    var onVerticalScrollSuppressionChanged: ((Bool) -> Void)?
 
     private let editorState: EditorState
     private var duration: Int64 = 0
@@ -29,11 +26,14 @@ final class TimelinePointerInputOverlay: UIView {
     private var lastScrollTranslation: CGPoint = .zero
     private var lastPointerX: CGFloat?
     private let pinchGesture: UIPinchGestureRecognizer
+    private let scrollGesture: UIPanGestureRecognizer
 
     init(editorState: EditorState) {
         self.editorState = editorState
         let pinch = UIPinchGestureRecognizer()
         pinchGesture = pinch
+        let scroll = UIPanGestureRecognizer()
+        scrollGesture = scroll
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = .clear
@@ -47,12 +47,11 @@ final class TimelinePointerInputOverlay: UIView {
         hover.cancelsTouchesInView = false
         addGestureRecognizer(hover)
 
-        let scroll = UIPanGestureRecognizer(target: self, action: #selector(handleScroll(_:)))
+        scroll.addTarget(self, action: #selector(handleScroll(_:)))
         scroll.maximumNumberOfTouches = 0
         scroll.allowedScrollTypesMask = [.continuous, .discrete]
         scroll.cancelsTouchesInView = false
         scroll.delegate = self
-        addGestureRecognizer(scroll)
     }
 
     @available(*, unavailable)
@@ -67,13 +66,20 @@ final class TimelinePointerInputOverlay: UIView {
         host.addGestureRecognizer(pinchGesture)
     }
 
+    /// Installs pointer scrolling on the track column so vertical events can continue through to
+    /// the underlying table view and use its native deceleration.
+    func attachScroll(to host: UIView) {
+        scrollGesture.view?.removeGestureRecognizer(scrollGesture)
+        host.addGestureRecognizer(scrollGesture)
+    }
+
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         guard let event else {
             return super.point(inside: point, with: event)
         }
         // All finger touches pass through so keyframe / scroll UI keeps receiving them.
         // Trackpad and mouse events stay on the overlay.
-        if event.type == .touches {
+        if event.type == .touches || event.type == .scroll {
             return false
         }
         return super.point(inside: point, with: event)
@@ -122,6 +128,8 @@ final class TimelinePointerInputOverlay: UIView {
         switch gesture.state {
         case .began:
             lastScrollTranslation = .zero
+            onVerticalScrollSuppressionChanged?(gesture.modifierFlags.contains(.command)
+                || gesture.modifierFlags.contains(.shift))
         case .changed:
             let translation = gesture.translation(in: self)
             let delta = CGPoint(x: translation.x - lastScrollTranslation.x,
@@ -130,21 +138,18 @@ final class TimelinePointerInputOverlay: UIView {
             if gesture.modifierFlags.contains(.command) {
                 let fallbackAnchor = bounds.width * 0.5
                 applyZoom(delta: exp(-delta.y * 0.01), anchorX: lastPointerX ?? fallbackAnchor)
-            } else if shouldForwardVerticalScroll(delta: delta, modifierFlags: gesture.modifierFlags) {
-                // Overlay sits above tracks; forward vertical wheel/trackpad to the row scroller.
-                onVerticalScroll?(delta.y)
-            } else {
+            } else if !shouldUseNativeVerticalScroll(delta: delta, modifierFlags: gesture.modifierFlags) {
                 applyScroll(delta: timelineScrollDelta(delta: delta, modifierFlags: gesture.modifierFlags))
             }
         case .ended, .cancelled, .failed:
             lastScrollTranslation = .zero
-            onVerticalScrollEnded?()
+            onVerticalScrollSuppressionChanged?(false)
         default:
             lastScrollTranslation = .zero
         }
     }
 
-    private func shouldForwardVerticalScroll(delta: CGPoint, modifierFlags: UIKeyModifierFlags) -> Bool {
+    private func shouldUseNativeVerticalScroll(delta: CGPoint, modifierFlags: UIKeyModifierFlags) -> Bool {
         if modifierFlags.contains(.shift) {
             return false
         }
