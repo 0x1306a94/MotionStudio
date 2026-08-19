@@ -451,7 +451,7 @@ git commit --only bridge/include/motionstudio_bridge.h bridge/src/common/motions
 
 ### Task 5: Swift 树辅助 + 测试
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineReorder.swift`
@@ -483,7 +483,7 @@ enum TimelineLayerTree {
 
 `canUngroup`：任一 id 的 type 为 `.GROUP`。`canGroup`：strip 后非空且这些 id 的 `parentOf[id] ?? 0` 全相同。
 
-- [ ] **Step 1: Write failing Swift tests**（`TimelineReorderTests.swift` 或新建 `TimelineLayerTreeTests.swift`）
+- [x] **Step 1: Write failing Swift tests**（`TimelineReorderTests.swift` 或新建 `TimelineLayerTreeTests.swift`）
 
 - depth：`A←B←C` 则 C=2。
 - inset：depth 1 图层 `20`，属性 `40`。
@@ -491,15 +491,15 @@ enum TimelineLayerTree {
 - strip：选 `{group, child}` → `{group}`。
 - 不同父 `canGroup` false。
 
-- [ ] **Step 2: Run via Xcode MCP `RunSomeTests`**（scheme MotionStudioApp）确认失败。
+- [x] **Step 2: Run via Xcode MCP `RunSomeTests`**（scheme MotionStudioApp）确认失败。
 
-- [ ] **Step 3: Implement `TimelineLayerTree`**。深度循环要有 visiting set 防环。不要 lambda。
+- [x] **Step 3: Implement `TimelineLayerTree`**。深度循环要有 visiting set 防环。不要 lambda。
 
-- [ ] **Step 4: 测试 PASS。**
+- [x] **Step 4: 测试 PASS。**
 
-- [ ] **Step 5: Update this plan** — Task 5 `[x]`，`Status: ✅ Done`。
+- [x] **Step 5: Update this plan** — Task 5 `[x]`，`Status: ✅ Done`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineReorder.swift apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineSupport.swift apps/MotionStudioApp/MotionStudioAppTests/TimelineReorderTests.swift docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Indent the layer tree by parent depth and move group subtrees together."

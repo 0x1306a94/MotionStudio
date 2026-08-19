@@ -5,6 +5,7 @@
 
 import Foundation
 @testable import MotionStudio
+import MotionStudioBridging
 import Testing
 
 struct TimelineReorderTests {
@@ -80,5 +81,52 @@ struct TimelineReorderTests {
                                                  action: .bringToFront) == nil)
         #expect(TimelineReorder.arrangedLayerIDs(current: current, moving: Set([1]),
                                                  action: .sendToBack) == nil)
+    }
+
+    @Test
+    func `parent depth follows ancestor chain`() {
+        let parentOf: [UInt64: UInt64] = [2: 1, 3: 2]
+        #expect(TimelineLayerTree.parentDepth(layerID: 1, parentOf: parentOf) == 0)
+        #expect(TimelineLayerTree.parentDepth(layerID: 2, parentOf: parentOf) == 1)
+        #expect(TimelineLayerTree.parentDepth(layerID: 3, parentOf: parentOf) == 2)
+    }
+
+    @Test
+    func `leading inset adds indent per depth`() {
+        #expect(TimelineLayerTree.leadingInset(depth: 1, isProperty: false) == 20)
+        #expect(TimelineLayerTree.leadingInset(depth: 1, isProperty: true) == 40)
+    }
+
+    @Test
+    func `moving I ds include group descendants`() {
+        let order: [UInt64] = [1, 2, 3]
+        let parentOf: [UInt64: UInt64] = [2: 1, 3: 1]
+        #expect(TimelineLayerTree.movingIDsIncludingDescendants(
+            order: order, parentOf: parentOf, moving: Set([1]),
+        ) == Set([1, 2, 3] as [UInt64]))
+        #expect(TimelineLayerTree.movingIDsIncludingDescendants(
+            order: order, parentOf: parentOf, moving: Set([2]),
+        ) == Set([2] as [UInt64]))
+    }
+
+    @Test
+    func `grouping I ds strip nested descendants`() {
+        let parentOf: [UInt64: UInt64] = [2: 1, 3: 1]
+        #expect(TimelineLayerTree.groupingIDsStrippingNested(
+            ids: [1, 2], parentOf: parentOf,
+        ) == [1] as [UInt64])
+    }
+
+    @Test
+    func `can group requires shared parent`() {
+        #expect(TimelineLayerTree.canGroup(ids: [2, 4], parentOf: [2: 1, 4: 5]) == false)
+        #expect(TimelineLayerTree.canGroup(ids: [2, 3], parentOf: [2: 1, 3: 1]) == true)
+    }
+
+    @Test
+    func `can ungroup when a group is selected`() {
+        let types: [UInt64: MS_LAYER] = [1: .GROUP, 2: .SHAPE]
+        #expect(TimelineLayerTree.canUngroup(ids: [1], types: types) == true)
+        #expect(TimelineLayerTree.canUngroup(ids: [2], types: types) == false)
     }
 }

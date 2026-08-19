@@ -7,6 +7,7 @@
 
 import CoreGraphics
 import Foundation
+import MotionStudioBridging
 
 enum LayerArrangeAction {
     case bringToFront
@@ -166,5 +167,122 @@ enum TimelineReorder {
             }
         }
         return slot
+    }
+}
+
+enum TimelineLayerTree {
+    nonisolated static let layerLeading: CGFloat = 8
+    nonisolated static let propertyLeading: CGFloat = 28
+    nonisolated static let indentPerDepth: CGFloat = 12
+
+    nonisolated static func parentDepth(layerID: UInt64, parentOf: [UInt64: UInt64]) -> Int {
+        var depth = 0
+        var current = layerID
+        var visiting = Set<UInt64>()
+        while true {
+            if visiting.contains(current) {
+                break
+            }
+            visiting.insert(current)
+            let parent = parentOf[current] ?? 0
+            if parent == 0 {
+                break
+            }
+            depth += 1
+            current = parent
+        }
+        return depth
+    }
+
+    nonisolated static func leadingInset(depth: Int, isProperty: Bool) -> CGFloat {
+        let base: CGFloat = if isProperty {
+            propertyLeading
+        } else {
+            layerLeading
+        }
+        return base + CGFloat(max(depth, 0)) * indentPerDepth
+    }
+
+    nonisolated static func movingIDsIncludingDescendants(
+        order: [UInt64], parentOf: [UInt64: UInt64], moving: Set<UInt64>,
+    ) -> Set<UInt64> {
+        var result = moving
+        for id in order {
+            if result.contains(id) {
+                continue
+            }
+            if hasSelectedAncestor(layerID: id, selected: moving, parentOf: parentOf) {
+                result.insert(id)
+            }
+        }
+        return result
+    }
+
+    nonisolated static func groupingIDsStrippingNested(
+        ids: [UInt64], parentOf: [UInt64: UInt64],
+    ) -> [UInt64] {
+        var seen = Set<UInt64>()
+        var candidates: [UInt64] = []
+        for id in ids {
+            if seen.contains(id) {
+                continue
+            }
+            seen.insert(id)
+            candidates.append(id)
+        }
+        let selected = Set(candidates)
+        var stripped: [UInt64] = []
+        for id in candidates {
+            if hasSelectedAncestor(layerID: id, selected: selected, parentOf: parentOf) {
+                continue
+            }
+            stripped.append(id)
+        }
+        return stripped
+    }
+
+    nonisolated static func canGroup(ids: [UInt64], parentOf: [UInt64: UInt64]) -> Bool {
+        let stripped = groupingIDsStrippingNested(ids: ids, parentOf: parentOf)
+        if stripped.isEmpty {
+            return false
+        }
+        let commonParent = parentOf[stripped[0]] ?? 0
+        for id in stripped {
+            let parent = parentOf[id] ?? 0
+            if parent != commonParent {
+                return false
+            }
+        }
+        return true
+    }
+
+    nonisolated static func canUngroup(ids: [UInt64], types: [UInt64: MS_LAYER]) -> Bool {
+        for id in ids {
+            if types[id] == .GROUP {
+                return true
+            }
+        }
+        return false
+    }
+
+    private nonisolated static func hasSelectedAncestor(
+        layerID: UInt64, selected: Set<UInt64>, parentOf: [UInt64: UInt64],
+    ) -> Bool {
+        var current = layerID
+        var visiting = Set<UInt64>()
+        while true {
+            if visiting.contains(current) {
+                return false
+            }
+            visiting.insert(current)
+            let parent = parentOf[current] ?? 0
+            if parent == 0 {
+                return false
+            }
+            if selected.contains(parent) {
+                return true
+            }
+            current = parent
+        }
     }
 }
