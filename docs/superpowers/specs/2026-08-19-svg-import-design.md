@@ -32,7 +32,7 @@
 | `<use>` | 经 `nodeIDMapper` 展开，深度上限 32，环检测 |
 | 产出 | **图层树**（根 `Group` + 扁平 `layers` + `parentId`），插入**当前合成**；不新建 `Document` / `Composition`，不改合成尺寸 |
 | Undo | `ImportSvgInto` 经 `UndoManager` 执行一条 `CompositeCommand`（`ImportImageAsset` + `AddLayer`）；一次 undo 整棵撤销 |
-| App / Bridge | **本 spec 不做** UI；库 API 已按「插入当前合成 + undo」设计，桥接随后只转调 |
+| App / Bridge | 库层不做 UI。App 接入见 [SVG Import UI](./2026-08-19-svg-import-ui-design.md) |
 
 ## 非目标
 
