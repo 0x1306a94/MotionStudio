@@ -259,3 +259,35 @@ TEST(SvgImporterTest, StrokeDashIsWarned) {
     }
     EXPECT_TRUE(found);
 }
+
+TEST(SvgImporterTest, LinearGradientMapsToPaint) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">"
+        "<stop offset=\"0\" stop-color=\"#ff0000\"/>"
+        "<stop offset=\"1\" stop-color=\"#0000ff\"/>"
+        "</linearGradient></defs>"
+        "<rect x=\"0\" y=\"0\" width=\"100\" height=\"20\" fill=\"url(#g)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *shape = result.value().layers.back().get();
+    auto *fill = static_cast<motion::FillStyle *>(shape->styles[0].get());
+    EXPECT_EQ(fill->paintMode, motion::StylePaintMode::Gradient);
+    EXPECT_EQ(fill->gradient.type, motion::GradientType::Linear);
+    ASSERT_GE(fill->gradient.stops.size(), 2u);
+}
+
+TEST(SvgImporterTest, UseExpandsWithoutDefsLayer) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<defs><rect id=\"r\" x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#0f0\"/></defs>"
+        "<use href=\"#r\" x=\"5\" y=\"6\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_GE(result.value().layers.size(), 2u);
+    for (const auto &layer : result.value().layers) {
+        EXPECT_NE(layer->name, "defs");
+    }
+}

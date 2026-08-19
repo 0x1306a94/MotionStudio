@@ -1,6 +1,7 @@
 #include "SvgWalk.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
@@ -8,8 +9,10 @@
 #include "SvgPathConvert.h"
 #include "SvgStyle.h"
 #include "SvgTransform.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/svg/node/SVGCircle.h"
 #include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGEllipse.h"
@@ -19,6 +22,7 @@
 #include "tgfx/svg/node/SVGPoly.h"
 #include "tgfx/svg/node/SVGRect.h"
 #include "tgfx/svg/node/SVGTransformableNode.h"
+#include "tgfx/svg/node/SVGUse.h"
 
 namespace motion {
 namespace svg {
@@ -111,6 +115,7 @@ std::string DefaultName(tgfx::SVGTag tag) {
             return "Polygon";
         case tgfx::SVGTag::G:
         case tgfx::SVGTag::Svg:
+        case tgfx::SVGTag::Use:
             return "Group";
         default:
             return "Path";
@@ -315,13 +320,55 @@ void AddDiagnostic(SvgLayerTree &tree, const std::string &code, const std::strin
     tree.diagnostics.push_back(diagnostic);
 }
 
-void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
-                   const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &style) {
-    const tgfx::Path path = ShapePathFromNode(node, lengthContext);
+struct WalkContext {
+    SvgLayerTree *tree = nullptr;
+    tgfx::SVGLengthContext lengthContext = tgfx::SVGLengthContext(tgfx::Size::Make(0.f, 0.f));
+    const tgfx::SVGIDMapper *mapper = nullptr;
+    std::vector<std::string> useStack = {};
+};
+
+void NetworkAabb(const VectorNetwork &network, Vec2 &minOut, Vec2 &sizeOut) {
+    minOut = {0.f, 0.f};
+    sizeOut = {0.f, 0.f};
+    if (network.vertices.empty()) {
+        return;
+    }
+    Vec2 min = network.vertices.front().point;
+    Vec2 max = min;
+    for (const VectorNetwork::Vertex &vertex : network.vertices) {
+        min.x = std::min(min.x, vertex.point.x);
+        min.y = std::min(min.y, vertex.point.y);
+        max.x = std::max(max.x, vertex.point.x);
+        max.y = std::max(max.y, vertex.point.y);
+    }
+    minOut = min;
+    sizeOut = {max.x - min.x, max.y - min.y};
+}
+
+std::string LocalIriId(const tgfx::SVGIRI &iri) {
+    std::string id = iri.iri();
+    if (!id.empty() && id.front() == '#') {
+        id = id.substr(1);
+    }
+    return id;
+}
+
+bool UseStackContains(const std::vector<std::string> &stack, const std::string &id) {
+    for (const std::string &entry : stack) {
+        if (entry == id) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
+                   const ComputedStyle &style) {
+    const tgfx::Path path = ShapePathFromNode(node, ctx.lengthContext);
     bool usedConic = false;
     const VectorNetwork network = PathToVectorNetwork(path, &usedConic);
     if (!NetworkHasArea(network) && !style.hasStroke) {
-        AddDiagnostic(tree, "shape.empty", "empty shape skipped", LayerName(node));
+        AddDiagnostic(*ctx.tree, "shape.empty", "empty shape skipped", LayerName(node));
         return;
     }
     auto layer = std::make_unique<Layer>(LayerType::Shape);
@@ -332,30 +379,68 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &t
     auto geometry = std::make_unique<ShapePath>();
     geometry->path.setStaticValue(network);
     content->geometry = std::move(geometry);
-    ApplyStyles(*layer, style);
+    Vec2 boundsMin = {};
+    Vec2 boundsSize = {};
+    NetworkAabb(network, boundsMin, boundsSize);
+    ApplyPaintStyles(*layer, style, ctx.mapper, boundsMin, boundsSize, &ctx.tree->diagnostics);
     ApplyNodeTransform(*layer, node);
     if (style.hasDash) {
-        AddDiagnostic(tree, "stroke.dash", "stroke-dasharray is imported as a solid stroke",
+        AddDiagnostic(*ctx.tree, "stroke.dash", "stroke-dasharray is imported as a solid stroke",
                       layer->name);
     }
-    tree.layers.push_back(std::move(layer));
+    ctx.tree->layers.push_back(std::move(layer));
 }
 
-void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
-              const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &parentStyle);
+void WalkNode(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
+              const ComputedStyle &parentStyle);
 
-void WalkChildren(const tgfx::SVGContainer &container, EntityId parentId, SvgLayerTree &tree,
-                  const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &parentStyle) {
+void WalkChildren(const tgfx::SVGContainer &container, EntityId parentId, WalkContext &ctx,
+                  const ComputedStyle &parentStyle) {
     for (const auto &child : container.getChildren()) {
         if (child) {
-            WalkNode(*child, parentId, tree, lengthContext, parentStyle);
+            WalkNode(*child, parentId, ctx, parentStyle);
         }
     }
 }
 
-void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
-              const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &parentStyle) {
-    const ComputedStyle style = ResolveStyle(node, parentStyle, lengthContext);
+void WalkUse(const tgfx::SVGUse &use, EntityId parentId, WalkContext &ctx,
+             const ComputedStyle &style) {
+    const std::string id = LocalIriId(use.getHref());
+    if (id.empty() || ctx.mapper == nullptr) {
+        AddDiagnostic(*ctx.tree, "use.missing", "use href could not be resolved", LayerName(use));
+        return;
+    }
+    if (ctx.useStack.size() >= 32 || UseStackContains(ctx.useStack, id)) {
+        AddDiagnostic(*ctx.tree, "use.cycle", "use reference cycle or depth limit", LayerName(use));
+        return;
+    }
+    const auto it = ctx.mapper->find(id);
+    if (it == ctx.mapper->end() || !it->second) {
+        AddDiagnostic(*ctx.tree, "use.missing", "use href could not be resolved", LayerName(use));
+        return;
+    }
+    auto group = std::make_unique<Layer>(LayerType::Group);
+    group->name = LayerName(use);
+    group->parentId = parentId;
+    group->visible = style.visible;
+    const float x =
+        ctx.lengthContext.resolve(use.getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float y =
+        ctx.lengthContext.resolve(use.getY(), tgfx::SVGLengthContext::LengthType::Vertical);
+    tgfx::Matrix matrix = tgfx::Matrix::MakeTrans(x, y);
+    matrix.preConcat(use.getTransform());
+    ApplySvgMatrixToLayer(*group, matrix);
+    ApplyNodeOpacity(*group, use);
+    const EntityId groupId = group->id;
+    ctx.tree->layers.push_back(std::move(group));
+    ctx.useStack.push_back(id);
+    WalkNode(*it->second, groupId, ctx, style);
+    ctx.useStack.pop_back();
+}
+
+void WalkNode(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
+              const ComputedStyle &parentStyle) {
+    const ComputedStyle style = ResolveStyle(node, parentStyle, ctx.lengthContext);
     if (style.displayNone) {
         return;
     }
@@ -370,9 +455,8 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
         group->visible = style.visible;
         ApplyNodeTransform(*group, node);
         const EntityId groupId = group->id;
-        tree.layers.push_back(std::move(group));
-        WalkChildren(static_cast<const tgfx::SVGContainer &>(node), groupId, tree, lengthContext,
-                     style);
+        ctx.tree->layers.push_back(std::move(group));
+        WalkChildren(static_cast<const tgfx::SVGContainer &>(node), groupId, ctx, style);
         return;
     }
     switch (tag) {
@@ -383,27 +467,32 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
         case tgfx::SVGTag::Line:
         case tgfx::SVGTag::Polygon:
         case tgfx::SVGTag::Polyline:
-            AddShapeLayer(node, parentId, tree, lengthContext, style);
+            AddShapeLayer(node, parentId, ctx, style);
+            break;
+        case tgfx::SVGTag::Use:
+            WalkUse(static_cast<const tgfx::SVGUse &>(node), parentId, ctx, style);
             break;
         case tgfx::SVGTag::Image:
-        case tgfx::SVGTag::Use:
             break;
         default:
-            AddDiagnostic(tree, "tag.unknown", "unsupported SVG element skipped", LayerName(node));
+            AddDiagnostic(*ctx.tree, "tag.unknown", "unsupported SVG element skipped",
+                          LayerName(node));
             break;
     }
 }
 
 }  // namespace
 
-void WalkSvgRoot(const tgfx::SVGRoot &root, SvgLayerTree &tree) {
+void WalkSvgRoot(const tgfx::SVGRoot &root, const tgfx::SVGIDMapper &mapper, SvgLayerTree &tree) {
     if (tree.layers.empty()) {
         return;
     }
-    const tgfx::SVGLengthContext lengthContext =
-        MakeRootLengthContext(tree.sourceWidth, tree.sourceHeight);
+    WalkContext ctx = {};
+    ctx.tree = &tree;
+    ctx.lengthContext = MakeRootLengthContext(tree.sourceWidth, tree.sourceHeight);
+    ctx.mapper = &mapper;
     ComputedStyle rootStyle = {};
-    WalkChildren(root, tree.layers.front()->id, tree, lengthContext, rootStyle);
+    WalkChildren(root, tree.layers.front()->id, ctx, rootStyle);
 }
 
 }  // namespace svg

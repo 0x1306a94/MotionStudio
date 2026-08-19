@@ -3,10 +3,14 @@
 #include <string>
 
 #include "MotionStudio/common/Color.h"
+#include "MotionStudio/common/Vec2.h"
+#include "MotionStudio/import/svg/SvgImporter.h"
 #include "MotionStudio/model/FillRule.h"
+#include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
+#include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/node/SVGNode.h"
 
@@ -33,11 +37,18 @@ struct ComputedStyle {
     float fontSize = 16.f;
     std::string fontStyle;
     std::string textAnchor;
+    std::string fillIri;
+    std::string strokeIri;
 };
 
 ComputedStyle ResolveStyle(const tgfx::SVGNode &node, const ComputedStyle &parent,
                            const tgfx::SVGLengthContext &lengthContext);
 void ApplyStyles(Layer &layer, const ComputedStyle &style);
+bool TryMapGradient(const tgfx::SVGPaint &paint, const tgfx::SVGIDMapper &mapper,
+                    const Vec2 &boundsMin, const Vec2 &boundsSize, GradientPaint *out,
+                    std::vector<Diagnostic> *diagnostics);
+void ApplyPaintStyles(Layer &layer, const ComputedStyle &style, const tgfx::SVGIDMapper *mapper,
+                      Vec2 boundsMin, Vec2 boundsSize, std::vector<Diagnostic> *diagnostics);
 
 }  // namespace svg
 }  // namespace motion

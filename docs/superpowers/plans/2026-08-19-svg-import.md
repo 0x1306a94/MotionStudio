@@ -861,6 +861,8 @@ git commit -m "Resolve inherited SVG paints and skip hidden subtrees."
 
 ### Task 7: 线性 / 径向渐变与 `<use>`
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `src/import/svg/SvgStyle.cpp`
 - Modify: `src/import/svg/SvgWalk.cpp`
@@ -870,7 +872,7 @@ git commit -m "Resolve inherited SVG paints and skip hidden subtrees."
 - Consumes: `nodeIDMapper()`、`ComputedStyle`
 - Produces: `bool TryMapGradient(const tgfx::SVGPaint &paint, const tgfx::SVGIDMapper &mapper, const motion::Vec2 &boundsMin, const motion::Vec2 &boundsSize, GradientPaint *out, std::vector<Diagnostic> *diagnostics);`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SvgImporterTest, LinearGradientMapsToPaint) {
@@ -906,21 +908,21 @@ TEST(SvgImporterTest, UseExpandsWithoutDefsLayer) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: fill 不是 Gradient / use 无层 → FAIL。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `url(#id)`：mapper 查找，最多 8 步 `href` 链。`<2` 个 stop → `gradient.stops` 并跳过该 paint。objectBoundingBox：比例 × 形状 AABB 再换成左上角空间（`start -= bounds.min` 已含在「比例×size」里，start 存在 AABB 空间即 `(0,0)=bounds.min`）。userSpaceOnUse：px 减 `bounds.min`。径向：`end = start + (r,0)`。`fx/fy` ≠ 圆心 → `gradient.focal`。repeat/reflect → `gradient.spread`。`gradientTransform` 乘到 start/end。pattern / 找不到 → `paint.unresolved`。
 
 `<use>`：本地 IRI，深度>32 或 id 栈环 → `use.cycle` / `use.missing`。展开目标为子树，外包 Group，矩阵 `T(x,y)*use.transform`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg tests/import/svg

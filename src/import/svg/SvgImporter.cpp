@@ -42,7 +42,7 @@ Expected<SvgLayerTree, std::string> BuildSvgLayers(const void *bytes, size_t len
     tree.sourceHeight = parsed.value().sourceHeight;
     tree.layers.push_back(std::move(root));
     if (parsed.value().dom && parsed.value().dom->getRoot()) {
-        WalkSvgRoot(*parsed.value().dom->getRoot(), tree);
+        WalkSvgRoot(*parsed.value().dom->getRoot(), parsed.value().dom->nodeIDMapper(), tree);
         ApplyRootViewBoxAndTransform(*tree.layers.front(), *parsed.value().dom->getRoot(),
                                      tree.sourceWidth, tree.sourceHeight);
     }
