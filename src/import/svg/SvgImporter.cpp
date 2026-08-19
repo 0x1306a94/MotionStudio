@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <unordered_map>
 
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
@@ -20,6 +21,63 @@ bool ReadFileContents(const std::string &path, std::string &out) {
     }
     out.assign((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     return true;
+}
+
+void AppendPostorderIndices(size_t index,
+                            const std::vector<std::unique_ptr<motion::Layer>> &layers,
+                            const std::unordered_map<uint64_t, std::vector<size_t>> &children,
+                            std::vector<char> &visiting, std::vector<size_t> &order) {
+    if (index >= layers.size() || visiting[index] != 0) {
+        return;
+    }
+    visiting[index] = 1;
+    const auto found = children.find(layers[index]->id.value);
+    if (found != children.end()) {
+        for (size_t childIndex : found->second) {
+            AppendPostorderIndices(childIndex, layers, children, visiting, order);
+        }
+    }
+    order.push_back(index);
+}
+
+void ReorderParentAfterChildren(std::vector<std::unique_ptr<motion::Layer>> &layers) {
+    if (layers.size() <= 1) {
+        return;
+    }
+    std::unordered_map<uint64_t, size_t> indexById;
+    for (size_t index = 0; index < layers.size(); ++index) {
+        indexById[layers[index]->id.value] = index;
+    }
+    std::unordered_map<uint64_t, std::vector<size_t>> children;
+    std::vector<size_t> roots;
+    for (size_t index = 0; index < layers.size(); ++index) {
+        const motion::EntityId parent = layers[index]->parentId;
+        if (parent.isValid()) {
+            const auto found = indexById.find(parent.value);
+            if (found != indexById.end()) {
+                children[parent.value].push_back(index);
+                continue;
+            }
+        }
+        roots.push_back(index);
+    }
+    std::vector<char> visiting(layers.size(), 0);
+    std::vector<size_t> order;
+    order.reserve(layers.size());
+    for (size_t rootIndex : roots) {
+        AppendPostorderIndices(rootIndex, layers, children, visiting, order);
+    }
+    for (size_t index = 0; index < layers.size(); ++index) {
+        if (visiting[index] == 0) {
+            order.push_back(index);
+        }
+    }
+    std::vector<std::unique_ptr<motion::Layer>> reordered;
+    reordered.reserve(layers.size());
+    for (size_t index : order) {
+        reordered.push_back(std::move(layers[index]));
+    }
+    layers = std::move(reordered);
 }
 
 }  // namespace
@@ -89,6 +147,7 @@ Expected<ImportResult, std::string> ImportSvgInto(Document &document, UndoManage
     out.diagnostics = tree.diagnostics;
     out.embeddedImages = std::move(tree.embeddedImages);
     out.rootLayerId = tree.layers.front()->id;
+    ReorderParentAfterChildren(tree.layers);
     auto composite = std::make_unique<CompositeCommand>("Import SVG");
     for (Asset &asset : tree.assets) {
         composite->add(std::make_unique<ImportImageAssetCommand>(asset));

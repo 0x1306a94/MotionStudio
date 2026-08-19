@@ -193,11 +193,44 @@ TEST(SvgImporterTest, ImportIntoExistingCompositionIsUndoable) {
     EXPECT_EQ(host->duration, 90);
     EXPECT_GE(host->layers.size(), 2u);
     EXPECT_EQ(host->layers.back()->outPoint, 90);
-    EXPECT_EQ(imported.value().rootLayerId, host->layers[host->layers.size() - 2]->id);
+    EXPECT_EQ(imported.value().rootLayerId, host->layers.back()->id);
 
     undo.undo(document);
     EXPECT_TRUE(host->layers.empty());
     EXPECT_EQ(host->width, 640);
+}
+
+TEST(SvgImporterTest, ImportedGroupSitsAboveChildren) {
+    motion::Document document;
+    auto composition = std::make_unique<motion::Composition>();
+    composition->duration = 90;
+    const motion::EntityId compositionId = composition->id;
+    document.addComposition(std::move(composition));
+
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"80\" height=\"40\">"
+        "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#000000\"/>"
+        "</svg>";
+    motion::UndoManager undo;
+    const auto imported = motion::svg::ImportSvgInto(document, undo, compositionId, svg.data(),
+                                                     svg.size());
+    ASSERT_TRUE(imported.hasValue());
+    motion::Composition *host = document.entityIndex().findComposition(compositionId);
+    ASSERT_NE(host, nullptr);
+
+    int rootIndex = -1;
+    int childIndex = -1;
+    for (int index = 0; index < static_cast<int>(host->layers.size()); ++index) {
+        if (host->layers[static_cast<size_t>(index)]->id == imported.value().rootLayerId) {
+            rootIndex = index;
+        } else if (host->layers[static_cast<size_t>(index)]->parentId ==
+                   imported.value().rootLayerId) {
+            childIndex = index;
+        }
+    }
+    ASSERT_GE(rootIndex, 0);
+    ASSERT_GE(childIndex, 0);
+    EXPECT_GT(rootIndex, childIndex);
 }
 
 TEST(SvgImporterTest, MissingCompositionFailsWithoutMutation) {
