@@ -109,6 +109,29 @@ typedef CF_CLOSED_ENUM(int, MS_STROKE_POSITION) {
     MS_STROKE_POSITION_OUTSIDE = 2,
 };
 
+// Stroke endpoint cap, mirrors motion::LineCap.
+typedef CF_CLOSED_ENUM(int, MS_LINE_CAP) {
+    MS_LINE_CAP_INVALID = -1,
+    MS_LINE_CAP_BUTT = 0,
+    MS_LINE_CAP_ROUND = 1,
+    MS_LINE_CAP_SQUARE = 2,
+};
+
+// Stroke corner join, mirrors motion::LineJoin.
+typedef CF_CLOSED_ENUM(int, MS_LINE_JOIN) {
+    MS_LINE_JOIN_INVALID = -1,
+    MS_LINE_JOIN_MITER = 0,
+    MS_LINE_JOIN_ROUND = 1,
+    MS_LINE_JOIN_BEVEL = 2,
+};
+
+// Solid vs dashed path stroke, mirrors motion::StrokeMode.
+typedef CF_CLOSED_ENUM(int, MS_STROKE_MODE) {
+    MS_STROKE_MODE_INVALID = -1,
+    MS_STROKE_MODE_SOLID = 0,
+    MS_STROKE_MODE_DASHED = 1,
+};
+
 // How image pixels map into the layer container (aligns with ImageScaleMode / PAGScaleMode).
 typedef CF_CLOSED_ENUM(int, MS_IMAGE_SCALE) {
     MS_IMAGE_SCALE_NONE = 0,
@@ -474,6 +497,12 @@ bool ms_layer_follow_path_orient(MSDocument *document, uint64_t layerId);
 // Stroke position of the style at index; MS_STROKE_POSITION_INVALID when out of
 // range or the style is not a stroke.
 MS_STROKE_POSITION ms_layer_style_stroke_position_at(MSDocument *document, uint64_t layerId, int index);
+MS_LINE_CAP ms_layer_style_stroke_cap_at(MSDocument *document, uint64_t layerId, int index);
+MS_LINE_JOIN ms_layer_style_stroke_join_at(MSDocument *document, uint64_t layerId, int index);
+float ms_layer_style_stroke_miter_limit_at(MSDocument *document, uint64_t layerId, int index);
+MS_STROKE_MODE ms_layer_style_stroke_mode_at(MSDocument *document, uint64_t layerId, int index);
+int ms_layer_style_stroke_dash_count(MSDocument *document, uint64_t layerId, int index);
+float ms_layer_style_stroke_dash_at(MSDocument *document, uint64_t layerId, int index, int dashIndex);
 
 /* ============================ property queries ============================ */
 // entityId: ID of the owning Layer or ShapeElement.
@@ -822,6 +851,11 @@ void ms_command_move_layer_style(MSDocument *document, uint64_t layerId, int fro
 void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int index, MS_BLEND blendMode);
 // position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position);
+void ms_command_set_stroke_cap(MSDocument *document, uint64_t layerId, int index, MS_LINE_CAP cap);
+void ms_command_set_stroke_join(MSDocument *document, uint64_t layerId, int index, MS_LINE_JOIN join);
+void ms_command_set_stroke_miter_limit(MSDocument *document, uint64_t layerId, int index, float miterLimit);
+void ms_command_set_stroke_mode(MSDocument *document, uint64_t layerId, int index, MS_STROKE_MODE strokeMode);
+void ms_command_set_stroke_dashes(MSDocument *document, uint64_t layerId, int index, const float *values, int count);
 
 // Appends a default BrightnessContrast effect (identity parameters, enabled).
 void ms_command_add_brightness_contrast_effect(MSDocument *document, uint64_t layerId);

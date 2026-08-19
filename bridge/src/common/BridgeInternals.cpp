@@ -290,6 +290,27 @@ motion::StrokePosition MakeStrokePosition(MS_STROKE_POSITION position) {
     return static_cast<motion::StrokePosition>(position);
 }
 
+motion::LineCap MakeLineCap(MS_LINE_CAP cap) {
+    if (cap < MS_LINE_CAP_BUTT || cap > MS_LINE_CAP_SQUARE) {
+        return motion::LineCap::Butt;
+    }
+    return static_cast<motion::LineCap>(cap);
+}
+
+motion::LineJoin MakeLineJoin(MS_LINE_JOIN join) {
+    if (join < MS_LINE_JOIN_MITER || join > MS_LINE_JOIN_BEVEL) {
+        return motion::LineJoin::Miter;
+    }
+    return static_cast<motion::LineJoin>(join);
+}
+
+motion::StrokeMode MakeStrokeMode(MS_STROKE_MODE strokeMode) {
+    if (strokeMode < MS_STROKE_MODE_SOLID || strokeMode > MS_STROKE_MODE_DASHED) {
+        return motion::StrokeMode::Solid;
+    }
+    return static_cast<motion::StrokeMode>(strokeMode);
+}
+
 motion::MaskMode MakeMaskMode(MS_MASK mode) {
     if (mode < MS_MASK_ADD || mode > MS_MASK_INTERSECT) {
         return motion::MaskMode::Add;

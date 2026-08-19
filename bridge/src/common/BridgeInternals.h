@@ -19,8 +19,11 @@
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LineCap.h"
+#include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/PropertyPath.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/SceneState.h"
@@ -64,6 +67,9 @@ motion::PropertyPath MakePath(uint64_t entityId, const char *path);
 
 motion::BlendMode MakeBlendMode(MS_BLEND blendMode);
 motion::StrokePosition MakeStrokePosition(MS_STROKE_POSITION position);
+motion::LineCap MakeLineCap(MS_LINE_CAP cap);
+motion::LineJoin MakeLineJoin(MS_LINE_JOIN join);
+motion::StrokeMode MakeStrokeMode(MS_STROKE_MODE strokeMode);
 motion::MaskMode MakeMaskMode(MS_MASK mode);
 motion::TrackMatteType MakeTrackMatteType(MS_TRACK_MATTE type);
 motion::Mask MakeMaskFromLayer(const motion::Layer &layer, int64_t frame);

@@ -798,6 +798,10 @@ TEST(BridgeTest, NullHandlesAreSafe) {
     ms_command_add_stroke_style(nullptr, 0);
     ms_command_set_stroke_position(nullptr, 0, 0, MS_STROKE_POSITION_INSIDE);
     EXPECT_EQ(ms_layer_style_stroke_position_at(nullptr, 0, 0), MS_STROKE_POSITION_INVALID);
+    EXPECT_EQ(ms_layer_style_stroke_cap_at(nullptr, 0, 0), MS_LINE_CAP_INVALID);
+    EXPECT_EQ(ms_layer_style_stroke_join_at(nullptr, 0, 0), MS_LINE_JOIN_INVALID);
+    EXPECT_EQ(ms_layer_style_stroke_mode_at(nullptr, 0, 0), MS_STROKE_MODE_INVALID);
+    EXPECT_EQ(ms_layer_style_stroke_dash_count(nullptr, 0, 0), 0);
 }
 
 TEST(BridgeCanvasTest, DrawModeApiNullSafe) {
@@ -921,6 +925,28 @@ TEST(BridgeCommandTest, StrokeStyleLifecycle) {
     EXPECT_EQ(ms_layer_style_stroke_position_at(document, layerId, 1),
               MS_STROKE_POSITION_CENTER);
 
+    EXPECT_EQ(ms_layer_style_stroke_cap_at(document, layerId, 0), MS_LINE_CAP_INVALID);
+    EXPECT_EQ(ms_layer_style_stroke_join_at(document, layerId, 0), MS_LINE_JOIN_INVALID);
+    EXPECT_EQ(ms_layer_style_stroke_mode_at(document, layerId, 0), MS_STROKE_MODE_INVALID);
+    ms_command_set_stroke_cap(document, layerId, 1, MS_LINE_CAP_ROUND);
+    EXPECT_EQ(ms_layer_style_stroke_cap_at(document, layerId, 1), MS_LINE_CAP_ROUND);
+    ms_command_set_stroke_cap(document, layerId, 1, static_cast<MS_LINE_CAP>(99));
+    EXPECT_EQ(ms_layer_style_stroke_cap_at(document, layerId, 1), MS_LINE_CAP_BUTT);
+    ms_command_set_stroke_join(document, layerId, 1, MS_LINE_JOIN_BEVEL);
+    EXPECT_EQ(ms_layer_style_stroke_join_at(document, layerId, 1), MS_LINE_JOIN_BEVEL);
+    ms_command_set_stroke_miter_limit(document, layerId, 1, 12.0f);
+    EXPECT_FLOAT_EQ(ms_layer_style_stroke_miter_limit_at(document, layerId, 1), 12.0f);
+    EXPECT_EQ(ms_layer_style_stroke_mode_at(document, layerId, 1), MS_STROKE_MODE_SOLID);
+    ms_command_set_stroke_mode(document, layerId, 1, MS_STROKE_MODE_DASHED);
+    EXPECT_EQ(ms_layer_style_stroke_mode_at(document, layerId, 1), MS_STROKE_MODE_DASHED);
+    EXPECT_EQ(ms_layer_style_stroke_dash_count(document, layerId, 1), 2);
+    EXPECT_FLOAT_EQ(ms_layer_style_stroke_dash_at(document, layerId, 1, 0), 8.0f);
+    EXPECT_FLOAT_EQ(ms_layer_style_stroke_dash_at(document, layerId, 1, 1), 8.0f);
+    const float dashes[2] = {10.0f, 4.0f};
+    ms_command_set_stroke_dashes(document, layerId, 1, dashes, 2);
+    EXPECT_FLOAT_EQ(ms_layer_style_stroke_dash_at(document, layerId, 1, 0), 10.0f);
+    EXPECT_FLOAT_EQ(ms_layer_style_stroke_dash_at(document, layerId, 1, 1), 4.0f);
+
     // Strokes carry their own blend mode.
     ms_command_set_style_blend_mode(document, layerId, 1, MS_BLEND_MULTIPLY);
     EXPECT_EQ(ms_layer_style_blend_mode_at(document, layerId, 1), MS_BLEND_MULTIPLY);
@@ -941,6 +967,11 @@ TEST(BridgeCommandTest, StrokeStyleLifecycle) {
     EXPECT_TRUE(ms_document_undo(document));  // trimStart keyframe
     EXPECT_TRUE(ms_document_undo(document));  // width keyframe
     EXPECT_TRUE(ms_document_undo(document));  // blend mode
+    EXPECT_TRUE(ms_document_undo(document));  // dashes
+    EXPECT_TRUE(ms_document_undo(document));  // stroke mode
+    EXPECT_TRUE(ms_document_undo(document));  // miter limit
+    EXPECT_TRUE(ms_document_undo(document));  // join
+    EXPECT_TRUE(ms_document_undo(document));  // cap (merged)
     EXPECT_TRUE(ms_document_undo(document));  // position (merged)
     EXPECT_TRUE(ms_document_undo(document));  // add stroke
     EXPECT_EQ(ms_layer_style_count(document, layerId), 1);

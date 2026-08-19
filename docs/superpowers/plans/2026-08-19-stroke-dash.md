@@ -419,7 +419,7 @@ Expected: PASS
 
 ### Task 8: Bridge
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`
@@ -436,20 +436,20 @@ Expected: PASS
   - `void ms_command_set_stroke_dashes(..., const float *values, int count)`；`values==nullptr && count==0` 视为空数组
   - `float ms_layer_style_stroke_miter_limit_at` 失败 0
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 对标 `ms_command_set_stroke_position`：null 文档；非 stroke 返回 `MS_*_INVALID`；set cap Round 再 get；非法 99 clamp Butt；set Dashed 空图案后 `dash_count==2`。
 
-- [ ] **Step 2: 跑测失败**
+- [x] **Step 2: 跑测失败**
 
 Run: `./build/bridge/bridge_test --gtest_filter='*Stroke*'`  
 Expected: FAIL（符号不存在）
 
-- [ ] **Step 3: 实现枚举、get/set、dashes 缓冲拷贝**
+- [x] **Step 3: 实现枚举、get/set、dashes 缓冲拷贝**
 
 set dashes：`std::vector<float>(values, values+count)` 再 `SetStrokeDashPatternCommand`。
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Expected: PASS
 

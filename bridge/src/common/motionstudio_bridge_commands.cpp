@@ -51,6 +51,11 @@
 #include "MotionStudio/undo/SetMaskModeCommand.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
+#include "MotionStudio/undo/SetStrokeCapCommand.h"
+#include "MotionStudio/undo/SetStrokeDashPatternCommand.h"
+#include "MotionStudio/undo/SetStrokeJoinCommand.h"
+#include "MotionStudio/undo/SetStrokeMiterLimitCommand.h"
+#include "MotionStudio/undo/SetStrokeModeCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
 #include "MotionStudio/undo/SetTrackMatteCommand.h"
@@ -426,6 +431,38 @@ void ms_command_set_style_blend_mode(MSDocument *document, uint64_t layerId, int
 void ms_command_set_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
+}
+
+void ms_command_set_stroke_cap(MSDocument *document, uint64_t layerId, int index, MS_LINE_CAP cap) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStrokeCapCommand>(EntityId{layerId}, index, MakeLineCap(cap)));
+}
+
+void ms_command_set_stroke_join(MSDocument *document, uint64_t layerId, int index, MS_LINE_JOIN join) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStrokeJoinCommand>(EntityId{layerId}, index, MakeLineJoin(join)));
+}
+
+void ms_command_set_stroke_miter_limit(MSDocument *document, uint64_t layerId, int index,
+                                       float miterLimit) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStrokeMiterLimitCommand>(EntityId{layerId}, index, miterLimit));
+}
+
+void ms_command_set_stroke_mode(MSDocument *document, uint64_t layerId, int index,
+                                MS_STROKE_MODE strokeMode) {
+    DocumentLock guard(document);
+    Execute(document, std::make_unique<motion::SetStrokeModeCommand>(EntityId{layerId}, index, MakeStrokeMode(strokeMode)));
+}
+
+void ms_command_set_stroke_dashes(MSDocument *document, uint64_t layerId, int index,
+                                  const float *values, int count) {
+    DocumentLock guard(document);
+    std::vector<float> dashes;
+    if (values != nullptr && count > 0) {
+        dashes.assign(values, values + count);
+    }
+    Execute(document, std::make_unique<motion::SetStrokeDashPatternCommand>(EntityId{layerId}, index, std::move(dashes)));
 }
 
 void ms_command_add_brightness_contrast_effect(MSDocument *document, uint64_t layerId) {

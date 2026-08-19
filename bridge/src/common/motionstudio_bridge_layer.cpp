@@ -276,6 +276,72 @@ MS_STROKE_POSITION ms_layer_style_stroke_position_at(MSDocument *document, uint6
     return static_cast<MS_STROKE_POSITION>(static_cast<StrokeStyle *>(style)->position);
 }
 
+static const StrokeStyle *StrokeStyleAt(Layer *layer, int index) {
+    if (layer == nullptr || index < 0 || static_cast<size_t>(index) >= layer->styles.size()) {
+        return nullptr;
+    }
+    motion::LayerStyle *style = layer->styles[static_cast<size_t>(index)].get();
+    if (style == nullptr || style->type() != motion::LayerStyleType::Stroke) {
+        return nullptr;
+    }
+    return static_cast<const StrokeStyle *>(style);
+}
+
+MS_LINE_CAP ms_layer_style_stroke_cap_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    const StrokeStyle *stroke = StrokeStyleAt(FindLayer(document, layerId), index);
+    if (stroke == nullptr) {
+        return MS_LINE_CAP_INVALID;
+    }
+    return static_cast<MS_LINE_CAP>(stroke->cap);
+}
+
+MS_LINE_JOIN ms_layer_style_stroke_join_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    const StrokeStyle *stroke = StrokeStyleAt(FindLayer(document, layerId), index);
+    if (stroke == nullptr) {
+        return MS_LINE_JOIN_INVALID;
+    }
+    return static_cast<MS_LINE_JOIN>(stroke->join);
+}
+
+float ms_layer_style_stroke_miter_limit_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    const StrokeStyle *stroke = StrokeStyleAt(FindLayer(document, layerId), index);
+    if (stroke == nullptr) {
+        return 0.0f;
+    }
+    return stroke->miterLimit;
+}
+
+MS_STROKE_MODE ms_layer_style_stroke_mode_at(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    const StrokeStyle *stroke = StrokeStyleAt(FindLayer(document, layerId), index);
+    if (stroke == nullptr) {
+        return MS_STROKE_MODE_INVALID;
+    }
+    return static_cast<MS_STROKE_MODE>(stroke->strokeMode);
+}
+
+int ms_layer_style_stroke_dash_count(MSDocument *document, uint64_t layerId, int index) {
+    DocumentLock guard(document);
+    const StrokeStyle *stroke = StrokeStyleAt(FindLayer(document, layerId), index);
+    if (stroke == nullptr) {
+        return 0;
+    }
+    return static_cast<int>(stroke->dashes.size());
+}
+
+float ms_layer_style_stroke_dash_at(MSDocument *document, uint64_t layerId, int index, int dashIndex) {
+    DocumentLock guard(document);
+    const StrokeStyle *stroke = StrokeStyleAt(FindLayer(document, layerId), index);
+    if (stroke == nullptr || dashIndex < 0 ||
+        static_cast<size_t>(dashIndex) >= stroke->dashes.size()) {
+        return 0.0f;
+    }
+    return stroke->dashes[static_cast<size_t>(dashIndex)];
+}
+
 /* ============================ mask / track matte queries ============================ */
 
 int ms_layer_mask_count(MSDocument *document, uint64_t layerId) {
