@@ -200,6 +200,18 @@ void ExpandCorner(Vec2 point, Vec2 &minPoint, Vec2 &maxPoint) {
     maxPoint.y = std::max(maxPoint.y, point.y);
 }
 
+bool PointInRoundedRect(Vec2 local, Vec2 minPoint, Vec2 maxPoint, float radius, float pad) {
+    const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
+    const float clamped = ClampCornerRadius(radius, size);
+    const Vec2 center{(minPoint.x + maxPoint.x) * 0.5f, (minPoint.y + maxPoint.y) * 0.5f};
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry(center, size, clamped);
+    item.paint = Paint{{1, 1, 1, 1}};
+    const BezierPath path = ShapeGeometryToBezierPath(item.geometry);
+    const std::vector<Vec2> points = FlattenPathInWorld(path, Mat3::Identity());
+    return HitTestShapeItem(item, points, local, pad);
+}
+
 }  // namespace
 
 bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
@@ -217,6 +229,9 @@ bool HitTestLayer(const EvaluatedLayer &layer, Vec2 point, float tolerance) {
         }
         const Vec2 local = inverse.transformPoint(point);
         const float pad = std::max(tolerance, 0.0f);
+        if (layer.imageItem->cornerRadius > 0.0f) {
+            return PointInRoundedRect(local, Vec2{0.0f, 0.0f}, container, layer.imageItem->cornerRadius, pad);
+        }
         return local.x >= -pad && local.y >= -pad && local.x <= container.x + pad &&
             local.y <= container.y + pad;
     }
@@ -457,10 +472,40 @@ bool BoundsOfLayerIncludingDescendants(const SceneState &state, const EvaluatedL
 }
 
 EntityId HitTestLayerAtPoint(const SceneState &state, Vec2 point, float tolerance) {
+    const float pad = std::max(tolerance, 0.0f);
     for (auto it = state.layers.rbegin(); it != state.layers.rend(); ++it) {
-        if (HitTestLayer(*it, point, tolerance)) {
-            return it->id;
+        if (!HitTestLayer(*it, point, tolerance)) {
+            continue;
         }
+        bool clippedByAncestor = false;
+        const EvaluatedLayer *current = &*it;
+        std::unordered_set<EntityId> visiting;
+        while (current != nullptr && current->parentId.isValid()) {
+            if (!visiting.insert(current->parentId).second) {
+                break;
+            }
+            const EvaluatedLayer *ancestor = FindEvaluatedLayer(state, current->parentId);
+            if (ancestor == nullptr) {
+                break;
+            }
+            if (ancestor->cornerRadius > 0.0f) {
+                Vec2 minPoint;
+                Vec2 maxPoint;
+                Mat3 inverse;
+                if (!BoundsOfDescendantUnionLocal(state, ancestor->id, minPoint, maxPoint) ||
+                    !ancestor->worldTransform.tryInvert(inverse) ||
+                    !PointInRoundedRect(inverse.transformPoint(point), minPoint, maxPoint,
+                                        ancestor->cornerRadius, pad)) {
+                    clippedByAncestor = true;
+                    break;
+                }
+            }
+            current = ancestor;
+        }
+        if (clippedByAncestor) {
+            continue;
+        }
+        return it->id;
     }
     return {};
 }

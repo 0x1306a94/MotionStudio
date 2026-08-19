@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -10,6 +11,7 @@ using motion::BoundsOfDescendantUnionLocal;
 using motion::BoundsOfLayerIncludingDescendants;
 using motion::BoundsOfLayerLocal;
 using motion::EntityId;
+using motion::EvaluatedImageItem;
 using motion::EvaluatedLayer;
 using motion::EvaluatedShapeItem;
 using motion::EvaluatedTextItem;
@@ -118,4 +120,37 @@ TEST(HitTestTest, DescendantUnionLocalForGroup) {
     EXPECT_FLOAT_EQ(sceneMin.y, 0);
     EXPECT_FLOAT_EQ(sceneMax.x, 20);
     EXPECT_FLOAT_EQ(sceneMax.y, 10);
+}
+
+TEST(HitTestTest, ImageCornerRadiusRejectsOutsideRound) {
+    EvaluatedLayer layer;
+    layer.opacity = 1.0f;
+    EvaluatedImageItem image;
+    image.containerSize = {100, 100};
+    image.cornerRadius = 50.0f;
+    layer.imageItem = image;
+    EXPECT_TRUE(HitTestLayer(layer, {50, 50}, 0));
+    EXPECT_FALSE(HitTestLayer(layer, {1, 1}, 0));
+}
+
+TEST(HitTestTest, GroupCornerRadiusClipsChildHit) {
+    SceneState state;
+    EvaluatedLayer child;
+    child.id = EntityId{2};
+    child.parentId = EntityId{1};
+    child.opacity = 1.0f;
+    child.worldTransform = Mat3::Identity();
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry({50, 50}, {100, 100});
+    item.paint = Paint{{1, 1, 1, 1}};
+    child.shapeItems.push_back(item);
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    group.opacity = 1.0f;
+    group.cornerRadius = 50.0f;
+    group.worldTransform = Mat3::Identity();
+    state.layers.push_back(child);
+    state.layers.push_back(group);
+    EXPECT_EQ(HitTestLayerAtPoint(state, {50, 50}, 0).value, 2);
+    EXPECT_EQ(HitTestLayerAtPoint(state, {1, 1}, 0).value, 0);
 }

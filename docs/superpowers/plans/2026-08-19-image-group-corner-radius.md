@@ -781,7 +781,7 @@ EOF
 
 ### Task 6: 点选尊重圆角
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/render/HitTest.cpp`、`include/MotionStudio/render/HitTest.h`（若要导出辅助函数）
@@ -791,7 +791,7 @@ EOF
 - Consumes: `EvaluatedImageItem::cornerRadius`、`EvaluatedLayer::cornerRadius`、`BoundsOfDescendantUnionLocal`、`MakeRectGeometry` / `ShapeGeometryToBezierPath`
 - Produces: Image 圆角外不命中；有圆角 isolation 祖先时点还要在祖先 AABB 圆角内
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```cpp
 TEST(HitTestTest, ImageCornerRadiusRejectsOutsideRound) {
@@ -830,7 +830,7 @@ TEST(HitTestTest, GroupCornerRadiusClipsChildHit) {
 
 `#include "MotionStudio/render/EvaluatedImageItem.h"`。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target core_tests
@@ -839,7 +839,7 @@ cmake --build build --target core_tests
 
 Expected: 角上 (1,1) 仍命中。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `HitTestShapeItem` / `FlattenPathInWorld` 已在 `HitTest.cpp` 匿名 namespace，同文件直接调用：
 
@@ -861,7 +861,7 @@ bool PointInRoundedRect(Vec2 local, Vec2 minPoint, Vec2 maxPoint, float radius, 
 
 `HitTestLayerAtPoint`：命中某层后，沿 `parentId` 走；若祖先 `cornerRadius>0` 且 `BoundsOfDescendantUnionLocal` 成功，把 scene 点变到祖先局部，再 `PointInRoundedRect`；失败则视为未命中，继续往下找。只检查 `cornerRadius>0` 的祖先（与 isolation 圆角裁剪一致）。mask/matte isolation 不改点选。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='HitTestTest.*'
@@ -869,7 +869,7 @@ bool PointInRoundedRect(Vec2 local, Vec2 minPoint, Vec2 maxPoint, float radius, 
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/render/HitTest.cpp include/MotionStudio/render/HitTest.h tests/render/HitTestTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'
