@@ -291,3 +291,104 @@ TEST(SvgImporterTest, UseExpandsWithoutDefsLayer) {
         EXPECT_NE(layer->name, "defs");
     }
 }
+
+TEST(SvgImporterTest, DataUriImageCreatesAsset) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\">"
+        "<image href=\"data:image/png;base64,"
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\""
+        " width=\"16\" height=\"16\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool hasImage = false;
+    for (const auto &layer : result.value().layers) {
+        if (layer->type() == motion::LayerType::Image) {
+            hasImage = true;
+        }
+    }
+    EXPECT_TRUE(hasImage);
+    EXPECT_FALSE(result.value().assets.empty());
+    EXPECT_FALSE(result.value().embeddedImages.empty());
+}
+
+TEST(SvgImporterTest, ExternalImageIsSkipped) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\">"
+        "<image href=\"photo.png\" width=\"16\" height=\"16\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool found = false;
+    for (const auto &d : result.value().diagnostics) {
+        if (d.code == "image.external") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(SvgImporterTest, SimpleClipPathBecomesMask) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<defs><clipPath id=\"c\"><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\"/></clipPath></defs>"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#000\" clip-path=\"url(#c)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().layers.back()->masks.size(), 1u);
+}
+
+TEST(SvgImporterTest, MaskAttributeIsSkipped) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><mask id=\"m\"><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#fff\"/></mask></defs>"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#000\" mask=\"url(#m)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool found = false;
+    for (const auto &d : result.value().diagnostics) {
+        if (d.code == "mask.skipped") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(SvgImporterTest, FilterAttributeIsSkipped) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><filter id=\"f\"><feGaussianBlur stdDeviation=\"2\"/></filter></defs>"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#000\" filter=\"url(#f)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool found = false;
+    for (const auto &d : result.value().diagnostics) {
+        if (d.code == "filter.skipped") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(SvgImporterTest, ComplexClipPathIsUnsupported) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><clipPath id=\"c\">"
+        "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\"/>"
+        "<circle cx=\"5\" cy=\"5\" r=\"4\"/>"
+        "</clipPath></defs>"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#000\" clip-path=\"url(#c)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool found = false;
+    for (const auto &d : result.value().diagnostics) {
+        if (d.code == "clip.unsupported") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}

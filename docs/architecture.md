@@ -65,10 +65,11 @@ motionstudio/
 │   ├── undo/                       # Command.h UndoManager.h AddKeyframeCommand.h ...
 │   ├── render/                     # RenderAdapter.h SceneEvaluator.h DrawCommand.h ...
 │   ├── export/                     # PagExporter.h
+│   ├── import/svg/                 # SVG → Layer 树（svg_import，链 tgfx）
 │   └── serialization/              # Serializer.h SchemaMigrator.h Dto.h
 ├── src/                            # 实现文件（与 include/ 同构，按模块分子目录）
 │   ├── CMakeLists.txt              # core 静态库（libmotionstudio_core.a）
-│   ├── core/ common/ model/ animation/ undo/ render/ export/ serialization/
+│   ├── core/ common/ model/ animation/ undo/ render/ export/ import/svg/ serialization/
 ├── tests/                          # GoogleTest 单元测试（与 src/ 同构）
 │   ├── CMakeLists.txt              # core_tests + gtest_discover_tests
 │   └── core/ ...

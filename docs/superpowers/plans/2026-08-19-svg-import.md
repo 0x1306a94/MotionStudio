@@ -933,6 +933,8 @@ git commit -m "Map SVG gradients and expand use references into layers."
 
 ### Task 8: Image、clip-path、剩余 diagnostic、文档
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `src/import/svg/SvgWalk.cpp`
 - Modify: `src/import/svg/SvgStyle.cpp`
@@ -943,7 +945,7 @@ git commit -m "Map SVG gradients and expand use references into layers."
 - Consumes: `ImportSvgInto`（image 的 asset 命令已在 Task 5 接好）
 - Produces: data URI → `Image` + `Asset` + `embeddedImages`；简单 clip → `Layer.masks[0]`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 用 1×1 PNG 的最小 data URI（或 tgfx 能解的红像素）。若解码依赖 codec 开关，当前 `TGFX_CMAKE_ARGS` 已开 PNG decode。
 
@@ -998,11 +1000,11 @@ TEST(SvgImporterTest, SimpleClipPathBecomesMask) {
 
 再补：`mask=` → `mask.skipped`；`filter=` → `filter.skipped`；复杂 clip（两个子形状）→ `clip.unsupported`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `<image>` data URI：`SVGImage::LoadImage`（公开静态方法）。失败 → `image.decode`。成功则 `Asset`（`path = "assets/<hexId>.png"`，宽高来自图像），`embeddedImages.bytes` 用 PNG 编码或原始 data URI 解码缓冲。`ImageContent.size` = resolve 后的元素 w/h。`preserveAspectRatio` 的 `none` → `ImageScaleMode::Stretch`，否则 `LetterBox`。`T(x,y)*transform` 再走 §5.2。外部 href → 不建层 + `image.external`。
 
@@ -1014,7 +1016,7 @@ clip：单个可转 Network 的子形状 → `masks[0]`，`MaskMode::Add`。多�
 │   └── import/svg/                 # SVG → Layer 树（svg_import，链 tgfx）
 ```
 
-- [ ] **Step 4: 全量该二进制测试**
+- [x] **Step 4: 全量该二进制测试**
 
 ```bash
 cmake --build build --target svg_import_tests
@@ -1023,7 +1025,7 @@ cmake --build build --target svg_import_tests
 
 Expected: 全部 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg tests/import/svg docs/architecture.md

@@ -1,8 +1,11 @@
 #include "SvgWalk.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <vector>
 
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "SvgLength.h"
@@ -14,8 +17,10 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/svg/node/SVGCircle.h"
+#include "tgfx/svg/node/SVGClipPath.h"
 #include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGEllipse.h"
+#include "tgfx/svg/node/SVGImage.h"
 #include "tgfx/svg/node/SVGLine.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/node/SVGPath.h"
@@ -117,6 +122,8 @@ std::string DefaultName(tgfx::SVGTag tag) {
         case tgfx::SVGTag::Svg:
         case tgfx::SVGTag::Use:
             return "Group";
+        case tgfx::SVGTag::Image:
+            return "Image";
         default:
             return "Path";
     }
@@ -362,6 +369,145 @@ bool UseStackContains(const std::vector<std::string> &stack, const std::string &
     return false;
 }
 
+bool IsShapeTag(tgfx::SVGTag tag) {
+    switch (tag) {
+        case tgfx::SVGTag::Path:
+        case tgfx::SVGTag::Rect:
+        case tgfx::SVGTag::Circle:
+        case tgfx::SVGTag::Ellipse:
+        case tgfx::SVGTag::Line:
+        case tgfx::SVGTag::Polygon:
+        case tgfx::SVGTag::Polyline:
+            return true;
+        default:
+            return false;
+    }
+}
+
+int Base64Digit(char character) {
+    if (character >= 'A' && character <= 'Z') {
+        return character - 'A';
+    }
+    if (character >= 'a' && character <= 'z') {
+        return character - 'a' + 26;
+    }
+    if (character >= '0' && character <= '9') {
+        return character - '0' + 52;
+    }
+    if (character == '+') {
+        return 62;
+    }
+    if (character == '/') {
+        return 63;
+    }
+    return -1;
+}
+
+bool DecodeBase64(const std::string &input, std::vector<uint8_t> &out) {
+    unsigned int accumulator = 0;
+    int bits = 0;
+    for (size_t i = 0; i < input.size(); ++i) {
+        const char character = input[i];
+        if (character == '=' || character == '\n' || character == '\r' || character == ' ') {
+            continue;
+        }
+        const int digit = Base64Digit(character);
+        if (digit < 0) {
+            return false;
+        }
+        accumulator = (accumulator << 6) | static_cast<unsigned int>(digit);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<uint8_t>((accumulator >> bits) & 0xff));
+        }
+    }
+    return !out.empty();
+}
+
+bool DecodeDataUriBytes(const std::string &iri, std::vector<uint8_t> &out) {
+    const size_t marker = iri.find("base64,");
+    if (marker == std::string::npos) {
+        return false;
+    }
+    return DecodeBase64(iri.substr(marker + 7), out);
+}
+
+std::string HexEntityId(EntityId id) {
+    char buffer[17];
+    std::snprintf(buffer, sizeof(buffer), "%016llx", static_cast<unsigned long long>(id.value));
+    return buffer;
+}
+
+void ApplySkippedEffects(const tgfx::SVGNode &node, WalkContext &ctx) {
+    const auto &mask = node.getMask();
+    if (mask.isValue() && mask->type() == tgfx::SVGFuncIRI::Type::IRI) {
+        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
+    }
+    const auto &filter = node.getFilter();
+    if (filter.isValue() && filter->type() == tgfx::SVGFuncIRI::Type::IRI) {
+        AddDiagnostic(*ctx.tree, "filter.skipped", "filter is not imported", LayerName(node));
+    }
+}
+
+void ApplyClipPath(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
+    const auto &clip = node.getClipPath();
+    if (!clip.isValue() || clip->type() != tgfx::SVGFuncIRI::Type::IRI) {
+        return;
+    }
+    if (ctx.mapper == nullptr) {
+        AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
+                      LayerName(node));
+        return;
+    }
+    const auto it = ctx.mapper->find(LocalIriId(clip->iri()));
+    if (it == ctx.mapper->end() || !it->second || it->second->tag() != tgfx::SVGTag::ClipPath) {
+        AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
+                      LayerName(node));
+        return;
+    }
+    const auto &clipPath = static_cast<const tgfx::SVGClipPath &>(*it->second);
+    const tgfx::SVGNode *shape = nullptr;
+    size_t shapeCount = 0;
+    bool unsupported = false;
+    for (const auto &child : clipPath.getChildren()) {
+        if (!child) {
+            continue;
+        }
+        if (child->tag() == tgfx::SVGTag::Use || child->tag() == tgfx::SVGTag::G ||
+            child->tag() == tgfx::SVGTag::Svg) {
+            unsupported = true;
+            break;
+        }
+        if (IsShapeTag(child->tag())) {
+            shape = child.get();
+            shapeCount += 1;
+        }
+    }
+    if (unsupported || shapeCount != 1 || shape == nullptr) {
+        AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
+                      LayerName(node));
+        return;
+    }
+    bool usedConic = false;
+    const VectorNetwork network =
+        PathToVectorNetwork(ShapePathFromNode(*shape, ctx.lengthContext), &usedConic);
+    if (!NetworkHasArea(network)) {
+        AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
+                      LayerName(node));
+        return;
+    }
+    Mask mask = {};
+    mask.path.setStaticValue(network);
+    mask.mode = MaskMode::Add;
+    layer.masks.push_back(mask);
+}
+
+void ApplyNodeEffects(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
+    ApplyClipPath(layer, node, ctx);
+    ApplySkippedEffects(node, ctx);
+}
+
 void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
                    const ComputedStyle &style) {
     const tgfx::Path path = ShapePathFromNode(node, ctx.lengthContext);
@@ -388,6 +534,7 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ct
         AddDiagnostic(*ctx.tree, "stroke.dash", "stroke-dasharray is imported as a solid stroke",
                       layer->name);
     }
+    ApplyNodeEffects(*layer, node, ctx);
     ctx.tree->layers.push_back(std::move(layer));
 }
 
@@ -431,11 +578,74 @@ void WalkUse(const tgfx::SVGUse &use, EntityId parentId, WalkContext &ctx,
     matrix.preConcat(use.getTransform());
     ApplySvgMatrixToLayer(*group, matrix);
     ApplyNodeOpacity(*group, use);
+    ApplyNodeEffects(*group, use, ctx);
     const EntityId groupId = group->id;
     ctx.tree->layers.push_back(std::move(group));
     ctx.useStack.push_back(id);
     WalkNode(*it->second, groupId, ctx, style);
     ctx.useStack.pop_back();
+}
+
+void WalkImage(const tgfx::SVGImage &image, EntityId parentId, WalkContext &ctx,
+               const ComputedStyle &style) {
+    const tgfx::SVGIRI &href = image.getHref();
+    if (href.type() != tgfx::SVGIRI::Type::DataURI) {
+        AddDiagnostic(*ctx.tree, "image.external", "external image href is not imported",
+                      LayerName(image));
+        return;
+    }
+    const float width =
+        ctx.lengthContext.resolve(image.getWidth(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float height =
+        ctx.lengthContext.resolve(image.getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
+    const tgfx::SVGImage::ImageInfo loaded =
+        tgfx::SVGImage::LoadImage(href, tgfx::Rect::MakeWH(width, height));
+    if (!loaded.image) {
+        AddDiagnostic(*ctx.tree, "image.decode", "data URI image could not be decoded",
+                      LayerName(image));
+        return;
+    }
+    std::vector<uint8_t> bytes;
+    if (!DecodeDataUriBytes(href.iri(), bytes)) {
+        AddDiagnostic(*ctx.tree, "image.decode", "data URI image could not be decoded",
+                      LayerName(image));
+        return;
+    }
+    Asset asset = {};
+    asset.type = AssetType::Image;
+    asset.name = LayerName(image);
+    asset.width = loaded.image->width();
+    asset.height = loaded.image->height();
+    asset.path = "assets/" + HexEntityId(asset.id) + ".png";
+    EmbeddedImage embedded = {};
+    embedded.assetId = asset.id;
+    embedded.suggestedFileName = asset.path;
+    embedded.bytes = std::move(bytes);
+
+    auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->name = LayerName(image);
+    layer->parentId = parentId;
+    layer->visible = style.visible;
+    auto *content = static_cast<ImageContent *>(layer->content.get());
+    content->assetId = asset.id;
+    content->size.setStaticValue({width, height});
+    if (image.getPreserveAspectRatio().align == tgfx::SVGPreserveAspectRatio::Align::None) {
+        content->scaleMode = ImageScaleMode::Stretch;
+    } else {
+        content->scaleMode = ImageScaleMode::LetterBox;
+    }
+    const float x =
+        ctx.lengthContext.resolve(image.getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float y =
+        ctx.lengthContext.resolve(image.getY(), tgfx::SVGLengthContext::LengthType::Vertical);
+    tgfx::Matrix matrix = tgfx::Matrix::MakeTrans(x, y);
+    matrix.preConcat(image.getTransform());
+    ApplySvgMatrixToLayer(*layer, matrix);
+    ApplyNodeOpacity(*layer, image);
+    ApplyNodeEffects(*layer, image, ctx);
+    ctx.tree->assets.push_back(asset);
+    ctx.tree->embeddedImages.push_back(std::move(embedded));
+    ctx.tree->layers.push_back(std::move(layer));
 }
 
 void WalkNode(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
@@ -454,6 +664,7 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
         group->parentId = parentId;
         group->visible = style.visible;
         ApplyNodeTransform(*group, node);
+        ApplyNodeEffects(*group, node, ctx);
         const EntityId groupId = group->id;
         ctx.tree->layers.push_back(std::move(group));
         WalkChildren(static_cast<const tgfx::SVGContainer &>(node), groupId, ctx, style);
@@ -473,6 +684,7 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
             WalkUse(static_cast<const tgfx::SVGUse &>(node), parentId, ctx, style);
             break;
         case tgfx::SVGTag::Image:
+            WalkImage(static_cast<const tgfx::SVGImage &>(node), parentId, ctx, style);
             break;
         default:
             AddDiagnostic(*ctx.tree, "tag.unknown", "unsupported SVG element skipped",
