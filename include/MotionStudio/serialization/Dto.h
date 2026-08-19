@@ -15,6 +15,7 @@
 #include "MotionStudio/model/MaskMode.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeType.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
@@ -48,6 +49,9 @@ Expected<LineJoin, std::string> lineJoinFromString(const std::string &text);
 
 const char *ToString(StrokePosition position);
 Expected<StrokePosition, std::string> strokePositionFromString(const std::string &text);
+
+const char *ToString(StrokeMode mode);
+Expected<StrokeMode, std::string> strokeModeFromString(const std::string &text);
 
 const char *ToString(BlendMode mode);
 Expected<BlendMode, std::string> blendModeFromString(const std::string &text);

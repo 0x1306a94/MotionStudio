@@ -1530,7 +1530,10 @@ json LayerStyleToJson(const LayerStyle &style) {
                       {"position", dto::ToString(stroke.position)},
                       {"trimStart", AnimatableToJson(stroke.trimStart)},
                       {"trimEnd", AnimatableToJson(stroke.trimEnd)},
-                      {"trimOffset", AnimatableToJson(stroke.trimOffset)}};
+                      {"trimOffset", AnimatableToJson(stroke.trimOffset)},
+                      {"strokeMode", dto::ToString(stroke.strokeMode)},
+                      {"dashes", stroke.dashes},
+                      {"dashOffset", AnimatableToJson(stroke.dashOffset)}};
             AppendStylePaintToJson(node, stroke.paintMode, stroke.shaderId, stroke.uniformValues,
                                    stroke.gradient);
             return node;
@@ -1641,6 +1644,33 @@ Expected<std::unique_ptr<LayerStyle>, std::string> LayerStyleFromJson(const json
                 continue;
             }
             result = AnimatableFromJson(**trimNode, *target);
+            if (!result) {
+                return Unexpected(result.error());
+            }
+        }
+        Expected<std::string, std::string> strokeModeText = ParseField<std::string>(node, "strokeMode");
+        if (strokeModeText) {
+            Expected<StrokeMode, std::string> strokeMode = dto::strokeModeFromString(*strokeModeText);
+            if (!strokeMode) {
+                return Unexpected(strokeMode.error());
+            }
+            stroke->strokeMode = *strokeMode;
+        }
+        Expected<const json *, std::string> dashesNode = Child(node, "dashes");
+        if (dashesNode) {
+            if (!(*dashesNode)->is_array()) {
+                return Unexpected(std::string("Stroke style dashes must be an array"));
+            }
+            for (const json &entry : **dashesNode) {
+                if (!entry.is_number()) {
+                    return Unexpected(std::string("Stroke style dashes must be numbers"));
+                }
+                stroke->dashes.push_back(entry.get<float>());
+            }
+        }
+        Expected<const json *, std::string> dashOffsetNode = Child(node, "dashOffset");
+        if (dashOffsetNode) {
+            result = AnimatableFromJson(**dashOffsetNode, stroke->dashOffset);
             if (!result) {
                 return Unexpected(result.error());
             }

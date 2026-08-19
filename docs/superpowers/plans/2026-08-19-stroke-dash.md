@@ -262,7 +262,7 @@ Expected: PASS
 
 ### Task 4: 序列化
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/serialization/Dto.h`、`src/serialization/Dto.cpp`（`ToString` / `strokeModeFromString`，`"solid"` / `"dashed"`）
@@ -273,22 +273,22 @@ Expected: PASS
 - Consumes: Task 1 字段
 - Produces: 可选 JSON `strokeMode` `dashes` `dashOffset`；缺省 Solid / `[]` / 0
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 Round-trip：Dashed + `{8,4}` + 动画 `dashOffset`。  
 缺字段旧 stroke JSON（已有 erase trim 的测）：`strokeMode==Solid`、`dashes.empty()`。
 
-- [ ] **Step 2: 跑测失败**
+- [x] **Step 2: 跑测失败**
 
 Run: `./build/tests/core_tests --gtest_filter='SerializerTest.*Stroke*'`  
 Expected: FAIL 或旧测仍过、新测 FAIL
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 写出：`{"strokeMode", dto::ToString(stroke.strokeMode)}`、`{"dashes", stroke.dashes}`、`{"dashOffset", AnimatableToJson(stroke.dashOffset)}`。  
 读入：字段均 optional；`strokeMode` 非法 → 当缺省 Solid（或返回 error；与 cap 必填不同，跟 trim 一样宽松：未知字符串 `Unexpected`）。`dashes` 须为 number 数组。
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Expected: PASS
 

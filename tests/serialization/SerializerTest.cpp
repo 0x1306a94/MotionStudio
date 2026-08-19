@@ -144,6 +144,12 @@ std::unique_ptr<Document> BuildRichDocument() {
     trimOffsetKeyframe.time = 20;
     trimOffsetKeyframe.value = 90.0f;
     strokeStyle->trimOffset.addKeyframe(trimOffsetKeyframe);
+    strokeStyle->strokeMode = motion::StrokeMode::Dashed;
+    strokeStyle->dashes = {8.0f, 4.0f};
+    Keyframe<float> dashOffsetKeyframe;
+    dashOffsetKeyframe.time = 20;
+    dashOffsetKeyframe.value = 3.0f;
+    strokeStyle->dashOffset.addKeyframe(dashOffsetKeyframe);
     shapeLayer->styles.push_back(std::move(strokeStyle));
 
     auto *shapeContent = static_cast<ShapeContent *>(shapeLayer->content.get());
@@ -229,6 +235,9 @@ TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
             style.erase("trimStart");
             style.erase("trimEnd");
             style.erase("trimOffset");
+            style.erase("strokeMode");
+            style.erase("dashes");
+            style.erase("dashOffset");
         }
     }
 
@@ -246,6 +255,9 @@ TEST(SerializerTest, FillWithoutBlendModeDefaultsToNormal) {
     EXPECT_EQ(strokeStyle->trimStart.staticValue(), 0.0f);
     EXPECT_EQ(strokeStyle->trimEnd.staticValue(), 1.0f);
     EXPECT_EQ(strokeStyle->trimOffset.staticValue(), 0.0f);
+    EXPECT_EQ(strokeStyle->strokeMode, motion::StrokeMode::Solid);
+    EXPECT_TRUE(strokeStyle->dashes.empty());
+    EXPECT_EQ(strokeStyle->dashOffset.staticValue(), 0.0f);
 }
 
 TEST(SerializerTest, LayerWithoutTrackMatteDefaultsToNone) {
@@ -344,6 +356,11 @@ TEST(SerializerTest, RestoredModelEvaluatesAndIndexes) {
     EXPECT_EQ(strokeStyle->trimEnd.staticValue(), 0.75f);
     EXPECT_TRUE(strokeStyle->trimOffset.isAnimated());
     EXPECT_EQ(strokeStyle->trimOffset.evaluate(20), 90.0f);
+    EXPECT_EQ(strokeStyle->strokeMode, motion::StrokeMode::Dashed);
+    ASSERT_EQ(strokeStyle->dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(strokeStyle->dashes[0], 8.0f);
+    EXPECT_TRUE(strokeStyle->dashOffset.isAnimated());
+    EXPECT_EQ(strokeStyle->dashOffset.evaluate(20), 3.0f);
 
     // EntityIndex rebuilt: original IDs resolve correctly.
     EXPECT_NE((*restored)->entityIndex().findLayer(shapes.id), nullptr);

@@ -161,6 +161,28 @@ Expected<StrokePosition, std::string> strokePositionFromString(const std::string
     return Unexpected(std::string("unknown stroke position: " + text));
 }
 
+const char *ToString(StrokeMode mode) {
+    switch (mode) {
+        case StrokeMode::Solid: {
+            return "solid";
+        }
+        case StrokeMode::Dashed: {
+            return "dashed";
+        }
+    }
+    return "unknown";
+}
+
+Expected<StrokeMode, std::string> strokeModeFromString(const std::string &text) {
+    if (text == "solid") {
+        return StrokeMode::Solid;
+    }
+    if (text == "dashed") {
+        return StrokeMode::Dashed;
+    }
+    return Unexpected(std::string("unknown stroke mode: " + text));
+}
+
 Expected<LineJoin, std::string> lineJoinFromString(const std::string &text) {
     if (text == "miter") {
         return LineJoin::Miter;
