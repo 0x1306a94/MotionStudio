@@ -393,6 +393,8 @@ git commit -m "Convert tgfx paths into editable VectorNetwork geometry."
 
 ### Task 3: 基本形状走 `ShapePath` + 中心锚点
 
+**Status:** ✅ Done
+
 **Files:**
 - Create: `src/import/svg/SvgLength.h/.cpp`
 - Create: `src/import/svg/SvgWalk.h/.cpp`
@@ -405,7 +407,7 @@ git commit -m "Convert tgfx paths into editable VectorNetwork geometry."
 - Consumes: `PathToVectorNetwork`、`ParseSvgBytes`
 - Produces: `BuildSvgLayers` 能输出 Shape 层；`AssignCenterAnchors(std::vector<std::unique_ptr<Layer>> &layers)`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SvgImporterTest, PathFillStrokeBecomesShapePath) {
@@ -483,7 +485,7 @@ TEST(SvgImporterTest, LineIsOpenStrokeOnly) {
 
 本 Task **先跳过** `text` / `textPath`（不写 `text.skipped`；Task 9 再导入）。不要加 `TextIsSkipped`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.PathFillStroke*:SvgImporterTest.Rect*:SvgImporterTest.Axis*:SvgImporterTest.Line*'
@@ -491,7 +493,7 @@ TEST(SvgImporterTest, LineIsOpenStrokeOnly) {
 
 Expected: FAIL（只有根 Group）。
 
-- [ ] **Step 3: 实现 walk + 形状 + 默认样式 + 中心锚点**
+- [x] **Step 3: 实现 walk + 形状 + 默认样式 + 中心锚点**
 
 `SvgWalk` 深度优先：
 
@@ -511,7 +513,7 @@ Expected: FAIL（只有根 Group）。
 
 `SvgStyle.cpp` / `SvgTransform.cpp` 本 Task 只放上述最小函数，避免把未测的渐变/剪切写进去。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.*:SvgPathConvertTest.*'
@@ -519,7 +521,7 @@ Expected: FAIL（只有根 Group）。
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg tests/import/svg

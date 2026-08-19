@@ -4,6 +4,8 @@
 #include <iterator>
 
 #include "SvgParse.h"
+#include "SvgTransform.h"
+#include "SvgWalk.h"
 
 namespace motion {
 namespace svg {
@@ -22,6 +24,10 @@ Expected<SvgLayerTree, std::string> BuildSvgLayers(const void *bytes, size_t len
     tree.sourceWidth = parsed.value().sourceWidth;
     tree.sourceHeight = parsed.value().sourceHeight;
     tree.layers.push_back(std::move(root));
+    if (parsed.value().dom && parsed.value().dom->getRoot()) {
+        WalkSvgRoot(*parsed.value().dom->getRoot(), tree);
+    }
+    AssignCenterAnchors(tree.layers);
     return tree;
 }
 
