@@ -11,6 +11,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [figma-to-motionstudio.md](figma-to-motionstudio.md) | Figma Design / Motion → MotionStudio：毫秒↔帧、旋转符号与 Design+Motion 关键帧 |
 | [superpowers/specs/2026-08-19-svg-import-design.md](superpowers/specs/2026-08-19-svg-import-design.md) | SVG 导入：tgfx `SVGDOM` → Core 图层树 + `VectorNetwork`（独立 `svg_import` 库） |
 | [superpowers/specs/2026-08-19-svg-import-ui-design.md](superpowers/specs/2026-08-19-svg-import-ui-design.md) | SVG 导入 UI：File 菜单 + `UIDocumentPicker`，对标图片导入 |
+| [superpowers/specs/2026-08-19-layer-group-ungroup-design.md](superpowers/specs/2026-08-19-layer-group-ungroup-design.md) | 图层编组/解组 + 时间轴父子缩进 |
 | [timeline-evaluation.md](timeline-evaluation.md) | 时间轴与曲线求值：关键帧求值流程、贝塞尔缓动（牛顿+二分）、空间插值、Precomp 时间映射、缓存策略 |
 | [rendering.md](rendering.md) | 渲染抽象与导出：SceneEvaluator → SceneState → DrawCommand → RenderAdapter 流水线、Metal 适配器、PAG/序列帧/MP4 导出边界、线程模型 |
 | [color-source-effect.md](color-source-effect.md) | ColorSourceEffect / RenderCache：过程色填充、离屏路径、pipeline 指纹与 UBO 三缓冲、调用约定 |
