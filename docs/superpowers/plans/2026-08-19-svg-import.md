@@ -1166,6 +1166,8 @@ git commit -m "Import SVG text nodes as editable point text layers."
 
 ### Task 10: 导入后渲染对照（WebP，人工核对）
 
+**Status:** ✅ Done
+
 对标 `adapter/tgfx/tests/ColorSourceEffectTest.mm`：Metal 不可用则 `GTEST_SKIP`；`readPixels` 后用 `SaveWebp` + `OutputPath` 写到 `adapter/tgfx/tests/out/`（已在 `/**/tests/out` gitignore）。**不**做像素对拍门禁，只做「画面非空」冒烟，便于打开 WebP 和源 SVG 对照。
 
 依赖 Task 5（`ImportSvgInto`）、Task 3–7 的形状/组/样式/渐变，以及 Task 9 的文本。放在 `tgfx_adapter_test` 里复用现成 GPU / `TgfxRenderAdapter` / `SaveWebp`，避免 `svg_import_tests` 再链一层 adapter。
@@ -1179,7 +1181,7 @@ git commit -m "Import SVG text nodes as editable point text layers."
 - Consumes: `ImportSvgInto`、`SceneEvaluator::Evaluate`、`BuildCommands`、`PlayCommands`、`TgfxRenderAdapter`、`tgfx_test::SaveWebp` / `OutputPath`、`tgfx::SVGDOM::render`（仅对照参考图）
 - Produces: `adapter/tgfx/tests/out/SvgImport_KitchenSink_Imported.webp`、`SvgImport_KitchenSink_SvgDom.webp`
 
-- [ ] **Step 1: 写夹具 SVG**
+- [x] **Step 1: 写夹具 SVG**
 
 `tests/import/svg/fixtures/kitchen_sink.svg`（256×256，覆盖本阶段已映射能力）：
 
@@ -1205,7 +1207,7 @@ git commit -m "Import SVG text nodes as editable point text layers."
 
 文字应同时出现在 Imported 与 SvgDom 两侧。人工核对：红矩形、蓝圆、绿描边椭圆、旋转橙三角、底部渐变条、以及底部「Hello」。
 
-- [ ] **Step 2: 写会失败的渲染测试**
+- [x] **Step 2: 写会失败的渲染测试**
 
 `adapter/tgfx/tests/SvgImportRenderTest.mm`：
 
@@ -1337,7 +1339,7 @@ TEST(SvgImportRenderTest, RendersKitchenSinkToWebp) {
 
 `tgfx::Stream::MakeFromData` / `Data::MakeWithCopy` 以仓库当前 tgfx 头为准；若签名不同，实现时改成 `MakeFromFile(FixturePath())`（优先，少一次拷贝）。
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -1346,7 +1348,7 @@ cmake --build build --target tgfx_adapter_test
 
 Expected: 链接失败（尚未链 `svg_import`）或 `ImportSvgFileInto` 未实现 → FAIL。尚无 WebP。
 
-- [ ] **Step 4: CMake 接入并确认落盘**
+- [x] **Step 4: CMake 接入并确认落盘**
 
 `src/import/svg/CMakeLists.txt` 在 `svg_import` target 定义之后加：
 
@@ -1367,7 +1369,7 @@ adapter/tgfx/tests/out/SvgImport_KitchenSink_SvgDom.webp
 
 人工核对：红矩形、蓝圆、绿描边椭圆、旋转橙三角、底部橙→蓝渐变条、以及「Hello」位置与颜色大致一致。字体替换造成的字宽差可接受。差异记到实现备注，不为此改 Core。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/import/svg/fixtures/kitchen_sink.svg adapter/tgfx/tests/SvgImportRenderTest.mm src/import/svg/CMakeLists.txt

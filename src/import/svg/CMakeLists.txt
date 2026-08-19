@@ -39,6 +39,10 @@ if(APPLE)
 endif()
 target_compile_options(svg_import PRIVATE -Wall -Wextra)
 
+if(TARGET tgfx_adapter_test)
+    target_link_libraries(tgfx_adapter_test PRIVATE svg_import)
+endif()
+
 include(GoogleTest)
 add_files_by_extension(SVG_IMPORT_TEST_SOURCES ".h;.cpp"
     ${PROJECT_SOURCE_DIR}/tests/import/svg
