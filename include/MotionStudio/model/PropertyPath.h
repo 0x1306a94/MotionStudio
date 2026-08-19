@@ -13,6 +13,7 @@ class Document;
 // Property path that locates an Animatable<T> within an entity.
 // Syntax (dot-separated segments, array segments written as name[index]):
 //   Layer:         "transform.position" / "content.text" / "image.size"
+//                  "image.cornerRadius" / "content.cornerRadius"
 //                  "size" (ShapeContent; resolves against the primary geometry element)
 //                  "styles[0].color" (Layer style; styles apply to layer output)
 //                  "styles[0].uniformValues.rippleCount" (shader paint uniforms; Shader mode only)

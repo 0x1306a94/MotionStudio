@@ -18,6 +18,8 @@ class ImageContent : public LayerContent {
     EntityId assetId;
     // Container size in layer-local pixels (independent of transform.scale).
     Animatable<Vec2> size{Vec2{200, 200}};
+    // Container clip radius in layer-local pixels. 0 = square corners.
+    Animatable<float> cornerRadius{0.0f};
     ImageScaleMode scaleMode = ImageScaleMode::LetterBox;
 };
 

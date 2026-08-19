@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/model/LayerContent.h"
 
 namespace motion {
@@ -9,6 +10,9 @@ class NullContent : public LayerContent {
   public:
     NullContent();
     ~NullContent() override;
+
+    // Group clip radius in layer-local pixels. Clip rect is descendant AABB.
+    Animatable<float> cornerRadius{0.0f};
 };
 
 }  // namespace motion

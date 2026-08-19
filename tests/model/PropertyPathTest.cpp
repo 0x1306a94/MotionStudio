@@ -15,6 +15,7 @@
 #include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/model/ShaderDefinition.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
@@ -244,6 +245,32 @@ TEST(ResolveAnimatableTest, ResolvesImageSize) {
     EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&imageContent->size));
     EXPECT_EQ(ResolveAnimatable(document, {imageLayer->id, "image.bogus"}), nullptr);
     EXPECT_EQ(ResolveAnimatable(document, {imageLayer->id, "size"}), nullptr);
+}
+
+TEST(ResolveAnimatableTest, ResolvesImageCornerRadius) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *imageLayer =
+        document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Image));
+    auto *imageContent = static_cast<motion::ImageContent *>(imageLayer->content.get());
+
+    AnimatableBase *resolved =
+        ResolveAnimatable(document, {imageLayer->id, "image.cornerRadius"});
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&imageContent->cornerRadius));
+    EXPECT_EQ(ResolveAnimatable(document, {imageLayer->id, "content.cornerRadius"}), nullptr);
+}
+
+TEST(ResolveAnimatableTest, ResolvesGroupCornerRadius) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *group =
+        document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    auto *nullContent = static_cast<motion::NullContent *>(group->content.get());
+
+    AnimatableBase *resolved =
+        ResolveAnimatable(document, {group->id, "content.cornerRadius"});
+    EXPECT_EQ(resolved, static_cast<AnimatableBase *>(&nullContent->cornerRadius));
+    EXPECT_EQ(ResolveAnimatable(document, {group->id, "image.cornerRadius"}), nullptr);
 }
 
 TEST(ResolveAnimatableTest, ReturnsNullForMissingOrInvalid) {

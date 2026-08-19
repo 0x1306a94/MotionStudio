@@ -38,7 +38,7 @@
 
 ### Task 1: 模型 + PropertyPath
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/model/ImageContent.h`
@@ -51,7 +51,7 @@
 - Consumes: `ResolveAnimatable`、`Animatable<float>`
 - Produces: `ImageContent::cornerRadius`；`NullContent::cornerRadius`；路径 `image.cornerRadius`、`content.cornerRadius`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 在 `PropertyPathTest.cpp` 的 `ResolvesImageSize` 后追加：
 
@@ -85,7 +85,7 @@ TEST(ResolveAnimatableTest, ResolvesGroupCornerRadius) {
 
 `#include "MotionStudio/model/NullContent.h"`。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target core_tests
@@ -94,7 +94,7 @@ cmake --build build --target core_tests
 
 Expected: 编译失败（无 `cornerRadius` 成员）或 `resolved == nullptr`。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `ImageContent.h` 在 `size` 后加：
 
@@ -143,7 +143,7 @@ class NullContent : public LayerContent {
 
 `PropertyPath.h` 注释 Layer 行补 `"image.cornerRadius"` / `"content.cornerRadius"`。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='ResolveAnimatableTest.*'
@@ -151,7 +151,7 @@ class NullContent : public LayerContent {
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add include/MotionStudio/model/ImageContent.h include/MotionStudio/model/NullContent.h include/MotionStudio/model/PropertyPath.h src/model/PropertyPath.cpp tests/model/PropertyPathTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md

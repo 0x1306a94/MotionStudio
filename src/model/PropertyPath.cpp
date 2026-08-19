@@ -9,6 +9,7 @@
 #include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -453,6 +454,11 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             return resolveShapeProperty(shapeContent->geometry.get(), first.name);
         }
         if (first.name == "content") {
+            if (layer->content->type() == LayerType::Group && segments.size() == 2 &&
+                segments[1].name == "cornerRadius") {
+                auto *nullContent = static_cast<NullContent *>(layer->content.get());
+                return &nullContent->cornerRadius;
+            }
             if (layer->content->type() != LayerType::Text) {
                 return nullptr;
             }
@@ -477,6 +483,9 @@ AnimatableBase *ResolveAnimatable(Document &document, const PropertyPath &proper
             auto *imageContent = static_cast<ImageContent *>(layer->content.get());
             if (segments[1].name == "size") {
                 return &imageContent->size;
+            }
+            if (segments[1].name == "cornerRadius") {
+                return &imageContent->cornerRadius;
             }
             return nullptr;
         }
