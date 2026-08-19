@@ -51,6 +51,12 @@ func timelineAnimatedPropertyPaths(core: MotionDocumentCore, layerID: UInt64) ->
     if !core.keyframes(entityID: layerID, path: ImageProperty.size.path).isEmpty {
         paths.append(ImageProperty.size.path)
     }
+    if !core.keyframes(entityID: layerID, path: ImageProperty.cornerRadius.path).isEmpty {
+        paths.append(ImageProperty.cornerRadius.path)
+    }
+    if !core.keyframes(entityID: layerID, path: GroupProperty.cornerRadius.path).isEmpty {
+        paths.append(GroupProperty.cornerRadius.path)
+    }
     for property in FollowPathProperty.allCases
         where !core.keyframes(entityID: layerID, path: property.path).isEmpty
     {
@@ -405,6 +411,19 @@ func buildTimelineRows(core: MotionDocumentCore, layerIDs: [UInt64]) -> [Timelin
         }
 
         for property in ShapeProperty.allCases where animatedPaths.contains(property.path) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: property.path,
+                                            label: property.actionLabel))
+        }
+
+        for property in ImageProperty.allCases where animatedPaths.contains(property.path) {
+            rows.append(timelinePropertyRow(core: core,
+                                            layerID: layerID,
+                                            path: property.path,
+                                            label: property.actionLabel))
+        }
+        for property in GroupProperty.allCases where animatedPaths.contains(property.path) {
             rows.append(timelinePropertyRow(core: core,
                                             layerID: layerID,
                                             path: property.path,

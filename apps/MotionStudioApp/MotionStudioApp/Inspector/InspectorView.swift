@@ -103,6 +103,13 @@ struct InspectorView: View {
                                                      perform: perform)
                         }
 
+                        if core.layerType(layerID) == .GROUP {
+                            GroupLayerInspector(core: core,
+                                                layerID: layerID,
+                                                isEditable: isEditable,
+                                                perform: perform)
+                        }
+
                         Text("Transform")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)

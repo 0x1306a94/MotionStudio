@@ -1005,7 +1005,7 @@ EOF
 
 ### Task 8: Inspector + 时间轴
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Bridge/PropertyPath.swift`
@@ -1019,7 +1019,7 @@ EOF
 
 无现成 Inspector 单测，本任务不新开 Swift 测试。
 
-- [ ] **Step 1: Add property paths and Image Radius row**
+- [x] **Step 1: Add property paths and Image Radius row**
 
 `PropertyPath.swift`：
 
@@ -1053,7 +1053,7 @@ enum GroupProperty: String, CaseIterable {
 
 `ImageLayerInspector.swift` 在 Height 行后、Reset 按钮前，照 `ShapeSizeInspector` Radius 行写 `image.cornerRadius` 的 `NumberPropertyRow`。`setCornerRadius`：`< 0` 写成 `0`。`hasCornerRadiusKeyframe` / `toggleCornerRadiusKeyframe` 与 size 对称。
 
-- [ ] **Step 2: Add Group Radius inspector**
+- [x] **Step 2: Add Group Radius inspector**
 
 `InspectorView.swift` 在 Transform 段之前：
 
@@ -1095,7 +1095,7 @@ if core.layerType(layerID) == .GROUP {
 
 `playheadClock.frame` 若 InspectorView 里没有 clock 环境，与 `ImageLayerInspector` 一样用 `@Environment(PlayheadClock.self)`。优先抽小组件 `GroupLayerInspector` 放在 `Inspector/`，避免 `InspectorView` 过长。
 
-- [ ] **Step 3: Timeline rows**
+- [x] **Step 3: Timeline rows**
 
 `timelineAnimatedPropertyPaths`：
 
@@ -1127,7 +1127,7 @@ if core.layerType(layerID) == .GROUP {
 
 这也会让已有 `image.size` 关键帧出现在时间轴（先前 `timelineAnimatedPropertyPaths` 收了但 `buildTimelineRows` 没画）。
 
-- [ ] **Step 4: Build the app**
+- [x] **Step 4: Build the app**
 
 优先 Xcode MCP `BuildProject`；不可用则：
 
@@ -1137,7 +1137,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 
 Expected: BUILD SUCCEEDED。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only apps/MotionStudioApp/MotionStudioApp/Bridge/PropertyPath.swift apps/MotionStudioApp/MotionStudioApp/Inspector/ImageLayerInspector.swift apps/MotionStudioApp/MotionStudioApp/Inspector/InspectorView.swift apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineSupport.swift apps/MotionStudioApp/MotionStudioApp/Inspector/GroupLayerInspector.swift docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'

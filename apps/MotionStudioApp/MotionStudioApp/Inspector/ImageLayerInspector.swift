@@ -9,6 +9,7 @@ import MotionStudioBridging
 import SwiftUI
 
 let imageSizePath = ImageProperty.size.path
+let imageCornerRadiusPath = ImageProperty.cornerRadius.path
 
 struct ImageLayerInspector: View {
     let core: MotionDocumentCore
@@ -137,6 +138,18 @@ struct ImageLayerInspector: View {
             toggleSizeKeyframe()
         }
 
+        NumberPropertyRow(label: "Radius",
+                          value: core.evaluateFloat(entityID: layerID,
+                                                    path: imageCornerRadiusPath,
+                                                    frame: playheadFrame),
+                          hasKeyframeAtPlayhead: hasCornerRadiusKeyframe(),
+                          isEditable: isEditable)
+        { newValue in
+            setCornerRadius(value: newValue)
+        } onToggleKeyframe: { value in
+            toggleCornerRadiusKeyframe(value: value)
+        }
+
         Button("Reset to Source Size") {
             guard isEditable, boundAssetID != 0 else { return }
             perform("Reset Image Size") {
@@ -190,6 +203,39 @@ struct ImageLayerInspector: View {
             perform("Add Keyframe") {
                 core.addKeyframeVec2(entityID: layerID, path: imageSizePath,
                                      frame: playheadFrame, value: value)
+            }
+        }
+    }
+
+    private func hasCornerRadiusKeyframe() -> Bool {
+        core.keyframes(entityID: layerID, path: imageCornerRadiusPath)
+            .contains { $0.frame == playheadFrame }
+    }
+
+    private func setCornerRadius(value: Float) {
+        guard isEditable else { return }
+        let radius = max(value, 0)
+        perform("Set Corner Radius") {
+            if hasCornerRadiusKeyframe() {
+                core.addKeyframeFloat(entityID: layerID, path: imageCornerRadiusPath,
+                                      frame: playheadFrame, value: radius)
+            } else {
+                core.setStaticFloat(entityID: layerID, path: imageCornerRadiusPath, value: radius)
+            }
+        }
+    }
+
+    private func toggleCornerRadiusKeyframe(value: Float) {
+        guard isEditable else { return }
+        if hasCornerRadiusKeyframe() {
+            perform("Delete Keyframe") {
+                core.removeKeyframe(entityID: layerID, path: imageCornerRadiusPath,
+                                    frame: playheadFrame)
+            }
+        } else {
+            perform("Add Keyframe") {
+                core.addKeyframeFloat(entityID: layerID, path: imageCornerRadiusPath,
+                                      frame: playheadFrame, value: max(value, 0))
             }
         }
     }

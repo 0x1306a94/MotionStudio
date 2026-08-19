@@ -245,6 +245,7 @@ enum FollowPathProperty: String, CaseIterable {
 
 enum ImageProperty: String, CaseIterable {
     case size = "image.size"
+    case cornerRadius = "image.cornerRadius"
 
     var path: String {
         rawValue
@@ -254,6 +255,23 @@ enum ImageProperty: String, CaseIterable {
         switch self {
         case .size:
             "Size"
+        case .cornerRadius:
+            "Corner Radius"
+        }
+    }
+}
+
+enum GroupProperty: String, CaseIterable {
+    case cornerRadius = "content.cornerRadius"
+
+    var path: String {
+        rawValue
+    }
+
+    var actionLabel: String {
+        switch self {
+        case .cornerRadius:
+            "Corner Radius"
         }
     }
 }
