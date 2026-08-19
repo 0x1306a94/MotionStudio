@@ -21,6 +21,7 @@
 #include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -435,6 +436,10 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
             imageItem.intrinsicSize = {static_cast<float>(asset->width), static_cast<float>(asset->height)};
             imageItem.absolutePath = JoinProjectPath(document.projectRoot, asset->path);
         }
+        const float radius =
+            ClampCornerRadius(imageContent.cornerRadius.evaluatePreview(time), imageItem.containerSize);
+        imageItem.cornerRadius = radius;
+        evaluated.cornerRadius = radius;
         evaluated.imageItem = std::move(imageItem);
         out.push_back(std::move(evaluated));
         return;
@@ -521,6 +526,8 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     if (layer.content->type() == LayerType::Group) {
         EvaluatedLayer evaluated;
         FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
+        const auto &nullContent = static_cast<const NullContent &>(*layer.content);
+        evaluated.cornerRadius = std::max(nullContent.cornerRadius.evaluatePreview(time), 0.0f);
         out.push_back(std::move(evaluated));
         return;
     }

@@ -16,6 +16,7 @@ struct EvaluatedImageItem {
     Vec2 containerSize;
     Vec2 intrinsicSize;
     ImageScaleMode scaleMode = ImageScaleMode::LetterBox;
+    float cornerRadius = 0.0f;
 };
 
 }  // namespace motion

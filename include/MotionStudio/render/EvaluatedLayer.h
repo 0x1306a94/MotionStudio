@@ -43,6 +43,7 @@ struct EvaluatedLayer {
     // True when another evaluated layer uses this layer as its track matte;
     // CommandBuilder skips normal compositing for these layers.
     bool usedAsMatteOnly = false;
+    float cornerRadius = 0.0f;
 };
 
 }  // namespace motion

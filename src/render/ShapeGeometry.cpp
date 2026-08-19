@@ -80,6 +80,11 @@ ShapeGeometry MakeRectGeometry(Vec2 center, Vec2 size, float cornerRadius) {
     return geometry;
 }
 
+float ClampCornerRadius(float radius, Vec2 size) {
+    const float half = std::min(std::max(size.x, 0.0f), std::max(size.y, 0.0f)) * 0.5f;
+    return std::clamp(radius, 0.0f, half);
+}
+
 ShapeGeometry MakeEllipseGeometry(Vec2 center, Vec2 size) {
     ShapeGeometry geometry;
     geometry.kind = ShapeGeometryKind::Ellipse;

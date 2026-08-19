@@ -296,7 +296,7 @@ EOF
 
 ### Task 3: SceneEvaluator 写出 clamp 后的 radius
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/ShapeGeometry.h`、`src/render/ShapeGeometry.cpp`
@@ -310,7 +310,7 @@ EOF
 
 本任务**不**删除 `InheritAncestorTrackMattes`。
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```cpp
 TEST(SceneEvaluatorTest, ImageCornerRadiusIsClamped) {
@@ -354,7 +354,7 @@ TEST(SceneEvaluatorTest, GroupCornerRadiusEvaluates) {
 
 `#include "MotionStudio/model/NullContent.h"`。`RectScene` 已有矩形子层，AABB 短边足够容纳 6。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target core_tests
@@ -363,7 +363,7 @@ cmake --build build --target core_tests
 
 Expected: 编译失败或 radius 仍为 0。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `ShapeGeometry.h` 在 `MakeRectGeometry` 旁：
 
@@ -404,7 +404,7 @@ Group 的短边一半 clamp 放到 CommandBuilder（那时才有 AABB）。求�
 
 `#include "MotionStudio/model/NullContent.h"`。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SceneEvaluatorTest.*'
@@ -412,7 +412,7 @@ Group 的短边一半 clamp 放到 CommandBuilder（那时才有 AABB）。求�
 
 Expected: PASS。`GroupTargetTrackMatteInheritsToChildren` 本任务仍应通过。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only include/MotionStudio/render/ShapeGeometry.h src/render/ShapeGeometry.cpp include/MotionStudio/render/EvaluatedImageItem.h include/MotionStudio/render/EvaluatedLayer.h src/render/SceneEvaluator.cpp tests/render/SceneEvaluatorTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'

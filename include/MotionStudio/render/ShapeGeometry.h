@@ -47,6 +47,9 @@ ShapeGeometry MakePathGeometry(BezierPath path);
 // cornerRadius: corner radius clamped by the adapter/evaluator consumers.
 ShapeGeometry MakeRectGeometry(Vec2 center, Vec2 size, float cornerRadius = 0);
 
+// Clamps radius to [0, half of the shorter side]. Non-positive size → 0.
+float ClampCornerRadius(float radius, Vec2 size);
+
 // Builds a centered Ellipse geometry.
 // center: ellipse center in layer-local space.
 // size: width/height of the bounding box.

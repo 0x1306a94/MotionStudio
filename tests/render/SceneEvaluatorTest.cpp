@@ -6,9 +6,11 @@
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -899,4 +901,42 @@ TEST(SceneEvaluatorTest, PrecompEffectsAreIgnored) {
     }
     ASSERT_NE(innerEval, nullptr);
     EXPECT_TRUE(innerEval->effects.empty());
+}
+
+TEST(SceneEvaluatorTest, ImageCornerRadiusIsClamped) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->duration = 100;
+    Layer *image =
+        document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Image));
+    image->outPoint = 100;
+    auto *content = static_cast<motion::ImageContent *>(image->content.get());
+    content->size.setStaticValue(Vec2{100, 40});
+    content->cornerRadius.setStaticValue(100.0f);
+    Expected<SceneState, std::string> result =
+        SceneEvaluator::Evaluate(document, composition->id, 0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_FALSE(result->layers.empty());
+    ASSERT_TRUE(result->layers[0].imageItem.has_value());
+    EXPECT_FLOAT_EQ(result->layers[0].imageItem->cornerRadius, 20.0f);
+    EXPECT_FLOAT_EQ(result->layers[0].cornerRadius, 20.0f);
+}
+
+TEST(SceneEvaluatorTest, GroupCornerRadiusEvaluates) {
+    RectScene scene;
+    Layer *group =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    group->outPoint = 100;
+    static_cast<motion::NullContent *>(group->content.get())->cornerRadius.setStaticValue(6.0f);
+    scene.layer->parentId = group->id;
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    const motion::EvaluatedLayer *groupEval = nullptr;
+    for (const motion::EvaluatedLayer &layer : result->layers) {
+        if (layer.id == group->id) {
+            groupEval = &layer;
+        }
+    }
+    ASSERT_NE(groupEval, nullptr);
+    EXPECT_FLOAT_EQ(groupEval->cornerRadius, 6.0f);
 }
