@@ -402,7 +402,7 @@ git commit --only src/undo/GroupLayers.cpp tests/undo/GroupLayersTest.cpp docs/s
 
 ### Task 4: Bridge API
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（在 `ms_command_remove_layer` 旁）
@@ -421,11 +421,11 @@ bool ms_command_ungroup_layers(MSDocument *document, uint64_t compositionId,
                                int64_t frame);
 ```
 
-- [ ] **Step 1: Write the failing bridge tests**
+- [x] **Step 1: Write the failing bridge tests**
 
 用 `ms_command_add_rect_layer` 建两层，调 `ms_command_group_layers`，断言返回非 0、`ms_layer_parent_id` 指向 Group、`ms_layer_type` 为 `MS_LAYER_GROUP`。再 `ms_command_ungroup_layers` 为 true、parent 清零。`document==nullptr` 或 `layerIds==nullptr && count>0` 返回 0 / false。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cmake --build build --target bridge_test && ./build/bridge/bridge_test --gtest_filter='*GroupLayer*'
@@ -433,15 +433,15 @@ cmake --build build --target bridge_test && ./build/bridge/bridge_test --gtest_f
 
 （测试名自定，filter 对齐。）Expected: 链接失败。
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `DocumentLock` 后 `std::vector<EntityId>` 从 C 数组填。`Make*` 为 nullptr 则不 `Execute`。Group 成功 `Execute` 后返回 `outGroupId.value`。
 
-- [ ] **Step 4: Run tests** — PASS。
+- [x] **Step 4: Run tests** — PASS。
 
-- [ ] **Step 5: Update this plan** — Task 4 `[x]`，`Status: ✅ Done`。
+- [x] **Step 5: Update this plan** — Task 4 `[x]`，`Status: ✅ Done`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only bridge/include/motionstudio_bridge.h bridge/src/common/motionstudio_bridge_commands.cpp bridge/tests/BridgeTest.cpp docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Expose group and ungroup layer commands on the bridge."

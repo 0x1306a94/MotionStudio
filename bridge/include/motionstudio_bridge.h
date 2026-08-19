@@ -795,6 +795,12 @@ bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, do
                                       float scaleY);
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
+// Wraps sibling layers in a new Group. Returns the new Group id, or 0 on no-op.
+uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId,
+                                 const uint64_t *layerIds, size_t count);
+// Unwraps selected Group layers. Returns false on no-op.
+bool ms_command_ungroup_layers(MSDocument *document, uint64_t compositionId,
+                               const uint64_t *layerIds, size_t count, int64_t frame);
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible);
 void ms_command_set_layer_locked(MSDocument *document, uint64_t layerId, bool locked);
 // name: UTF-8 layer display name. Null is treated as empty.

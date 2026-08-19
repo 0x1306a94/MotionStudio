@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/Color.h"
@@ -20,6 +21,7 @@
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
+#include "MotionStudio/undo/GroupLayers.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
 #include "MotionStudio/undo/MoveLayerEffectCommand.h"
@@ -320,6 +322,56 @@ void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint6
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, fromIndex, toIndex));
+}
+
+uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId,
+                                 const uint64_t *layerIds, size_t count) {
+    if (count > 0 && layerIds == nullptr) {
+        return 0;
+    }
+    DocumentLock guard(document);
+    motion::Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return 0;
+    }
+    std::vector<EntityId> ids;
+    ids.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+        ids.push_back(EntityId{layerIds[index]});
+    }
+    EntityId groupId;
+    std::unique_ptr<motion::Command> command =
+        motion::MakeGroupLayersCommand(*doc, EntityId{compositionId}, ids, groupId);
+    if (command == nullptr) {
+        return 0;
+    }
+    Execute(document, std::move(command));
+    return groupId.value;
+}
+
+bool ms_command_ungroup_layers(MSDocument *document, uint64_t compositionId,
+                               const uint64_t *layerIds, size_t count, int64_t frame) {
+    if (count > 0 && layerIds == nullptr) {
+        return false;
+    }
+    DocumentLock guard(document);
+    motion::Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return false;
+    }
+    std::vector<EntityId> ids;
+    ids.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+        ids.push_back(EntityId{layerIds[index]});
+    }
+    std::unique_ptr<motion::Command> command =
+        motion::MakeUngroupLayersCommand(*doc, EntityId{compositionId}, ids,
+                                         static_cast<FrameTime>(frame));
+    if (command == nullptr) {
+        return false;
+    }
+    Execute(document, std::move(command));
+    return true;
 }
 
 void ms_command_set_layer_visible(MSDocument *document, uint64_t layerId, bool visible) {

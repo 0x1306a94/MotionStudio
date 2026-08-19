@@ -1685,4 +1685,29 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeGroupLayersTest, GroupAndUngroup) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t a = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t b = ms_command_add_rect_layer(document, compositionId);
+    ASSERT_NE(a, 0u);
+    ASSERT_NE(b, 0u);
+    const uint64_t ids[2] = {a, b};
+    const uint64_t groupId = ms_command_group_layers(document, compositionId, ids, 2);
+    ASSERT_NE(groupId, 0u);
+    EXPECT_EQ(ms_layer_type(document, groupId), MS_LAYER_GROUP);
+    EXPECT_EQ(ms_layer_parent_id(document, a), groupId);
+    EXPECT_EQ(ms_layer_parent_id(document, b), groupId);
+    const uint64_t groupIds[1] = {groupId};
+    EXPECT_TRUE(ms_command_ungroup_layers(document, compositionId, groupIds, 1, 0));
+    EXPECT_EQ(ms_layer_parent_id(document, a), 0u);
+    ms_document_destroy(document);
+}
+
+TEST(BridgeGroupLayersTest, NullDocumentIsNoop) {
+    EXPECT_EQ(ms_command_group_layers(nullptr, 1, nullptr, 0), 0u);
+    EXPECT_FALSE(ms_command_ungroup_layers(nullptr, 1, nullptr, 0, 0));
+}
+
 }  // namespace
