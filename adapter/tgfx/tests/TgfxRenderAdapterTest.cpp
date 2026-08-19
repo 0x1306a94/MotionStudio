@@ -38,6 +38,9 @@ using motion::BuildCommands;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::DrawCommand;
+using motion::DrawCommandList;
+using motion::DrawCommandType;
 using motion::DropShadowStyle;
 using motion::EntityId;
 using motion::EvaluatedGradientStop;
@@ -1340,4 +1343,23 @@ TEST(TgfxRenderAdapterTest, BlurThenDropShadowHasShadowInBleed) {
     ASSERT_TRUE(adapter->ReadPixels(bothPixels));
     const Pixel withShadow = PixelAt(bothPixels, 100, 68, 50);
     EXPECT_NE(blurOnly.r, withShadow.r);
+}
+
+TEST(TgfxRenderAdapterTest, NestedBeginLayerDoesNotFreeUnallocatedCanvas) {
+    auto adapter = TgfxRenderAdapter::Make(64, 64);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+    adapter->beginFrame(64, 64, Color{0, 0, 0, 1}, 0.0f);
+    DrawCommandList commands;
+    DrawCommand beginLayer;
+    beginLayer.type = DrawCommandType::BeginLayer;
+    commands.push_back(beginLayer);
+    commands.push_back(beginLayer);
+    DrawCommand endLayer;
+    endLayer.type = DrawCommandType::EndLayer;
+    commands.push_back(endLayer);
+    commands.push_back(endLayer);
+    PlayCommands(commands, *adapter);
+    adapter->endFrame();
 }

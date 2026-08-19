@@ -304,7 +304,7 @@ IsolationLayer *TopIsolationLayer(const std::unique_ptr<TgfxIsolationStack> &sta
     if (stack == nullptr || stack->layers.empty()) {
         return nullptr;
     }
-    return &stack->layers.back();
+    return stack->layers.back().get();
 }
 
 uint64_t HashTextPathDrawParams(const TextDrawParams &params) {
@@ -614,7 +614,7 @@ void TgfxCanvasAdapter::restoreCompositionClip() {
 
 tgfx::Canvas *TgfxCanvasAdapter::drawingCanvas() {
     if (isolationStack_ != nullptr && !isolationStack_->layers.empty()) {
-        IsolationLayer &top = isolationStack_->layers.back();
+        IsolationLayer &top = *isolationStack_->layers.back();
         if (top.masking && top.maskCanvas != nullptr) {
             return top.maskCanvas;
         }
@@ -814,10 +814,10 @@ void TgfxCanvasAdapter::beginLayer() {
     if (isolationStack_ == nullptr) {
         return;
     }
-    // Emplace first: moving PictureRecorder invalidates any canvas* from
-    // beginRecording().
-    isolationStack_->layers.emplace_back();
-    IsolationLayer &layer = isolationStack_->layers.back();
+    // PictureRecorder is not safely movable: never store it by value in a
+    // reallocating vector. unique_ptr keeps an in-progress recording in place.
+    isolationStack_->layers.push_back(std::make_unique<IsolationLayer>());
+    IsolationLayer &layer = *isolationStack_->layers.back();
     layer.compositeOpacity = opacity_;
     layer.compositeBlend = blendMode_;
     opacity_ = 1.0f;
@@ -832,7 +832,7 @@ void TgfxCanvasAdapter::endLayer(
         return;
     }
     // PictureRecorder is not safely movable; finish and pop in place.
-    IsolationLayer &layer = isolationStack_->layers.back();
+    IsolationLayer &layer = *isolationStack_->layers.back();
     layer.contentCanvas = nullptr;
     std::shared_ptr<tgfx::Picture> content = layer.contentRecorder.finishRecordingAsPicture();
     const float compositeOpacity = layer.compositeOpacity;
@@ -944,7 +944,7 @@ void TgfxCanvasAdapter::beginMask(MaskApplyMode mode) {
     if (isolationStack_ == nullptr || isolationStack_->layers.empty()) {
         return;
     }
-    IsolationLayer &layer = isolationStack_->layers.back();
+    IsolationLayer &layer = *isolationStack_->layers.back();
     layer.maskApplyMode = mode;
     layer.masking = true;
     layer.savedOpacity = opacity_;
@@ -983,7 +983,7 @@ void TgfxCanvasAdapter::endMask() {
     if (isolationStack_ == nullptr || isolationStack_->layers.empty()) {
         return;
     }
-    IsolationLayer &layer = isolationStack_->layers.back();
+    IsolationLayer &layer = *isolationStack_->layers.back();
     if (!layer.masking) {
         return;
     }
@@ -1061,7 +1061,7 @@ void TgfxCanvasAdapter::drawMaskPath(const ShapeGeometry &geometry, MaskMode mod
     if (!pathCache_ || isolationStack_ == nullptr || isolationStack_->layers.empty()) {
         return;
     }
-    IsolationLayer &layer = isolationStack_->layers.back();
+    IsolationLayer &layer = *isolationStack_->layers.back();
     if (!layer.masking || layer.maskCanvas == nullptr) {
         return;
     }

@@ -31,6 +31,12 @@ struct CoverageImage {
 };
 
 struct IsolationLayer {
+    IsolationLayer() = default;
+    IsolationLayer(const IsolationLayer &) = delete;
+    IsolationLayer &operator=(const IsolationLayer &) = delete;
+    IsolationLayer(IsolationLayer &&) = delete;
+    IsolationLayer &operator=(IsolationLayer &&) = delete;
+
     tgfx::PictureRecorder contentRecorder;
     tgfx::Canvas *contentCanvas = nullptr;
     tgfx::PictureRecorder maskRecorder;
@@ -49,7 +55,9 @@ struct IsolationLayer {
 };
 
 struct TgfxIsolationStack {
-    std::vector<IsolationLayer> layers;
+    // PictureRecorder owns a raw Canvas* and is not safely movable; keep
+    // layers in unique_ptr so vector growth never relocates a recorder.
+    std::vector<std::unique_ptr<IsolationLayer>> layers;
 };
 
 tgfx::BlendMode ToMaskBlendMode(MaskMode mode);
