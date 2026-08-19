@@ -457,7 +457,7 @@ Expected: PASS
 
 ### Task 9: App UI + 文档
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Bridge/MotionStudioBridgingExtension.swift`
@@ -475,21 +475,21 @@ Miter / Dash 长度用 `NumberPropertyRow(..., showsKeyframeButton: false)`。
 `setStrokeMode(.DASHED)` 走 bridge 命令（内部 seed `{8,8}`）。  
 Dashed 至少一对：改 Gap 不得把两段都写成 0（commit 时若 `Normalize` 会空则忽略，保持旧值——Core 命令已 no-op）。
 
-- [ ] **Step 1: 扩展枚举 `label` / `allCases`**
+- [x] **Step 1: 扩展枚举 `label` / `allCases`**
 
 `MS_LINE_CAP`：Butt Round Square。`MS_LINE_JOIN`：Miter Round Bevel。`MS_STROKE_MODE`：Solid Dashed。不含 INVALID。
 
-- [ ] **Step 2: Core 包装**
+- [x] **Step 2: Core 包装**
 
 `strokeCap` `setStrokeCap` `strokeJoin` `setStrokeJoin` `strokeMiterLimit` `setStrokeMiterLimit` `strokeMode` `setStrokeMode` `strokeDashes() -> [Float]` `setStrokeDashes`。
 
-- [ ] **Step 3: StrokesInspector 布局**
+- [x] **Step 3: StrokesInspector 布局**
 
 顺序见 spec §7。`isTextLayer` 时不显示 Cap/Join/Style/Dash（与 Position/Trim 相同）。
 
-- [ ] **Step 4: 人机验证**
+- [x] **Step 4: 人机验证**
 
-实线↔虚线切换图案保留；Cap Round 端点变圆；Join Miter 显示 Limit；时间轴仅 Offset 可关键帧。验证后把本 Task **Status** 标 ✅。
+实线↔虚线切换图案保留；Cap Round 端点变圆；Join Miter 显示 Limit；时间轴仅 Offset 可关键帧（Solid 隐藏 dashOffset track）。验证后把本 Task **Status** 标 ✅。
 
 ---
 

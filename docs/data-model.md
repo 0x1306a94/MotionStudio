@@ -334,7 +334,7 @@ class FillStyle : public LayerStyle {
     FillRule fillRule = NonZero;
     BlendMode blendMode = Normal;
 };
-// StrokeStyle 同构（另含 width / cap / join / trim / …）
+// StrokeStyle 同构（另含 width / cap / join / miterLimit / trim / strokeMode / dashes / dashOffset）
 ```
 
 `document.json` 中 `paintMode` / `gradient` / `shaderId` / `uniformValues` 为**可选**字段：缺省 → `Color`（与旧文档兼容）；`schemaVersion` **保持 1**。非当前 kind 的字段仍可持久化（切回保留配置）。合并 `shader.json` 后可用 `ValidateShaderReferences` 校验引用。

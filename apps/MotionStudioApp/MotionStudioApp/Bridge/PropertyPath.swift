@@ -176,6 +176,7 @@ enum StyleProperty: String, CaseIterable {
     case trimStart
     case trimEnd
     case trimOffset
+    case dashOffset
 
     func path(at index: Int) -> String {
         "styles[\(index)].\(rawValue)"
@@ -221,6 +222,8 @@ enum StyleProperty: String, CaseIterable {
             "Trim End"
         case .trimOffset:
             "Trim Offset"
+        case .dashOffset:
+            "Dash Offset"
         }
     }
 }

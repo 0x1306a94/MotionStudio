@@ -116,6 +116,56 @@ struct StrokesInspector: View {
                 }
                 floatRow(styleIndex: styleIndex, label: "Width", property: .width)
                 if !isTextLayer {
+                    HStack(spacing: 6) {
+                        Text("Cap")
+                            .font(.callout)
+                            .frame(width: 78, alignment: .leading)
+                        Picker("", selection: capBinding(styleIndex: styleIndex)) {
+                            ForEach(MS_LINE_CAP.allCases) { tag in
+                                Text(tag.label).tag(tag)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    }
+                    HStack(spacing: 6) {
+                        Text("Join")
+                            .font(.callout)
+                            .frame(width: 78, alignment: .leading)
+                        Picker("", selection: joinBinding(styleIndex: styleIndex)) {
+                            ForEach(MS_LINE_JOIN.allCases) { tag in
+                                Text(tag.label).tag(tag)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    }
+                    if joinValue(styleIndex: styleIndex) == .MITER {
+                        staticFloatRow(styleIndex: styleIndex, label: "Miter",
+                                       value: core.strokeMiterLimit(layerID: layerID, index: styleIndex))
+                        { newValue in
+                            perform("Set Stroke Miter") {
+                                core.setStrokeMiterLimit(layerID: layerID, index: styleIndex,
+                                                         miterLimit: newValue)
+                            }
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        Text("Style")
+                            .font(.callout)
+                            .frame(width: 78, alignment: .leading)
+                        Picker("", selection: strokeModeBinding(styleIndex: styleIndex)) {
+                            ForEach(MS_STROKE_MODE.allCases) { tag in
+                                Text(tag.label).tag(tag)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                    }
+                    if strokeModeValue(styleIndex: styleIndex) == .DASHED {
+                        dashPatternEditor(styleIndex: styleIndex)
+                        floatRow(styleIndex: styleIndex, label: "Offset", property: .dashOffset)
+                    }
                     floatRow(styleIndex: styleIndex, label: "Trim Start", property: .trimStart)
                     floatRow(styleIndex: styleIndex, label: "Trim End", property: .trimEnd)
                     floatRow(styleIndex: styleIndex, label: "Trim Offset", property: .trimOffset)
@@ -218,6 +268,144 @@ struct StrokesInspector: View {
             perform("Set Stroke Position") {
                 core.setStrokePosition(layerID: layerID, index: styleIndex, position: newValue)
             }
+        }
+    }
+
+    private func capBinding(styleIndex: Int) -> Binding<MS_LINE_CAP> {
+        Binding {
+            let cap = core.strokeCap(layerID: layerID, index: styleIndex)
+            return cap == .INVALID ? .BUTT : cap
+        } set: { newValue in
+            guard isEditable else { return }
+            perform("Set Stroke Cap") {
+                core.setStrokeCap(layerID: layerID, index: styleIndex, cap: newValue)
+            }
+        }
+    }
+
+    private func joinBinding(styleIndex: Int) -> Binding<MS_LINE_JOIN> {
+        Binding {
+            let join = core.strokeJoin(layerID: layerID, index: styleIndex)
+            return join == .INVALID ? .MITER : join
+        } set: { newValue in
+            guard isEditable else { return }
+            perform("Set Stroke Join") {
+                core.setStrokeJoin(layerID: layerID, index: styleIndex, join: newValue)
+            }
+        }
+    }
+
+    private func joinValue(styleIndex: Int) -> MS_LINE_JOIN {
+        let join = core.strokeJoin(layerID: layerID, index: styleIndex)
+        return join == .INVALID ? .MITER : join
+    }
+
+    private func strokeModeBinding(styleIndex: Int) -> Binding<MS_STROKE_MODE> {
+        Binding {
+            strokeModeValue(styleIndex: styleIndex)
+        } set: { newValue in
+            guard isEditable else { return }
+            perform("Set Stroke Style") {
+                core.setStrokeMode(layerID: layerID, index: styleIndex, strokeMode: newValue)
+            }
+        }
+    }
+
+    private func strokeModeValue(styleIndex: Int) -> MS_STROKE_MODE {
+        let mode = core.strokeMode(layerID: layerID, index: styleIndex)
+        return mode == .INVALID ? .SOLID : mode
+    }
+
+    private func staticFloatRow(styleIndex _: Int, label: String, value: Float,
+                                onCommit: @escaping (Float) -> Void) -> some View
+    {
+        NumberPropertyRow(label: label,
+                          value: value,
+                          hasKeyframeAtPlayhead: false,
+                          isEditable: isEditable,
+                          showsKeyframeButton: false,
+                          onCommit: { newValue in
+                              guard isEditable else { return }
+                              onCommit(newValue)
+                          },
+                          onToggleKeyframe: { _ in })
+    }
+
+    private func dashIntervals(styleIndex: Int) -> [Float] {
+        var dashes = core.strokeDashes(layerID: layerID, index: styleIndex)
+        if dashes.count % 2 == 1 {
+            dashes.append(dashes.last ?? 8)
+        }
+        if dashes.count < 2 {
+            dashes = [8, 8]
+        }
+        return dashes
+    }
+
+    @ViewBuilder
+    private func dashPatternEditor(styleIndex: Int) -> some View {
+        let dashes = dashIntervals(styleIndex: styleIndex)
+        let pairCount = dashes.count / 2
+        ForEach(0 ..< pairCount, id: \.self) { pairIndex in
+            HStack(spacing: 6) {
+                staticFloatRow(styleIndex: styleIndex,
+                               label: pairIndex == 0 ? "Dash" : "Dash \(pairIndex + 1)",
+                               value: dashes[pairIndex * 2])
+                { newValue in
+                    setDash(styleIndex: styleIndex, intervalIndex: pairIndex * 2, value: newValue)
+                }
+                if pairCount > 1 {
+                    Button(role: .destructive) {
+                        removeDashPair(styleIndex: styleIndex, pairIndex: pairIndex)
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .disabled(!isEditable)
+                }
+            }
+            staticFloatRow(styleIndex: styleIndex,
+                           label: pairIndex == 0 ? "Gap" : "Gap \(pairIndex + 1)",
+                           value: dashes[pairIndex * 2 + 1])
+            { newValue in
+                setDash(styleIndex: styleIndex, intervalIndex: pairIndex * 2 + 1, value: newValue)
+            }
+        }
+        HStack {
+            Spacer()
+            Button {
+                addDashPair(styleIndex: styleIndex)
+            } label: {
+                Image(systemName: "plus")
+            }
+            .disabled(!isEditable)
+            .help("Add dash/gap pair")
+        }
+    }
+
+    private func setDash(styleIndex: Int, intervalIndex: Int, value: Float) {
+        var dashes = dashIntervals(styleIndex: styleIndex)
+        guard intervalIndex >= 0, intervalIndex < dashes.count else { return }
+        dashes[intervalIndex] = value
+        perform("Set Stroke Dash") {
+            core.setStrokeDashes(layerID: layerID, index: styleIndex, dashes: dashes)
+        }
+    }
+
+    private func addDashPair(styleIndex: Int) {
+        var dashes = dashIntervals(styleIndex: styleIndex)
+        dashes.append(contentsOf: [8, 8])
+        perform("Add Stroke Dash Pair") {
+            core.setStrokeDashes(layerID: layerID, index: styleIndex, dashes: dashes)
+        }
+    }
+
+    private func removeDashPair(styleIndex: Int, pairIndex: Int) {
+        var dashes = dashIntervals(styleIndex: styleIndex)
+        let start = pairIndex * 2
+        guard dashes.count > 2, start + 1 < dashes.count else { return }
+        dashes.removeSubrange(start ... start + 1)
+        perform("Remove Stroke Dash Pair") {
+            core.setStrokeDashes(layerID: layerID, index: styleIndex, dashes: dashes)
         }
     }
 

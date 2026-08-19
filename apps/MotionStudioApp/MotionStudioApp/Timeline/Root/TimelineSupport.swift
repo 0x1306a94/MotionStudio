@@ -112,9 +112,14 @@ func timelineStyleTracks(core: MotionDocumentCore,
             strokePosition += 1
             let name = "Stroke \(strokePosition)"
             let strokeProperties: [StyleProperty] = (isShaderPaint || isGradientPaint)
-                ? [.width, .trimStart, .trimEnd, .trimOffset]
+                ? [.width, .trimStart, .trimEnd, .trimOffset, .dashOffset]
                 : StyleProperty.allCases
+            let strokeMode = core.strokeMode(layerID: layerID, index: index)
             for property in strokeProperties {
+                // dashOffset only affects Dashed strokes; hide the track in Solid.
+                if property == .dashOffset, strokeMode != .DASHED {
+                    continue
+                }
                 let path = property.path(at: index)
                 if !core.keyframeFrames(entityID: layerID, path: path).isEmpty {
                     tracks.append((path, "\(name) \(property.actionLabel)"))

@@ -772,6 +772,30 @@ final class MotionDocumentCore {
         ms_layer_style_stroke_position_at(handle, layerID, Int32(index))
     }
 
+    func strokeCap(layerID: UInt64, index: Int) -> MS_LINE_CAP {
+        ms_layer_style_stroke_cap_at(handle, layerID, Int32(index))
+    }
+
+    func strokeJoin(layerID: UInt64, index: Int) -> MS_LINE_JOIN {
+        ms_layer_style_stroke_join_at(handle, layerID, Int32(index))
+    }
+
+    func strokeMiterLimit(layerID: UInt64, index: Int) -> Float {
+        ms_layer_style_stroke_miter_limit_at(handle, layerID, Int32(index))
+    }
+
+    func strokeMode(layerID: UInt64, index: Int) -> MS_STROKE_MODE {
+        ms_layer_style_stroke_mode_at(handle, layerID, Int32(index))
+    }
+
+    func strokeDashes(layerID: UInt64, index: Int) -> [Float] {
+        let count = Int(ms_layer_style_stroke_dash_count(handle, layerID, Int32(index)))
+        guard count > 0 else { return [] }
+        return (0 ..< count).map { dashIndex in
+            ms_layer_style_stroke_dash_at(handle, layerID, Int32(index), Int32(dashIndex))
+        }
+    }
+
     // MARK: - Layer effect queries
 
     func effectCount(layerID: UInt64) -> Int {
@@ -1889,6 +1913,34 @@ final class MotionDocumentCore {
     /// position: MS_STROKE_POSITION_* tag. Only applies to stroke styles.
     func setStrokePosition(layerID: UInt64, index: Int, position: MS_STROKE_POSITION) {
         ms_command_set_stroke_position(handle, layerID, Int32(index), position)
+        changed()
+    }
+
+    func setStrokeCap(layerID: UInt64, index: Int, cap: MS_LINE_CAP) {
+        ms_command_set_stroke_cap(handle, layerID, Int32(index), cap)
+        changed()
+    }
+
+    func setStrokeJoin(layerID: UInt64, index: Int, join: MS_LINE_JOIN) {
+        ms_command_set_stroke_join(handle, layerID, Int32(index), join)
+        changed()
+    }
+
+    func setStrokeMiterLimit(layerID: UInt64, index: Int, miterLimit: Float) {
+        ms_command_set_stroke_miter_limit(handle, layerID, Int32(index), miterLimit)
+        changed()
+    }
+
+    func setStrokeMode(layerID: UInt64, index: Int, strokeMode: MS_STROKE_MODE) {
+        ms_command_set_stroke_mode(handle, layerID, Int32(index), strokeMode)
+        changed()
+    }
+
+    func setStrokeDashes(layerID: UInt64, index: Int, dashes: [Float]) {
+        dashes.withUnsafeBufferPointer { buffer in
+            ms_command_set_stroke_dashes(handle, layerID, Int32(index), buffer.baseAddress,
+                                         Int32(buffer.count))
+        }
         changed()
     }
 

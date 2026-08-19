@@ -177,6 +177,73 @@ extension MS_STROKE_POSITION: @retroactive CaseIterable, @retroactive Identifiab
     }
 }
 
+extension MS_LINE_CAP: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_LINE_CAP] {
+        [.BUTT, .ROUND, .SQUARE]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .INVALID:
+            "Invalid"
+        case .BUTT:
+            "Butt"
+        case .ROUND:
+            "Round"
+        case .SQUARE:
+            "Square"
+        }
+    }
+}
+
+extension MS_LINE_JOIN: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_LINE_JOIN] {
+        [.MITER, .ROUND, .BEVEL]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .INVALID:
+            "Invalid"
+        case .MITER:
+            "Miter"
+        case .ROUND:
+            "Round"
+        case .BEVEL:
+            "Bevel"
+        }
+    }
+}
+
+extension MS_STROKE_MODE: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_STROKE_MODE] {
+        [.SOLID, .DASHED]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .INVALID:
+            "Invalid"
+        case .SOLID:
+            "Solid"
+        case .DASHED:
+            "Dashed"
+        }
+    }
+}
+
 extension MS_IMAGE_SCALE: @retroactive CaseIterable, @retroactive Identifiable {
     public static var allCases: [MS_IMAGE_SCALE] {
         [.NONE, .STRETCH, .LETTER_BOX, .ZOOM]
