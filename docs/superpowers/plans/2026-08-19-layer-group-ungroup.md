@@ -326,7 +326,7 @@ git commit --only include/MotionStudio/undo/GroupLayers.h src/undo/GroupLayers.c
 
 ### Task 3: `MakeUngroupLayersCommand`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/undo/GroupLayers.cpp`
@@ -336,7 +336,7 @@ git commit --only include/MotionStudio/undo/GroupLayers.h src/undo/GroupLayers.c
 - Consumes: `SetParentCommand`、`SetStaticValueCommand`、`RemoveLayerCommand`、`Layer::localTransform`
 - Produces: 成功时 `"Ungroup"` composite；无选中 Group 时 `nullptr`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```cpp
 TEST(GroupLayersTest, UngroupIdentityRestoresParentAndWorld) {
@@ -362,11 +362,11 @@ TEST(GroupLayersTest, UngroupIgnoresNonGroupSelection) {
 
 Bake 测试用 `undo.execute` 跑 `SetStaticValueCommand` 改 Group 的 `transform.position`，再 `MakeUngroupLayersCommand`。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Expected: Ungroup 测试 FAIL（返回 nullptr 或未 bake）。
 
-- [ ] **Step 3: Implement ungroup**
+- [x] **Step 3: Implement ungroup**
 
 选中里 `type() == Group` 的层。按 parent 链深度降序（先拆深的）。对每个 Group G：
 
@@ -382,7 +382,7 @@ Expected: Ungroup 测试 FAIL（返回 nullptr 或未 bake）。
 
 无 Group → `nullptr`。
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filter='GroupLayersTest.*:SetParentCommandTest.*'
@@ -390,9 +390,9 @@ cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filt
 
 Expected: PASS。
 
-- [ ] **Step 5: Update this plan** — Task 3 `[x]`，`Status: ✅ Done`。
+- [x] **Step 5: Update this plan** — Task 3 `[x]`，`Status: ✅ Done`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only src/undo/GroupLayers.cpp tests/undo/GroupLayersTest.cpp docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Ungroup layers and bake a static group transform."

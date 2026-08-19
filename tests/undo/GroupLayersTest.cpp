@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "MotionStudio/animation/Keyframe.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Document.h"
@@ -12,9 +13,11 @@
 using motion::Composition;
 using motion::Document;
 using motion::EntityId;
+using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
 using motion::MakeGroupLayersCommand;
+using motion::MakeUngroupLayersCommand;
 using motion::Mat3;
 using motion::UndoManager;
 using motion::Vec2;
@@ -105,4 +108,95 @@ TEST(GroupLayersTest, StripsDescendantsOfSelectedAncestors) {
     undo.execute(document, std::move(command));
     EXPECT_EQ(group->parentId, outerId);
     EXPECT_EQ(child->parentId, group->id);
+}
+
+TEST(GroupLayersTest, UngroupIdentityRestoresParentAndWorld) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *a = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *b = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    a->transform.position.setStaticValue(Vec2{10, 0});
+    b->transform.position.setStaticValue(Vec2{40, 0});
+    const Mat3 worldA = a->worldTransform(0, document);
+    const Mat3 worldB = b->worldTransform(0, document);
+
+    EntityId groupId;
+    std::unique_ptr<motion::Command> groupCommand =
+        MakeGroupLayersCommand(document, composition->id, {a->id, b->id}, groupId);
+    ASSERT_NE(groupCommand, nullptr);
+    undo.execute(document, std::move(groupCommand));
+
+    std::unique_ptr<motion::Command> ungroupCommand =
+        MakeUngroupLayersCommand(document, composition->id, {groupId}, 0);
+    ASSERT_NE(ungroupCommand, nullptr);
+    undo.execute(document, std::move(ungroupCommand));
+
+    EXPECT_EQ(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_FALSE(a->parentId.isValid());
+    EXPECT_FALSE(b->parentId.isValid());
+    EXPECT_EQ(a->worldTransform(0, document), worldA);
+    EXPECT_EQ(b->worldTransform(0, document), worldB);
+}
+
+TEST(GroupLayersTest, UngroupBakesStaticTransform) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *a = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    a->transform.position.setStaticValue(Vec2{10, 0});
+
+    EntityId groupId;
+    std::unique_ptr<motion::Command> groupCommand =
+        MakeGroupLayersCommand(document, composition->id, {a->id}, groupId);
+    ASSERT_NE(groupCommand, nullptr);
+    undo.execute(document, std::move(groupCommand));
+    Layer *group = document.entityIndex().findLayer(groupId);
+    ASSERT_NE(group, nullptr);
+    group->transform.position.setStaticValue(Vec2{100, 0});
+
+    std::unique_ptr<motion::Command> ungroupCommand =
+        MakeUngroupLayersCommand(document, composition->id, {groupId}, 0);
+    ASSERT_NE(ungroupCommand, nullptr);
+    undo.execute(document, std::move(ungroupCommand));
+
+    EXPECT_EQ(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_FALSE(a->parentId.isValid());
+    EXPECT_EQ(a->worldTransform(0, document), Mat3::Translate(Vec2{110, 0}));
+    EXPECT_FALSE(a->transform.position.isAnimated());
+}
+
+TEST(GroupLayersTest, UngroupSkipsKeyframedChildPosition) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *a = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Keyframe<Vec2> keyframe;
+    keyframe.time = 0;
+    keyframe.value = Vec2{10, 0};
+    a->transform.position.addKeyframe(keyframe);
+
+    EntityId groupId;
+    std::unique_ptr<motion::Command> groupCommand =
+        MakeGroupLayersCommand(document, composition->id, {a->id}, groupId);
+    ASSERT_NE(groupCommand, nullptr);
+    undo.execute(document, std::move(groupCommand));
+    Layer *group = document.entityIndex().findLayer(groupId);
+    ASSERT_NE(group, nullptr);
+    group->transform.position.setStaticValue(Vec2{100, 0});
+
+    std::unique_ptr<motion::Command> ungroupCommand =
+        MakeUngroupLayersCommand(document, composition->id, {groupId}, 0);
+    ASSERT_NE(ungroupCommand, nullptr);
+    undo.execute(document, std::move(ungroupCommand));
+
+    ASSERT_EQ(a->transform.position.keyframes().size(), 1u);
+    EXPECT_EQ(a->transform.position.keyframes()[0].value, (Vec2{10, 0}));
+}
+
+TEST(GroupLayersTest, UngroupIgnoresNonGroupSelection) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *shape = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    EXPECT_EQ(MakeUngroupLayersCommand(document, composition->id, {shape->id}, 0), nullptr);
 }

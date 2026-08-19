@@ -1,17 +1,23 @@
 #include "MotionStudio/undo/GroupLayers.h"
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "MotionStudio/common/Mat3.h"
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/CompositeCommand.h"
 #include "MotionStudio/undo/MoveLayerCommand.h"
+#include "MotionStudio/undo/RemoveLayerCommand.h"
 #include "MotionStudio/undo/SetParentCommand.h"
+#include "MotionStudio/undo/SetStaticValueCommand.h"
 
 namespace motion {
 namespace {
@@ -86,6 +92,101 @@ std::vector<std::pair<int, int>> MoveSteps(const std::vector<EntityId> &from,
         steps.push_back({sourceIndex, static_cast<int>(targetIndex)});
     }
     return steps;
+}
+
+int ParentDepth(const Document &document, EntityId layerId) {
+    const Layer *layer = document.entityIndex().findLayer(layerId);
+    if (layer == nullptr) {
+        return 0;
+    }
+    int depth = 0;
+    EntityId cursor = layer->parentId;
+    std::unordered_set<EntityId> visiting;
+    while (cursor.isValid()) {
+        depth += 1;
+        if (!visiting.insert(cursor).second) {
+            break;
+        }
+        const Layer *ancestor = document.entityIndex().findLayer(cursor);
+        if (ancestor == nullptr) {
+            break;
+        }
+        cursor = ancestor->parentId;
+    }
+    return depth;
+}
+
+void SortGroupsDeepFirst(const Document &document, std::vector<EntityId> &groups) {
+    for (size_t i = 0; i < groups.size(); ++i) {
+        size_t best = i;
+        int bestDepth = ParentDepth(document, groups[i]);
+        for (size_t j = i + 1; j < groups.size(); ++j) {
+            const int depth = ParentDepth(document, groups[j]);
+            if (depth > bestDepth) {
+                best = j;
+                bestDepth = depth;
+            }
+        }
+        if (best != i) {
+            const EntityId tmp = groups[i];
+            groups[i] = groups[best];
+            groups[best] = tmp;
+        }
+    }
+}
+
+void DecomposeLayerLocal(const Mat3 &composed, Vec2 anchor, Vec2 &position, Vec2 &scale, float &rotation) {
+    const float m00 = composed.values[0];
+    const float m01 = composed.values[1];
+    const float m10 = composed.values[3];
+    rotation = std::atan2(m10, m00) * 180.0f / 3.14159265358979323846f;
+    scale.x = std::hypot(m00, m10);
+    scale.y = std::hypot(m01, composed.values[4]);
+    position = composed.transformPoint(anchor);
+}
+
+void CollectEffectiveChildren(const Composition &composition, EntityId groupId,
+                              const std::unordered_set<EntityId> &ungrouping,
+                              std::vector<EntityId> &out) {
+    for (const auto &layer : composition.layers) {
+        if (layer->parentId != groupId) {
+            continue;
+        }
+        if (ungrouping.find(layer->id) != ungrouping.end()) {
+            CollectEffectiveChildren(composition, layer->id, ungrouping, out);
+            continue;
+        }
+        out.push_back(layer->id);
+    }
+}
+
+Mat3 GroupChainLocal(const Document &document, EntityId fromGroupId, EntityId childId, FrameTime time) {
+    const Layer *child = document.entityIndex().findLayer(childId);
+    if (child == nullptr) {
+        return Mat3::Identity();
+    }
+    std::vector<const Layer *> chain;
+    EntityId cursor = child->parentId;
+    std::unordered_set<EntityId> visiting;
+    while (cursor.isValid()) {
+        if (!visiting.insert(cursor).second) {
+            break;
+        }
+        const Layer *layer = document.entityIndex().findLayer(cursor);
+        if (layer == nullptr) {
+            break;
+        }
+        chain.push_back(layer);
+        if (cursor == fromGroupId) {
+            break;
+        }
+        cursor = layer->parentId;
+    }
+    Mat3 groupLocal = Mat3::Identity();
+    for (size_t index = chain.size(); index > 0; --index) {
+        groupLocal = groupLocal * chain[index - 1]->localTransform(time);
+    }
+    return groupLocal;
 }
 
 }  // namespace
@@ -208,11 +309,71 @@ std::unique_ptr<Command> MakeGroupLayersCommand(
 std::unique_ptr<Command> MakeUngroupLayersCommand(
     const Document &document, EntityId compositionId,
     const std::vector<EntityId> &layerIds, FrameTime time) {
-    (void)document;
-    (void)compositionId;
-    (void)layerIds;
-    (void)time;
-    return nullptr;
+    const Composition *composition = document.entityIndex().findComposition(compositionId);
+    if (composition == nullptr) {
+        return nullptr;
+    }
+
+    std::vector<EntityId> groups;
+    for (const EntityId &id : layerIds) {
+        if (ContainsId(groups, id)) {
+            continue;
+        }
+        if (IndexInComposition(*composition, id) < 0) {
+            continue;
+        }
+        const Layer *layer = document.entityIndex().findLayer(id);
+        if (layer == nullptr || layer->type() != LayerType::Group) {
+            continue;
+        }
+        groups.push_back(id);
+    }
+    if (groups.empty()) {
+        return nullptr;
+    }
+    SortGroupsDeepFirst(document, groups);
+    std::unordered_set<EntityId> ungrouping(groups.begin(), groups.end());
+
+    auto composite = std::make_unique<CompositeCommand>("Ungroup");
+    for (const EntityId &groupId : groups) {
+        const Layer *group = document.entityIndex().findLayer(groupId);
+        if (group == nullptr) {
+            continue;
+        }
+        const EntityId restoredParent = group->parentId;
+        std::vector<EntityId> children;
+        CollectEffectiveChildren(*composition, groupId, ungrouping, children);
+        for (const EntityId &childId : children) {
+            Layer *child = document.entityIndex().findLayer(childId);
+            if (child == nullptr) {
+                continue;
+            }
+            const Mat3 groupLocal = GroupChainLocal(document, groupId, childId, time);
+            if (groupLocal != Mat3::Identity()) {
+                const Mat3 composed = groupLocal * child->localTransform(time);
+                const Vec2 anchor = child->transform.anchorPoint.evaluate(time);
+                Vec2 position = {};
+                Vec2 scale = {};
+                float rotation = 0.0f;
+                DecomposeLayerLocal(composed, anchor, position, scale, rotation);
+                if (!child->transform.position.isAnimated()) {
+                    composite->add(std::make_unique<SetStaticValueCommand>(
+                        PropertyPath{childId, "transform.position"}, PropertyValue{position}));
+                }
+                if (!child->transform.rotation.isAnimated()) {
+                    composite->add(std::make_unique<SetStaticValueCommand>(
+                        PropertyPath{childId, "transform.rotation"}, PropertyValue{rotation}));
+                }
+                if (!child->transform.scale.isAnimated()) {
+                    composite->add(std::make_unique<SetStaticValueCommand>(
+                        PropertyPath{childId, "transform.scale"}, PropertyValue{scale}));
+                }
+            }
+            composite->add(std::make_unique<SetParentCommand>(childId, restoredParent));
+        }
+        composite->add(std::make_unique<RemoveLayerCommand>(compositionId, groupId));
+    }
+    return composite;
 }
 
 }  // namespace motion
