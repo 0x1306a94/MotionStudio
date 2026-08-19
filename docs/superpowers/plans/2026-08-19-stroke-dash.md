@@ -115,7 +115,7 @@ Expected: PASS（需先 `cmake --build build`）
 
 ### Task 2: StrokeOptions 求值 + dashOffset PropertyPath
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/render/StrokeOptions.h`
@@ -148,7 +148,7 @@ struct StrokeOptions {
 
 `appendStroke` 在现有 `StrokeOptions options{width, cap, join, position, trim...}` 初始化处改为包含 `stroke.miterLimit`、`stroke.strokeMode`、`stroke.dashes`、`stroke.dashOffset.evaluatePreview(time)`（C++17 按成员序或改成赋值，避免 designated init）。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在 `SceneEvaluatorTest` 追加：
 
@@ -172,16 +172,16 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesDashAndMiter) {
 }
 ```
 
-- [ ] **Step 2: 跑测确认失败**
+- [x] **Step 2: 跑测确认失败**
 
 Run: `./build/tests/core_tests --gtest_filter='SceneEvaluatorTest.StrokeItemCarriesDashAndMiter'`  
 Expected: FAIL（无成员）
 
-- [ ] **Step 3: 改 StrokeOptions + appendStroke + PropertyPath**
+- [x] **Step 3: 改 StrokeOptions + appendStroke + PropertyPath**
 
 `resolveStyleProperty` Stroke 分支在 `trimOffset` 后：`if (name == "dashOffset") return &stroke->dashOffset;`
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Run: `./build/tests/core_tests --gtest_filter='SceneEvaluatorTest.StrokeItemCarriesDashAndMiter'`  
 Expected: PASS

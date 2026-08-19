@@ -173,6 +173,9 @@ AnimatableBase *resolveStyleProperty(LayerStyle *style, const std::string &name)
             if (name == "trimOffset") {
                 return &stroke->trimOffset;
             }
+            if (name == "dashOffset") {
+                return &stroke->dashOffset;
+            }
             break;
         }
     }

@@ -230,6 +230,26 @@ TEST(SceneEvaluatorTest, StrokeItemCarriesPositionAndTrim) {
     EXPECT_FLOAT_EQ(strokeItem.stroke.trimOffset, 90.0f);
 }
 
+TEST(SceneEvaluatorTest, StrokeItemCarriesDashAndMiter) {
+    RectScene scene;
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->miterLimit = 12.0f;
+    stroke->strokeMode = motion::StrokeMode::Dashed;
+    stroke->dashes = {10.0f, 4.0f};
+    stroke->dashOffset.setStaticValue(3.0f);
+    scene.layer->styles.push_back(std::move(stroke));
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result->layers[0].shapeItems.size(), 2u);
+    const auto &strokeItem = result->layers[0].shapeItems[1];
+    EXPECT_FLOAT_EQ(strokeItem.stroke.miterLimit, 12.0f);
+    EXPECT_EQ(strokeItem.stroke.strokeMode, motion::StrokeMode::Dashed);
+    ASSERT_EQ(strokeItem.stroke.dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(strokeItem.stroke.dashes[0], 10.0f);
+    EXPECT_FLOAT_EQ(strokeItem.stroke.dashOffset, 3.0f);
+}
+
 TEST(SceneEvaluatorTest, StrokeBeforeFillStillPaintsFillThenStroke) {
     RectScene scene;
     // RectScene already has one Fill at styles[0]. Prepend a Stroke so disk

@@ -317,10 +317,14 @@ void ApplyLayerStyles(const Document &document, const Layer &layer, PreviewTime 
         const StrokeOptions options{stroke.width.evaluatePreview(time),
                                     stroke.cap,
                                     stroke.join,
+                                    stroke.miterLimit,
                                     stroke.position,
                                     stroke.trimStart.evaluatePreview(time),
                                     stroke.trimEnd.evaluatePreview(time),
-                                    stroke.trimOffset.evaluatePreview(time)};
+                                    stroke.trimOffset.evaluatePreview(time),
+                                    stroke.strokeMode,
+                                    stroke.dashes,
+                                    stroke.dashOffset.evaluatePreview(time)};
         for (const ShapeGeometry &geometry : geometries) {
             // Stroke uses strokePath when present; fill faces stay on
             // geometry.path for Inside/Outside positioning.
