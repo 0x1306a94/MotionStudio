@@ -12,6 +12,7 @@
 #include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerStylePaint.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShaderDefinition.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -42,11 +43,13 @@ using motion::EnsureDefaultGradient;
 using motion::Expected;
 using motion::FillStyle;
 using motion::GradientType;
+using motion::ImageContent;
 using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
 using motion::MakeSingleContour;
 using motion::MaskMode;
+using motion::NullContent;
 using motion::PrecompContent;
 using motion::SchemaMigrator;
 using motion::Serializer;
@@ -979,4 +982,39 @@ TEST(SerializerTest, DocumentGradientPaintRoundTrip) {
     nlohmann::json root = nlohmann::json::parse(Serializer::serialize(original));
     EXPECT_EQ(root["compositions"][0]["layers"][0]["styles"][0]["paintMode"], "gradient");
     EXPECT_EQ(root["compositions"][0]["layers"][0]["styles"][0]["gradient"]["type"], "radial");
+}
+
+TEST(SerializerTest, ImageAndGroupCornerRadiusRoundTrip) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    composition->duration = 30;
+    Layer *image = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Image));
+    static_cast<ImageContent *>(image->content.get())->cornerRadius.setStaticValue(12.0f);
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    static_cast<NullContent *>(group->content.get())->cornerRadius.setStaticValue(8.0f);
+
+    const std::string first = Serializer::serialize(document);
+    Expected<std::unique_ptr<Document>, std::string> loaded = Serializer::deserialize(first);
+    ASSERT_TRUE(loaded.hasValue());
+    EXPECT_EQ(first, Serializer::serialize(**loaded));
+
+    Layer *loadedImage = (*loaded)->compositions[0]->layers[0].get();
+    Layer *loadedGroup = (*loaded)->compositions[0]->layers[1].get();
+    EXPECT_FLOAT_EQ(static_cast<ImageContent *>(loadedImage->content.get())->cornerRadius.staticValue(),
+                    12.0f);
+    EXPECT_FLOAT_EQ(static_cast<NullContent *>(loadedGroup->content.get())->cornerRadius.staticValue(),
+                    8.0f);
+}
+
+TEST(SerializerTest, MissingCornerRadiusDefaultsToZero) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    auto json = nlohmann::json::parse(Serializer::serialize(document));
+    json["compositions"][0]["layers"][0]["content"].erase("cornerRadius");
+    Expected<std::unique_ptr<Document>, std::string> loaded =
+        Serializer::deserialize(json.dump());
+    ASSERT_TRUE(loaded.hasValue()) << loaded.error();
+    Layer *group = (*loaded)->compositions[0]->layers[0].get();
+    EXPECT_FLOAT_EQ(static_cast<NullContent *>(group->content.get())->cornerRadius.staticValue(), 0.0f);
 }

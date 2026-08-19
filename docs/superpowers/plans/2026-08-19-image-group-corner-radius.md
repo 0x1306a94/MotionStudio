@@ -166,7 +166,7 @@ EOF
 
 ### Task 2: 序列化
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/serialization/Serializer.cpp`
@@ -176,7 +176,7 @@ EOF
 - Consumes: `ImageContent::cornerRadius`、`NullContent::cornerRadius`、`AnimatableToJson` / `AnimatableFromJson`
 - Produces: Image `content.cornerRadius`；Group `content.cornerRadius`；缺字段 = 0
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 在 `SerializerTest.cpp` 追加（API 是 `Serializer::serialize` / `deserialize`）：
 
@@ -219,7 +219,7 @@ TEST(SerializerTest, MissingCornerRadiusDefaultsToZero) {
 
 `#include "MotionStudio/model/NullContent.h"`。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target core_tests
@@ -228,7 +228,7 @@ cmake --build build --target core_tests
 
 Expected: round-trip 值仍为 0，或 FromJson 后不是 12/8。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `ContentToJson` Image 分支在 `scaleMode` 旁：
 
@@ -274,7 +274,7 @@ Group FromJson：
         }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SerializerTest.*'
@@ -282,7 +282,7 @@ Group FromJson：
 
 Expected: PASS。已有 kitchen-sink round-trip 仍绿。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/serialization/Serializer.cpp tests/serialization/SerializerTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'

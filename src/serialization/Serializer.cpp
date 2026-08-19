@@ -1938,6 +1938,7 @@ json ContentToJson(const LayerContent &content) {
             }
             node["size"] = AnimatableToJson(image.size);
             node["scaleMode"] = dto::ToString(image.scaleMode);
+            node["cornerRadius"] = AnimatableToJson(image.cornerRadius);
             break;
         }
         case LayerType::Text: {
@@ -1964,6 +1965,8 @@ json ContentToJson(const LayerContent &content) {
             break;
         }
         case LayerType::Group: {
+            const auto &group = static_cast<const NullContent &>(content);
+            node["cornerRadius"] = AnimatableToJson(group.cornerRadius);
             break;
         }
         case LayerType::Precomp: {
@@ -2032,6 +2035,13 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
                     return Unexpected(mode.error());
                 }
                 content->scaleMode = *mode;
+            }
+            if (const json *cornerRadiusNode = FindChild(node, "cornerRadius")) {
+                Expected<void, std::string> radiusResult =
+                    AnimatableFromJson(*cornerRadiusNode, content->cornerRadius);
+                if (!radiusResult) {
+                    return Unexpected(radiusResult.error());
+                }
             }
             return std::unique_ptr<LayerContent>(std::move(content));
         }
@@ -2144,7 +2154,15 @@ Expected<std::unique_ptr<LayerContent>, std::string> ContentFromJson(const json 
             return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Group: {
-            return std::unique_ptr<LayerContent>(std::make_unique<NullContent>());
+            auto content = std::make_unique<NullContent>();
+            if (const json *cornerRadiusNode = FindChild(node, "cornerRadius")) {
+                Expected<void, std::string> radiusResult =
+                    AnimatableFromJson(*cornerRadiusNode, content->cornerRadius);
+                if (!radiusResult) {
+                    return Unexpected(radiusResult.error());
+                }
+            }
+            return std::unique_ptr<LayerContent>(std::move(content));
         }
         case LayerType::Precomp: {
             auto content = std::make_unique<PrecompContent>();
