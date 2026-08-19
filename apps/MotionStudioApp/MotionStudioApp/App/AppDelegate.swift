@@ -84,8 +84,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                       action: #selector(EditorViewController.sendLayersToBack),
                                       input: "[",
                                       modifierFlags: [.command, .alternate])
+        let groupLayers = UIKeyCommand(title: "Group",
+                                       image: nil,
+                                       action: #selector(EditorViewController.groupSelectedLayers),
+                                       input: "g",
+                                       modifierFlags: .command)
+        let ungroupLayers = UIKeyCommand(title: "Ungroup",
+                                         image: nil,
+                                         action: #selector(EditorViewController.ungroupSelectedLayers),
+                                         input: "g",
+                                         modifierFlags: [.command, .shift])
         let arrangeMenu = UIMenu(title: "Arrange",
-                                 children: [bringToFront, bringForward, sendBackward, sendToBack])
+                                 children: [groupLayers, ungroupLayers, bringToFront, bringForward, sendBackward, sendToBack])
         builder.insertSibling(arrangeMenu, afterMenu: .edit)
     }
 

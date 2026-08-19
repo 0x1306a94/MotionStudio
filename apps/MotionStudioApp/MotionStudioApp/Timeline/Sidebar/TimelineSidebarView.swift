@@ -298,10 +298,75 @@ private extension TimelineSidebarView {
                 self?.arrangeFromContextMenu(layerID: layerID, action: action)
             }
         }
+        let group = UIAction(title: "Group") { [weak self] _ in
+            self?.groupFromContextMenu(layerID: layerID)
+        }
+        let ungroup = UIAction(title: "Ungroup") { [weak self] _ in
+            self?.ungroupFromContextMenu(layerID: layerID)
+        }
         let delete = UIAction(title: "Delete", attributes: .destructive) { [weak self] _ in
             self?.deleteFromContextMenu(layerID: layerID)
         }
-        return UIMenu(children: arrange + [delete])
+        return UIMenu(children: [group, ungroup] + arrange + [delete])
+    }
+
+    func groupFromContextMenu(layerID: UInt64) {
+        if !editorState.isLayerSelected(layerID) {
+            editorState.selectLayer(layerID)
+        }
+        let compositionID = document.core.firstCompositionID
+        var parentOf: [UInt64: UInt64] = [:]
+        for id in document.core.layerIDs(compositionID: compositionID) {
+            parentOf[id] = document.core.layerParentID(id)
+        }
+        if !TimelineLayerTree.canGroup(ids: editorState.selectedLayerIDs, parentOf: parentOf) {
+            return
+        }
+        performEdit("Group") {
+            let newID = self.document.core.groupLayers(compositionID: compositionID,
+                                                       layerIDs: self.editorState.selectedLayerIDs)
+            if newID != 0 {
+                self.editorState.selectLayer(newID)
+            }
+        }
+    }
+
+    func ungroupFromContextMenu(layerID: UInt64) {
+        if !editorState.isLayerSelected(layerID) {
+            editorState.selectLayer(layerID)
+        }
+        let compositionID = document.core.firstCompositionID
+        let current = document.core.layerIDs(compositionID: compositionID)
+        let selected = Set(editorState.selectedLayerIDs)
+        var types: [UInt64: MS_LAYER] = [:]
+        for id in selected {
+            types[id] = document.core.layerType(id)
+        }
+        if !TimelineLayerTree.canUngroup(ids: editorState.selectedLayerIDs, types: types) {
+            return
+        }
+        var children: [UInt64] = []
+        for id in current {
+            let parent = document.core.layerParentID(id)
+            if selected.contains(parent), types[parent] == .GROUP {
+                children.append(id)
+            }
+        }
+        let frame = playheadClock.frame
+        performEdit("Ungroup") {
+            let ok = self.document.core.ungroupLayers(compositionID: compositionID,
+                                                      layerIDs: self.editorState.selectedLayerIDs,
+                                                      frame: frame)
+            if ok {
+                var remaining: [UInt64] = []
+                for id in children {
+                    if self.document.core.layerType(id) != .INVALID {
+                        remaining.append(id)
+                    }
+                }
+                self.editorState.selectedLayerIDs = remaining
+            }
+        }
     }
 
     func arrangeFromContextMenu(layerID: UInt64, action: LayerArrangeAction) {

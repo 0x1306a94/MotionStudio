@@ -188,6 +188,8 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "[", modifierFlags: [.command], action: #selector(sendLayersBackward)),
             UIKeyCommand(input: "]", modifierFlags: [.command, .alternate], action: #selector(bringLayersToFront)),
             UIKeyCommand(input: "[", modifierFlags: [.command, .alternate], action: #selector(sendLayersToBack)),
+            UIKeyCommand(input: "g", modifierFlags: [.command], action: #selector(groupSelectedLayers)),
+            UIKeyCommand(input: "g", modifierFlags: [.command, .shift], action: #selector(ungroupSelectedLayers)),
             UIKeyCommand(title: "Show Selection Anchor",
                          image: nil,
                          action: #selector(toggleSelectionAnchor),
@@ -224,6 +226,10 @@ final class EditorViewController: UIViewController {
             canArrangeSelection(.sendBackward)
         case #selector(sendLayersToBack):
             canArrangeSelection(.sendToBack)
+        case #selector(groupSelectedLayers):
+            canGroupSelection()
+        case #selector(ungroupSelectedLayers):
+            canUngroupSelection()
         case #selector(nudgeSelectionLeft),
              #selector(nudgeSelectionRight),
              #selector(nudgeSelectionUp),

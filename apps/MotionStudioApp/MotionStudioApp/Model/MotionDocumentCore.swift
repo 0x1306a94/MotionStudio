@@ -1741,6 +1741,35 @@ final class MotionDocumentCore {
         changed()
     }
 
+    @discardableResult
+    func groupLayers(compositionID: UInt64, layerIDs: [UInt64]) -> UInt64 {
+        if layerIDs.isEmpty {
+            return 0
+        }
+        var ids = layerIDs
+        let newID = ids.withUnsafeBufferPointer { buffer in
+            ms_command_group_layers(handle, compositionID, buffer.baseAddress, ids.count)
+        }
+        if newID != 0 {
+            changed()
+        }
+        return newID
+    }
+
+    func ungroupLayers(compositionID: UInt64, layerIDs: [UInt64], frame: Int64) -> Bool {
+        if layerIDs.isEmpty {
+            return false
+        }
+        var ids = layerIDs
+        let ok = ids.withUnsafeBufferPointer { buffer in
+            ms_command_ungroup_layers(handle, compositionID, buffer.baseAddress, ids.count, frame)
+        }
+        if ok {
+            changed()
+        }
+        return ok
+    }
+
     func setLayerVisible(_ layerID: UInt64, visible: Bool) {
         ms_command_set_layer_visible(handle, layerID, visible)
         changed()

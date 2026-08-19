@@ -562,7 +562,7 @@ git commit --only apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/Timeline
 
 ### Task 7: 菜单、快捷键、Core 门面
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `MotionDocumentCore.swift`（`groupLayers` / `ungroupLayers`）
@@ -575,7 +575,7 @@ git commit --only apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/Timeline
 - Consumes: `ms_command_group_layers` / `ms_command_ungroup_layers`、`TimelineLayerTree.canGroup` / `canUngroup`、`playheadClock.frame`
 - Produces: `⌘G` / `⇧⌘G`；成功后 Group 选中新 Group，Ungroup 选中放出的子层
 
-- [ ] **Step 1: Core 包装**
+- [x] **Step 1: Core 包装**
 
 ```swift
 @discardableResult
@@ -604,18 +604,18 @@ func ungroupLayers(compositionID: UInt64, layerIDs: [UInt64], frame: Int64) -> B
 
 `count==0` 时不要传悬挂指针：`count==0` 直接 return 0 / false。
 
-- [ ] **Step 2: Editor 动作**
+- [x] **Step 2: Editor 动作**
 
 `canGroupSelection`：`!isExportInProgress` 且 `TimelineLayerTree.canGroup`。  
 `groupSelectedLayers`：`perform("Group") { let id = core.groupLayers(...); if id != 0 { editorState.selectLayer(id) } }`。
 
 Ungroup：先在 Swift 记下选中 Group 的直接子 id（`layerParentID(child)==group`），`perform("Ungroup")` 成功后 `selectedLayerIDs = children`。
 
-- [ ] **Step 3: Arrange 菜单与右键** 加 Group / Ungroup；`canPerformAction` 接上。`keyCommands` 加 `"g"` command 与 command+shift。
+- [x] **Step 3: Arrange 菜单与右键** 加 Group / Ungroup；`canPerformAction` 接上。`keyCommands` 加 `"g"` command 与 command+shift。
 
-- [ ] **Step 4: Update spec 状态为已实现（已验收前可写「已实现」）并勾选本 plan。**
+- [x] **Step 4: Update spec 状态为已实现（已验收前可写「已实现」）并勾选本 plan。**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift apps/MotionStudioApp/MotionStudioApp/App/AppDelegate.swift apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController.swift apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController+Commands.swift apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/TimelineSidebarView.swift docs/superpowers/specs/2026-08-19-layer-group-ungroup-design.md docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Add Group and Ungroup commands to the arrange menu."

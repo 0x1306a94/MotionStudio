@@ -290,6 +290,81 @@ extension EditorViewController {
         arrangeSelection(.sendToBack, actionName: "Send to Back")
     }
 
+    func canGroupSelection() -> Bool {
+        if isExportInProgress {
+            return false
+        }
+        let compositionID = document.core.firstCompositionID
+        let current = document.core.layerIDs(compositionID: compositionID)
+        var parentOf: [UInt64: UInt64] = [:]
+        for id in current {
+            parentOf[id] = document.core.layerParentID(id)
+        }
+        return TimelineLayerTree.canGroup(ids: editorState.selectedLayerIDs, parentOf: parentOf)
+    }
+
+    func canUngroupSelection() -> Bool {
+        if isExportInProgress {
+            return false
+        }
+        let compositionID = document.core.firstCompositionID
+        let current = document.core.layerIDs(compositionID: compositionID)
+        var types: [UInt64: MS_LAYER] = [:]
+        for id in current {
+            types[id] = document.core.layerType(id)
+        }
+        return TimelineLayerTree.canUngroup(ids: editorState.selectedLayerIDs, types: types)
+    }
+
+    @objc func groupSelectedLayers() {
+        guard canGroupSelection() else {
+            return
+        }
+        let compositionID = document.core.firstCompositionID
+        perform("Group") {
+            let newID = document.core.groupLayers(compositionID: compositionID,
+                                                  layerIDs: editorState.selectedLayerIDs)
+            if newID != 0 {
+                editorState.selectLayer(newID)
+            }
+        }
+    }
+
+    @objc func ungroupSelectedLayers() {
+        guard canUngroupSelection() else {
+            return
+        }
+        let compositionID = document.core.firstCompositionID
+        let current = document.core.layerIDs(compositionID: compositionID)
+        let selected = Set(editorState.selectedLayerIDs)
+        var types: [UInt64: MS_LAYER] = [:]
+        for id in selected {
+            types[id] = document.core.layerType(id)
+        }
+        var children: [UInt64] = []
+        for id in current {
+            let parent = document.core.layerParentID(id)
+            if selected.contains(parent), types[parent] == .GROUP {
+                children.append(id)
+            }
+        }
+        let frame = playheadClock.frame
+        perform("Ungroup") {
+            let ok = document.core.ungroupLayers(compositionID: compositionID,
+                                                 layerIDs: editorState.selectedLayerIDs,
+                                                 frame: frame)
+            if ok {
+                var remaining: [UInt64] = []
+                for id in children {
+                    if document.core.layerType(id) != .INVALID {
+                        remaining.append(id)
+                    }
+                }
+                editorState.selectedLayerIDs = remaining
+            }
+        }
+    }
+
     @objc func nudgeSelectionLeft() {
         nudgeSelection(dx: -1, dy: 0)
     }
