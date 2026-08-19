@@ -296,7 +296,7 @@ Expected: PASS
 
 ### Task 5: tgfx 适配器 dash + miter
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `adapter/tgfx/src/TgfxCanvasAdapter.cpp` `strokePath`
@@ -327,19 +327,19 @@ Center：`tgfxPaint.setStrokeMiter(options.miterLimit);`（若 tgfx API 名为 `
 `tgfx::Stroke(..., options.miterLimit)` 替换当前未传 miter 的构造。  
 Solid + 非空 dashes **不得**调用 `MakeDash`。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 对标 `StrokeTrimKeepsOnlyPartialSegment`：水平线 y=50、x=20..80，width=6，蓝笔，`strokeMode=Dashed`，`dashes={10,50}`（大 gap），`dashOffset=0`。期望 x=25 附近有蓝、x=50 附近为白背景（具体采样点实现时用 `ReadPixels` 微调，但必须一侧 stroke 色一侧背景）。  
 第二测：同样 dashes 但 `strokeMode=Solid` → 中点为蓝色（实线）。
 
-- [ ] **Step 2: 跑测失败**
+- [x] **Step 2: 跑测失败**
 
 Run: `./build/adapter/tgfx/tgfx_adapter_test --gtest_filter='TgfxRenderAdapterTest.StrokeDash*'`  
 Expected: Solid 测或可过；Dashed 测 FAIL（整段实线）
 
-- [ ] **Step 3: 实现 adapter + cache key**
+- [x] **Step 3: 实现 adapter + cache key**
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Expected: PASS（无 Metal 则 `GTEST_SKIP`）
 

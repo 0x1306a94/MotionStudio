@@ -1,10 +1,12 @@
 #include "TgfxPathCache.h"
 
 #include <cmath>
+#include <vector>
 
 #include <tgfx/core/PathEffect.h>
 #include <tgfx/core/Stroke.h>
 
+#include "MotionStudio/model/StrokeDash.h"
 #include "TgfxPathBuilder.h"
 #include "TgfxTypeConvert.h"
 
@@ -28,7 +30,8 @@ tgfx::Path ApplyTrimWindow(const tgfx::Path &path, const TrimWindow &window) {
 tgfx::Path BuildPositionedStrokeOutline(const tgfx::Path &strokeGeometry,
                                         const tgfx::Path &fullPath,
                                         const StrokeOptions &options) {
-    tgfx::Stroke stroke(options.width * 2, ToTgfxLineCap(options.cap), ToTgfxLineJoin(options.join));
+    tgfx::Stroke stroke(options.width * 2, ToTgfxLineCap(options.cap), ToTgfxLineJoin(options.join),
+                        options.miterLimit);
     tgfx::Path outline = strokeGeometry;
     if (!stroke.applyToPath(&outline)) {
         outline.reset();
@@ -53,6 +56,17 @@ tgfx::Path BuildMaskExpandedPath(const tgfx::Path &sourcePath, float expansion) 
         result.addPath(stroked, tgfx::PathOp::Difference);
     }
     return result;
+}
+
+uint64_t HashDashPattern(const StrokeOptions &options) {
+    uint64_t hash = static_cast<uint64_t>(options.strokeMode);
+    hash = MixHash(hash, FloatBits(options.dashOffset));
+    const std::vector<float> intervals = NormalizeDashArray(options.dashes);
+    hash = MixHash(hash, static_cast<uint64_t>(intervals.size()));
+    for (float value : intervals) {
+        hash = MixHash(hash, FloatBits(value));
+    }
+    return hash;
 }
 
 }  // namespace
@@ -87,6 +101,8 @@ bool TgfxPathCache::DerivedPathCacheKey::operator==(const DerivedPathCacheKey &o
         FloatBits(trimStart) == FloatBits(other.trimStart) &&
         FloatBits(trimEnd) == FloatBits(other.trimEnd) && position == other.position &&
         FloatBits(width) == FloatBits(other.width) && cap == other.cap && join == other.join &&
+        FloatBits(miterLimit) == FloatBits(other.miterLimit) && strokeMode == other.strokeMode &&
+        FloatBits(dashOffset) == FloatBits(other.dashOffset) && dashHash == other.dashHash &&
         FloatBits(expansion) == FloatBits(other.expansion);
 }
 
@@ -102,6 +118,10 @@ size_t TgfxPathCache::DerivedPathCacheKeyHash::operator()(const DerivedPathCache
     hash = MixHash(hash, FloatBits(key.width));
     hash = MixHash(hash, static_cast<uint64_t>(key.cap));
     hash = MixHash(hash, static_cast<uint64_t>(key.join));
+    hash = MixHash(hash, FloatBits(key.miterLimit));
+    hash = MixHash(hash, static_cast<uint64_t>(key.strokeMode));
+    hash = MixHash(hash, FloatBits(key.dashOffset));
+    hash = MixHash(hash, key.dashHash);
     hash = MixHash(hash, FloatBits(key.expansion));
     return static_cast<size_t>(hash);
 }
@@ -166,6 +186,10 @@ tgfx::Path TgfxPathCache::ResolvePositionedOutline(const ShapeGeometry &geometry
     key.width = options.width;
     key.cap = options.cap;
     key.join = options.join;
+    key.miterLimit = options.miterLimit;
+    key.strokeMode = options.strokeMode;
+    key.dashOffset = options.dashOffset;
+    key.dashHash = HashDashPattern(options);
     const auto found = derivedIndex_.find(key);
     if (found != derivedIndex_.end()) {
         derivedOrder_.splice(derivedOrder_.begin(), derivedOrder_, found->second);

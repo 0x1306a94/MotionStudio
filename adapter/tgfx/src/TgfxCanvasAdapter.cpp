@@ -6,6 +6,7 @@
 #include <optional>
 #include <sstream>
 #include <utility>
+#include <vector>
 
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/ColorFilter.h>
@@ -16,6 +17,7 @@
 #include <tgfx/core/MaskFilter.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Path.h>
+#include <tgfx/core/PathEffect.h>
 #include <tgfx/core/Rect.h>
 #include <tgfx/core/Shader.h>
 #include <tgfx/core/Stroke.h>
@@ -25,6 +27,7 @@
 #include <tgfx/gpu/Context.h>
 
 #include "MotionStudio/model/GradientType.h"
+#include "MotionStudio/model/StrokeDash.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/render/ImageScaleLayout.h"
 #include "MotionStudio/render/Paint.h"
@@ -736,6 +739,17 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
     if (strokeGeometry.isEmpty()) {
         return;
     }
+    if (NeedsDash(options.strokeMode, options.dashes)) {
+        const std::vector<float> intervals = NormalizeDashArray(options.dashes);
+        auto effect = tgfx::PathEffect::MakeDash(intervals.data(), static_cast<int>(intervals.size()),
+                                                 options.dashOffset, false);
+        if (effect != nullptr) {
+            effect->filterPath(&strokeGeometry);
+        }
+        if (strokeGeometry.isEmpty()) {
+            return;
+        }
+    }
     // Trim can collapse a non-zero source to a point; hairlines must still draw.
     const tgfx::Rect bounds = strokeGeometry.getBounds();
     if (bounds.width() <= 0.0f && bounds.height() <= 0.0f) {
@@ -764,6 +778,7 @@ void TgfxCanvasAdapter::strokePath(const ShapeGeometry &geometry, const Paint &p
         tgfxPaint.setStrokeWidth(options.width);
         tgfxPaint.setLineCap(ToTgfxLineCap(options.cap));
         tgfxPaint.setLineJoin(ToTgfxLineJoin(options.join));
+        tgfxPaint.setMiterLimit(options.miterLimit);
         canvas->drawPath(strokeGeometry, tgfxPaint);
         if (IsolationLayer *layer = TopIsolationLayer(isolationStack_)) {
             tgfx::Rect strokeBounds = bounds;

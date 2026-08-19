@@ -10,6 +10,7 @@
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "MotionStudio/render/StrokeOptions.h"
@@ -82,6 +83,10 @@ struct TgfxPathCache {
         float width = 0.0f;
         LineCap cap = LineCap::Butt;
         LineJoin join = LineJoin::Miter;
+        float miterLimit = 4.0f;
+        StrokeMode strokeMode = StrokeMode::Solid;
+        float dashOffset = 0.0f;
+        uint64_t dashHash = 0;
         // Meaningful when derivedKind == MaskExpanded.
         float expansion = 0.0f;
 

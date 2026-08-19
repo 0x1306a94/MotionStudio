@@ -17,6 +17,7 @@
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
 #include "MotionStudio/model/TextContent.h"
@@ -62,6 +63,7 @@ using motion::SceneEvaluator;
 using motion::SceneState;
 using motion::ShapeContent;
 using motion::ShapeRect;
+using motion::StrokeMode;
 using motion::StylePaintMode;
 using motion::TgfxRenderAdapter;
 using motion::TrackMatteType;
@@ -412,6 +414,74 @@ TEST(TgfxRenderAdapterTest, StrokeTrimKeepsOnlyPartialSegment) {
     const Pixel kept = PixelAt(pixels, 100, 65, 50);
     EXPECT_NEAR(kept.b, 255, 8);
     EXPECT_NEAR(kept.r, 0, 8);
+}
+
+TEST(TgfxRenderAdapterTest, StrokeDashLeavesGapOnLongInterval) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.isStroke = true;
+    BezierPath path = MakeSingleContour({{{20, 50}, {}, {}}, {{80, 50}, {}, {}}}, false);
+    item.geometry = MakePathGeometry(std::move(path));
+    item.paint = Paint{Color{0, 0, 1, 1}};
+    item.stroke.width = 6;
+    item.stroke.cap = LineCap::Butt;
+    item.stroke.strokeMode = StrokeMode::Dashed;
+    item.stroke.dashes = {10.0f, 50.0f};
+    item.stroke.dashOffset = 0.0f;
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel onDash = PixelAt(pixels, 100, 25, 50);
+    EXPECT_NEAR(onDash.b, 255, 8);
+    EXPECT_NEAR(onDash.r, 0, 8);
+    const Pixel inGap = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(inGap.r, 255, 8);
+    EXPECT_NEAR(inGap.b, 255, 8);
+}
+
+TEST(TgfxRenderAdapterTest, StrokeDashSolidIgnoresStoredPattern) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    SceneState state;
+    state.backgroundColor = Color{1, 1, 1, 1};
+    EvaluatedLayer layer;
+    EvaluatedShapeItem item;
+    item.isStroke = true;
+    BezierPath path = MakeSingleContour({{{20, 50}, {}, {}}, {{80, 50}, {}, {}}}, false);
+    item.geometry = MakePathGeometry(std::move(path));
+    item.paint = Paint{Color{0, 0, 1, 1}};
+    item.stroke.width = 6;
+    item.stroke.cap = LineCap::Butt;
+    item.stroke.strokeMode = StrokeMode::Solid;
+    item.stroke.dashes = {10.0f, 50.0f};
+    layer.shapeItems.push_back(item);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel mid = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(mid.b, 255, 8);
+    EXPECT_NEAR(mid.r, 0, 8);
 }
 
 TEST(TgfxRenderAdapterTest, StrokeEmptyTrimDrawsNothing) {
