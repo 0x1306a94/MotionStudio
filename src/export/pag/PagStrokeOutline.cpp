@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <memory>
+#include <vector>
 
 #include "MotionStudio/common/Time.h"
 #include "MotionStudio/common/VectorNetworkCompile.h"
@@ -9,6 +10,7 @@
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeType.h"
+#include "MotionStudio/model/StrokeDash.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "base/keyframes/SingleEaseKeyframe.h"
 
@@ -252,6 +254,7 @@ void CollectStrokeOutlineBakeTimes(const ShapeElement &geometry, const StrokeSty
     CollectAnimatableTimes(stroke.trimStart, times);
     CollectAnimatableTimes(stroke.trimEnd, times);
     CollectAnimatableTimes(stroke.trimOffset, times);
+    CollectAnimatableTimes(stroke.dashOffset, times);
     if (times->empty()) {
         times->insert(fallbackTime);
     }
@@ -274,9 +277,17 @@ pag::PathHandle BakePositionedStrokeOutline(const ShapeElement &geometry, const 
     const TrimWindow window =
         NormalizeTrimWindow(stroke.trimStart.evaluate(time), stroke.trimEnd.evaluate(time),
                             stroke.trimOffset.evaluate(time));
-    const tgfx::Path strokeGeometry =
+    tgfx::Path strokeGeometry =
         (window.end - window.start < 1.0f - 1e-6f) ? ApplyTrimWindow(strokeSource, window)
                                                    : strokeSource;
+    if (NeedsDash(stroke.strokeMode, stroke.dashes)) {
+        const std::vector<float> intervals = NormalizeDashArray(stroke.dashes);
+        auto effect = tgfx::PathEffect::MakeDash(intervals.data(), static_cast<int>(intervals.size()),
+                                                 stroke.dashOffset.evaluate(time), false);
+        if (effect != nullptr) {
+            effect->filterPath(&strokeGeometry);
+        }
+    }
     const float width = stroke.width.evaluate(time);
     const tgfx::Path outline =
         BuildPositionedOutline(strokeGeometry, fullPath, width, stroke.cap, stroke.join,

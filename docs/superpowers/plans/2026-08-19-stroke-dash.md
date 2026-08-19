@@ -347,7 +347,7 @@ Expected: PASS（无 Metal 则 `GTEST_SKIP`）
 
 ### Task 6: PAG 导出
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp`（`appendCenterStroke` 及平行层上的 `StrokeElement` / `GradientStrokeElement`）
@@ -367,18 +367,18 @@ void AssignPagDashes(pag::StrokeElement *pagStroke, const StrokeStyle &stroke,
 
 `GradientStrokeElement` 若同样有 `dashes`/`dashOffset` 字段则同样赋值；没有则只 Center 实色 Stroke 写 dash。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 导出一层 Center Dashed `{8,8}` 的 shape，decode 后 `StrokeElement::dashes.size()==2`。Solid 带非空 `dashes` 的文档 → PAG stroke `dashes.empty()`。
 
-- [ ] **Step 2: 跑测失败**
+- [x] **Step 2: 跑测失败**
 
 Run: `ctest --test-dir build -R PagExporter --output-on-failure` 或对应 gtest filter  
 Expected: FAIL
 
-- [ ] **Step 3: 实现导出 + bake dash**
+- [x] **Step 3: 实现导出 + bake dash**
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Expected: PASS
 

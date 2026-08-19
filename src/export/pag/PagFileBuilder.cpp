@@ -35,6 +35,7 @@
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/ShapeType.h"
+#include "MotionStudio/model/StrokeDash.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextAlign.h"
@@ -300,6 +301,24 @@ void Warn(std::vector<PagExportWarning> *warnings, EntityId entityId, const char
     warning.code = code;
     warning.message = message;
     warnings->push_back(std::move(warning));
+}
+
+template <typename PagStrokeT>
+void AssignPagDashes(PagStrokeT *pagStroke, const StrokeStyle &stroke,
+                     std::vector<PagExportWarning> *warnings, EntityId layerId) {
+    if (pagStroke == nullptr || !NeedsDash(stroke.strokeMode, stroke.dashes)) {
+        return;
+    }
+    std::vector<float> intervals = NormalizeDashArray(stroke.dashes);
+    if (intervals.size() > 6) {
+        Warn(warnings, layerId, "StrokeDashTruncated",
+             "Dash pattern truncated to 6 intervals for PAG export");
+        intervals.resize(6);
+    }
+    for (float value : intervals) {
+        pagStroke->dashes.push_back(new pag::Property<float>(value));
+    }
+    pagStroke->dashOffset = ConvertFloat(stroke.dashOffset, warnings, layerId);
 }
 
 bool ContainsPagLayer(const std::vector<pag::Layer *> &layers, const pag::Layer *target) {
@@ -2393,6 +2412,7 @@ Expected<pag::ShapeLayer *, PagExportError> PagFileBuilder::buildCenterTrimStrok
     pagStroke->lineCap = MapLineCap(stroke.cap);
     pagStroke->lineJoin = MapLineJoin(stroke.join);
     pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
+    AssignPagDashes(pagStroke, stroke, &warnings_, layer.id);
     group->elements.push_back(pagStroke);
 
     pagLayer->contents.push_back(group);
@@ -2522,6 +2542,7 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
             pagStroke->lineCap = MapLineCap(stroke.cap);
             pagStroke->lineJoin = MapLineJoin(stroke.join);
             pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
+            AssignPagDashes(pagStroke, stroke, &warnings_, layer.id);
             contents->push_back(pagStroke);
             return Expected<void, PagExportError>();
         }
@@ -2540,6 +2561,7 @@ Expected<void, PagExportError> PagFileBuilder::appendMainStyles(
         pagStroke->lineCap = MapLineCap(stroke.cap);
         pagStroke->lineJoin = MapLineJoin(stroke.join);
         pagStroke->miterLimit = new pag::Property<float>(stroke.miterLimit);
+        AssignPagDashes(pagStroke, stroke, &warnings_, layer.id);
         contents->push_back(pagStroke);
         return Expected<void, PagExportError>();
     };

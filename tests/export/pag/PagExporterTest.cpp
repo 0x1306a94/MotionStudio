@@ -31,6 +31,7 @@
 #include "MotionStudio/model/ShapeEllipse.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "MotionStudio/model/TextContent.h"
@@ -77,6 +78,7 @@ using motion::ShapeContent;
 using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
+using motion::StrokeMode;
 using motion::StrokePosition;
 using motion::StrokeStyle;
 using motion::StylePaintMode;
@@ -2321,6 +2323,72 @@ TEST(PagExporterTest, StrokePlusFillStaysShapeLayer) {
     ASSERT_NE(file, nullptr);
     auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
     EXPECT_EQ(vector->layers[0]->type(), pag::LayerType::Shape);
+}
+
+pag::StrokeElement *FindFirstPagStroke(pag::File *file) {
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    for (pag::Layer *layer : vector->layers) {
+        if (layer->type() != pag::LayerType::Shape) {
+            continue;
+        }
+        auto *shape = static_cast<pag::ShapeLayer *>(layer);
+        for (pag::ShapeElement *content : shape->contents) {
+            if (content->type() != pag::ShapeType::ShapeGroup) {
+                continue;
+            }
+            auto *group = static_cast<pag::ShapeGroupElement *>(content);
+            for (pag::ShapeElement *element : group->elements) {
+                if (element->type() == pag::ShapeType::Stroke) {
+                    return static_cast<pag::StrokeElement *>(element);
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
+TEST(PagExporterTest, CenterDashedStrokeExportsDashIntervals) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(Color{0, 0, 0, 1});
+    stroke->width.setStaticValue(2.0f);
+    stroke->strokeMode = StrokeMode::Dashed;
+    stroke->dashes = {8.0f, 8.0f};
+    layer->styles.push_back(std::move(stroke));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    pag::StrokeElement *pagStroke = FindFirstPagStroke(file.get());
+    ASSERT_NE(pagStroke, nullptr);
+    ASSERT_EQ(pagStroke->dashes.size(), 2u);
+    ASSERT_NE(pagStroke->dashes[0], nullptr);
+    EXPECT_FLOAT_EQ(pagStroke->dashes[0]->value, 8.0f);
+    ASSERT_NE(pagStroke->dashes[1], nullptr);
+    EXPECT_FLOAT_EQ(pagStroke->dashes[1]->value, 8.0f);
+}
+
+TEST(PagExporterTest, SolidStrokeOmitsStoredDashes) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+    Layer *layer = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{120, 80});
+    auto stroke = std::make_unique<StrokeStyle>();
+    stroke->color.setStaticValue(Color{0, 0, 0, 1});
+    stroke->width.setStaticValue(2.0f);
+    stroke->strokeMode = StrokeMode::Solid;
+    stroke->dashes = {8.0f, 8.0f};
+    layer->styles.push_back(std::move(stroke));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    pag::StrokeElement *pagStroke = FindFirstPagStroke(file.get());
+    ASSERT_NE(pagStroke, nullptr);
+    EXPECT_TRUE(pagStroke->dashes.empty());
 }
 
 TEST(PagExporterTest, AnimatedFillColorStaysShapeLayer) {
