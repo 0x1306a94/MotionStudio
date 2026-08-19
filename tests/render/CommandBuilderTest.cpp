@@ -400,6 +400,42 @@ TEST(CommandBuilderTest, ImageLayerEmitsDrawImage) {
     EXPECT_EQ(commands[5].type, DrawCommandType::Restore);
 }
 
+TEST(CommandBuilderTest, ImageCornerRadiusEmitsClipPathBeforeDrawImage) {
+    SceneState state;
+    EvaluatedLayer layer;
+    layer.opacity = 1.0f;
+    EvaluatedImageItem image;
+    image.absolutePath = "/tmp/project/assets/a.png";
+    image.containerSize = {200, 100};
+    image.intrinsicSize = {200, 100};
+    image.cornerRadius = 12.0f;
+    layer.imageItem = std::move(image);
+    layer.cornerRadius = 12.0f;
+    state.layers.push_back(std::move(layer));
+
+    auto commands = BuildCommands(state);
+    int clipIndex = -1;
+    int drawIndex = -1;
+    int beginLayerCount = 0;
+    for (size_t index = 0; index < commands.size(); ++index) {
+        if (commands[index].type == DrawCommandType::ClipPath) {
+            clipIndex = static_cast<int>(index);
+        }
+        if (commands[index].type == DrawCommandType::DrawImage) {
+            drawIndex = static_cast<int>(index);
+        }
+        if (commands[index].type == DrawCommandType::BeginLayer) {
+            ++beginLayerCount;
+        }
+    }
+    EXPECT_GE(clipIndex, 0);
+    EXPECT_GE(drawIndex, 0);
+    EXPECT_LT(clipIndex, drawIndex);
+    EXPECT_EQ(beginLayerCount, 0);
+    EXPECT_EQ(commands[static_cast<size_t>(clipIndex)].geometry.kind, ShapeGeometryKind::Rect);
+    EXPECT_FLOAT_EQ(commands[static_cast<size_t>(clipIndex)].geometry.cornerRadius, 12.0f);
+}
+
 TEST(CommandBuilderTest, ImageLayerWithoutPathSkipsDrawImage) {
     SceneState state;
     EvaluatedLayer layer;

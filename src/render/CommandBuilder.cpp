@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedTextItem.h"
@@ -58,6 +59,16 @@ void AppendShapeItems(const std::vector<EvaluatedShapeItem> &shapeItems, BlendMo
 void AppendImageItem(const std::optional<EvaluatedImageItem> &imageItem, DrawCommandList &commands) {
     if (!imageItem.has_value() || imageItem->absolutePath.empty()) {
         return;
+    }
+    const float radius = ClampCornerRadius(imageItem->cornerRadius, imageItem->containerSize);
+    if (radius > 0.0f) {
+        DrawCommand clip;
+        clip.type = DrawCommandType::ClipPath;
+        clip.geometry = MakeRectGeometry(
+            Vec2{imageItem->containerSize.x * 0.5f, imageItem->containerSize.y * 0.5f},
+            imageItem->containerSize, radius);
+        clip.fillRule = FillRule::NonZero;
+        commands.push_back(std::move(clip));
     }
     DrawCommand drawImage;
     drawImage.type = DrawCommandType::DrawImage;

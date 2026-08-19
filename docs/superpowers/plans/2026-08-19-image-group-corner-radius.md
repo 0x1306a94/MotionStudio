@@ -426,7 +426,7 @@ EOF
 
 ### Task 4: Image `ClipPath` before `DrawImage`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/render/CommandBuilder.cpp`
@@ -436,7 +436,7 @@ EOF
 - Consumes: `EvaluatedImageItem::cornerRadius`、`MakeRectGeometry`、`ClampCornerRadius`
 - Produces: `radius>0` 时 `ClipPath` 紧挨在 `DrawImage` 前；不因此多发 `BeginLayer`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```cpp
 TEST(CommandBuilderTest, ImageCornerRadiusEmitsClipPathBeforeDrawImage) {
@@ -482,7 +482,7 @@ TEST(CommandBuilderTest, ImageLayerEmitsDrawImage) {
 
 现有 `ImageLayerEmitsDrawImage` 不要改断言条数以外的语义；radius 0 仍无 `ClipPath`。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target core_tests
@@ -491,7 +491,7 @@ cmake --build build --target core_tests
 
 Expected: `clipIndex == -1`。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `AppendImageItem` 改为：
 
@@ -522,7 +522,7 @@ void AppendImageItem(const std::optional<EvaluatedImageItem> &imageItem, DrawCom
 
 `#include` 已有 `ShapeGeometry.h`。加 `FillRule.h` 若尚未包含。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='CommandBuilderTest.*'
@@ -530,7 +530,7 @@ void AppendImageItem(const std::optional<EvaluatedImageItem> &imageItem, DrawCom
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/render/CommandBuilder.cpp tests/render/CommandBuilderTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'
