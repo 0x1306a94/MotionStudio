@@ -12,7 +12,8 @@ import UniformTypeIdentifiers
 final class SvgImportCoordinator: NSObject {
     private weak var presenter: UIViewController?
     private let document: MotionProjectDocument
-    private let perform: (String, () -> Void) -> Void
+    // perform is NSObject reserve
+    private let performUndo: (String, () -> Void) -> Void
     var onImported: ((SvgImportOutcome) -> Void)?
     var onFailed: ((String) -> Void)?
 
@@ -22,7 +23,7 @@ final class SvgImportCoordinator: NSObject {
     {
         self.presenter = presenter
         self.document = document
-        self.perform = perform
+        performUndo = perform
     }
 
     func presentImport() {
@@ -51,10 +52,8 @@ final class SvgImportCoordinator: NSObject {
         let stem = url.deletingPathExtension().lastPathComponent
         let rootName = stem.isEmpty ? nil : stem
         do {
-            let outcome = try document.core.importSvg(compositionID: compositionID,
-                                                      data: data,
-                                                      rootName: rootName)
-            perform("Import SVG") {
+            let outcome = try document.core.importSvg(compositionID: compositionID, data: data, rootName: rootName)
+            performUndo("Import SVG") {
                 self.onImported?(outcome)
             }
         } catch let SvgImportError.failed(message) {
