@@ -205,6 +205,8 @@ final class EditorViewController: UIViewController {
              #selector(exportPAG),
              #selector(importSVG):
             !isExportInProgress
+        case #selector(pasteSVG):
+            !isExportInProgress && ClipboardSvg.containsSvg
         case #selector(requestCloseWindow),
              #selector(addRectangleLayer),
              #selector(addEllipseLayer),

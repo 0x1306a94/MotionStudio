@@ -2,7 +2,7 @@
 //  EditorViewController+SvgImport.swift
 //  MotionStudioApp
 //
-//  File → Import SVG… : document picker → insert into the current composition.
+//  File → Import SVG… / Paste SVG : insert into the current composition.
 //
 
 import UIKit
@@ -10,12 +10,26 @@ import UIKit
 @MainActor
 extension EditorViewController {
     @objc func importSVG() {
-        guard !isExportInProgress else {
+        guard beginSvgImport() else {
             return
+        }
+        svgImportCoordinator?.presentImport()
+    }
+
+    @objc func pasteSVG() {
+        guard beginSvgImport() else {
+            return
+        }
+        svgImportCoordinator?.pasteFromClipboard()
+    }
+
+    private func beginSvgImport() -> Bool {
+        guard !isExportInProgress else {
+            return false
         }
         if document.core.firstCompositionID == 0 {
             presentImportAlert(title: "Import Failed", message: "No composition to import into.")
-            return
+            return false
         }
         if svgImportCoordinator == nil {
             svgImportCoordinator = SvgImportCoordinator(
@@ -32,7 +46,7 @@ extension EditorViewController {
                 self?.presentImportAlert(title: "Import Failed", message: message)
             }
         }
-        svgImportCoordinator?.presentImport()
+        return true
     }
 
     private func finishSvgImport(_ outcome: SvgImportOutcome) {

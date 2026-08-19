@@ -37,6 +37,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                             action: #selector(EditorViewController.importSVG),
                                             input: "s",
                                             modifierFlags: [.command, .alternate])
+        let pasteSVGCommand = UICommand(title: "Paste SVG",
+                                        image: nil,
+                                        action: #selector(EditorViewController.pasteSVG))
         let exportMP4Command = UIKeyCommand(title: "Export MP4...",
                                             image: nil,
                                             action: #selector(EditorViewController.exportMP4),
@@ -49,7 +52,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                             modifierFlags: [.command, .alternate])
         let saveMenu = UIMenu(title: "",
                               options: .displayInline,
-                              children: [saveCommand, saveAsCommand, importSVGCommand, exportMP4Command, exportPAGCommand])
+                              children: [saveCommand, saveAsCommand, importSVGCommand, pasteSVGCommand, exportMP4Command, exportPAGCommand])
         builder.insertSibling(saveMenu, beforeMenu: .close)
 
         let closeCommand = UIKeyCommand(title: "Close",

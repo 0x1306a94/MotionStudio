@@ -39,6 +39,14 @@ final class SvgImportCoordinator: NSObject {
         presenter?.present(picker, animated: true)
     }
 
+    func pasteFromClipboard() {
+        guard let data = ClipboardSvg.data() else {
+            onFailed?("Clipboard does not contain SVG.")
+            return
+        }
+        importSvg(data: data, rootName: nil, undoName: "Paste SVG")
+    }
+
     private func importSvg(from url: URL) {
         let data: Data
         do {
@@ -47,13 +55,17 @@ final class SvgImportCoordinator: NSObject {
             onFailed?(error.localizedDescription)
             return
         }
-        document.syncProjectRoot()
-        let compositionID = document.core.firstCompositionID
         let stem = url.deletingPathExtension().lastPathComponent
         let rootName = stem.isEmpty ? nil : stem
+        importSvg(data: data, rootName: rootName, undoName: "Import SVG")
+    }
+
+    private func importSvg(data: Data, rootName: String?, undoName: String) {
+        document.syncProjectRoot()
+        let compositionID = document.core.firstCompositionID
         do {
             let outcome = try document.core.importSvg(compositionID: compositionID, data: data, rootName: rootName)
-            performUndo("Import SVG") {
+            performUndo(undoName) {
                 self.onImported?(outcome)
             }
         } catch let SvgImportError.failed(message) {
@@ -61,6 +73,58 @@ final class SvgImportCoordinator: NSObject {
         } catch {
             onFailed?(error.localizedDescription)
         }
+    }
+}
+
+enum ClipboardSvg {
+    static var containsSvg: Bool {
+        data() != nil
+    }
+
+    static func data() -> Data? {
+        let board = UIPasteboard.general
+        if let svgType = UTType(filenameExtension: "svg"),
+           let data = board.data(forPasteboardType: svgType.identifier),
+           looksLikeSvg(data)
+        {
+            return data
+        }
+        if let data = board.data(forPasteboardType: "public.svg-image"), looksLikeSvg(data) {
+            return data
+        }
+        if let data = board.data(forPasteboardType: "public.xml"), looksLikeSvg(data) {
+            return data
+        }
+        if let string = board.string, let data = string.data(using: .utf8), looksLikeSvg(data) {
+            return data
+        }
+        if let url = board.url, url.pathExtension.lowercased() == "svg" {
+            return try? Data(contentsOf: url)
+        }
+        return nil
+    }
+
+    static func looksLikeSvg(_ data: Data) -> Bool {
+        guard var text = String(data: data, encoding: .utf8) else {
+            return false
+        }
+        if text.hasPrefix("\u{FEFF}") {
+            text.removeFirst()
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        if lower.hasPrefix("<html") || lower.hasPrefix("<!doctype html") {
+            return false
+        }
+        guard let svgRange = lower.range(of: "<svg") else {
+            return false
+        }
+        let prefix = lower[..<svgRange.lowerBound]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if prefix.isEmpty {
+            return true
+        }
+        return prefix.hasPrefix("<?xml")
     }
 }
 
