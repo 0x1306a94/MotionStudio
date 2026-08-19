@@ -563,6 +563,52 @@ TEST(SceneEvaluatorTest, ResolvesTrackMatteAndMarksSource) {
     EXPECT_TRUE(source->usedAsMatteOnly);
 }
 
+TEST(SceneEvaluatorTest, GroupTrackMatteMarksDescendantsMatteOnly) {
+    RectScene scene;
+    Layer *group =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    group->outPoint = 100;
+    scene.layer->parentId = group->id;
+
+    Layer *target =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+    target->outPoint = 100;
+    auto *targetContent = static_cast<ShapeContent *>(target->content.get());
+    auto rectElement = std::make_unique<ShapeRect>();
+    rectElement->size.setStaticValue(Vec2{40, 20});
+    targetContent->geometry = std::move(rectElement);
+    auto fillElement = std::make_unique<FillStyle>();
+    fillElement->color.setStaticValue(Color{0, 0, 1, 1});
+    target->styles.push_back(std::move(fillElement));
+    target->trackMatteType = motion::TrackMatteType::Alpha;
+    target->trackMatteLayerId = group->id;
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+
+    const motion::EvaluatedLayer *groupEval = nullptr;
+    const motion::EvaluatedLayer *childEval = nullptr;
+    const motion::EvaluatedLayer *targetEval = nullptr;
+    for (const auto &layer : result->layers) {
+        if (layer.id == group->id) {
+            groupEval = &layer;
+        }
+        if (layer.id == scene.layer->id) {
+            childEval = &layer;
+        }
+        if (layer.id == target->id) {
+            targetEval = &layer;
+        }
+    }
+    ASSERT_NE(groupEval, nullptr);
+    ASSERT_NE(childEval, nullptr);
+    ASSERT_NE(targetEval, nullptr);
+    EXPECT_TRUE(groupEval->usedAsMatteOnly);
+    EXPECT_TRUE(childEval->usedAsMatteOnly);
+    EXPECT_FALSE(targetEval->usedAsMatteOnly);
+    EXPECT_EQ(targetEval->matteSourceId, group->id);
+}
+
 TEST(SceneEvaluatorTest, SelfTrackMatteIsIgnored) {
     RectScene scene;
     scene.layer->trackMatteType = motion::TrackMatteType::Luma;

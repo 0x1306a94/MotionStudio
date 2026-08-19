@@ -1,6 +1,7 @@
 #include "MotionStudio/render/CommandBuilder.h"
 
 #include <optional>
+#include <unordered_set>
 #include <utility>
 
 #include "MotionStudio/model/TrackMatteType.h"
@@ -103,6 +104,48 @@ const EvaluatedLayer *FindLayer(const SceneState &state, EntityId id) {
     return nullptr;
 }
 
+bool HasAncestor(const SceneState &state, EntityId layerId, EntityId ancestorId) {
+    const EvaluatedLayer *current = FindLayer(state, layerId);
+    std::unordered_set<EntityId> visiting;
+    while (current != nullptr && current->parentId.isValid()) {
+        if (current->parentId == ancestorId) {
+            return true;
+        }
+        if (!visiting.insert(current->parentId).second) {
+            return false;
+        }
+        current = FindLayer(state, current->parentId);
+    }
+    return false;
+}
+
+bool LayerHasDrawableContent(const EvaluatedLayer &layer) {
+    return !layer.shapeItems.empty() || layer.imageItem.has_value() || layer.textItem.has_value() ||
+        !layer.shapeNetwork.vertices.empty();
+}
+
+void AppendLayerAsMatte(const EvaluatedLayer &source, const Mat3 &inverseTarget, DrawCommandList &commands) {
+    if (!LayerHasDrawableContent(source)) {
+        return;
+    }
+    DrawCommand save;
+    save.type = DrawCommandType::Save;
+    commands.push_back(save);
+
+    DrawCommand relative;
+    relative.type = DrawCommandType::ConcatTransform;
+    relative.transform = inverseTarget * source.worldTransform;
+    commands.push_back(relative);
+
+    AppendShapeItems(source.shapeItems, source.blendMode, commands);
+    AppendImageItem(source.imageItem, commands);
+    AppendTextItem(source.textItem, commands);
+
+    DrawCommand restore;
+    restore.type = DrawCommandType::Restore;
+    commands.push_back(restore);
+}
+
 void AppendPathMasks(const std::vector<EvaluatedMask> &masks, DrawCommandList &commands) {
     DrawCommand beginMask;
     beginMask.type = DrawCommandType::BeginMask;
@@ -126,44 +169,26 @@ void AppendPathMasks(const std::vector<EvaluatedMask> &masks, DrawCommandList &c
     commands.push_back(endMask);
 }
 
-void AppendTrackMatte(const SceneState &state, const EvaluatedLayer &layer,
-                      DrawCommandList &commands) {
+void AppendTrackMatte(const SceneState &state, const EvaluatedLayer &layer, DrawCommandList &commands) {
     DrawCommand beginMask;
     beginMask.type = DrawCommandType::BeginMask;
     beginMask.maskApplyMode = ToMaskApplyMode(layer.trackMatteType);
     commands.push_back(beginMask);
 
     const EvaluatedLayer *source = FindLayer(state, layer.matteSourceId);
-    if (source != nullptr) {
-        Mat3 inverseTarget;
-        if (layer.worldTransform.tryInvert(inverseTarget)) {
-            DrawCommand save;
-            save.type = DrawCommandType::Save;
-            commands.push_back(save);
-
-            DrawCommand relative;
-            relative.type = DrawCommandType::ConcatTransform;
-            relative.transform = inverseTarget * source->worldTransform;
-            commands.push_back(relative);
-
-            AppendShapeItems(source->shapeItems, source->blendMode, commands);
-            AppendImageItem(source->imageItem, commands);
-            AppendTextItem(source->textItem, commands);
-
-            DrawCommand restore;
-            restore.type = DrawCommandType::Restore;
-            commands.push_back(restore);
+    Mat3 inverseTarget;
+    if (source != nullptr && layer.worldTransform.tryInvert(inverseTarget)) {
+        AppendLayerAsMatte(*source, inverseTarget, commands);
+        for (const EvaluatedLayer &candidate : state.layers) {
+            if (HasAncestor(state, candidate.id, source->id)) {
+                AppendLayerAsMatte(candidate, inverseTarget, commands);
+            }
         }
     }
 
     DrawCommand endMask;
     endMask.type = DrawCommandType::EndMask;
     commands.push_back(endMask);
-}
-
-bool LayerHasDrawableContent(const EvaluatedLayer &layer) {
-    return !layer.shapeItems.empty() || layer.imageItem.has_value() || layer.textItem.has_value() ||
-        !layer.shapeNetwork.vertices.empty();
 }
 
 }  // namespace

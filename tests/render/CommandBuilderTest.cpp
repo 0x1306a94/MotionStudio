@@ -331,6 +331,47 @@ TEST(CommandBuilderTest, TrackMatteReplaysImageSourceAsDrawImage) {
     EXPECT_TRUE(foundImageMatte);
 }
 
+TEST(CommandBuilderTest, TrackMatteReplaysGroupDescendants) {
+    SceneState state;
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    group.usedAsMatteOnly = true;
+    group.worldTransform = Mat3::Translate(Vec2{10, 0});
+
+    EvaluatedLayer child;
+    child.id = EntityId{2};
+    child.parentId = EntityId{1};
+    child.usedAsMatteOnly = true;
+    child.worldTransform = Mat3::Translate(Vec2{10, 0});
+    child.shapeItems.push_back(MakeFillItem());
+
+    EvaluatedLayer target;
+    target.id = EntityId{3};
+    target.worldTransform = Mat3::Translate(Vec2{30, 0});
+    target.shapeItems.push_back(MakeFillItem());
+    target.trackMatteType = TrackMatteType::Alpha;
+    target.matteSourceId = EntityId{1};
+
+    state.layers.push_back(std::move(group));
+    state.layers.push_back(std::move(child));
+    state.layers.push_back(std::move(target));
+
+    auto commands = BuildCommands(state);
+    bool foundDescendantMatte = false;
+    for (size_t i = 0; i + 3 < commands.size(); ++i) {
+        if (commands[i].type == DrawCommandType::BeginMask &&
+            commands[i].maskApplyMode == MaskApplyMode::AlphaMatte) {
+            EXPECT_EQ(commands[i + 1].type, DrawCommandType::Save);
+            EXPECT_EQ(commands[i + 2].type, DrawCommandType::ConcatTransform);
+            EXPECT_EQ(commands[i + 2].transform, Mat3::Translate(Vec2{-20, 0}));
+            EXPECT_EQ(commands[i + 3].type, DrawCommandType::DrawPath);
+            foundDescendantMatte = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundDescendantMatte);
+}
+
 TEST(CommandBuilderTest, ImageLayerEmitsDrawImage) {
     SceneState state;
     EvaluatedLayer layer;

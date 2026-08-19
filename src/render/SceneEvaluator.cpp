@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -533,18 +534,37 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
 }
 
 void MarkMatteSources(std::vector<EvaluatedLayer> &layers) {
-    std::vector<EntityId> matteSourceIds;
+    std::unordered_set<EntityId> matteSourceIds;
     for (const EvaluatedLayer &layer : layers) {
         if (layer.trackMatteType != TrackMatteType::None && layer.matteSourceId.isValid()) {
-            matteSourceIds.push_back(layer.matteSourceId);
+            matteSourceIds.insert(layer.matteSourceId);
         }
     }
+    if (matteSourceIds.empty()) {
+        return;
+    }
     for (EvaluatedLayer &layer : layers) {
-        for (const EntityId &sourceId : matteSourceIds) {
-            if (layer.id == sourceId) {
+        EntityId currentId = layer.id;
+        std::unordered_set<EntityId> visiting;
+        while (currentId.isValid()) {
+            if (matteSourceIds.find(currentId) != matteSourceIds.end()) {
                 layer.usedAsMatteOnly = true;
                 break;
             }
+            if (!visiting.insert(currentId).second) {
+                break;
+            }
+            const EvaluatedLayer *current = nullptr;
+            for (const EvaluatedLayer &candidate : layers) {
+                if (candidate.id == currentId) {
+                    current = &candidate;
+                    break;
+                }
+            }
+            if (current == nullptr || !current->parentId.isValid()) {
+                break;
+            }
+            currentId = current->parentId;
         }
     }
 }
