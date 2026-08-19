@@ -190,7 +190,7 @@ Expected: PASS
 
 ### Task 3: Undo 命令
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `include/MotionStudio/undo/CommandKind.h` 在 `SetStrokePosition` 后追加：
@@ -205,7 +205,7 @@ Expected: PASS
   - `SetStrokeDashPatternCommand(EntityId, int, std::vector<float>)`：Dashed 且归一后为空则 execute no-op；可 merge
   - `SetStrokeCapCommand` / `SetStrokeJoinCommand` / `SetStrokeMiterLimitCommand`：与 Position 同形，可 merge
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SetStrokeModeCommandTest, SeedsDefaultDashesWhenEmpty) {
@@ -245,16 +245,16 @@ TEST(SetStrokeCapCommandTest, SetAndUndo) {
 
 另写 `SetStrokeJoinCommand` / `SetStrokeMiterLimitCommand` / `SetStrokeDashPatternCommand` 的 SetAndUndo + merge 测（Dashed 下设 `{0,0}` 保持原数组）。`RectScene` 若已有 Fill 在 `[0]`，stroke 索引用 `styles.size()-1` 或与 `SetStrokePositionCommandTest` 相同 fixture。
 
-- [ ] **Step 2: 跑测失败**
+- [x] **Step 2: 跑测失败**
 
 Run: `./build/tests/core_tests --gtest_filter='SetStroke*CommandTest.*'`  
 Expected: FAIL
 
-- [ ] **Step 3: 实现五个 Command**
+- [x] **Step 3: 实现五个 Command**
 
 `SetStrokeModeCommand` 私有：`strokeMode_`、`oldStrokeMode_`、`oldDashes_`、`didSeedDashes_`。execute 首次记下旧 mode/dashes；若新 mode 为 Dashed 且归一空则 seed。undo 恢复两者。merge 只吸收新 mode（已 seed 则不再改 oldDashes）。
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Expected: PASS
 

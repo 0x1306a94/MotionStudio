@@ -43,6 +43,11 @@
 #include "MotionStudio/undo/SetParentCommand.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
+#include "MotionStudio/undo/SetStrokeCapCommand.h"
+#include "MotionStudio/undo/SetStrokeDashPatternCommand.h"
+#include "MotionStudio/undo/SetStrokeJoinCommand.h"
+#include "MotionStudio/undo/SetStrokeMiterLimitCommand.h"
+#include "MotionStudio/undo/SetStrokeModeCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
 #include "MotionStudio/undo/SetStyleBlendModeCommand.h"
 #include "MotionStudio/undo/SetTextPathCommand.h"
@@ -71,6 +76,8 @@ using motion::Keyframe;
 using motion::KeyframeData;
 using motion::Layer;
 using motion::LayerType;
+using motion::LineCap;
+using motion::LineJoin;
 using motion::MakeSingleContour;
 using motion::Mask;
 using motion::MaskMode;
@@ -97,6 +104,11 @@ using motion::SetMaskModeCommand;
 using motion::SetParentCommand;
 using motion::SetSpatialTangentsCommand;
 using motion::SetStaticValueCommand;
+using motion::SetStrokeCapCommand;
+using motion::SetStrokeDashPatternCommand;
+using motion::SetStrokeJoinCommand;
+using motion::SetStrokeMiterLimitCommand;
+using motion::SetStrokeModeCommand;
 using motion::SetStrokePositionCommand;
 using motion::SetStyleBlendModeCommand;
 using motion::SetTextPathCommand;
@@ -106,6 +118,7 @@ using motion::ShapeEllipse;
 using motion::ShapePath;
 using motion::ShapeRect;
 using motion::ShapeType;
+using motion::StrokeMode;
 using motion::StrokeStyle;
 using motion::TextContent;
 using motion::TrackMatteType;
@@ -785,6 +798,99 @@ TEST(SetStrokePositionCommandTest, ExecuteSkipsMissingLayer) {
     scene.execute<SetStrokePositionCommand>(EntityId{999}, 0, motion::StrokePosition::Inside);
     scene.undo.undo(scene.document);
     EXPECT_TRUE(scene.layer->styles.empty());
+}
+
+TEST(SetStrokeModeCommandTest, SeedsDefaultDashesWhenEmpty) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<StrokeStyle>());
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokeModeCommand>(scene.layer->id, 0, StrokeMode::Dashed);
+    EXPECT_EQ(stroke->strokeMode, StrokeMode::Dashed);
+    ASSERT_EQ(stroke->dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(stroke->dashes[0], 8.0f);
+    EXPECT_FLOAT_EQ(stroke->dashes[1], 8.0f);
+
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(stroke->strokeMode, StrokeMode::Solid);
+    EXPECT_TRUE(stroke->dashes.empty());
+}
+
+TEST(SetStrokeModeCommandTest, SolidKeepsDashes) {
+    Scene scene;
+    auto style = std::make_unique<StrokeStyle>();
+    style->strokeMode = StrokeMode::Dashed;
+    style->dashes = {2.0f, 4.0f};
+    scene.layer->styles.push_back(std::move(style));
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokeModeCommand>(scene.layer->id, 0, StrokeMode::Solid);
+    EXPECT_EQ(stroke->strokeMode, StrokeMode::Solid);
+    ASSERT_EQ(stroke->dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(stroke->dashes[0], 2.0f);
+}
+
+TEST(SetStrokeCapCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<StrokeStyle>());
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokeCapCommand>(scene.layer->id, 0, LineCap::Round);
+    EXPECT_EQ(stroke->cap, LineCap::Round);
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(stroke->cap, LineCap::Butt);
+}
+
+TEST(SetStrokeJoinCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<StrokeStyle>());
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokeJoinCommand>(scene.layer->id, 0, LineJoin::Bevel);
+    EXPECT_EQ(stroke->join, LineJoin::Bevel);
+    scene.undo.undo(scene.document);
+    EXPECT_EQ(stroke->join, LineJoin::Miter);
+}
+
+TEST(SetStrokeMiterLimitCommandTest, SetAndUndo) {
+    Scene scene;
+    scene.layer->styles.push_back(std::make_unique<StrokeStyle>());
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    scene.execute<SetStrokeMiterLimitCommand>(scene.layer->id, 0, 12.0f);
+    EXPECT_FLOAT_EQ(stroke->miterLimit, 12.0f);
+    scene.undo.undo(scene.document);
+    EXPECT_FLOAT_EQ(stroke->miterLimit, 4.0f);
+}
+
+TEST(SetStrokeDashPatternCommandTest, RejectsInvalidWhenDashed) {
+    Scene scene;
+    auto style = std::make_unique<StrokeStyle>();
+    style->strokeMode = StrokeMode::Dashed;
+    style->dashes = {8.0f, 8.0f};
+    scene.layer->styles.push_back(std::move(style));
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    std::vector<float> invalid = {0.0f, 0.0f};
+    scene.execute<SetStrokeDashPatternCommand>(scene.layer->id, 0, invalid);
+    ASSERT_EQ(stroke->dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(stroke->dashes[0], 8.0f);
+}
+
+TEST(SetStrokeDashPatternCommandTest, SetAndUndo) {
+    Scene scene;
+    auto style = std::make_unique<StrokeStyle>();
+    style->strokeMode = StrokeMode::Dashed;
+    style->dashes = {8.0f, 8.0f};
+    scene.layer->styles.push_back(std::move(style));
+    auto *stroke = static_cast<StrokeStyle *>(scene.layer->styles[0].get());
+
+    std::vector<float> pattern = {2.0f, 4.0f};
+    scene.execute<SetStrokeDashPatternCommand>(scene.layer->id, 0, pattern);
+    ASSERT_EQ(stroke->dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(stroke->dashes[0], 2.0f);
+    scene.undo.undo(scene.document);
+    EXPECT_FLOAT_EQ(stroke->dashes[0], 8.0f);
 }
 
 namespace {
