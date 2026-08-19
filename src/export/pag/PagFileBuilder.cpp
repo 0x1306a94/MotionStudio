@@ -1156,6 +1156,148 @@ pag::VectorComposition *PagFileBuilder::wrapGroupWithCornerClip(pag::VectorCompo
     return inner;
 }
 
+void PagFileBuilder::applyGroupTrackMatteSourceWrap(pag::VectorComposition *host,
+                                                    const Composition &composition) {
+    if (host == nullptr) {
+        return;
+    }
+    std::unordered_set<uint64_t> matteSourceIds;
+    for (const auto &layerPtr : composition.layers) {
+        if (layerPtr == nullptr || layerPtr->trackMatteType == TrackMatteType::None ||
+            !layerPtr->trackMatteLayerId.isValid()) {
+            continue;
+        }
+        matteSourceIds.insert(layerPtr->trackMatteLayerId.value);
+    }
+    for (uint64_t sourceId : matteSourceIds) {
+        const Layer *source = nullptr;
+        for (const auto &layerPtr : composition.layers) {
+            if (layerPtr != nullptr && layerPtr->id.value == sourceId) {
+                source = layerPtr.get();
+                break;
+            }
+        }
+        if (source == nullptr || source->type() != LayerType::Group) {
+            continue;
+        }
+        auto pagIt = layerByEntity_.find(sourceId);
+        if (pagIt == layerByEntity_.end() || !ContainsPagLayer(host->layers, pagIt->second)) {
+            // Already nested (e.g. corner-radius Precomp) or skipped.
+            continue;
+        }
+        std::unordered_set<uint64_t> subtree;
+        subtree.insert(source->id.value);
+        collectDescendants(source->id, &subtree);
+        if (subtree.size() <= 1) {
+            // Lone NullLayer: isActive=false is enough; nothing to hide as a sibling.
+            continue;
+        }
+        Warn(&warnings_, source->id, "GroupTrackMatteSourceWrapped",
+             "Group track-matte source wrapped in export-only Precomp so descendants are sampled "
+             "as matte and not drawn as normal layers");
+        wrapGroupAsTrackMatteSource(host, *source);
+    }
+}
+
+pag::VectorComposition *PagFileBuilder::wrapGroupAsTrackMatteSource(pag::VectorComposition *host,
+                                                                    const Layer &group) {
+    auto pagIt = layerByEntity_.find(group.id.value);
+    if (host == nullptr || pagIt == layerByEntity_.end()) {
+        return nullptr;
+    }
+    pag::Layer *groupPag = pagIt->second;
+
+    std::unordered_set<uint64_t> subtree;
+    subtree.insert(group.id.value);
+    collectDescendants(group.id, &subtree);
+
+    std::unordered_set<pag::Layer *> toMove;
+    for (uint64_t entityId : subtree) {
+        auto layerIt = layerByEntity_.find(entityId);
+        if (layerIt != layerByEntity_.end()) {
+            toMove.insert(layerIt->second);
+        }
+        auto siblingIt = strokeSiblingsByEntity_.find(entityId);
+        if (siblingIt != strokeSiblingsByEntity_.end()) {
+            for (pag::Layer *sibling : siblingIt->second) {
+                toMove.insert(sibling);
+            }
+        }
+    }
+
+    std::vector<pag::Layer *> original = host->layers;
+    std::vector<pag::Layer *> moved;
+    moved.reserve(original.size());
+    for (pag::Layer *layer : original) {
+        if (toMove.count(layer) != 0) {
+            moved.push_back(layer);
+        }
+    }
+    if (moved.size() < 2) {
+        return nullptr;
+    }
+
+    auto *inner = new pag::VectorComposition();
+    inner->id = nextCompositionId_++;
+    inner->width = host->width;
+    inner->height = host->height;
+    inner->duration = host->duration;
+    inner->frameRate = host->frameRate;
+    inner->backgroundColor = ToPagColor(Color{0, 0, 0, 0});
+    for (pag::Layer *layer : moved) {
+        layer->containingComposition = inner;
+    }
+    inner->layers = std::move(moved);
+
+    auto *wrap = new pag::PreComposeLayer();
+    wrap->id = nextLayerId_++;
+    wrap->name = groupPag->name;
+    wrap->startTime = groupPag->startTime;
+    wrap->duration = groupPag->duration;
+    wrap->stretch = groupPag->stretch;
+    wrap->isActive = groupPag->isActive;
+    wrap->blendMode = groupPag->blendMode;
+    wrap->parent = groupPag->parent;
+    wrap->trackMatteType = groupPag->trackMatteType;
+    wrap->trackMatteLayer = groupPag->trackMatteLayer;
+    wrap->transform = groupPag->transform;
+    wrap->effects = groupPag->effects;
+    wrap->layerStyles = groupPag->layerStyles;
+    wrap->masks = groupPag->masks;
+    wrap->composition = inner;
+    wrap->compositionStartTime = 0;
+    wrap->containingComposition = host;
+
+    groupPag->parent = nullptr;
+    groupPag->trackMatteType = pag::TrackMatteType::None;
+    groupPag->trackMatteLayer = nullptr;
+    groupPag->transform = MakeIdentityTransform();
+    groupPag->effects.clear();
+    groupPag->layerStyles.clear();
+    groupPag->masks.clear();
+
+    std::vector<pag::Layer *> rebuilt;
+    rebuilt.reserve(original.size());
+    for (pag::Layer *layer : original) {
+        if (layer == groupPag) {
+            rebuilt.push_back(wrap);
+            continue;
+        }
+        if (toMove.count(layer) != 0) {
+            continue;
+        }
+        if (layer->trackMatteLayer == groupPag) {
+            layer->trackMatteLayer = wrap;
+        }
+        rebuilt.push_back(layer);
+    }
+    host->layers = std::move(rebuilt);
+    layerByEntity_[group.id.value] = wrap;
+
+    nestedCompositions_.push_back(inner);
+    return inner;
+}
+
 void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Layer &layer,
                                             const ImageContent &content, int intrinsicWidth,
                                             int intrinsicHeight) {
@@ -1513,6 +1655,15 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
 
     pagComposition->layers = std::move(contentLayers);
     applyGroupCornerRadiusClip(pagComposition, composition);
+    // After corner-radius Precomp wraps: Group matte sources with descendants still need a
+    // Precomp so children are not left drawable on the host (see applyGroupTrackMatteSourceWrap).
+    applyGroupTrackMatteSourceWrap(pagComposition, composition);
+    for (pag::Layer *pagLayer : pagComposition->layers) {
+        if (pagLayer->trackMatteLayer != nullptr &&
+            pagLayer->trackMatteType != pag::TrackMatteType::None) {
+            pagLayer->trackMatteLayer->isActive = false;
+        }
+    }
 
     // Many PAG viewers ignore Composition.backgroundColor and only draw layers; always emit a
     // bottom backdrop so the MS composition background is visible.

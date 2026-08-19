@@ -1063,6 +1063,80 @@ TEST(PagExporterTest, TrackMatteExports) {
     EXPECT_EQ(vector->layers.back()->name, "CompositionBackground");
 }
 
+// Group matte sources keep children as siblings in the same PAG composition. Only setting the
+// NullLayer inactive leaves Path/Image children drawing as a silhouette, while matte sampling
+// of the empty NullLayer hides the target. Wrap the Group subtree into an export-only Precomp.
+TEST(PagExporterTest, GroupTrackMatteSourceWrappedInPrecomp) {
+    Document document = MakeEmptyDoc(400, 300, 30);
+    Composition *composition = Primary(document);
+
+    auto matteGroup = std::make_unique<Layer>(LayerType::Group);
+    matteGroup->name = "MatteGroup";
+    matteGroup->inPoint = 0;
+    matteGroup->outPoint = composition->duration;
+    Layer *matteGroupLayer = document.addLayer(composition->id, std::move(matteGroup));
+
+    Layer *matteChild = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{80, 80});
+    matteChild->name = "MatteChild";
+    ASSERT_TRUE(matteChild->setParent(matteGroupLayer->id, document));
+
+    Layer *target = AddShapeRect(document, composition, Vec2{10, 10}, Vec2{80, 80});
+    target->name = "Target";
+    target->trackMatteType = TrackMatteType::Alpha;
+    target->trackMatteLayerId = matteGroupLayer->id;
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    bool warned = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "GroupTrackMatteSourceWrapped") {
+            warned = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(warned);
+
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_GE(vector->layers.size(), 3u);
+
+    pag::Layer *matteLayer = nullptr;
+    pag::Layer *targetLayer = nullptr;
+    for (pag::Layer *layer : vector->layers) {
+        if (layer->name == "Target") {
+            targetLayer = layer;
+        }
+        if (layer->name == "MatteGroup") {
+            matteLayer = layer;
+        }
+    }
+    ASSERT_NE(targetLayer, nullptr);
+    ASSERT_NE(matteLayer, nullptr);
+    EXPECT_EQ(targetLayer->trackMatteType, pag::TrackMatteType::Alpha);
+    EXPECT_EQ(targetLayer->trackMatteLayer, matteLayer);
+    ASSERT_EQ(matteLayer->type(), pag::LayerType::PreCompose);
+    EXPECT_FALSE(matteLayer->isActive);
+
+    // Matte child must not remain a drawable sibling on the host composition.
+    for (pag::Layer *layer : vector->layers) {
+        EXPECT_NE(layer->name, "MatteChild");
+    }
+
+    auto *mattePrecomp = static_cast<pag::PreComposeLayer *>(matteLayer);
+    ASSERT_NE(mattePrecomp->composition, nullptr);
+    ASSERT_EQ(mattePrecomp->composition->type(), pag::CompositionType::Vector);
+    auto *inner = static_cast<pag::VectorComposition *>(mattePrecomp->composition);
+    bool foundChild = false;
+    for (pag::Layer *innerLayer : inner->layers) {
+        if (innerLayer->name == "MatteChild") {
+            foundChild = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundChild);
+}
+
 TEST(PagExporterTest, TrackMatteWrapsMultipleTrimStrokesInPrecomp) {
     // PAG decode only binds track matte to layers[index-1]. Multiple trim-stroke siblings
     // cannot all share one matte — wrap them in an export-only Precomp so the host alone

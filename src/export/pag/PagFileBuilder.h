@@ -94,6 +94,13 @@ class PagFileBuilder {
     void applyGroupCornerRadiusClip(pag::VectorComposition *host, const Composition &composition);
     pag::VectorComposition *wrapGroupWithCornerClip(pag::VectorComposition *host, const Layer &group,
                                                     Vec2 minPoint, Vec2 maxPoint, float radius);
+    // Group track-matte sources keep children as siblings in the host composition. Wrap the
+    // subtree into an export-only Precomp so isActive=false hides descendants and matte
+    // sampling draws the whole group (matches MS usedAsMatteOnly + descendant replay).
+    void applyGroupTrackMatteSourceWrap(pag::VectorComposition *host,
+                                        const Composition &composition);
+    pag::VectorComposition *wrapGroupAsTrackMatteSource(pag::VectorComposition *host,
+                                                        const Layer &group);
     void applyImageContainerFit(pag::ImageLayer *pagLayer, const Layer &layer,
                                 const ImageContent &content, int intrinsicWidth,
                                 int intrinsicHeight);
@@ -127,8 +134,8 @@ class PagFileBuilder {
     std::unordered_map<uint64_t, pag::ImageBytes *> imageBytesByAsset_;
     std::vector<pag::ImageBytes *> imageBytesList_;
     std::vector<pag::Composition *> bitmapCompositions_;
-    // Inner comps from corner-radius clip or stroke-sibling track-matte wrap; owned until
-    // VerifyAndMake.
+    // Inner comps from corner-radius clip, group track-matte source wrap, or stroke-sibling
+    // track-matte wrap; owned until VerifyAndMake.
     std::vector<pag::Composition *> nestedCompositions_;
     const Composition *currentHostComposition_ = nullptr;
     pag::ID nextLayerId_ = 1;

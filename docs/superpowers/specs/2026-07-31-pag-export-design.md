@@ -527,6 +527,7 @@ Encode(file)
 | `StrokePositionBaked` | Inside/Outside 已导出为平行 outline ShapeLayer |
 | `StrokePositionBakeFailed` | 轮廓烘焙失败，该描边省略 |
 | `StrokeSiblingsWrappedForTrackMatte` | 同一 Shape 拆出多平行层且带 TrackMatte → 包进 export-only Precomp，宿主独占 matte 邻接 |
+| `GroupTrackMatteSourceWrapped` | Group 作 Track Matte 源且有子孙 → 包进 export-only Precomp，避免子孙当普通层画出、并让 matte 采样整组 |
 | `StrokeTrimSeparated` | 带 Trim 的 Center Stroke 已拆到平行层，避免裁切 Fill |
 | `SpatialEasingApproximated` | 空间缓动被采样近似 |
 | `TextFeatureApproximated` | 文本特性部分丢失但仍矢量 |
@@ -582,7 +583,8 @@ Encode(file)
 
 2. **Track Matte**  
    - Decode 时 `InstallReferences` 把有 matte 的层的源**强制绑成** `layers[index - 1]`（只认邻接，不认任意指针）。导出后须把 matte 源排在目标层正上方。  
-   - AE exporter：`trackMatteLayer->isActive = false`。PAG 渲染跳过 `!isActive` 层，仅经 `trackMatteLayer` 采样。若源层仍 `isActive=true`，会当普通层画出（例如白色 silhouette 盖住蓝色 Luma 结果）。对齐 MS `usedAsMatteOnly`。  
+   - AE exporter：`trackMatteLayer->isActive = false`。PAG 渲染跳过 `!isActive` 层，仅经 `trackMatteLayer` 采样。若源层仍 `isActive=true`，会当普通层画出（例如白色 silhouette 盖住蓝色 Luma 结果）。对齐 MS `usedAsMatteOnly`。
+   - **Group 作 matte 源**：MS 会把源 Group **及子孙**标 `usedAsMatteOnly`，采样时回放子孙。PAG 的 Group 是 `NullLayer`，子孙与 NullLayer **同级**写在 `layers[]`；只把 NullLayer `isActive=false` 时子孙仍上屏，且 matte 采样空 NullLayer 会裁掉目标。导出把源 Group 子树包进 **export-only Precomp**（宿主 `isActive=false`，内层保留空间 transform）。在圆角 Precomp 包装之后执行；若源已因圆角进嵌套合成则跳过。warning：`GroupTrackMatteSourceWrapped`。
    - **多平行 stroke 层**：同一 MS Shape 因 Trim / Inside/Outside 拆成 ≥2 个 PAG 层时，不能让每个 sibling 都挂同一 matte（重排后只有一层邻接正确）。导出在 `buildShapeLayers` 末尾包 **export-only Precomp**：宿主 `PreComposeLayer` 承担 trackMatte（及 opacity/timing/masks/blend/parent；空间 transform 为单位）；内部层**保留空间 transform**、无 matte（嵌套合成 `clip(0,0,w,h)`，负局部坐标依赖层 position）。触发条件：`layers.size()>1` 且 MS 层有有效 track matte。warning：`StrokeSiblingsWrappedForTrackMatte`。
 
 3. **合成背景色**  
@@ -626,6 +628,7 @@ Encode(file)
 | Image 容器 ≠ 源尺寸 + LetterBox | `ImageBytes` 仍为源尺寸；transform.scale 含容器 fit |
 | Mask Add/Sub/Intersect | masks 非空且 mode 正确 |
 | TrackMatte | 类型/邻接正确；**matte 源 `isActive == false`** |
+| Group 作 Track Matte 源（含子孙） | 根合成 matte 为 `PreComposeLayer` 且 `isActive=false`；子孙不在宿主 `layers[]`；`GroupTrackMatteSourceWrapped` |
 | Precomp 嵌套 | PreComposeLayer 指向子 VectorComposition；时长关系正确 |
 | Group 父子 | NullLayer + child.parent；PAG 顶→底序 |
 | 空合成 / 任意合成 | 含 `CompositionBackground`；`backgroundColor` 字段与色块一致 |
