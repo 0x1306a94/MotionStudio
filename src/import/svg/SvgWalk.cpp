@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <unordered_map>
 #include <vector>
 
 #include "MotionStudio/model/ImageContent.h"
@@ -23,8 +24,10 @@
 #include "tgfx/svg/node/SVGEllipse.h"
 #include "tgfx/svg/node/SVGImage.h"
 #include "tgfx/svg/node/SVGLine.h"
+#include "tgfx/svg/node/SVGMask.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/node/SVGPath.h"
+#include "tgfx/svg/node/SVGPattern.h"
 #include "tgfx/svg/node/SVGPoly.h"
 #include "tgfx/svg/node/SVGRect.h"
 #include "tgfx/svg/node/SVGTransformableNode.h"
@@ -335,6 +338,7 @@ struct WalkContext {
     tgfx::SVGLengthContext lengthContext = tgfx::SVGLengthContext(tgfx::Size::Make(0.f, 0.f));
     const tgfx::SVGIDMapper *mapper = nullptr;
     std::vector<std::string> useStack = {};
+    std::unordered_map<std::string, EntityId> imageAssetByHref = {};
 };
 
 void NetworkAabb(const VectorNetwork &network, Vec2 &minOut, Vec2 &sizeOut) {
@@ -443,14 +447,46 @@ std::string HexEntityId(EntityId id) {
 }
 
 void ApplySkippedEffects(const tgfx::SVGNode &node, WalkContext &ctx) {
-    const auto &mask = node.getMask();
-    if (mask.isValue() && mask->type() == tgfx::SVGFuncIRI::Type::IRI) {
-        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
-    }
     const auto &filter = node.getFilter();
     if (filter.isValue() && filter->type() == tgfx::SVGFuncIRI::Type::IRI) {
         AddDiagnostic(*ctx.tree, "filter.skipped", "filter is not imported", LayerName(node));
     }
+}
+
+const tgfx::SVGNode *CollectSingleShape(const tgfx::SVGContainer &container) {
+    const tgfx::SVGNode *shape = nullptr;
+    size_t shapeCount = 0;
+    for (const auto &child : container.getChildren()) {
+        if (!child) {
+            continue;
+        }
+        if (child->tag() == tgfx::SVGTag::Use || child->tag() == tgfx::SVGTag::G ||
+            child->tag() == tgfx::SVGTag::Svg) {
+            return nullptr;
+        }
+        if (IsShapeTag(child->tag())) {
+            shape = child.get();
+            shapeCount += 1;
+        }
+    }
+    if (shapeCount != 1) {
+        return nullptr;
+    }
+    return shape;
+}
+
+bool AppendShapeMask(Layer &layer, const tgfx::SVGNode &shape, WalkContext &ctx) {
+    bool usedConic = false;
+    const VectorNetwork network =
+        PathToVectorNetwork(ShapePathFromNode(shape, ctx.lengthContext), &usedConic);
+    if (!NetworkHasArea(network)) {
+        return false;
+    }
+    Mask mask = {};
+    mask.path.setStaticValue(network);
+    mask.mode = MaskMode::Add;
+    layer.masks.push_back(mask);
+    return true;
 }
 
 void ApplyClipPath(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
@@ -470,45 +506,290 @@ void ApplyClipPath(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
         return;
     }
     const auto &clipPath = static_cast<const tgfx::SVGClipPath &>(*it->second);
-    const tgfx::SVGNode *shape = nullptr;
-    size_t shapeCount = 0;
-    bool unsupported = false;
-    for (const auto &child : clipPath.getChildren()) {
-        if (!child) {
-            continue;
-        }
-        if (child->tag() == tgfx::SVGTag::Use || child->tag() == tgfx::SVGTag::G ||
-            child->tag() == tgfx::SVGTag::Svg) {
-            unsupported = true;
-            break;
-        }
-        if (IsShapeTag(child->tag())) {
-            shape = child.get();
-            shapeCount += 1;
-        }
-    }
-    if (unsupported || shapeCount != 1 || shape == nullptr) {
+    const tgfx::SVGNode *shape = CollectSingleShape(clipPath);
+    if (shape == nullptr || !AppendShapeMask(layer, *shape, ctx)) {
         AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
                       LayerName(node));
+    }
+}
+
+void ApplyMask(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
+    const auto &mask = node.getMask();
+    if (!mask.isValue() || mask->type() != tgfx::SVGFuncIRI::Type::IRI) {
         return;
     }
-    bool usedConic = false;
-    const VectorNetwork network =
-        PathToVectorNetwork(ShapePathFromNode(*shape, ctx.lengthContext), &usedConic);
-    if (!NetworkHasArea(network)) {
-        AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
-                      LayerName(node));
+    if (ctx.mapper == nullptr) {
+        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
         return;
     }
-    Mask mask = {};
-    mask.path.setStaticValue(network);
-    mask.mode = MaskMode::Add;
-    layer.masks.push_back(mask);
+    const auto it = ctx.mapper->find(LocalIriId(mask->iri()));
+    if (it == ctx.mapper->end() || !it->second || it->second->tag() != tgfx::SVGTag::Mask) {
+        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
+        return;
+    }
+    const auto &svgMask = static_cast<const tgfx::SVGMask &>(*it->second);
+    if (svgMask.getMaskContentUnits().type() !=
+        tgfx::SVGObjectBoundingBoxUnits::Type::UserSpaceOnUse) {
+        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
+        return;
+    }
+    const tgfx::SVGNode *shape = CollectSingleShape(svgMask);
+    if (shape == nullptr || !AppendShapeMask(layer, *shape, ctx)) {
+        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
+    }
 }
 
 void ApplyNodeEffects(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
     ApplyClipPath(layer, node, ctx);
+    ApplyMask(layer, node, ctx);
     ApplySkippedEffects(node, ctx);
+}
+
+bool EnsureImageAsset(const tgfx::SVGIRI &href, const std::string &name, WalkContext &ctx,
+                      EntityId *assetId) {
+    if (assetId == nullptr || href.type() != tgfx::SVGIRI::Type::DataURI) {
+        return false;
+    }
+    const auto cached = ctx.imageAssetByHref.find(href.iri());
+    if (cached != ctx.imageAssetByHref.end()) {
+        *assetId = cached->second;
+        return true;
+    }
+    const tgfx::SVGImage::ImageInfo loaded =
+        tgfx::SVGImage::LoadImage(href, tgfx::Rect::MakeWH(1.f, 1.f));
+    if (!loaded.image) {
+        return false;
+    }
+    std::vector<uint8_t> bytes;
+    if (!DecodeDataUriBytes(href.iri(), bytes)) {
+        return false;
+    }
+    Asset asset = {};
+    asset.type = AssetType::Image;
+    asset.name = name;
+    asset.width = loaded.image->width();
+    asset.height = loaded.image->height();
+    asset.path = "assets/" + HexEntityId(asset.id) + ".png";
+    EmbeddedImage embedded = {};
+    embedded.assetId = asset.id;
+    embedded.suggestedFileName = asset.path;
+    embedded.bytes = std::move(bytes);
+    *assetId = asset.id;
+    ctx.imageAssetByHref[href.iri()] = asset.id;
+    ctx.tree->assets.push_back(asset);
+    ctx.tree->embeddedImages.push_back(std::move(embedded));
+    return true;
+}
+
+tgfx::Matrix NodeTransformMatrix(const tgfx::SVGNode &node) {
+    const tgfx::SVGTag tag = node.tag();
+    switch (tag) {
+        case tgfx::SVGTag::Path:
+        case tgfx::SVGTag::Rect:
+        case tgfx::SVGTag::Circle:
+        case tgfx::SVGTag::Ellipse:
+        case tgfx::SVGTag::Line:
+        case tgfx::SVGTag::Polygon:
+        case tgfx::SVGTag::Polyline:
+        case tgfx::SVGTag::G:
+        case tgfx::SVGTag::Svg:
+        case tgfx::SVGTag::Image:
+        case tgfx::SVGTag::Use:
+        case tgfx::SVGTag::Text: {
+            return static_cast<const tgfx::SVGTransformableNode &>(node).getTransform();
+        }
+        default: {
+            tgfx::Matrix identity;
+            identity.setIdentity();
+            return identity;
+        }
+    }
+}
+
+bool PatternTileCoversBox(const tgfx::SVGPattern &pattern, Vec2 boundsSize,
+                          const tgfx::SVGLengthContext &userContext) {
+    const bool objectBox =
+        pattern.getPatternUnits().type() == tgfx::SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox;
+    const tgfx::SVGLengthContext boxContext(tgfx::Size::Make(1.f, 1.f));
+    const tgfx::SVGLengthContext &context = objectBox ? boxContext : userContext;
+    float width = objectBox ? 1.f : boundsSize.x;
+    float height = objectBox ? 1.f : boundsSize.y;
+    if (pattern.getWidth().has_value()) {
+        width = context.resolve(*pattern.getWidth(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    }
+    if (pattern.getHeight().has_value()) {
+        height = context.resolve(*pattern.getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
+    }
+    if (objectBox) {
+        return width >= 0.999f && height >= 0.999f;
+    }
+    return width + 1e-3f >= boundsSize.x && height + 1e-3f >= boundsSize.y;
+}
+
+const tgfx::SVGImage *ResolvePatternImage(const tgfx::SVGPattern &pattern, WalkContext &ctx,
+                                          const tgfx::SVGUse **useOut) {
+    if (useOut != nullptr) {
+        *useOut = nullptr;
+    }
+    const tgfx::SVGNode *found = nullptr;
+    size_t count = 0;
+    for (const auto &child : pattern.getChildren()) {
+        if (!child) {
+            continue;
+        }
+        if (child->tag() == tgfx::SVGTag::Image) {
+            found = child.get();
+            count += 1;
+            continue;
+        }
+        if (child->tag() == tgfx::SVGTag::Use) {
+            if (ctx.mapper == nullptr) {
+                return nullptr;
+            }
+            const auto &use = static_cast<const tgfx::SVGUse &>(*child);
+            const auto mapped = ctx.mapper->find(LocalIriId(use.getHref()));
+            if (mapped == ctx.mapper->end() || !mapped->second ||
+                mapped->second->tag() != tgfx::SVGTag::Image) {
+                return nullptr;
+            }
+            found = mapped->second.get();
+            if (useOut != nullptr) {
+                *useOut = &use;
+            }
+            count += 1;
+            continue;
+        }
+        return nullptr;
+    }
+    if (count != 1 || found == nullptr) {
+        return nullptr;
+    }
+    return static_cast<const tgfx::SVGImage *>(found);
+}
+
+tgfx::Matrix PatternImageUserMatrix(const tgfx::SVGPattern &pattern, const tgfx::SVGUse *use,
+                                    const tgfx::SVGImage &image, Vec2 boundsMin, Vec2 boundsSize,
+                                    const tgfx::SVGLengthContext &userContext) {
+    const bool objectContent = pattern.getContentUnits().type() ==
+        tgfx::SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox;
+    const tgfx::SVGLengthContext boxContext(tgfx::Size::Make(1.f, 1.f));
+    const tgfx::SVGLengthContext &contentContext = objectContent ? boxContext : userContext;
+    tgfx::Matrix matrix = image.getTransform();
+    const float imageX =
+        contentContext.resolve(image.getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float imageY =
+        contentContext.resolve(image.getY(), tgfx::SVGLengthContext::LengthType::Vertical);
+    tgfx::Matrix imageOffset = tgfx::Matrix::MakeTrans(imageX, imageY);
+    imageOffset.preConcat(matrix);
+    matrix = imageOffset;
+    if (use != nullptr) {
+        const float useX =
+            contentContext.resolve(use->getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
+        const float useY =
+            contentContext.resolve(use->getY(), tgfx::SVGLengthContext::LengthType::Vertical);
+        tgfx::Matrix useMatrix = tgfx::Matrix::MakeTrans(useX, useY);
+        useMatrix.preConcat(use->getTransform());
+        useMatrix.preConcat(matrix);
+        matrix = useMatrix;
+    }
+    if (objectContent) {
+        tgfx::Matrix box = tgfx::Matrix::MakeTrans(boundsMin.x, boundsMin.y);
+        box.preScale(boundsSize.x, boundsSize.y);
+        box.preConcat(matrix);
+        matrix = box;
+    }
+    if (pattern.getPatternTransform().has_value()) {
+        tgfx::Matrix patternTransform = *pattern.getPatternTransform();
+        patternTransform.preConcat(matrix);
+        matrix = patternTransform;
+    }
+    return matrix;
+}
+
+bool TryImportPatternFill(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
+                          const ComputedStyle &style, const VectorNetwork &network) {
+    if (style.fillIri.empty() || ctx.mapper == nullptr) {
+        return false;
+    }
+    const auto mapped = ctx.mapper->find(style.fillIri);
+    if (mapped == ctx.mapper->end() || !mapped->second ||
+        mapped->second->tag() != tgfx::SVGTag::Pattern) {
+        return false;
+    }
+    const auto &pattern = static_cast<const tgfx::SVGPattern &>(*mapped->second);
+    Vec2 boundsMin = {};
+    Vec2 boundsSize = {};
+    NetworkAabb(network, boundsMin, boundsSize);
+    if (boundsSize.x <= 1e-6f || boundsSize.y <= 1e-6f) {
+        return false;
+    }
+    if (!PatternTileCoversBox(pattern, boundsSize, ctx.lengthContext)) {
+        return false;
+    }
+    const tgfx::SVGUse *use = nullptr;
+    const tgfx::SVGImage *image = ResolvePatternImage(pattern, ctx, &use);
+    if (image == nullptr) {
+        return false;
+    }
+    const tgfx::SVGIRI &href = image->getHref();
+    if (href.type() != tgfx::SVGIRI::Type::DataURI) {
+        return false;
+    }
+    const bool objectContent = pattern.getContentUnits().type() ==
+        tgfx::SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox;
+    const tgfx::SVGLengthContext boxContext(tgfx::Size::Make(1.f, 1.f));
+    const tgfx::SVGLengthContext &contentContext = objectContent ? boxContext : ctx.lengthContext;
+    const float imageWidth =
+        contentContext.resolve(image->getWidth(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float imageHeight =
+        contentContext.resolve(image->getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
+    if (imageWidth <= 0.f || imageHeight <= 0.f) {
+        return false;
+    }
+    EntityId assetId{};
+    if (!EnsureImageAsset(href, LayerName(node), ctx, &assetId)) {
+        AddDiagnostic(*ctx.tree, "image.decode", "data URI image could not be decoded",
+                      LayerName(node));
+        return false;
+    }
+    tgfx::Matrix patternUser =
+        PatternImageUserMatrix(pattern, use, *image, boundsMin, boundsSize, ctx.lengthContext);
+    tgfx::Matrix inverse = {};
+    if (!patternUser.invert(&inverse)) {
+        return false;
+    }
+    tgfx::Path clipPath = ShapePathFromNode(node, ctx.lengthContext);
+    clipPath.transform(inverse);
+    bool usedConic = false;
+    const VectorNetwork maskNetwork = PathToVectorNetwork(clipPath, &usedConic);
+
+    auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->name = LayerName(node);
+    layer->parentId = parentId;
+    layer->visible = style.visible;
+    auto *content = static_cast<ImageContent *>(layer->content.get());
+    content->assetId = assetId;
+    content->size.setStaticValue({imageWidth, imageHeight});
+    if (image->getPreserveAspectRatio().align == tgfx::SVGPreserveAspectRatio::Align::None) {
+        content->scaleMode = ImageScaleMode::Stretch;
+    } else {
+        content->scaleMode = ImageScaleMode::LetterBox;
+    }
+    tgfx::Matrix layerMatrix = NodeTransformMatrix(node);
+    layerMatrix.preConcat(patternUser);
+    ApplySvgMatrixToLayer(*layer, layerMatrix);
+    ApplyNodeOpacity(*layer, node);
+    const float opacity = layer->transform.opacity.staticValue();
+    layer->transform.opacity.setStaticValue(opacity * style.fillOpacity);
+    if (NetworkHasArea(maskNetwork)) {
+        Mask mask = {};
+        mask.path.setStaticValue(maskNetwork);
+        mask.mode = MaskMode::Add;
+        layer->masks.push_back(mask);
+    }
+    ApplyNodeEffects(*layer, node, ctx);
+    ctx.tree->layers.push_back(std::move(layer));
+    return true;
 }
 
 void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
@@ -520,10 +801,18 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ct
         AddDiagnostic(*ctx.tree, "shape.empty", "empty shape skipped", LayerName(node));
         return;
     }
+    ComputedStyle remaining = style;
+    if (TryImportPatternFill(node, parentId, ctx, style, network)) {
+        remaining.hasFill = false;
+        remaining.fillIri.clear();
+        if (!remaining.hasStroke) {
+            return;
+        }
+    }
     auto layer = std::make_unique<Layer>(LayerType::Shape);
     layer->name = LayerName(node);
     layer->parentId = parentId;
-    layer->visible = style.visible;
+    layer->visible = remaining.visible;
     auto *content = static_cast<ShapeContent *>(layer->content.get());
     auto geometry = std::make_unique<ShapePath>();
     geometry->path.setStaticValue(network);
@@ -531,7 +820,7 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ct
     Vec2 boundsMin = {};
     Vec2 boundsSize = {};
     NetworkAabb(network, boundsMin, boundsSize);
-    ApplyPaintStyles(*layer, style, ctx.mapper, boundsMin, boundsSize, &ctx.tree->diagnostics);
+    ApplyPaintStyles(*layer, remaining, ctx.mapper, boundsMin, boundsSize, &ctx.tree->diagnostics);
     ApplyNodeTransform(*layer, node);
     ApplyNodeEffects(*layer, node, ctx);
     ctx.tree->layers.push_back(std::move(layer));
@@ -597,36 +886,18 @@ void WalkImage(const tgfx::SVGImage &image, EntityId parentId, WalkContext &ctx,
         ctx.lengthContext.resolve(image.getWidth(), tgfx::SVGLengthContext::LengthType::Horizontal);
     const float height =
         ctx.lengthContext.resolve(image.getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
-    const tgfx::SVGImage::ImageInfo loaded =
-        tgfx::SVGImage::LoadImage(href, tgfx::Rect::MakeWH(width, height));
-    if (!loaded.image) {
+    EntityId assetId{};
+    if (!EnsureImageAsset(href, LayerName(image), ctx, &assetId)) {
         AddDiagnostic(*ctx.tree, "image.decode", "data URI image could not be decoded",
                       LayerName(image));
         return;
     }
-    std::vector<uint8_t> bytes;
-    if (!DecodeDataUriBytes(href.iri(), bytes)) {
-        AddDiagnostic(*ctx.tree, "image.decode", "data URI image could not be decoded",
-                      LayerName(image));
-        return;
-    }
-    Asset asset = {};
-    asset.type = AssetType::Image;
-    asset.name = LayerName(image);
-    asset.width = loaded.image->width();
-    asset.height = loaded.image->height();
-    asset.path = "assets/" + HexEntityId(asset.id) + ".png";
-    EmbeddedImage embedded = {};
-    embedded.assetId = asset.id;
-    embedded.suggestedFileName = asset.path;
-    embedded.bytes = std::move(bytes);
-
     auto layer = std::make_unique<Layer>(LayerType::Image);
     layer->name = LayerName(image);
     layer->parentId = parentId;
     layer->visible = style.visible;
     auto *content = static_cast<ImageContent *>(layer->content.get());
-    content->assetId = asset.id;
+    content->assetId = assetId;
     content->size.setStaticValue({width, height});
     if (image.getPreserveAspectRatio().align == tgfx::SVGPreserveAspectRatio::Align::None) {
         content->scaleMode = ImageScaleMode::Stretch;
@@ -642,8 +913,6 @@ void WalkImage(const tgfx::SVGImage &image, EntityId parentId, WalkContext &ctx,
     ApplySvgMatrixToLayer(*layer, matrix);
     ApplyNodeOpacity(*layer, image);
     ApplyNodeEffects(*layer, image, ctx);
-    ctx.tree->assets.push_back(asset);
-    ctx.tree->embeddedImages.push_back(std::move(embedded));
     ctx.tree->layers.push_back(std::move(layer));
 }
 

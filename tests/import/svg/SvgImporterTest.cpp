@@ -7,6 +7,7 @@
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/LayerType.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/StrokeMode.h"
@@ -366,6 +367,85 @@ TEST(SvgImporterTest, ExternalImageIsSkipped) {
     EXPECT_TRUE(found);
 }
 
+constexpr const char *kOnePixelPng =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+bool HasDiagnostic(const motion::svg::SvgLayerTree &tree, const std::string &code) {
+    for (const auto &diagnostic : tree.diagnostics) {
+        if (diagnostic.code == code) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const motion::Layer *FindLayerByType(const motion::svg::SvgLayerTree &tree, motion::LayerType type) {
+    for (const auto &layer : tree.layers) {
+        if (layer->type() == type) {
+            return layer.get();
+        }
+    }
+    return nullptr;
+}
+
+TEST(SvgImporterTest, PatternImageFillCreatesImageLayer) {
+    const std::string svg =
+        std::string("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\">"
+                    "<defs><pattern id=\"p\" patternContentUnits=\"objectBoundingBox\" "
+                    "width=\"1\" height=\"1\">"
+                    "<image href=\"data:image/png;base64,") +
+        kOnePixelPng +
+        "\" width=\"1\" height=\"1\"/>"
+        "</pattern></defs>"
+        "<rect id=\"photo\" x=\"0\" y=\"0\" width=\"20\" height=\"10\" fill=\"url(#p)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *image = FindLayerByType(result.value(), motion::LayerType::Image);
+    ASSERT_NE(image, nullptr);
+    EXPECT_EQ(image->name, "photo");
+    EXPECT_FALSE(result.value().assets.empty());
+    EXPECT_FALSE(result.value().embeddedImages.empty());
+    EXPECT_FALSE(HasDiagnostic(result.value(), "paint.unresolved"));
+}
+
+TEST(SvgImporterTest, PatternUseImageFillCreatesImageLayer) {
+    const std::string svg =
+        std::string("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+                    "width=\"20\" height=\"10\">"
+                    "<defs>"
+                    "<pattern id=\"p\" patternContentUnits=\"objectBoundingBox\" width=\"1\" height=\"1\">"
+                    "<use xlink:href=\"#img\"/>"
+                    "</pattern>"
+                    "<image id=\"img\" width=\"1\" height=\"1\" xlink:href=\"data:image/png;base64,") +
+        kOnePixelPng +
+        "\"/>"
+        "</defs>"
+        "<rect width=\"20\" height=\"10\" fill=\"url(#p)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_NE(FindLayerByType(result.value(), motion::LayerType::Image), nullptr);
+    EXPECT_FALSE(HasDiagnostic(result.value(), "paint.unresolved"));
+}
+
+TEST(SvgImporterTest, TiledPatternFillStaysUnresolved) {
+    const std::string svg =
+        std::string("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\">"
+                    "<defs><pattern id=\"p\" patternContentUnits=\"objectBoundingBox\" "
+                    "width=\"0.5\" height=\"1\">"
+                    "<image href=\"data:image/png;base64,") +
+        kOnePixelPng +
+        "\" width=\"1\" height=\"1\"/>"
+        "</pattern></defs>"
+        "<rect width=\"20\" height=\"10\" fill=\"url(#p)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(FindLayerByType(result.value(), motion::LayerType::Image), nullptr);
+    EXPECT_TRUE(HasDiagnostic(result.value(), "paint.unresolved"));
+}
+
 TEST(SvgImporterTest, SimpleClipPathBecomesMask) {
     const std::string svg =
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
@@ -377,7 +457,7 @@ TEST(SvgImporterTest, SimpleClipPathBecomesMask) {
     EXPECT_EQ(result.value().layers.back()->masks.size(), 1u);
 }
 
-TEST(SvgImporterTest, MaskAttributeIsSkipped) {
+TEST(SvgImporterTest, MaskAttributeBecomesMask) {
     const std::string svg =
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
         "<defs><mask id=\"m\"><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#fff\"/></mask></defs>"
@@ -385,13 +465,43 @@ TEST(SvgImporterTest, MaskAttributeIsSkipped) {
         "</svg>";
     const auto result = BuildSvgLayers(svg.data(), svg.size());
     ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().layers.back()->masks.size(), 1u);
+    EXPECT_FALSE(HasDiagnostic(result.value(), "mask.skipped"));
+}
+
+TEST(SvgImporterTest, ComplexMaskAttributeIsSkipped) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><mask id=\"m\">"
+        "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#fff\"/>"
+        "<rect x=\"5\" y=\"5\" width=\"10\" height=\"10\" fill=\"#fff\"/>"
+        "</mask></defs>"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"20\" fill=\"#000\" mask=\"url(#m)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_TRUE(HasDiagnostic(result.value(), "mask.skipped"));
+    EXPECT_TRUE(result.value().layers.back()->masks.empty());
+}
+
+TEST(SvgImporterTest, MaskOnGroupBecomesMask) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><mask id=\"m\" maskUnits=\"userSpaceOnUse\">"
+        "<path d=\"M0 0H20V20H0Z\" fill=\"#fff\"/>"
+        "</mask></defs>"
+        "<g mask=\"url(#m)\"><rect width=\"20\" height=\"20\" fill=\"#000\"/></g>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
     bool found = false;
-    for (const auto &d : result.value().diagnostics) {
-        if (d.code == "mask.skipped") {
+    for (const auto &layer : result.value().layers) {
+        if (layer->type() == motion::LayerType::Group && layer->masks.size() == 1u) {
             found = true;
         }
     }
     EXPECT_TRUE(found);
+    EXPECT_FALSE(HasDiagnostic(result.value(), "mask.skipped"));
 }
 
 TEST(SvgImporterTest, FilterAttributeIsSkipped) {
