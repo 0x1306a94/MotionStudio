@@ -1,4 +1,4 @@
-# 图层编组 / 解组 + 时间轴父子缩进 — 设计说明
+# 图层编组 / 解组 + Layer 树父子缩进 — 设计说明
 
 日期：2026-08-19  
 状态：已确认，可进入实现计划  
@@ -8,7 +8,7 @@
 
 1. 把选中图层包进 `LayerType::Group`（编组），或拆掉选中的 Group（解组），画面在操作当下尽量不跳。
 2. 一次操作一条 undo。
-3. 时间轴 Layer 列按 `parentId` 缩进，父子关系可见。
+3. 底部时间轴**左侧 Layer 树**按 `parentId` 缩进，父子关系可见。右侧关键帧轨道不缩进。
 
 对标 Figma Group / Ungroup，不是预合成。模型沿用已有扁平 `Composition.layers` + `parentId`。
 
@@ -23,13 +23,13 @@
 | Group transform | 新建为单位矩阵（position 0、anchor 0、scale 1、rotation 0、opacity 1） |
 | 解组 bake | 当前帧；只改子层**无关键帧**的 position / rotation / scale；有关键帧的属性不改空间 |
 | 默认名 | `"Group"`（重名允许） |
-| 时间轴 | 按 `parentId` 深度缩进；**不做**折叠；拖拽/排列不改 `parentId` |
-| 入口 | Arrange 菜单 + 时间轴右键；`⌘G` / `⇧⌘G` |
+| Layer 树 | 底部时间轴左侧图层列表按 `parentId` 深度缩进；**不做**折叠；拖拽/排列不改 `parentId` |
+| 入口 | Arrange 菜单 + Layer 树右键；`⌘G` / `⇧⌘G` |
 
 ## 非目标
 
 - 预合成的创建 / 解组 / Pre-compose
-- 时间轴折叠 / 展开
+- Layer 树折叠 / 展开
 - 拖到某层上改 parent（drop-to-parent）
 - 单独的 Parent 拾取器（不新建 Group）
 - 把子层关键帧乘上 Group 矩阵
@@ -70,7 +70,7 @@ topIndex = ids 在 layers[] 里的最大下标（最前）
 undo 名 "Group"
 ```
 
-Group 下标高于其子层 → 时间轴 `.reversed()` 后 Group 在子层之上，缩进后看起来像树。
+Group 下标高于其子层 → Layer 树 `.reversed()` 后 Group 在子层之上，缩进后看起来像树。
 
 `setParent` 失败（环、悬空）则整条命令不执行。
 
@@ -160,7 +160,9 @@ Swift：`MotionDocumentCore.groupLayers` / `ungroupLayers`；成功后改选中�
 
 ---
 
-## §5 时间轴缩进
+## §5 底部时间轴左侧 Layer 树缩进
+
+只改左侧图层列表（`TimelineSidebarView`），不改右侧轨道条的 x 布局。行仍与右侧按 index 对齐。
 
 列表仍按图层数组倒序（顶 = 画面最前），**不**按树 DFS 重排。编组后的连续块（§1）让 Group 紧挨子层。
 
@@ -194,7 +196,7 @@ SVG 导入的 Group 树同样缩进，无需另做。
 | 位置 | Group | Ungroup |
 |---|---|---|
 | Arrange 菜单（`AppDelegate.buildMenu`） | Group `⌘G` | Ungroup `⇧⌘G` |
-| 时间轴 Layer 行右键 | 同上 | 同上 |
+| Layer 树行右键 | 同上 | 同上 |
 | `canPerformAction` | 去子孙后 ≥1 且同父 | 选中含 Group |
 
 导出进行中时与其它编辑命令一样禁用。
@@ -219,7 +221,7 @@ App：`TimelineReorder` 子孙扩展；缩进量随 depth。
 
 ## 验收
 
-1. 选两层 `⌘G`：时间轴出现缩进的 Group 树；画布位置不变；一次 Undo 还原。
+1. 选两层 `⌘G`：左侧 Layer 树出现缩进的 Group；画布位置不变；一次 Undo 还原。
 2. 选 Group `⇧⌘G`：子层回到原层级；若 Group 被移动过，静态子层留在世界位置。
 3. SVG 导入的嵌套 Group 自动缩进。
 4. 拖 Group 整棵子树一起走；只拖子层不改 parent。
