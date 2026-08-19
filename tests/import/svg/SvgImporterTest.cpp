@@ -1,12 +1,16 @@
+#include <memory>
 #include <string>
 
 #include <gtest/gtest.h>
 
 #include "MotionStudio/import/svg/SvgImporter.h"
+#include "MotionStudio/model/Composition.h"
+#include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/undo/UndoManager.h"
 #include "SvgPathConvert.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -161,4 +165,47 @@ TEST(SvgImporterTest, ViewBoxDoesNotResizeCallerComposition) {
     EXPECT_EQ(result.value().sourceHeight, 50);
     const motion::Vec2 scale = result.value().layers[0]->transform.scale.staticValue();
     EXPECT_GT(scale.x, 0.f);
+}
+
+TEST(SvgImporterTest, ImportIntoExistingCompositionIsUndoable) {
+    motion::Document document;
+    auto composition = std::make_unique<motion::Composition>();
+    composition->width = 640;
+    composition->height = 480;
+    composition->duration = 90;
+    composition->frameRate = {30, 1};
+    const motion::EntityId compositionId = composition->id;
+    document.addComposition(std::move(composition));
+
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"80\" height=\"40\">"
+        "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#000000\"/>"
+        "</svg>";
+    motion::UndoManager undo;
+    const auto imported = motion::svg::ImportSvgInto(document, undo, compositionId, svg.data(),
+                                                     svg.size());
+    ASSERT_TRUE(imported.hasValue());
+    motion::Composition *host = document.entityIndex().findComposition(compositionId);
+    ASSERT_NE(host, nullptr);
+    EXPECT_EQ(host->width, 640);
+    EXPECT_EQ(host->height, 480);
+    EXPECT_EQ(host->duration, 90);
+    EXPECT_GE(host->layers.size(), 2u);
+    EXPECT_EQ(host->layers.back()->outPoint, 90);
+    EXPECT_EQ(imported.value().rootLayerId, host->layers[host->layers.size() - 2]->id);
+
+    undo.undo(document);
+    EXPECT_TRUE(host->layers.empty());
+    EXPECT_EQ(host->width, 640);
+}
+
+TEST(SvgImporterTest, MissingCompositionFailsWithoutMutation) {
+    motion::Document document;
+    motion::UndoManager undo;
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"></svg>";
+    const auto imported =
+        motion::svg::ImportSvgInto(document, undo, motion::EntityId{}, svg.data(), svg.size());
+    ASSERT_FALSE(imported.hasValue());
+    EXPECT_TRUE(document.compositions.empty());
 }

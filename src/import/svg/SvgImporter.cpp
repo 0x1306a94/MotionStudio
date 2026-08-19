@@ -3,9 +3,26 @@
 #include <fstream>
 #include <iterator>
 
+#include "MotionStudio/model/Composition.h"
+#include "MotionStudio/undo/AddLayerCommand.h"
+#include "MotionStudio/undo/CompositeCommand.h"
+#include "MotionStudio/undo/ImportImageAssetCommand.h"
 #include "SvgParse.h"
 #include "SvgTransform.h"
 #include "SvgWalk.h"
+
+namespace {
+
+bool ReadFileContents(const std::string &path, std::string &out) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        return false;
+    }
+    out.assign((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    return true;
+}
+
+}  // namespace
 
 namespace motion {
 namespace svg {
@@ -35,36 +52,67 @@ Expected<SvgLayerTree, std::string> BuildSvgLayers(const void *bytes, size_t len
 
 Expected<SvgLayerTree, std::string> BuildSvgLayersFromFile(const std::string &path,
                                                            const ImportOptions &options) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
+    std::string contents;
+    if (!ReadFileContents(path, contents)) {
         return Unexpected<std::string>("cannot read file");
     }
-    const std::string contents((std::istreambuf_iterator<char>(input)),
-                               std::istreambuf_iterator<char>());
     return BuildSvgLayers(contents.data(), contents.size(), options);
 }
 
 Expected<ImportResult, std::string> ImportSvgInto(Document &document, UndoManager &undo,
                                                   EntityId compositionId, const void *bytes,
                                                   size_t length, const ImportOptions &options) {
-    (void)document;
-    (void)undo;
-    (void)compositionId;
-    (void)bytes;
-    (void)length;
-    (void)options;
-    return Unexpected<std::string>("not implemented");
+    auto built = BuildSvgLayers(bytes, length, options);
+    if (!built.hasValue()) {
+        return Unexpected<std::string>(built.error());
+    }
+    Composition *composition = document.entityIndex().findComposition(compositionId);
+    if (composition == nullptr) {
+        return Unexpected<std::string>("composition not found");
+    }
+    SvgLayerTree tree = std::move(built.value());
+    if (tree.layers.empty()) {
+        return Unexpected<std::string>("empty layer tree");
+    }
+    if (options.parentLayerId.isValid()) {
+        if (!tree.layers.front()->setParent(options.parentLayerId, document)) {
+            return Unexpected<std::string>("parent cycle");
+        }
+    }
+    for (auto &layer : tree.layers) {
+        layer->inPoint = 0;
+        layer->outPoint = composition->duration;
+    }
+    ImportResult out;
+    out.sourceWidth = tree.sourceWidth;
+    out.sourceHeight = tree.sourceHeight;
+    out.diagnostics = tree.diagnostics;
+    out.rootLayerId = tree.layers.front()->id;
+    auto composite = std::make_unique<CompositeCommand>("Import SVG");
+    for (Asset &asset : tree.assets) {
+        composite->add(std::make_unique<ImportImageAssetCommand>(asset));
+    }
+    int index = options.insertIndex;
+    for (size_t i = 0; i < tree.layers.size(); ++i) {
+        out.layerIds.push_back(tree.layers[i]->id);
+        composite->add(std::make_unique<AddLayerCommand>(compositionId, std::move(tree.layers[i]),
+                                                         index));
+        if (index >= 0) {
+            index += 1;
+        }
+    }
+    undo.execute(document, std::move(composite));
+    return out;
 }
 
 Expected<ImportResult, std::string> ImportSvgFileInto(Document &document, UndoManager &undo,
                                                       EntityId compositionId, const std::string &path,
                                                       const ImportOptions &options) {
-    (void)document;
-    (void)undo;
-    (void)compositionId;
-    (void)path;
-    (void)options;
-    return Unexpected<std::string>("not implemented");
+    std::string contents;
+    if (!ReadFileContents(path, contents)) {
+        return Unexpected<std::string>("cannot read file");
+    }
+    return ImportSvgInto(document, undo, compositionId, contents.data(), contents.size(), options);
 }
 
 }  // namespace svg

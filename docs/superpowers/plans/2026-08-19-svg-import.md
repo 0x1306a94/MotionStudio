@@ -636,6 +636,8 @@ git commit -m "Preserve SVG group transforms and viewBox on imported layers."
 
 ### Task 5: `ImportSvgInto` + 一次 undo
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `src/import/svg/SvgImporter.cpp`
 - Modify: `tests/import/svg/SvgImporterTest.cpp`
@@ -644,7 +646,7 @@ git commit -m "Preserve SVG group transforms and viewBox on imported layers."
 - Consumes: `BuildSvgLayers`、`AddLayerCommand`、`ImportImageAssetCommand`、`CompositeCommand`、`UndoManager::execute`
 - Produces: 完整 `ImportSvgInto` / `ImportSvgFileInto`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SvgImporterTest, ImportIntoExistingCompositionIsUndoable) {
@@ -693,11 +695,11 @@ TEST(SvgImporterTest, MissingCompositionFailsWithoutMutation) {
 
 根 Group 用 `insertIndex` 插入；随后各层依次插在根之后，保持底→顶文档序。`parentLayerId` 有效则 `setParent`，成环 → Unexpected 且不 `execute`。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: FAIL（`not implemented`）。
 
-- [ ] **Step 3: 实现插入**
+- [x] **Step 3: 实现插入**
 
 ```cpp
 Expected<ImportResult, std::string> ImportSvgInto(...) {
@@ -747,7 +749,7 @@ Expected<ImportResult, std::string> ImportSvgInto(...) {
 
 `ImportSvgFileInto`：读文件再转调。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.Import*:SvgImporterTest.Missing*'
@@ -755,7 +757,7 @@ Expected<ImportResult, std::string> ImportSvgInto(...) {
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg/SvgImporter.cpp tests/import/svg/SvgImporterTest.cpp
