@@ -209,3 +209,53 @@ TEST(SvgImporterTest, MissingCompositionFailsWithoutMutation) {
     ASSERT_FALSE(imported.hasValue());
     EXPECT_TRUE(document.compositions.empty());
 }
+
+TEST(SvgImporterTest, FillInheritsFromGroup) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<g fill=\"#ff0000\"><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\"/></g>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *shape = result.value().layers.back().get();
+    auto *fill = static_cast<motion::FillStyle *>(shape->styles[0].get());
+    EXPECT_NEAR(fill->color.staticValue().r, 1.f, 1e-3f);
+    EXPECT_EQ(result.value().layers[1]->styles.size(), 0u);
+}
+
+TEST(SvgImporterTest, DisplayNoneDropsSubtree) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<g display=\"none\"><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#000\"/></g>"
+        "<rect x=\"20\" y=\"0\" width=\"10\" height=\"10\" fill=\"#000\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().layers.size(), 2u);
+}
+
+TEST(SvgImporterTest, HiddenStaysInvisible) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#000\" visibility=\"hidden\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_FALSE(result.value().layers.back()->visible);
+}
+
+TEST(SvgImporterTest, StrokeDashIsWarned) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<line x1=\"0\" y1=\"0\" x2=\"10\" y2=\"0\" stroke=\"#000\" stroke-dasharray=\"2 2\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool found = false;
+    for (const auto &d : result.value().diagnostics) {
+        if (d.code == "stroke.dash") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}

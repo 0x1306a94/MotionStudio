@@ -306,46 +306,59 @@ void ApplyNodeTransform(Layer &layer, const tgfx::SVGNode &node) {
     ApplyNodeOpacity(layer, node);
 }
 
+void AddDiagnostic(SvgLayerTree &tree, const std::string &code, const std::string &message,
+                   const std::string &nodeName) {
+    Diagnostic diagnostic = {};
+    diagnostic.code = code;
+    diagnostic.message = message;
+    diagnostic.nodeName = nodeName;
+    tree.diagnostics.push_back(diagnostic);
+}
+
 void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
-                   const tgfx::SVGLengthContext &lengthContext) {
-    const ComputedStyle style = ResolveNodeStyle(node, lengthContext);
+                   const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &style) {
     const tgfx::Path path = ShapePathFromNode(node, lengthContext);
     bool usedConic = false;
     const VectorNetwork network = PathToVectorNetwork(path, &usedConic);
     if (!NetworkHasArea(network) && !style.hasStroke) {
-        Diagnostic diagnostic = {};
-        diagnostic.code = "shape.empty";
-        diagnostic.message = "empty shape skipped";
-        diagnostic.nodeName = LayerName(node);
-        tree.diagnostics.push_back(diagnostic);
+        AddDiagnostic(tree, "shape.empty", "empty shape skipped", LayerName(node));
         return;
     }
     auto layer = std::make_unique<Layer>(LayerType::Shape);
     layer->name = LayerName(node);
     layer->parentId = parentId;
+    layer->visible = style.visible;
     auto *content = static_cast<ShapeContent *>(layer->content.get());
     auto geometry = std::make_unique<ShapePath>();
     geometry->path.setStaticValue(network);
     content->geometry = std::move(geometry);
     ApplyStyles(*layer, style);
     ApplyNodeTransform(*layer, node);
+    if (style.hasDash) {
+        AddDiagnostic(tree, "stroke.dash", "stroke-dasharray is imported as a solid stroke",
+                      layer->name);
+    }
     tree.layers.push_back(std::move(layer));
 }
 
 void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
-              const tgfx::SVGLengthContext &lengthContext);
+              const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &parentStyle);
 
 void WalkChildren(const tgfx::SVGContainer &container, EntityId parentId, SvgLayerTree &tree,
-                  const tgfx::SVGLengthContext &lengthContext) {
+                  const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &parentStyle) {
     for (const auto &child : container.getChildren()) {
         if (child) {
-            WalkNode(*child, parentId, tree, lengthContext);
+            WalkNode(*child, parentId, tree, lengthContext, parentStyle);
         }
     }
 }
 
 void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
-              const tgfx::SVGLengthContext &lengthContext) {
+              const tgfx::SVGLengthContext &lengthContext, const ComputedStyle &parentStyle) {
+    const ComputedStyle style = ResolveStyle(node, parentStyle, lengthContext);
+    if (style.displayNone) {
+        return;
+    }
     const tgfx::SVGTag tag = node.tag();
     if (IsSkippedContainer(tag) || IsFilterPrimitive(tag) || IsTextNode(tag)) {
         return;
@@ -354,10 +367,12 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
         auto group = std::make_unique<Layer>(LayerType::Group);
         group->name = LayerName(node);
         group->parentId = parentId;
+        group->visible = style.visible;
         ApplyNodeTransform(*group, node);
         const EntityId groupId = group->id;
         tree.layers.push_back(std::move(group));
-        WalkChildren(static_cast<const tgfx::SVGContainer &>(node), groupId, tree, lengthContext);
+        WalkChildren(static_cast<const tgfx::SVGContainer &>(node), groupId, tree, lengthContext,
+                     style);
         return;
     }
     switch (tag) {
@@ -368,9 +383,13 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
         case tgfx::SVGTag::Line:
         case tgfx::SVGTag::Polygon:
         case tgfx::SVGTag::Polyline:
-            AddShapeLayer(node, parentId, tree, lengthContext);
+            AddShapeLayer(node, parentId, tree, lengthContext, style);
+            break;
+        case tgfx::SVGTag::Image:
+        case tgfx::SVGTag::Use:
             break;
         default:
+            AddDiagnostic(tree, "tag.unknown", "unsupported SVG element skipped", LayerName(node));
             break;
     }
 }
@@ -383,7 +402,8 @@ void WalkSvgRoot(const tgfx::SVGRoot &root, SvgLayerTree &tree) {
     }
     const tgfx::SVGLengthContext lengthContext =
         MakeRootLengthContext(tree.sourceWidth, tree.sourceHeight);
-    WalkChildren(root, tree.layers.front()->id, tree, lengthContext);
+    ComputedStyle rootStyle = {};
+    WalkChildren(root, tree.layers.front()->id, tree, lengthContext, rootStyle);
 }
 
 }  // namespace svg

@@ -768,6 +768,8 @@ git commit -m "Insert imported SVG layers into the current composition with undo
 
 ### Task 6: 样式继承、dash、display / visibility
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `src/import/svg/SvgStyle.cpp`
 - Modify: `src/import/svg/SvgWalk.cpp`
@@ -778,7 +780,7 @@ git commit -m "Insert imported SVG layers into the current composition with undo
 - Produces: `ComputedStyle ResolveStyle(const tgfx::SVGNode &node, const ComputedStyle &parent);`  
   可继承字段按 spec §7.1（含 font-* / text-anchor）；Unspecified 用 parent；Inherit 用 parent；Value 用本节点。Task 9 才消费字体字段。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SvgImporterTest, FillInheritsFromGroup) {
@@ -832,15 +834,15 @@ TEST(SvgImporterTest, StrokeDashIsWarned) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: 继承 fill 仍是默认黑 → FAIL。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 walk 带 `ComputedStyle parent`。`display=none` 整棵跳过。`visibility=hidden/collapse` → `visible=false`。`stroke-dasharray` 非空 → `stroke.dash`（每节点一次），描边仍导入为实线。`fill-opacity`/`stroke-opacity` 乘进 `Color.a`。`currentColor` 用继承 `color`。linecap/join/miter/fill-rule 按 spec 表映射。未知标签 → `tag.unknown`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.*'
@@ -848,7 +850,7 @@ walk 带 `ComputedStyle parent`。`display=none` 整棵跳过。`visibility=hidd
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg tests/import/svg
