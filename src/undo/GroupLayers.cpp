@@ -376,4 +376,33 @@ std::unique_ptr<Command> MakeUngroupLayersCommand(
     return composite;
 }
 
+std::unique_ptr<Command> MakeRemoveLayerCommand(
+    const Document &document, EntityId compositionId, EntityId layerId) {
+    const Composition *composition = document.entityIndex().findComposition(compositionId);
+    if (composition == nullptr) {
+        return std::make_unique<RemoveLayerCommand>(compositionId, layerId);
+    }
+
+    std::unordered_set<EntityId> roots;
+    roots.insert(layerId);
+    std::vector<EntityId> ids;
+    for (const auto &layer : composition->layers) {
+        if (layer->id == layerId || HasSelectedAncestor(document, layer->id, roots)) {
+            ids.push_back(layer->id);
+        }
+    }
+    if (ids.empty()) {
+        return std::make_unique<RemoveLayerCommand>(compositionId, layerId);
+    }
+    if (ids.size() == 1) {
+        return std::make_unique<RemoveLayerCommand>(compositionId, ids[0]);
+    }
+
+    auto composite = std::make_unique<CompositeCommand>("Remove Layer");
+    for (const EntityId &id : ids) {
+        composite->add(std::make_unique<RemoveLayerCommand>(compositionId, id));
+    }
+    return composite;
+}
+
 }  // namespace motion

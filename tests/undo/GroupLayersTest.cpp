@@ -17,6 +17,7 @@ using motion::Keyframe;
 using motion::Layer;
 using motion::LayerType;
 using motion::MakeGroupLayersCommand;
+using motion::MakeRemoveLayerCommand;
 using motion::MakeUngroupLayersCommand;
 using motion::Mat3;
 using motion::UndoManager;
@@ -199,4 +200,64 @@ TEST(GroupLayersTest, UngroupIgnoresNonGroupSelection) {
     Composition *composition = document.addComposition(std::make_unique<Composition>());
     Layer *shape = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
     EXPECT_EQ(MakeUngroupLayersCommand(document, composition->id, {shape->id}, 0), nullptr);
+}
+
+TEST(GroupLayersTest, RemovingGroupDeletesDescendants) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *child = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *nested = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *grandchild = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *sibling = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    ASSERT_TRUE(child->setParent(group->id, document));
+    ASSERT_TRUE(nested->setParent(group->id, document));
+    ASSERT_TRUE(grandchild->setParent(nested->id, document));
+    const EntityId groupId = group->id;
+    const EntityId childId = child->id;
+    const EntityId nestedId = nested->id;
+    const EntityId grandchildId = grandchild->id;
+    const EntityId siblingId = sibling->id;
+
+    undo.execute(document, MakeRemoveLayerCommand(document, composition->id, groupId));
+
+    EXPECT_EQ(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_EQ(document.entityIndex().findLayer(childId), nullptr);
+    EXPECT_EQ(document.entityIndex().findLayer(nestedId), nullptr);
+    EXPECT_EQ(document.entityIndex().findLayer(grandchildId), nullptr);
+    EXPECT_NE(document.entityIndex().findLayer(siblingId), nullptr);
+    EXPECT_EQ(composition->layers.size(), 1u);
+
+    undo.undo(document);
+    EXPECT_NE(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_NE(document.entityIndex().findLayer(childId), nullptr);
+    EXPECT_NE(document.entityIndex().findLayer(nestedId), nullptr);
+    EXPECT_NE(document.entityIndex().findLayer(grandchildId), nullptr);
+    EXPECT_EQ(document.entityIndex().findLayer(childId)->parentId, groupId);
+    EXPECT_EQ(document.entityIndex().findLayer(nestedId)->parentId, groupId);
+    EXPECT_EQ(document.entityIndex().findLayer(grandchildId)->parentId, nestedId);
+    EXPECT_EQ(composition->layers.size(), 5u);
+
+    undo.redo(document);
+    EXPECT_EQ(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_EQ(document.entityIndex().findLayer(childId), nullptr);
+    EXPECT_NE(document.entityIndex().findLayer(siblingId), nullptr);
+}
+
+TEST(GroupLayersTest, RemovingShapeLeavesSiblings) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *child = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    ASSERT_TRUE(child->setParent(group->id, document));
+    const EntityId childId = child->id;
+    const EntityId groupId = group->id;
+
+    undo.execute(document, MakeRemoveLayerCommand(document, composition->id, childId));
+
+    EXPECT_EQ(document.entityIndex().findLayer(childId), nullptr);
+    EXPECT_NE(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_EQ(composition->layers.size(), 1u);
 }

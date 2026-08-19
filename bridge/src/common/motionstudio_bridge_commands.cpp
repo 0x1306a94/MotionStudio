@@ -29,7 +29,6 @@
 #include "MotionStudio/undo/MoveLayerStyleCommand.h"
 #include "MotionStudio/undo/MoveMaskCommand.h"
 #include "MotionStudio/undo/RemoveKeyframeCommand.h"
-#include "MotionStudio/undo/RemoveLayerCommand.h"
 #include "MotionStudio/undo/RemoveLayerEffectCommand.h"
 #include "MotionStudio/undo/RemoveLayerFxCommand.h"
 #include "MotionStudio/undo/RemoveMaskCommand.h"
@@ -316,7 +315,11 @@ void ms_command_convert_geometry_to_path(MSDocument *document, uint64_t layerId,
 
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId) {
     DocumentLock guard(document);
-    Execute(document, std::make_unique<motion::RemoveLayerCommand>(EntityId{compositionId}, EntityId{layerId}));
+    motion::Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return;
+    }
+    Execute(document, motion::MakeRemoveLayerCommand(*doc, EntityId{compositionId}, EntityId{layerId}));
 }
 
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex) {
