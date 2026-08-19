@@ -91,6 +91,9 @@ class PagFileBuilder {
     pag::ShapeLayer *buildCompositionBackdrop(const Composition &composition);
     pag::VectorComposition *wrapCompositionWithCornerClip(pag::VectorComposition *inner,
                                                           const Composition &composition);
+    void applyGroupCornerRadiusClip(pag::VectorComposition *host, const Composition &composition);
+    pag::VectorComposition *wrapGroupWithCornerClip(pag::VectorComposition *host, const Layer &group,
+                                                    Vec2 minPoint, Vec2 maxPoint, float radius);
     void applyImageContainerFit(pag::ImageLayer *pagLayer, const Layer &layer,
                                 const ImageContent &content, int intrinsicWidth,
                                 int intrinsicHeight);

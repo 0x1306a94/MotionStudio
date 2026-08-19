@@ -883,7 +883,7 @@ EOF
 
 ### Task 7: PAG 导出
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp`、`src/export/pag/PagFileBuilder.h`（若要加成员）
@@ -893,7 +893,7 @@ EOF
 - Consumes: `ImageContent::cornerRadius`、`NullContent::cornerRadius`、`applyImageContainerFit`、`wrapCompositionWithCornerClip` 同款 mask
 - Produces: Image 圆角 mask；动画半径 warning `ImageCornerRadiusAnimationBaked`；Group warning `GroupCornerRadiusApproximated` + Precomp 圆角 mask
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 复用 `PagExporterTest.ImageLayerExports` 的 1x1 PNG fixture。追加：
 
@@ -927,7 +927,7 @@ TEST(PagExporterTest, GroupCornerRadiusApproximatedWarning) {
 
 `AddShapeRect` / `MakeEmptyDoc` 以该测试文件已有 helper 为准。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target pag_export_tests
@@ -936,7 +936,7 @@ cmake --build build --target pag_export_tests
 
 二进制名若不同，用 `ctest --test-dir build -R 'ImageCornerRadiusAddsMask' --output-on-failure`。Expected: 无 mask / 无 warning。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 **Image：** `applyImageContainerFit` 在现有 overflow clip 处改用半径；即使没有 overflow，`radius>0` 也要加圆角 mask。半径取 `content.cornerRadius.evaluate(layer.inPoint)`，`ClampCornerRadius(..., container)`。若 `content.cornerRadius.isAnimated()`，`Warn(..., "ImageCornerRadiusAnimationBaked", "Animated image corner radius baked using in-point value")`。
 
@@ -983,7 +983,7 @@ void PagFileBuilder::applyGroupCornerRadiusClip(pag::VectorComposition *host,
 
 `#include "MotionStudio/render/SceneEvaluator.h"`、`HitTest.h`、`NullContent.h`。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ctest --test-dir build -R 'PagExporterTest' --output-on-failure
@@ -991,7 +991,7 @@ ctest --test-dir build -R 'PagExporterTest' --output-on-failure
 
 Expected: 新用例 PASS；`ImageLayerExports` / `CompositionCornerRadiusAddsBackdrop` 仍绿。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/export/pag/PagFileBuilder.cpp src/export/pag/PagFileBuilder.h tests/export/pag/PagExporterTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'

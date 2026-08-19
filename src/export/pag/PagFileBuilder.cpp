@@ -28,6 +28,7 @@
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -40,7 +41,9 @@
 #include "MotionStudio/model/TextPath.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/FollowPathEval.h"
+#include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/ImageScaleLayout.h"
+#include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 #include "PagAlmostStatic.h"
 #include "PagAnimatableConvert.h"
@@ -297,6 +300,25 @@ void Warn(std::vector<PagExportWarning> *warnings, EntityId entityId, const char
     warning.code = code;
     warning.message = message;
     warnings->push_back(std::move(warning));
+}
+
+bool ContainsPagLayer(const std::vector<pag::Layer *> &layers, const pag::Layer *target) {
+    for (pag::Layer *layer : layers) {
+        if (layer == target) {
+            return true;
+        }
+    }
+    return false;
+}
+
+pag::Transform2D *MakeIdentityTransform() {
+    auto *transform = new pag::Transform2D();
+    transform->anchorPoint = new pag::Property<pag::Point>(pag::Point::Zero());
+    transform->position = new pag::Property<pag::Point>(pag::Point::Zero());
+    transform->scale = new pag::Property<pag::Point>(pag::Point::Make(1, 1));
+    transform->rotation = new pag::Property<float>(0);
+    transform->opacity = new pag::Property<pag::Opacity>(pag::Opaque);
+    return transform;
 }
 
 void SetTransformOpacityOpaque(pag::Transform2D *transform) {
@@ -969,6 +991,171 @@ pag::VectorComposition *PagFileBuilder::wrapCompositionWithCornerClip(
     return root;
 }
 
+void PagFileBuilder::applyGroupCornerRadiusClip(pag::VectorComposition *host,
+                                                const Composition &composition) {
+    if (host == nullptr) {
+        return;
+    }
+    std::unordered_set<uint64_t> wrapped;
+    std::vector<pag::VectorComposition *> queue;
+    queue.push_back(host);
+    size_t index = 0;
+    while (index < queue.size()) {
+        pag::VectorComposition *current = queue[index];
+        ++index;
+        for (const auto &layerPtr : composition.layers) {
+            if (layerPtr == nullptr || layerPtr->type() != LayerType::Group) {
+                continue;
+            }
+            if (wrapped.count(layerPtr->id.value) != 0) {
+                continue;
+            }
+            const auto &content = static_cast<const NullContent &>(*layerPtr->content);
+            if (!content.cornerRadius.isAnimated() && content.cornerRadius.staticValue() <= 0.0f) {
+                continue;
+            }
+            const float radius = std::max(content.cornerRadius.evaluate(layerPtr->inPoint), 0.0f);
+            if (radius <= 0.0f) {
+                continue;
+            }
+            auto pagIt = layerByEntity_.find(layerPtr->id.value);
+            if (pagIt == layerByEntity_.end() || !ContainsPagLayer(current->layers, pagIt->second)) {
+                continue;
+            }
+            Expected<SceneState, std::string> state =
+                SceneEvaluator::Evaluate(document_, composition.id, layerPtr->inPoint);
+            Vec2 minPoint;
+            Vec2 maxPoint;
+            if (!state.hasValue() ||
+                !BoundsOfDescendantUnionLocal(*state, layerPtr->id, minPoint, maxPoint)) {
+                continue;
+            }
+            Warn(&warnings_, layerPtr->id, "GroupCornerRadiusApproximated",
+                 "Group corner radius exported as precomp clip mask");
+            pag::VectorComposition *nested =
+                wrapGroupWithCornerClip(current, *layerPtr, minPoint, maxPoint, radius);
+            wrapped.insert(layerPtr->id.value);
+            if (nested != nullptr) {
+                queue.push_back(nested);
+            }
+        }
+    }
+}
+
+pag::VectorComposition *PagFileBuilder::wrapGroupWithCornerClip(pag::VectorComposition *host,
+                                                                const Layer &group, Vec2 minPoint,
+                                                                Vec2 maxPoint, float radius) {
+    auto pagIt = layerByEntity_.find(group.id.value);
+    if (host == nullptr || pagIt == layerByEntity_.end()) {
+        return nullptr;
+    }
+    pag::Layer *groupPag = pagIt->second;
+
+    std::unordered_set<uint64_t> subtree;
+    subtree.insert(group.id.value);
+    collectDescendants(group.id, &subtree);
+
+    std::unordered_set<pag::Layer *> toMove;
+    for (uint64_t entityId : subtree) {
+        auto layerIt = layerByEntity_.find(entityId);
+        if (layerIt != layerByEntity_.end()) {
+            toMove.insert(layerIt->second);
+        }
+        auto siblingIt = strokeSiblingsByEntity_.find(entityId);
+        if (siblingIt != strokeSiblingsByEntity_.end()) {
+            for (pag::Layer *sibling : siblingIt->second) {
+                toMove.insert(sibling);
+            }
+        }
+    }
+
+    std::vector<pag::Layer *> original = host->layers;
+    std::vector<pag::Layer *> moved;
+    moved.reserve(original.size());
+    for (pag::Layer *layer : original) {
+        if (toMove.count(layer) != 0) {
+            moved.push_back(layer);
+        }
+    }
+    if (moved.empty()) {
+        return nullptr;
+    }
+
+    auto *inner = new pag::VectorComposition();
+    inner->id = nextCompositionId_++;
+    inner->width = host->width;
+    inner->height = host->height;
+    inner->duration = host->duration;
+    inner->frameRate = host->frameRate;
+    inner->backgroundColor = ToPagColor(Color{0, 0, 0, 0});
+    for (pag::Layer *layer : moved) {
+        layer->containingComposition = inner;
+    }
+    inner->layers = std::move(moved);
+
+    auto *wrap = new pag::PreComposeLayer();
+    wrap->id = nextLayerId_++;
+    wrap->name = groupPag->name;
+    wrap->startTime = groupPag->startTime;
+    wrap->duration = groupPag->duration;
+    wrap->stretch = groupPag->stretch;
+    wrap->isActive = groupPag->isActive;
+    wrap->blendMode = groupPag->blendMode;
+    wrap->parent = groupPag->parent;
+    wrap->trackMatteType = groupPag->trackMatteType;
+    wrap->trackMatteLayer = groupPag->trackMatteLayer;
+    wrap->transform = groupPag->transform;
+    wrap->effects = groupPag->effects;
+    wrap->layerStyles = groupPag->layerStyles;
+    wrap->masks = groupPag->masks;
+    wrap->composition = inner;
+    wrap->compositionStartTime = 0;
+    wrap->containingComposition = host;
+
+    groupPag->parent = nullptr;
+    groupPag->trackMatteType = pag::TrackMatteType::None;
+    groupPag->trackMatteLayer = nullptr;
+    groupPag->transform = MakeIdentityTransform();
+    groupPag->effects.clear();
+    groupPag->layerStyles.clear();
+    groupPag->masks.clear();
+
+    const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
+    const float clamped = ClampCornerRadius(radius, size);
+    BezierPath maskPath = ShapeGeometryToBezierPath(
+        MakeRectGeometry((minPoint + maxPoint) * 0.5f, size, clamped));
+    Animatable<BezierPath> maskAnimatable;
+    maskAnimatable.setStaticValue(maskPath);
+    auto *mask = new pag::MaskData();
+    mask->id = nextMaskId_++;
+    mask->inverted = false;
+    mask->maskMode = pag::MaskMode::Add;
+    mask->maskPath = ConvertBezierPath(maskAnimatable, &warnings_, group.id);
+    mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
+    mask->maskExpansion = new pag::Property<float>(0);
+    wrap->masks.push_back(mask);
+
+    std::vector<pag::Layer *> rebuilt;
+    rebuilt.reserve(original.size());
+    for (pag::Layer *layer : original) {
+        if (layer == groupPag) {
+            rebuilt.push_back(wrap);
+            continue;
+        }
+        if (toMove.count(layer) != 0) {
+            continue;
+        }
+        if (layer->trackMatteLayer == groupPag) {
+            layer->trackMatteLayer = wrap;
+        }
+        rebuilt.push_back(layer);
+    }
+    host->layers = std::move(rebuilt);
+
+    nestedCompositions_.push_back(inner);
+    return inner;
+}
+
 void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Layer &layer,
                                             const ImageContent &content, int intrinsicWidth,
                                             int intrinsicHeight) {
@@ -1002,10 +1189,17 @@ void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Lay
     });
     RemapImageLayerMasksToSourceSpace(pagLayer, destination.x, destination.y, fitX, fitY);
 
+    if (content.cornerRadius.isAnimated()) {
+        Warn(&warnings_, layer.id, "ImageCornerRadiusAnimationBaked",
+             "Animated image corner radius baked using in-point value");
+    }
+    const float containerRadius =
+        ClampCornerRadius(content.cornerRadius.evaluate(layer.inPoint), container);
+
     const bool overflows = destination.x < -0.001f || destination.y < -0.001f ||
         destination.x + destination.width > container.x + 0.001f ||
         destination.y + destination.height > container.y + 0.001f;
-    if (!overflows) {
+    if (!overflows && containerRadius <= 0.0f) {
         return;
     }
 
@@ -1013,8 +1207,14 @@ void PagFileBuilder::applyImageContainerFit(pag::ImageLayer *pagLayer, const Lay
     const float maskY = -destination.y / fitY;
     const float maskW = container.x / fitX;
     const float maskH = container.y / fitY;
+    float sourceRadius = 0.0f;
+    const float fit = std::min(fitX, fitY);
+    if (containerRadius > 0.0f && fit > 1e-6f) {
+        sourceRadius = ClampCornerRadius(containerRadius / fit, Vec2{maskW, maskH});
+    }
     BezierPath clipPath = ShapeGeometryToBezierPath(
-        MakeRectGeometry(Vec2{maskX + maskW * 0.5f, maskY + maskH * 0.5f}, Vec2{maskW, maskH}, 0.0f));
+        MakeRectGeometry(Vec2{maskX + maskW * 0.5f, maskY + maskH * 0.5f}, Vec2{maskW, maskH},
+                         sourceRadius));
     Animatable<BezierPath> clipAnimatable;
     clipAnimatable.setStaticValue(clipPath);
     auto *mask = new pag::MaskData();
@@ -1312,6 +1512,7 @@ Expected<pag::VectorComposition *, PagExportError> PagFileBuilder::buildComposit
     }
 
     pagComposition->layers = std::move(contentLayers);
+    applyGroupCornerRadiusClip(pagComposition, composition);
 
     // Many PAG viewers ignore Composition.backgroundColor and only draw layers; always emit a
     // bottom backdrop so the MS composition background is visible.

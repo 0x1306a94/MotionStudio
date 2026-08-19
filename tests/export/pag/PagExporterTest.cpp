@@ -25,6 +25,7 @@
 #include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/MaskMode.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/PrecompContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapeEllipse.h"
@@ -64,6 +65,7 @@ using motion::LayerType;
 using motion::MakeSingleContour;
 using motion::Mask;
 using motion::MaskMode;
+using motion::NullContent;
 using motion::OuterGlowStyle;
 using motion::PagBmpSequenceType;
 using motion::PagExporter;
@@ -825,6 +827,130 @@ TEST(PagExporterTest, ImageLayerExports) {
     EXPECT_FLOAT_EQ(imageLayer->transform->scale->value.y, 100.0f);
     EXPECT_FLOAT_EQ(imageLayer->transform->anchorPoint->value.x, 0.5f);
     EXPECT_FLOAT_EQ(imageLayer->transform->anchorPoint->value.y, 0.5f);
+}
+
+TEST(PagExporterTest, ImageCornerRadiusAddsMask) {
+    static const unsigned char kPng[] = {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8,
+        0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0xC9, 0xFE, 0x92, 0xEF, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82};
+
+    const std::string dir = "/tmp/motionstudio_pag_export_image_radius_test";
+    std::error_code error;
+    std::filesystem::create_directories(dir + "/assets", error);
+    ASSERT_FALSE(error) << error.message();
+    const std::string relative = "assets/pixel.png";
+    {
+        std::ofstream output(dir + "/" + relative, std::ios::binary);
+        ASSERT_TRUE(output);
+        output.write(reinterpret_cast<const char *>(kPng), sizeof(kPng));
+    }
+
+    Document document = MakeEmptyDoc(400, 300, 30);
+    document.projectRoot = dir;
+    Asset asset;
+    asset.type = AssetType::Image;
+    asset.path = relative;
+    asset.width = 1;
+    asset.height = 1;
+    document.assets.push_back(asset);
+
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto *content = static_cast<ImageContent *>(layer->content.get());
+    content->assetId = asset.id;
+    content->size = Vec2{100, 100};
+    content->cornerRadius.setStaticValue(12.0f);
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    ASSERT_EQ(vector->layers[0]->type(), pag::LayerType::Image);
+    auto *imageLayer = static_cast<pag::ImageLayer *>(vector->layers[0]);
+    EXPECT_FALSE(imageLayer->masks.empty());
+}
+
+TEST(PagExporterTest, ImageCornerRadiusAnimationBakedWarning) {
+    static const unsigned char kPng[] = {
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8,
+        0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0xC9, 0xFE, 0x92, 0xEF, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82};
+
+    const std::string dir = "/tmp/motionstudio_pag_export_image_radius_kf_test";
+    std::error_code error;
+    std::filesystem::create_directories(dir + "/assets", error);
+    ASSERT_FALSE(error) << error.message();
+    const std::string relative = "assets/pixel.png";
+    {
+        std::ofstream output(dir + "/" + relative, std::ios::binary);
+        ASSERT_TRUE(output);
+        output.write(reinterpret_cast<const char *>(kPng), sizeof(kPng));
+    }
+
+    Document document = MakeEmptyDoc(400, 300, 30);
+    document.projectRoot = dir;
+    Asset asset;
+    asset.type = AssetType::Image;
+    asset.path = relative;
+    asset.width = 1;
+    asset.height = 1;
+    document.assets.push_back(asset);
+
+    Composition *composition = Primary(document);
+    auto layer = std::make_unique<Layer>(LayerType::Image);
+    layer->inPoint = 0;
+    layer->outPoint = composition->duration;
+    auto *content = static_cast<ImageContent *>(layer->content.get());
+    content->assetId = asset.id;
+    content->size = Vec2{100, 100};
+    Keyframe<float> from;
+    from.time = 0;
+    from.value = 4.0f;
+    Keyframe<float> to;
+    to.time = 15;
+    to.value = 20.0f;
+    content->cornerRadius.addKeyframe(from);
+    content->cornerRadius.addKeyframe(to);
+    document.addLayer(composition->id, std::move(layer));
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    bool found = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "ImageCornerRadiusAnimationBaked") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST(PagExporterTest, GroupCornerRadiusApproximatedWarning) {
+    Document document = MakeEmptyDoc(200, 200, 30);
+    Composition *composition = Primary(document);
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    group->inPoint = 0;
+    group->outPoint = composition->duration;
+    static_cast<NullContent *>(group->content.get())->cornerRadius.setStaticValue(10.0f);
+    Layer *rect = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{80, 80});
+    rect->parentId = group->id;
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    bool found = false;
+    for (const auto &warning : result.value().warnings) {
+        if (warning.code == "GroupCornerRadiusApproximated") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
 }
 
 TEST(PagExporterTest, ImageMaskRemappedToSourceSpace) {
