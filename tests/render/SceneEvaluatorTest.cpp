@@ -616,7 +616,7 @@ TEST(SceneEvaluatorTest, GroupTrackMatteMarksDescendantsMatteOnly) {
     EXPECT_EQ(targetEval->matteSourceId, group->id);
 }
 
-TEST(SceneEvaluatorTest, GroupTargetTrackMatteInheritsToChildren) {
+TEST(SceneEvaluatorTest, GroupTargetTrackMatteStaysOnGroup) {
     RectScene scene;
     Layer *matteLayer =
         scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
@@ -658,21 +658,24 @@ TEST(SceneEvaluatorTest, GroupTargetTrackMatteInheritsToChildren) {
     ASSERT_NE(sourceEval, nullptr);
     EXPECT_EQ(groupEval->trackMatteType, motion::TrackMatteType::Alpha);
     EXPECT_EQ(groupEval->matteSourceId, matteLayer->id);
-    EXPECT_EQ(childEval->trackMatteType, motion::TrackMatteType::Alpha);
-    EXPECT_EQ(childEval->matteSourceId, matteLayer->id);
+    EXPECT_EQ(childEval->trackMatteType, motion::TrackMatteType::None);
     EXPECT_FALSE(childEval->usedAsMatteOnly);
     EXPECT_TRUE(sourceEval->usedAsMatteOnly);
 
     const auto commands = BuildCommands(*result);
-    bool childHasMatte = false;
+    bool foundBeginLayer = false;
+    bool foundGroupMatte = false;
     for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginLayer) {
+            foundBeginLayer = true;
+        }
         if (command.type == DrawCommandType::BeginMask &&
             command.maskApplyMode == MaskApplyMode::AlphaMatte) {
-            childHasMatte = true;
-            break;
+            foundGroupMatte = true;
         }
     }
-    EXPECT_TRUE(childHasMatte);
+    EXPECT_TRUE(foundBeginLayer);
+    EXPECT_TRUE(foundGroupMatte);
 }
 
 TEST(SceneEvaluatorTest, PrecompTrackMatteMarksInnerLayersMatteOnly) {

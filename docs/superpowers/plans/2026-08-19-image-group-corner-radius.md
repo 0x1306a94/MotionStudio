@@ -544,7 +544,7 @@ EOF
 
 ### Task 5: Group isolation + 去掉 matte 继承
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/render/CommandBuilder.cpp`
@@ -555,7 +555,7 @@ EOF
 - Consumes: `EvaluatedLayer::cornerRadius`、`BoundsOfDescendantUnionLocal`、`HasAncestor`
 - Produces: isolation Group 在自身 `layers[]` 位置发 `BeginLayer`；子孙相对变换；`ClipPath` 在子绘制前；子层不再继承 Group matte
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 改写 `GroupTargetTrackMatteInheritsToChildren` 为不继承，并断言命令里 Group isolation 带 AlphaMatte、子层命令不再单独带 matte：
 
@@ -638,7 +638,7 @@ TEST(CommandBuilderTest, GroupWithoutRadiusDoesNotBeginLayer) {
 
 需要 `#include "MotionStudio/render/HitTest.h"` 仅当测试直接调 AABB；CommandBuilder 内部会调 `BoundsOfDescendantUnionLocal`。子层局部 bounds 为 `[0,100]x[0,100]`，世界平移 (10,20)，Group 为单位矩阵 → AABB 非空。
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 cmake --build build --target core_tests
@@ -647,7 +647,7 @@ cmake --build build --target core_tests
 
 Expected: Group 被 `LayerHasDrawableContent` 跳过，无 `BeginLayer`；matte 测试若已改名则旧继承断言不再适用。
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `SceneEvaluator.cpp`：删除 `InheritAncestorTrackMattes` 函数及其在 `EvaluatePreview` 里的调用。
 
@@ -759,7 +759,7 @@ for layer in state.layers:
 
 递归 `AppendIsolatingGroup` 必须是具名函数，不要 lambda。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='CommandBuilderTest.*:SceneEvaluatorTest.*'
@@ -767,7 +767,7 @@ for layer in state.layers:
 
 Expected: PASS。无 isolation 的 Group 仍不出现在命令里；子层仍直画。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only src/render/CommandBuilder.cpp src/render/SceneEvaluator.cpp tests/render/CommandBuilderTest.cpp tests/render/SceneEvaluatorTest.cpp docs/superpowers/plans/2026-08-19-image-group-corner-radius.md -m "$(cat <<'EOF'

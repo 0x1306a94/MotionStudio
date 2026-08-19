@@ -554,40 +554,6 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     }
 }
 
-const EvaluatedLayer *FindEvaluatedLayer(const std::vector<EvaluatedLayer> &layers, EntityId id) {
-    for (const EvaluatedLayer &candidate : layers) {
-        if (candidate.id == id) {
-            return &candidate;
-        }
-    }
-    return nullptr;
-}
-
-void InheritAncestorTrackMattes(std::vector<EvaluatedLayer> &layers) {
-    for (EvaluatedLayer &layer : layers) {
-        if (layer.trackMatteType != TrackMatteType::None) {
-            continue;
-        }
-        EntityId currentId = layer.parentId;
-        std::unordered_set<EntityId> visiting;
-        while (currentId.isValid()) {
-            if (!visiting.insert(currentId).second) {
-                break;
-            }
-            const EvaluatedLayer *ancestor = FindEvaluatedLayer(layers, currentId);
-            if (ancestor == nullptr) {
-                break;
-            }
-            if (ancestor->trackMatteType != TrackMatteType::None && ancestor->matteSourceId.isValid()) {
-                layer.trackMatteType = ancestor->trackMatteType;
-                layer.matteSourceId = ancestor->matteSourceId;
-                break;
-            }
-            currentId = ancestor->parentId;
-        }
-    }
-}
-
 void MarkMatteSources(std::vector<EvaluatedLayer> &layers) {
     std::unordered_set<EntityId> matteSourceIds;
     for (const EvaluatedLayer &layer : layers) {
@@ -657,7 +623,6 @@ Expected<SceneState, std::string> SceneEvaluator::EvaluatePreview(const Document
     state.frameIndex = static_cast<int64_t>(time);
     state.timeSeconds = fps > 0.f ? static_cast<float>(time / static_cast<double>(fps)) : 0.f;
     EvaluateComposition(document, *composition, time, Mat3::Identity(), 1.0f, 0, state.layers);
-    InheritAncestorTrackMattes(state.layers);
     MarkMatteSources(state.layers);
     return state;
 }

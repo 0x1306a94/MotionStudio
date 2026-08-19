@@ -32,6 +32,7 @@ using motion::LayerFxType;
 using motion::LineCap;
 using motion::LineJoin;
 using motion::MakePathGeometry;
+using motion::MakeRectGeometry;
 using motion::MakeSingleContour;
 using motion::MaskApplyMode;
 using motion::MaskMode;
@@ -152,6 +153,69 @@ TEST(CommandBuilderTest, EmptyGroupEmitsNoDrawCommands) {
     state.layers.push_back(group);
 
     EXPECT_TRUE(BuildCommands(state).empty());
+}
+
+TEST(CommandBuilderTest, GroupCornerRadiusIsolatesDescendants) {
+    SceneState state;
+    EvaluatedLayer child;
+    child.id = EntityId{2};
+    child.parentId = EntityId{1};
+    child.opacity = 1.0f;
+    child.worldTransform = Mat3::Translate(Vec2{10, 20});
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry({50, 50}, {100, 100});
+    item.paint = Paint{{1, 1, 1, 1}};
+    child.shapeItems.push_back(item);
+
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    group.opacity = 1.0f;
+    group.cornerRadius = 8.0f;
+    group.worldTransform = Mat3::Identity();
+
+    state.layers.push_back(child);
+    state.layers.push_back(group);
+
+    auto commands = BuildCommands(state);
+    int beginLayerCount = 0;
+    int lastClip = -1;
+    int lastDraw = -1;
+    for (size_t index = 0; index < commands.size(); ++index) {
+        if (commands[index].type == DrawCommandType::BeginLayer) {
+            ++beginLayerCount;
+        }
+        if (commands[index].type == DrawCommandType::ClipPath) {
+            lastClip = static_cast<int>(index);
+        }
+        if (commands[index].type == DrawCommandType::DrawPath) {
+            lastDraw = static_cast<int>(index);
+        }
+    }
+    EXPECT_EQ(beginLayerCount, 1);
+    EXPECT_GE(lastClip, 0);
+    EXPECT_GE(lastDraw, 0);
+    EXPECT_LT(lastClip, lastDraw);
+}
+
+TEST(CommandBuilderTest, GroupWithoutRadiusDoesNotBeginLayer) {
+    SceneState state;
+    EvaluatedLayer child;
+    child.id = EntityId{2};
+    child.parentId = EntityId{1};
+    child.opacity = 1.0f;
+    EvaluatedShapeItem item;
+    item.geometry = MakeRectGeometry({50, 50}, {100, 100});
+    item.paint = Paint{{1, 1, 1, 1}};
+    child.shapeItems.push_back(item);
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    group.opacity = 1.0f;
+    state.layers.push_back(child);
+    state.layers.push_back(group);
+    auto commands = BuildCommands(state);
+    for (const DrawCommand &command : commands) {
+        EXPECT_NE(command.type, DrawCommandType::BeginLayer);
+    }
 }
 
 TEST(CommandBuilderTest, SelectionOutlineBuildsStrokeForSelectedLayerBounds) {

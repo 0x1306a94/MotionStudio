@@ -8,6 +8,7 @@
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/EvaluatedImageItem.h"
 #include "MotionStudio/render/EvaluatedTextItem.h"
+#include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -135,6 +136,63 @@ bool LayerHasDrawableContent(const EvaluatedLayer &layer) {
         !layer.shapeNetwork.vertices.empty();
 }
 
+bool IsIsolatingGroup(const EvaluatedLayer &layer, const SceneState &state) {
+    if (LayerHasDrawableContent(layer)) {
+        return false;
+    }
+    if (!layer.masks.empty() || layer.trackMatteType != TrackMatteType::None) {
+        return true;
+    }
+    if (layer.cornerRadius <= 0.0f) {
+        return false;
+    }
+    Vec2 minPoint;
+    Vec2 maxPoint;
+    return BoundsOfDescendantUnionLocal(state, layer.id, minPoint, maxPoint);
+}
+
+const EvaluatedLayer *IsolatingAncestor(const SceneState &state, EntityId layerId, EntityId stopAt) {
+    const EvaluatedLayer *current = FindLayer(state, layerId);
+    std::unordered_set<EntityId> visiting;
+    while (current != nullptr && current->parentId.isValid()) {
+        if (stopAt.isValid() && current->parentId == stopAt) {
+            return nullptr;
+        }
+        if (!visiting.insert(current->parentId).second) {
+            return nullptr;
+        }
+        const EvaluatedLayer *parent = FindLayer(state, current->parentId);
+        if (parent == nullptr) {
+            return nullptr;
+        }
+        if (IsIsolatingGroup(*parent, state)) {
+            return parent;
+        }
+        current = parent;
+    }
+    return nullptr;
+}
+
+float OpacityRelativeToGroup(float childOpacity, float groupOpacity) {
+    if (groupOpacity <= 1e-6f) {
+        return 0.0f;
+    }
+    return childOpacity / groupOpacity;
+}
+
+void AppendRoundedClip(Vec2 minPoint, Vec2 maxPoint, float radius, DrawCommandList &commands) {
+    const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
+    const float clamped = ClampCornerRadius(radius, size);
+    if (clamped <= 0.0f || size.x <= 0.0f || size.y <= 0.0f) {
+        return;
+    }
+    DrawCommand clip;
+    clip.type = DrawCommandType::ClipPath;
+    clip.geometry = MakeRectGeometry((minPoint + maxPoint) * 0.5f, size, clamped);
+    clip.fillRule = FillRule::NonZero;
+    commands.push_back(std::move(clip));
+}
+
 void AppendLayerAsMatte(const EvaluatedLayer &source, const Mat3 &inverseTarget, DrawCommandList &commands) {
     if (!LayerHasDrawableContent(source)) {
         return;
@@ -202,66 +260,158 @@ void AppendTrackMatte(const SceneState &state, const EvaluatedLayer &layer, Draw
     commands.push_back(endMask);
 }
 
+void AppendLeafLayer(const SceneState &state, const EvaluatedLayer &layer, const Mat3 &parentWorld,
+                     float parentOpacity, DrawCommandList &commands) {
+    DrawCommand save;
+    save.type = DrawCommandType::Save;
+    commands.push_back(save);
+
+    Mat3 relative = layer.worldTransform;
+    Mat3 inverseParent;
+    if (parentWorld.tryInvert(inverseParent)) {
+        relative = inverseParent * layer.worldTransform;
+    }
+
+    DrawCommand transform;
+    transform.type = DrawCommandType::ConcatTransform;
+    transform.transform = relative;
+    commands.push_back(transform);
+
+    DrawCommand opacity;
+    opacity.type = DrawCommandType::SetOpacity;
+    opacity.opacity = OpacityRelativeToGroup(layer.opacity, parentOpacity);
+    commands.push_back(opacity);
+
+    DrawCommand blend;
+    blend.type = DrawCommandType::SetBlendMode;
+    blend.blendMode = layer.blendMode;
+    commands.push_back(blend);
+
+    const bool needsIsolation = !layer.masks.empty() ||
+        layer.trackMatteType != TrackMatteType::None ||
+        !layer.effects.empty() ||
+        !layer.layerStyles.empty();
+    if (needsIsolation) {
+        DrawCommand beginLayer;
+        beginLayer.type = DrawCommandType::BeginLayer;
+        commands.push_back(beginLayer);
+    }
+
+    AppendShapeItems(layer.shapeItems, layer.blendMode, commands);
+    AppendImageItem(layer.imageItem, commands);
+    AppendTextItem(layer.textItem, commands);
+
+    if (!layer.masks.empty()) {
+        AppendPathMasks(layer.masks, commands);
+    }
+    if (layer.trackMatteType != TrackMatteType::None) {
+        AppendTrackMatte(state, layer, commands);
+    }
+
+    if (needsIsolation) {
+        DrawCommand endLayer;
+        endLayer.type = DrawCommandType::EndLayer;
+        endLayer.effects = layer.effects;
+        endLayer.layerStyles = layer.layerStyles;
+        commands.push_back(std::move(endLayer));
+    }
+
+    DrawCommand restore;
+    restore.type = DrawCommandType::Restore;
+    commands.push_back(restore);
+}
+
+void AppendIsolatingGroup(const SceneState &state, const EvaluatedLayer &group, const Mat3 &parentWorld,
+                          float parentOpacity, DrawCommandList &commands) {
+    DrawCommand save;
+    save.type = DrawCommandType::Save;
+    commands.push_back(save);
+
+    Mat3 relative = group.worldTransform;
+    Mat3 inverseParent;
+    if (parentWorld.tryInvert(inverseParent)) {
+        relative = inverseParent * group.worldTransform;
+    }
+
+    DrawCommand transform;
+    transform.type = DrawCommandType::ConcatTransform;
+    transform.transform = relative;
+    commands.push_back(transform);
+
+    DrawCommand opacity;
+    opacity.type = DrawCommandType::SetOpacity;
+    opacity.opacity = OpacityRelativeToGroup(group.opacity, parentOpacity);
+    commands.push_back(opacity);
+
+    DrawCommand blend;
+    blend.type = DrawCommandType::SetBlendMode;
+    blend.blendMode = group.blendMode;
+    commands.push_back(blend);
+
+    DrawCommand beginLayer;
+    beginLayer.type = DrawCommandType::BeginLayer;
+    commands.push_back(beginLayer);
+
+    Vec2 minPoint;
+    Vec2 maxPoint;
+    if (BoundsOfDescendantUnionLocal(state, group.id, minPoint, maxPoint)) {
+        AppendRoundedClip(minPoint, maxPoint, group.cornerRadius, commands);
+    }
+
+    for (const EvaluatedLayer &layer : state.layers) {
+        if (layer.id == group.id) {
+            continue;
+        }
+        if (!HasAncestor(state, layer.id, group.id)) {
+            continue;
+        }
+        if (IsolatingAncestor(state, layer.id, group.id) != nullptr) {
+            continue;
+        }
+        if (layer.usedAsMatteOnly) {
+            continue;
+        }
+        if (IsIsolatingGroup(layer, state)) {
+            AppendIsolatingGroup(state, layer, group.worldTransform, group.opacity, commands);
+        } else if (LayerHasDrawableContent(layer)) {
+            AppendLeafLayer(state, layer, group.worldTransform, group.opacity, commands);
+        }
+    }
+
+    if (!group.masks.empty()) {
+        AppendPathMasks(group.masks, commands);
+    }
+    if (group.trackMatteType != TrackMatteType::None) {
+        AppendTrackMatte(state, group, commands);
+    }
+
+    DrawCommand endLayer;
+    endLayer.type = DrawCommandType::EndLayer;
+    endLayer.effects = group.effects;
+    endLayer.layerStyles = group.layerStyles;
+    commands.push_back(std::move(endLayer));
+
+    DrawCommand restore;
+    restore.type = DrawCommandType::Restore;
+    commands.push_back(restore);
+}
+
 }  // namespace
 
 DrawCommandList BuildCommands(const SceneState &state) {
     DrawCommandList commands;
     for (const EvaluatedLayer &layer : state.layers) {
-        if (layer.usedAsMatteOnly || !LayerHasDrawableContent(layer)) {
+        if (layer.usedAsMatteOnly) {
             continue;
         }
-
-        DrawCommand save;
-        save.type = DrawCommandType::Save;
-        commands.push_back(save);
-
-        DrawCommand transform;
-        transform.type = DrawCommandType::ConcatTransform;
-        transform.transform = layer.worldTransform;
-        commands.push_back(transform);
-
-        DrawCommand opacity;
-        opacity.type = DrawCommandType::SetOpacity;
-        opacity.opacity = layer.opacity;
-        commands.push_back(opacity);
-
-        DrawCommand blend;
-        blend.type = DrawCommandType::SetBlendMode;
-        blend.blendMode = layer.blendMode;
-        commands.push_back(blend);
-
-        const bool needsIsolation = !layer.masks.empty() ||
-            layer.trackMatteType != TrackMatteType::None ||
-            !layer.effects.empty() ||
-            !layer.layerStyles.empty();
-        if (needsIsolation) {
-            DrawCommand beginLayer;
-            beginLayer.type = DrawCommandType::BeginLayer;
-            commands.push_back(beginLayer);
+        if (IsolatingAncestor(state, layer.id, EntityId{}) != nullptr) {
+            continue;
         }
-
-        AppendShapeItems(layer.shapeItems, layer.blendMode, commands);
-        AppendImageItem(layer.imageItem, commands);
-        AppendTextItem(layer.textItem, commands);
-
-        if (!layer.masks.empty()) {
-            AppendPathMasks(layer.masks, commands);
+        if (IsIsolatingGroup(layer, state)) {
+            AppendIsolatingGroup(state, layer, Mat3::Identity(), 1.0f, commands);
+        } else if (LayerHasDrawableContent(layer)) {
+            AppendLeafLayer(state, layer, Mat3::Identity(), 1.0f, commands);
         }
-        if (layer.trackMatteType != TrackMatteType::None) {
-            AppendTrackMatte(state, layer, commands);
-        }
-
-        if (needsIsolation) {
-            DrawCommand endLayer;
-            endLayer.type = DrawCommandType::EndLayer;
-            endLayer.effects = layer.effects;
-            endLayer.layerStyles = layer.layerStyles;
-            commands.push_back(std::move(endLayer));
-        }
-
-        DrawCommand restore;
-        restore.type = DrawCommandType::Restore;
-        commands.push_back(restore);
     }
     return commands;
 }
