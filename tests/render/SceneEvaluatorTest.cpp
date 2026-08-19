@@ -16,6 +16,8 @@
 #include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
+#include "MotionStudio/render/CommandBuilder.h"
+#include "MotionStudio/render/MaskApplyMode.h"
 #include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/render/ShapeGeometry.h"
@@ -23,9 +25,11 @@
 using motion::BezierPath;
 using motion::BezierPathToVectorNetwork;
 using motion::BrightnessContrastEffect;
+using motion::BuildCommands;
 using motion::Color;
 using motion::Composition;
 using motion::Document;
+using motion::DrawCommandType;
 using motion::EntityId;
 using motion::EvaluatedShapeItem;
 using motion::Expected;
@@ -35,6 +39,7 @@ using motion::Layer;
 using motion::LayerEffectType;
 using motion::LayerType;
 using motion::MakeSingleContour;
+using motion::MaskApplyMode;
 using motion::Mat3;
 using motion::PrecompContent;
 using motion::SceneEvaluator;
@@ -609,6 +614,79 @@ TEST(SceneEvaluatorTest, GroupTrackMatteMarksDescendantsMatteOnly) {
     EXPECT_EQ(targetEval->matteSourceId, group->id);
 }
 
+TEST(SceneEvaluatorTest, PrecompTrackMatteMarksInnerLayersMatteOnly) {
+    Document document;
+    Composition *inner = document.addComposition(std::make_unique<Composition>());
+    inner->duration = 100;
+    Layer *rect = document.addLayer(inner->id, std::make_unique<Layer>(LayerType::Shape));
+    rect->outPoint = 100;
+    auto *content = static_cast<ShapeContent *>(rect->content.get());
+    auto innerRect = std::make_unique<ShapeRect>();
+    innerRect->size.setStaticValue(Vec2{10, 10});
+    content->geometry = std::move(innerRect);
+    auto innerFill = std::make_unique<FillStyle>();
+    innerFill->color.setStaticValue(Color{1, 1, 1, 1});
+    rect->styles.push_back(std::move(innerFill));
+
+    Composition *main = document.addComposition(std::make_unique<Composition>());
+    main->duration = 100;
+    Layer *precomp = document.addLayer(main->id, std::make_unique<Layer>(LayerType::Precomp));
+    precomp->outPoint = 100;
+    static_cast<PrecompContent *>(precomp->content.get())->compositionId = inner->id;
+
+    Layer *target = document.addLayer(main->id, std::make_unique<Layer>(LayerType::Shape));
+    target->outPoint = 100;
+    auto *targetContent = static_cast<ShapeContent *>(target->content.get());
+    auto targetRect = std::make_unique<ShapeRect>();
+    targetRect->size.setStaticValue(Vec2{40, 20});
+    targetContent->geometry = std::move(targetRect);
+    auto targetFill = std::make_unique<FillStyle>();
+    targetFill->color.setStaticValue(Color{0, 0, 1, 1});
+    target->styles.push_back(std::move(targetFill));
+    target->trackMatteType = motion::TrackMatteType::Alpha;
+    target->trackMatteLayerId = precomp->id;
+
+    Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
+    ASSERT_TRUE(result.hasValue());
+
+    const motion::EvaluatedLayer *precompEval = nullptr;
+    const motion::EvaluatedLayer *innerEval = nullptr;
+    const motion::EvaluatedLayer *targetEval = nullptr;
+    for (const auto &layer : result->layers) {
+        if (layer.id == precomp->id) {
+            precompEval = &layer;
+        }
+        if (layer.id == rect->id) {
+            innerEval = &layer;
+        }
+        if (layer.id == target->id) {
+            targetEval = &layer;
+        }
+    }
+    ASSERT_NE(precompEval, nullptr);
+    ASSERT_NE(innerEval, nullptr);
+    ASSERT_NE(targetEval, nullptr);
+    EXPECT_TRUE(precompEval->usedAsMatteOnly);
+    EXPECT_TRUE(innerEval->usedAsMatteOnly);
+    EXPECT_EQ(innerEval->parentId, precomp->id);
+    EXPECT_FALSE(targetEval->usedAsMatteOnly);
+    EXPECT_EQ(targetEval->matteSourceId, precomp->id);
+
+    const auto commands = BuildCommands(*result);
+    bool foundInnerMatte = false;
+    for (size_t i = 0; i + 3 < commands.size(); ++i) {
+        if (commands[i].type == DrawCommandType::BeginMask &&
+            commands[i].maskApplyMode == MaskApplyMode::AlphaMatte) {
+            EXPECT_EQ(commands[i + 1].type, DrawCommandType::Save);
+            EXPECT_EQ(commands[i + 2].type, DrawCommandType::ConcatTransform);
+            EXPECT_EQ(commands[i + 3].type, DrawCommandType::DrawPath);
+            foundInnerMatte = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundInnerMatte);
+}
+
 TEST(SceneEvaluatorTest, SelfTrackMatteIsIgnored) {
     RectScene scene;
     scene.layer->trackMatteType = motion::TrackMatteType::Luma;
@@ -753,6 +831,13 @@ TEST(SceneEvaluatorTest, PrecompEffectsAreIgnored) {
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);
-    EXPECT_TRUE(result->layers[0].effects.empty());
+    ASSERT_EQ(result->layers.size(), 2u);
+    const motion::EvaluatedLayer *innerEval = nullptr;
+    for (const auto &layer : result->layers) {
+        if (layer.id == rect->id) {
+            innerEval = &layer;
+        }
+    }
+    ASSERT_NE(innerEval, nullptr);
+    EXPECT_TRUE(innerEval->effects.empty());
 }

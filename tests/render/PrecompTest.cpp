@@ -14,6 +14,7 @@
 using motion::Composition;
 using motion::Document;
 using motion::EntityId;
+using motion::EvaluatedLayer;
 using motion::Expected;
 using motion::FillStyle;
 using motion::Keyframe;
@@ -51,6 +52,15 @@ Layer *AddPrecompLayer(Document &document, EntityId hostId, EntityId sourceId) {
     return layer;
 }
 
+const EvaluatedLayer *FindEvaluated(const SceneState &state, EntityId id) {
+    for (const EvaluatedLayer &layer : state.layers) {
+        if (layer.id == id) {
+            return &layer;
+        }
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 TEST(PrecompTest, FlattensSublayerKeepingItsId) {
@@ -63,11 +73,15 @@ TEST(PrecompTest, FlattensSublayerKeepingItsId) {
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);
-    EXPECT_EQ(result->layers[0].id, rectLayer->id);  // sublayer id preserved
-    EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{100, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.center, (Vec2{0, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.size, (Vec2{10, 10}));
+    ASSERT_EQ(result->layers.size(), 2u);
+    const EvaluatedLayer *precompEval = FindEvaluated(*result, precomp->id);
+    const EvaluatedLayer *rectEval = FindEvaluated(*result, rectLayer->id);
+    ASSERT_NE(precompEval, nullptr);
+    ASSERT_NE(rectEval, nullptr);
+    EXPECT_EQ(rectEval->parentId, precomp->id);
+    EXPECT_EQ(rectEval->worldTransform, Mat3::Translate(Vec2{100, 0}));
+    EXPECT_EQ(rectEval->shapeItems[0].geometry.center, (Vec2{0, 0}));
+    EXPECT_EQ(rectEval->shapeItems[0].geometry.size, (Vec2{10, 10}));
 }
 
 TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
@@ -93,9 +107,10 @@ TEST(PrecompTest, TimeMappingAppliesStretchAndStart) {
     // outer 15 -> inner (15-10)*2+5 = 15 -> layer position x = 75; path stays local.
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 15);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);
-    EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{75, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.center, (Vec2{0, 0}));
+    const EvaluatedLayer *rectEval = FindEvaluated(*result, rectLayer->id);
+    ASSERT_NE(rectEval, nullptr);
+    EXPECT_EQ(rectEval->worldTransform, Mat3::Translate(Vec2{75, 0}));
+    EXPECT_EQ(rectEval->shapeItems[0].geometry.center, (Vec2{0, 0}));
 }
 
 TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
@@ -115,11 +130,18 @@ TEST(PrecompTest, ThreeLevelNestingComposesTransformsAndOpacity) {
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);
-    // Nested precomp transforms compose into worldTransform; path stays local.
-    EXPECT_EQ(result->layers[0].worldTransform, Mat3::Translate(Vec2{30, 0}));
-    EXPECT_EQ(result->layers[0].shapeItems[0].geometry.center, (Vec2{0, 0}));
-    EXPECT_FLOAT_EQ(result->layers[0].opacity, 0.25f);
+    ASSERT_EQ(result->layers.size(), 3u);
+    const EvaluatedLayer *leaf = nullptr;
+    for (const EvaluatedLayer &layer : result->layers) {
+        if (!layer.shapeItems.empty()) {
+            leaf = &layer;
+            break;
+        }
+    }
+    ASSERT_NE(leaf, nullptr);
+    EXPECT_EQ(leaf->worldTransform, Mat3::Translate(Vec2{30, 0}));
+    EXPECT_EQ(leaf->shapeItems[0].geometry.center, (Vec2{0, 0}));
+    EXPECT_FLOAT_EQ(leaf->opacity, 0.25f);
 }
 
 TEST(PrecompTest, MissingTargetProducesNoLayers) {
@@ -139,7 +161,8 @@ TEST(PrecompTest, SelfReferencingCycleTerminates) {
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, loop->id, 0);
     ASSERT_TRUE(result.hasValue());
-    EXPECT_TRUE(result->layers.empty());
+    ASSERT_EQ(result->layers.size(), 1u);
+    EXPECT_TRUE(result->layers[0].shapeItems.empty());
 }
 
 TEST(PrecompTest, TwoCompositionCycleTerminates) {
@@ -151,5 +174,7 @@ TEST(PrecompTest, TwoCompositionCycleTerminates) {
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, a->id, 0);
     ASSERT_TRUE(result.hasValue());
-    EXPECT_TRUE(result->layers.empty());
+    ASSERT_EQ(result->layers.size(), 2u);
+    EXPECT_TRUE(result->layers[0].shapeItems.empty());
+    EXPECT_TRUE(result->layers[1].shapeItems.empty());
 }

@@ -402,11 +402,25 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         if (!source) {
             return;
         }
-        // innerTime = (outer - inPoint) * timeStretch + startTime
+        for (const EvaluatedLayer &existing : out) {
+            if (existing.id == layer.id) {
+                return;
+            }
+        }
+        EvaluatedLayer stub;
+        FillCommonLayerFields(document, layer, time, world, opacity, stub);
+        out.push_back(std::move(stub));
+        const size_t innerBegin = out.size();
         const double inner =
             static_cast<double>(time - layer.inPoint) * layer.timeStretch +
             static_cast<double>(layer.startTime);
-        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world, opacity, depth + 1, out);
+        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world, opacity, depth + 1,
+                            out);
+        for (size_t index = innerBegin; index < out.size(); ++index) {
+            if (!out[index].parentId.isValid()) {
+                out[index].parentId = layer.id;
+            }
+        }
         return;
     }
     if (layer.content->type() == LayerType::Image) {

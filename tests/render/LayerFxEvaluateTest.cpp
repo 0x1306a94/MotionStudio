@@ -102,8 +102,15 @@ TEST(LayerFxEvaluateTest, PrecompStylesAreIgnored) {
 
     Expected<SceneState, std::string> result = SceneEvaluator::Evaluate(document, main->id, 0);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);
-    EXPECT_TRUE(result->layers[0].layerStyles.empty());
+    ASSERT_EQ(result->layers.size(), 2u);
+    const motion::EvaluatedLayer *innerEval = nullptr;
+    for (const auto &layer : result->layers) {
+        if (layer.id == rect->id) {
+            innerEval = &layer;
+        }
+    }
+    ASSERT_NE(innerEval, nullptr);
+    EXPECT_TRUE(innerEval->layerStyles.empty());
     const auto commands = BuildCommands(*result);
     for (const auto &command : commands) {
         EXPECT_NE(command.type, DrawCommandType::BeginLayer);
