@@ -386,7 +386,7 @@ Expected: PASS
 
 ### Task 7: SVG 导入
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/import/svg/SvgStyle.h`：`hasDash` 改为 `std::vector<float> dashes` + `float dashOffset = 0`
@@ -398,20 +398,20 @@ Expected: PASS
 - Consumes: Task 1
 - Produces: `stroke-dasharray="2 2"` → Dashed + `{2,2}`，无 diagnostic
 
-- [ ] **Step 1: 改现有失败语义的测试**
+- [x] **Step 1: 改现有失败语义的测试**
 
 把 `if (d.code == "stroke.dash")` 换成：导入成功、无该 code、对应 `StrokeStyle::strokeMode==Dashed`、`dashes` 含 2,2。
 
-- [ ] **Step 2: 跑测失败**
+- [x] **Step 2: 跑测失败**
 
 Run: `./build/tests/core_tests --gtest_filter='SvgImporterTest.*Dash*'`（或现测名）  
 Expected: FAIL（仍 diagnostic / 实线）
 
-- [ ] **Step 3: 映射实现**
+- [x] **Step 3: 映射实现**
 
 `ApplyPaintStyles` 里 `stroke->dashes = style.dashes;` `stroke->dashOffset.setStaticValue(style.dashOffset);` `stroke->strokeMode = NormalizeDashArray(style.dashes).empty() ? Solid : Dashed;`
 
-- [ ] **Step 4: 跑测通过**
+- [x] **Step 4: 跑测通过**
 
 Expected: PASS
 

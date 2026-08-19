@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/Vec2.h"
@@ -29,7 +30,8 @@ struct ComputedStyle {
     LineCap cap = LineCap::Butt;
     LineJoin join = LineJoin::Miter;
     float miterLimit = 4.f;
-    bool hasDash = false;
+    std::vector<float> dashes;
+    float dashOffset = 0.f;
     Color currentColor{0.f, 0.f, 0.f, 1.f};
     bool visible = true;
     bool displayNone = false;

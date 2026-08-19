@@ -6,6 +6,7 @@
 
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/LayerStyle.h"
+#include "MotionStudio/model/StrokeDash.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/StylePaintMode.h"
 #include "tgfx/core/Point.h"
@@ -238,8 +239,19 @@ ComputedStyle ResolveStyle(const tgfx::SVGNode &node, const ComputedStyle &paren
 
     const auto &dash = node.getStrokeDashArray();
     if (dash.isValue()) {
-        style.hasDash = dash->type() == tgfx::SVGDashArray::Type::DashArray &&
-            !dash->dashArray().empty();
+        style.dashes.clear();
+        if (dash->type() == tgfx::SVGDashArray::Type::DashArray) {
+            for (const tgfx::SVGLength &length : dash->dashArray()) {
+                style.dashes.push_back(
+                    lengthContext.resolve(length, tgfx::SVGLengthContext::LengthType::Other));
+            }
+        }
+    }
+
+    const auto &dashOffset = node.getStrokeDashOffset();
+    if (dashOffset.isValue()) {
+        style.dashOffset =
+            lengthContext.resolve(*dashOffset, tgfx::SVGLengthContext::LengthType::Other);
     }
 
     const auto &display = node.getDisplay();
@@ -344,6 +356,13 @@ std::string FirstFontFamily(const std::string &family) {
     return family.substr(start, end - start);
 }
 
+void AssignStrokeDash(StrokeStyle &stroke, const ComputedStyle &style) {
+    stroke.dashes = style.dashes;
+    stroke.dashOffset.setStaticValue(style.dashOffset);
+    stroke.strokeMode =
+        NormalizeDashArray(style.dashes).empty() ? StrokeMode::Solid : StrokeMode::Dashed;
+}
+
 void ApplyStyles(Layer &layer, const ComputedStyle &style) {
     if (style.hasFill) {
         auto fill = std::make_unique<FillStyle>();
@@ -359,6 +378,7 @@ void ApplyStyles(Layer &layer, const ComputedStyle &style) {
         stroke->join = style.join;
         stroke->miterLimit = style.miterLimit;
         stroke->position = StrokePosition::Center;
+        AssignStrokeDash(*stroke, style);
         layer.styles.push_back(std::move(stroke));
     }
 }
@@ -508,6 +528,7 @@ void ApplyPaintStyles(Layer &layer, const ComputedStyle &style, const tgfx::SVGI
         stroke->join = style.join;
         stroke->miterLimit = style.miterLimit;
         stroke->position = StrokePosition::Center;
+        AssignStrokeDash(*stroke, style);
         bool applied = false;
         if (!style.strokeIri.empty()) {
             if (mapper == nullptr) {

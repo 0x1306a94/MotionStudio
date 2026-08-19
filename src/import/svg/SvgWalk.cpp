@@ -533,10 +533,6 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ct
     NetworkAabb(network, boundsMin, boundsSize);
     ApplyPaintStyles(*layer, style, ctx.mapper, boundsMin, boundsSize, &ctx.tree->diagnostics);
     ApplyNodeTransform(*layer, node);
-    if (style.hasDash) {
-        AddDiagnostic(*ctx.tree, "stroke.dash", "stroke-dasharray is imported as a solid stroke",
-                      layer->name);
-    }
     ApplyNodeEffects(*layer, node, ctx);
     ctx.tree->layers.push_back(std::move(layer));
 }

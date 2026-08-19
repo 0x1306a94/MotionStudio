@@ -9,6 +9,7 @@
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/undo/UndoManager.h"
@@ -278,20 +279,23 @@ TEST(SvgImporterTest, HiddenStaysInvisible) {
     EXPECT_FALSE(result.value().layers.back()->visible);
 }
 
-TEST(SvgImporterTest, StrokeDashIsWarned) {
+TEST(SvgImporterTest, StrokeDashArrayMapsToDashedStroke) {
     const std::string svg =
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
         "<line x1=\"0\" y1=\"0\" x2=\"10\" y2=\"0\" stroke=\"#000\" stroke-dasharray=\"2 2\"/>"
         "</svg>";
     const auto result = BuildSvgLayers(svg.data(), svg.size());
     ASSERT_TRUE(result.hasValue());
-    bool found = false;
     for (const auto &d : result.value().diagnostics) {
-        if (d.code == "stroke.dash") {
-            found = true;
-        }
+        EXPECT_NE(d.code, "stroke.dash");
     }
-    EXPECT_TRUE(found);
+    const motion::Layer *shape = result.value().layers.back().get();
+    ASSERT_FALSE(shape->styles.empty());
+    auto *stroke = static_cast<motion::StrokeStyle *>(shape->styles.back().get());
+    EXPECT_EQ(stroke->strokeMode, motion::StrokeMode::Dashed);
+    ASSERT_EQ(stroke->dashes.size(), 2u);
+    EXPECT_FLOAT_EQ(stroke->dashes[0], 2.0f);
+    EXPECT_FLOAT_EQ(stroke->dashes[1], 2.0f);
 }
 
 TEST(SvgImporterTest, LinearGradientMapsToPaint) {
