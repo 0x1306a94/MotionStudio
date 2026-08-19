@@ -12,4 +12,6 @@ else
   brew upgrade 0x1306a94/tap/depctl > /dev/null
 fi
 
+git lfs install && git lfs pull || exit 1
+
 depctl --skip-paths third_party/libpag/third_party/tgfx/third_party/shaderc,third_party/libpag/third_party/tgfx/third_party/tint,third_party/libpag/third_party/libyuv || exit 1
