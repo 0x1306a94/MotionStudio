@@ -5,7 +5,6 @@
 #include <limits>
 #include <unordered_set>
 
-#include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
@@ -49,37 +48,6 @@ void FillEdgeMidsAndCenter(SelectionHandles &handles) {
                       (handles.corners[0].y + handles.corners[2].y) * 0.5f};
 }
 
-const EvaluatedLayer *FindEvaluatedLayer(const SceneState &state, EntityId id) {
-    for (const EvaluatedLayer &layer : state.layers) {
-        if (layer.id == id) {
-            return &layer;
-        }
-    }
-    return nullptr;
-}
-
-bool HasAncestor(const SceneState &state, EntityId layerId, EntityId ancestorId) {
-    const EvaluatedLayer *current = FindEvaluatedLayer(state, layerId);
-    std::unordered_set<EntityId> visiting;
-    while (current != nullptr && current->parentId.isValid()) {
-        if (current->parentId == ancestorId) {
-            return true;
-        }
-        if (!visiting.insert(current->parentId).second) {
-            return false;
-        }
-        current = FindEvaluatedLayer(state, current->parentId);
-    }
-    return false;
-}
-
-void ExpandPoint(Vec2 point, Vec2 &minPoint, Vec2 &maxPoint) {
-    minPoint.x = std::min(minPoint.x, point.x);
-    minPoint.y = std::min(minPoint.y, point.y);
-    maxPoint.x = std::max(maxPoint.x, point.x);
-    maxPoint.y = std::max(maxPoint.y, point.y);
-}
-
 bool FillOrientedBox(const EvaluatedLayer &layer, Vec2 localMin, Vec2 localMax, SelectionHandles &out) {
     const Vec2 localCorners[4] = {
         {localMin.x, localMin.y},
@@ -111,35 +79,9 @@ bool BuildOrientedHandles(const EvaluatedLayer &layer, SelectionHandles &out) {
 }
 
 bool BuildDescendantUnionHandles(const SceneState &state, const EvaluatedLayer &container, SelectionHandles &out) {
-    Mat3 inverse = Mat3::Identity();
-    if (!container.worldTransform.tryInvert(inverse)) {
-        return false;
-    }
-    Vec2 localMin{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-    Vec2 localMax{std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
-    bool hasBounds = false;
-    for (const EvaluatedLayer &layer : state.layers) {
-        if (layer.id == container.id || !HasAncestor(state, layer.id, container.id)) {
-            continue;
-        }
-        Vec2 childLocalMin;
-        Vec2 childLocalMax;
-        if (!BoundsOfLayerLocal(layer, childLocalMin, childLocalMax)) {
-            continue;
-        }
-        const Vec2 childCorners[4] = {
-            {childLocalMin.x, childLocalMin.y},
-            {childLocalMax.x, childLocalMin.y},
-            {childLocalMax.x, childLocalMax.y},
-            {childLocalMin.x, childLocalMax.y},
-        };
-        for (const Vec2 &corner : childCorners) {
-            const Vec2 world = layer.worldTransform.transformPoint(corner);
-            ExpandPoint(inverse.transformPoint(world), localMin, localMax);
-            hasBounds = true;
-        }
-    }
-    if (!hasBounds) {
+    Vec2 localMin;
+    Vec2 localMax;
+    if (!BoundsOfDescendantUnionLocal(state, container.id, localMin, localMax)) {
         return false;
     }
     return FillOrientedBox(container, localMin, localMax, out);
@@ -162,7 +104,7 @@ bool BuildAxisAlignedUnionHandles(const SceneState &state,
         }
         Vec2 layerMin;
         Vec2 layerMax;
-        if (!BoundsOfLayer(layer, layerMin, layerMax)) {
+        if (!BoundsOfLayerIncludingDescendants(state, layer, layerMin, layerMax)) {
             continue;
         }
         minPoint.x = std::min(minPoint.x, layerMin.x);

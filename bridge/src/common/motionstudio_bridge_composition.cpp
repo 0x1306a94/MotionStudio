@@ -145,7 +145,7 @@ bool ms_composition_layer_bounds(MSDocument *document, uint64_t compositionId, u
         }
         Vec2 minPoint;
         Vec2 maxPoint;
-        if (!motion::BoundsOfLayer(layer, minPoint, maxPoint)) {
+        if (!motion::BoundsOfLayerIncludingDescendants(state, layer, minPoint, maxPoint)) {
             return false;
         }
         if (minX != nullptr) {
@@ -215,7 +215,8 @@ bool ms_layer_local_bounds(MSDocument *document, uint64_t compositionId, uint64_
         }
         Vec2 minPoint;
         Vec2 maxPoint;
-        if (!motion::BoundsOfLayerLocal(layer, minPoint, maxPoint)) {
+        if (!motion::BoundsOfLayerLocal(layer, minPoint, maxPoint) &&
+            !motion::BoundsOfDescendantUnionLocal(state, layer.id, minPoint, maxPoint)) {
             return false;
         }
         if (minX != nullptr) {

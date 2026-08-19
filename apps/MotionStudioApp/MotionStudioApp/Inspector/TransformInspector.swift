@@ -3,6 +3,7 @@
 //  MotionStudioApp
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 struct TransformInspector: View {
@@ -130,6 +131,37 @@ struct TransformInspector: View {
             toggleVec2Keyframe(.position)
         }
 
+        if core.layerType(layerID) == .GROUP,
+           let localBounds = core.layerLocalBounds(compositionID: compositionID,
+                                                   layerID: layerID,
+                                                   frameTime: Double(playheadFrame)),
+           localBounds.width > 0, localBounds.height > 0
+        {
+            let visualWidth = Float(localBounds.width * abs(scale.dx))
+            let visualHeight = Float(localBounds.height * abs(scale.dy))
+            NumberPropertyRow(label: ShapeSizeField.width.label,
+                              value: visualWidth,
+                              hasKeyframeAtPlayhead: false,
+                              isEditable: isEditable,
+                              showsKeyframeButton: false,
+                              showsStepButtons: true)
+            { newValue in
+                setGroupVisualSize(width: newValue, height: visualHeight,
+                                   localBounds: localBounds, scale: scale)
+            } onToggleKeyframe: { _ in }
+
+            NumberPropertyRow(label: ShapeSizeField.height.label,
+                              value: visualHeight,
+                              hasKeyframeAtPlayhead: false,
+                              isEditable: isEditable,
+                              showsKeyframeButton: false,
+                              showsStepButtons: true)
+            { newValue in
+                setGroupVisualSize(width: visualWidth, height: newValue,
+                                   localBounds: localBounds, scale: scale)
+            } onToggleKeyframe: { _ in }
+        }
+
         NumberPropertyRow(label: TransformField.scaleX.label,
                           value: Float(scale.dx),
                           hasKeyframeAtPlayhead: hasKeyframe(.scale),
@@ -247,6 +279,19 @@ struct TransformInspector: View {
                                      frame: playheadFrame,
                                      value: value)
         }
+    }
+
+    private func setGroupVisualSize(width: Float, height: Float, localBounds: CGRect, scale: CGVector) {
+        let localWidth = localBounds.width
+        let localHeight = localBounds.height
+        guard localWidth > 1e-6, localHeight > 1e-6 else {
+            return
+        }
+        let signX: CGFloat = scale.dx < 0 ? -1 : 1
+        let signY: CGFloat = scale.dy < 0 ? -1 : 1
+        let newScale = CGVector(dx: signX * max(CGFloat(width), 1) / localWidth,
+                                dy: signY * max(CGFloat(height), 1) / localHeight)
+        setVec2Property(.scale, value: newScale)
     }
 
     private func performSet(_ property: TransformProperty, action: () -> Void) {

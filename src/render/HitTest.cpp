@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -166,6 +167,37 @@ bool HitTestShapeItem(const EvaluatedShapeItem &item, const std::vector<Vec2> &p
         return true;
     }
     return IsNearPolyline(points, closed, point, tolerance);
+}
+
+const EvaluatedLayer *FindEvaluatedLayer(const SceneState &state, EntityId id) {
+    for (const EvaluatedLayer &layer : state.layers) {
+        if (layer.id == id) {
+            return &layer;
+        }
+    }
+    return nullptr;
+}
+
+bool HasAncestor(const SceneState &state, EntityId layerId, EntityId ancestorId) {
+    const EvaluatedLayer *current = FindEvaluatedLayer(state, layerId);
+    std::unordered_set<EntityId> visiting;
+    while (current != nullptr && current->parentId.isValid()) {
+        if (current->parentId == ancestorId) {
+            return true;
+        }
+        if (!visiting.insert(current->parentId).second) {
+            return false;
+        }
+        current = FindEvaluatedLayer(state, current->parentId);
+    }
+    return false;
+}
+
+void ExpandCorner(Vec2 point, Vec2 &minPoint, Vec2 &maxPoint) {
+    minPoint.x = std::min(minPoint.x, point.x);
+    minPoint.y = std::min(minPoint.y, point.y);
+    maxPoint.x = std::max(maxPoint.x, point.x);
+    maxPoint.y = std::max(maxPoint.y, point.y);
 }
 
 }  // namespace
@@ -357,6 +389,71 @@ bool BoundsOfLayerLocal(const EvaluatedLayer &layer, Vec2 &minPoint, Vec2 &maxPo
         hasBounds = true;
     }
     return hasBounds;
+}
+
+bool BoundsOfDescendantUnionLocal(const SceneState &state, EntityId containerId, Vec2 &minPoint, Vec2 &maxPoint) {
+    const EvaluatedLayer *container = FindEvaluatedLayer(state, containerId);
+    if (container == nullptr) {
+        return false;
+    }
+    Mat3 inverse = Mat3::Identity();
+    if (!container->worldTransform.tryInvert(inverse)) {
+        return false;
+    }
+    Vec2 localMin{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+    Vec2 localMax{std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
+    bool hasBounds = false;
+    for (const EvaluatedLayer &layer : state.layers) {
+        if (layer.id == containerId || !HasAncestor(state, layer.id, containerId)) {
+            continue;
+        }
+        Vec2 childLocalMin;
+        Vec2 childLocalMax;
+        if (!BoundsOfLayerLocal(layer, childLocalMin, childLocalMax)) {
+            continue;
+        }
+        const Vec2 childCorners[4] = {
+            {childLocalMin.x, childLocalMin.y},
+            {childLocalMax.x, childLocalMin.y},
+            {childLocalMax.x, childLocalMax.y},
+            {childLocalMin.x, childLocalMax.y},
+        };
+        for (const Vec2 &corner : childCorners) {
+            const Vec2 world = layer.worldTransform.transformPoint(corner);
+            ExpandCorner(inverse.transformPoint(world), localMin, localMax);
+            hasBounds = true;
+        }
+    }
+    if (!hasBounds) {
+        return false;
+    }
+    minPoint = localMin;
+    maxPoint = localMax;
+    return true;
+}
+
+bool BoundsOfLayerIncludingDescendants(const SceneState &state, const EvaluatedLayer &layer, Vec2 &minPoint,
+                                       Vec2 &maxPoint) {
+    if (BoundsOfLayer(layer, minPoint, maxPoint)) {
+        return true;
+    }
+    Vec2 localMin;
+    Vec2 localMax;
+    if (!BoundsOfDescendantUnionLocal(state, layer.id, localMin, localMax)) {
+        return false;
+    }
+    const Vec2 localCorners[4] = {
+        {localMin.x, localMin.y},
+        {localMax.x, localMin.y},
+        {localMax.x, localMax.y},
+        {localMin.x, localMax.y},
+    };
+    minPoint = layer.worldTransform.transformPoint(localCorners[0]);
+    maxPoint = minPoint;
+    for (int index = 1; index < 4; ++index) {
+        ExpandCorner(layer.worldTransform.transformPoint(localCorners[index]), minPoint, maxPoint);
+    }
+    return true;
 }
 
 EntityId HitTestLayerAtPoint(const SceneState &state, Vec2 point, float tolerance) {

@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/render/EvaluatedTextItem.h"
 #include "MotionStudio/render/HitTest.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::BezierPath;
+using motion::BoundsOfDescendantUnionLocal;
+using motion::BoundsOfLayerIncludingDescendants;
 using motion::BoundsOfLayerLocal;
 using motion::EntityId;
 using motion::EvaluatedLayer;
@@ -15,6 +18,7 @@ using motion::HitTestLayerAtPoint;
 using motion::MakePathGeometry;
 using motion::MakeRectGeometry;
 using motion::MakeSingleContour;
+using motion::Mat3;
 using motion::Paint;
 using motion::SceneState;
 using motion::Vec2;
@@ -84,4 +88,34 @@ TEST(HitTestTest, TextExactLocalBoundsNotOriginAnchored) {
     EXPECT_FLOAT_EQ(maxPoint.y, 10.0f);
     EXPECT_TRUE(HitTestLayer(layer, {-5.0f, -10.0f}, 0));
     EXPECT_FALSE(HitTestLayer(layer, {5.0f, 20.0f}, 0));
+}
+
+TEST(HitTestTest, DescendantUnionLocalForGroup) {
+    SceneState state;
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    group.worldTransform = Mat3::Translate({10, 0});
+    group.worldAnchor = {10, 0};
+
+    EvaluatedLayer child = LayerWithRect(2, 0, 0, 10, 10);
+    child.parentId = EntityId{1};
+    child.worldTransform = Mat3::Translate({10, 0});
+    state.layers.push_back(group);
+    state.layers.push_back(child);
+
+    Vec2 localMin;
+    Vec2 localMax;
+    ASSERT_TRUE(BoundsOfDescendantUnionLocal(state, EntityId{1}, localMin, localMax));
+    EXPECT_FLOAT_EQ(localMin.x, 0);
+    EXPECT_FLOAT_EQ(localMin.y, 0);
+    EXPECT_FLOAT_EQ(localMax.x, 10);
+    EXPECT_FLOAT_EQ(localMax.y, 10);
+
+    Vec2 sceneMin;
+    Vec2 sceneMax;
+    ASSERT_TRUE(BoundsOfLayerIncludingDescendants(state, group, sceneMin, sceneMax));
+    EXPECT_FLOAT_EQ(sceneMin.x, 10);
+    EXPECT_FLOAT_EQ(sceneMin.y, 0);
+    EXPECT_FLOAT_EQ(sceneMax.x, 20);
+    EXPECT_FLOAT_EQ(sceneMax.y, 10);
 }

@@ -132,4 +132,53 @@ TEST(SvgImportBridgeTest, ExternalImageReturnsDiagnostics) {
     ms_document_destroy(document);
 }
 
+TEST(SvgImportBridgeTest, GroupLocalBoundsMatchSelectionHandles) {
+    MSDocument *document = ms_document_create();
+    ASSERT_NE(document, nullptr);
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    MSSvgImportOptions options{};
+    options.insertIndex = -1;
+    options.parentLayerId = 0;
+    options.rootName = "SVG";
+    MSSvgImportResult out{};
+    char *error = nullptr;
+    const char svg[] =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\">"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"10\" fill=\"#f00\"/>"
+        "</svg>";
+    ASSERT_TRUE(ms_document_import_svg(document, compositionId, svg, sizeof(svg) - 1, &options, &out,
+                                       nullptr, &error))
+        << (error != nullptr ? error : "unknown");
+    ASSERT_NE(out.rootLayerId, 0u);
+    EXPECT_EQ(ms_layer_type(document, out.rootLayerId), MS_LAYER_GROUP);
+
+    float minX = 0;
+    float minY = 0;
+    float maxX = 0;
+    float maxY = 0;
+    ASSERT_TRUE(ms_layer_local_bounds(document, compositionId, out.rootLayerId, 0.0, &minX, &minY,
+                                      &maxX, &maxY));
+    MSSelectionHandles handles = {};
+    const uint64_t ids[] = {out.rootLayerId};
+    ASSERT_TRUE(ms_composition_selection_handles(document, compositionId, 0.0, ids, 1,
+                                                 out.rootLayerId, &handles));
+    EXPECT_FLOAT_EQ(minX, handles.localMinX);
+    EXPECT_FLOAT_EQ(minY, handles.localMinY);
+    EXPECT_FLOAT_EQ(maxX, handles.localMaxX);
+    EXPECT_FLOAT_EQ(maxY, handles.localMaxY);
+    EXPECT_GT(maxX - minX, 0.0f);
+    EXPECT_GT(maxY - minY, 0.0f);
+
+    float sceneMinX = 0;
+    float sceneMinY = 0;
+    float sceneMaxX = 0;
+    float sceneMaxY = 0;
+    ASSERT_TRUE(ms_composition_layer_bounds(document, compositionId, out.rootLayerId, 0.0,
+                                            &sceneMinX, &sceneMinY, &sceneMaxX, &sceneMaxY));
+    EXPECT_GT(sceneMaxX - sceneMinX, 0.0f);
+    EXPECT_GT(sceneMaxY - sceneMinY, 0.0f);
+
+    ms_document_destroy(document);
+}
+
 #endif

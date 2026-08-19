@@ -331,35 +331,38 @@ struct FreeTransformDrag {
         var scaleX = projectionRatio(current: currentOffset, start: startOffset, axis: axisX)
         var scaleY = projectionRatio(current: currentOffset, start: startOffset, axis: axisY)
 
-        switch kind {
-        case .scaleEdge(0), .scaleEdge(2):
-            scaleX = 1
-        case .scaleEdge(1), .scaleEdge(3):
-            scaleY = 1
-        default:
-            break
-        }
-
         if shift {
-            let uniform = (abs(scaleX) + abs(scaleY)) * 0.5
-            let signX: CGFloat = scaleX < 0 ? -1 : 1
-            let signY: CGFloat = scaleY < 0 ? -1 : 1
-            if case .scaleEdge = kind {
-                if scaleX == 1 {
-                    scaleY = uniform * signY
+            switch kind {
+            case .scaleEdge(0), .scaleEdge(2):
+                scaleX = scaleY
+            case .scaleEdge(1), .scaleEdge(3):
+                scaleY = scaleX
+            default:
+                let signX: CGFloat = scaleX < 0 ? -1 : 1
+                let signY: CGFloat = scaleY < 0 ? -1 : 1
+                let startLength = hypot(startOffset.x, startOffset.y)
+                let uniform: CGFloat = if startLength > 1e-4 {
+                    hypot(currentOffset.x, currentOffset.y) / startLength
                 } else {
-                    scaleX = uniform * signX
+                    (abs(scaleX) + abs(scaleY)) * 0.5
                 }
-            } else {
                 scaleX = uniform * signX
                 scaleY = uniform * signY
+            }
+        } else {
+            switch kind {
+            case .scaleEdge(0), .scaleEdge(2):
+                scaleX = 1
+            case .scaleEdge(1), .scaleEdge(3):
+                scaleY = 1
+            default:
+                break
             }
         }
 
         scaleX = clampedScale(scaleX)
         scaleY = clampedScale(scaleY)
 
-        // Never write transform.scale — resize boxes / move positions only.
         let orientedSingle = startHandles.isOriented && layerStarts.count == 1
         for start in layerStarts {
             if let contentSizePath = start.contentSizePath {
@@ -382,6 +385,9 @@ struct FreeTransformDrag {
             } else if start.hasShapeGeometry {
                 applyShapeGeometryResize(core: core, frame: frame, start: start,
                                          scaleX: scaleX, scaleY: scaleY)
+            } else if core.layerType(start.layerID) == .GROUP {
+                applyTransformScale(core: core, frame: frame, start: start,
+                                    scaleX: scaleX, scaleY: scaleY)
             } else {
                 let position = CGVector(dx: pivotScene.x + (start.position.dx - pivotScene.x) * scaleX,
                                         dy: pivotScene.y + (start.position.dy - pivotScene.y) * scaleY)
@@ -389,6 +395,28 @@ struct FreeTransformDrag {
                           frame: frame, value: position, animated: start.positionAnimated)
             }
         }
+    }
+
+    private func applyTransformScale(core: MotionDocumentCore,
+                                     frame: Int64,
+                                     start: LayerTransformStart,
+                                     scaleX: CGFloat,
+                                     scaleY: CGFloat)
+    {
+        let newScale = CGVector(dx: start.scale.dx * scaleX, dy: start.scale.dy * scaleY)
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.scale.path,
+                  frame: frame, value: newScale, animated: start.scaleAnimated)
+        let position: CGVector = if let relative = localPivotRelative, startHandles.isOriented, layerStarts.count == 1 {
+            compensatedPosition(pivot: pivotScene,
+                                rotationDegrees: start.rotation,
+                                scale: newScale,
+                                localRelative: relative)
+        } else {
+            CGVector(dx: pivotScene.x + (start.position.dx - pivotScene.x) * scaleX,
+                     dy: pivotScene.y + (start.position.dy - pivotScene.y) * scaleY)
+        }
+        writeVec2(core: core, layerID: start.layerID, path: TransformProperty.position.path,
+                  frame: frame, value: position, animated: start.positionAnimated)
     }
 
     private func applyShapeGeometryResize(core: MotionDocumentCore,
