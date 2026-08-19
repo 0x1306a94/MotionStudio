@@ -147,7 +147,7 @@ git commit --only include/MotionStudio/undo/SetParentCommand.h src/undo/SetParen
 
 ### Task 2: `MakeGroupLayersCommand`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/undo/GroupLayers.h`
@@ -166,7 +166,7 @@ std::unique_ptr<Command> MakeGroupLayersCommand(
 
 `outGroupId` 在失败时保持 invalid。成功时 command 的 `describe()` 为 `"Group"`。
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/undo/GroupLayersTest.cpp`（自建 Document，不要依赖 CommandsTest 的匿名 `Scene`）：
 
@@ -249,7 +249,7 @@ TEST(GroupLayersTest, StripsDescendantsOfSelectedAncestors) {
 
 `IndexOfLayer` 在 `src/undo/CommandHelpers.h`，测试可从 composition.layers 手写下标比较，或把 `IndexOfLayer` 测里复制一小段循环，**不要** include 私有 `CommandHelpers.h`。用公开 API：扫 `composition->layers`。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filter='GroupLayersTest.*'
@@ -257,7 +257,7 @@ cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filt
 
 Expected: 编译失败。
 
-- [ ] **Step 3: Implement grouping**
+- [x] **Step 3: Implement grouping**
 
 `GroupLayers.h`：
 
@@ -306,7 +306,7 @@ Task 2 里 `MakeUngroupLayersCommand` 先 `return nullptr;`。
 
 C++ `moveSteps` 放 `GroupLayers.cpp` 匿名命名空间，抄 `TimelineReorder.moveSteps` 的命令式循环，不要用 lambda。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filter='GroupLayersTest.*:SetParentCommandTest.*'
@@ -314,9 +314,9 @@ cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filt
 
 Expected: Group 相关 PASS；Ungroup 尚未实现，不要在本任务加 Ungroup 测试。
 
-- [ ] **Step 5: Update this plan** — Task 2 `[x]`，`Status: ✅ Done`。
+- [x] **Step 5: Update this plan** — Task 2 `[x]`，`Status: ✅ Done`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only include/MotionStudio/undo/GroupLayers.h src/undo/GroupLayers.cpp tests/undo/GroupLayersTest.cpp docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Group sibling layers under a new identity group."
