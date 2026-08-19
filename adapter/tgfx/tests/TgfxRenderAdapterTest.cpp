@@ -91,6 +91,11 @@ std::string RedFixturePath() {
     return (std::filesystem::path(__FILE__).parent_path() / "fixtures" / "red_2x2.png").string();
 }
 
+BezierPath FullCanvasMaskPath() {
+    return MakeSingleContour(
+        {{{0, 0}, {}, {}}, {{100, 0}, {}, {}}, {{100, 100}, {}, {}}, {{0, 100}, {}, {}}}, true);
+}
+
 }  // namespace
 
 TEST(TgfxRenderAdapterTest, FillsRectOverBackground) {
@@ -539,6 +544,141 @@ TEST(TgfxRenderAdapterTest, DrawsStretchedImageIntoContainer) {
     image.scaleMode = motion::ImageScaleMode::Stretch;
     layer.imageItem = std::move(image);
     state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(center.r, 255, 20);
+    EXPECT_NEAR(center.g, 0, 20);
+    EXPECT_NEAR(center.b, 0, 20);
+}
+
+TEST(TgfxRenderAdapterTest, PathMaskAddShowsImageContent) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    const std::string path = RedFixturePath();
+    ASSERT_TRUE(std::filesystem::exists(path)) << path;
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+    EvaluatedLayer layer;
+    motion::EvaluatedImageItem image;
+    image.absolutePath = path;
+    image.containerSize = {100, 100};
+    image.intrinsicSize = {2, 2};
+    image.scaleMode = motion::ImageScaleMode::Stretch;
+    layer.imageItem = std::move(image);
+    EvaluatedMask mask;
+    mask.mode = MaskMode::Add;
+    mask.path = MakeSingleContour(
+        {{{0, 0}, {}, {}}, {{100, 0}, {}, {}}, {{100, 100}, {}, {}}, {{0, 100}, {}, {}}}, true);
+    layer.masks.push_back(mask);
+    state.layers.push_back(std::move(layer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(center.r, 255, 20);
+    EXPECT_NEAR(center.g, 0, 20);
+    EXPECT_NEAR(center.b, 0, 20);
+}
+
+TEST(TgfxRenderAdapterTest, ImageInsideGroupMaskShows) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    const std::string path = RedFixturePath();
+    ASSERT_TRUE(std::filesystem::exists(path)) << path;
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    EvaluatedMask groupMask;
+    groupMask.mode = MaskMode::Add;
+    groupMask.path = FullCanvasMaskPath();
+    group.masks.push_back(groupMask);
+
+    EvaluatedLayer imageLayer;
+    imageLayer.id = EntityId{2};
+    imageLayer.parentId = EntityId{1};
+    motion::EvaluatedImageItem image;
+    image.absolutePath = path;
+    image.containerSize = {100, 100};
+    image.intrinsicSize = {2, 2};
+    image.scaleMode = motion::ImageScaleMode::Stretch;
+    imageLayer.imageItem = std::move(image);
+
+    state.layers.push_back(std::move(group));
+    state.layers.push_back(std::move(imageLayer));
+
+    adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
+    PlayCommands(BuildCommands(state), *adapter);
+    adapter->endFrame();
+
+    std::vector<uint8_t> pixels;
+    ASSERT_TRUE(adapter->ReadPixels(pixels));
+    const Pixel center = PixelAt(pixels, 100, 50, 50);
+    EXPECT_NEAR(center.r, 255, 20);
+    EXPECT_NEAR(center.g, 0, 20);
+    EXPECT_NEAR(center.b, 0, 20);
+}
+
+TEST(TgfxRenderAdapterTest, ImageMaskInsideGroupMaskShows) {
+    auto adapter = TgfxRenderAdapter::Make(100, 100);
+    if (!adapter) {
+        GTEST_SKIP() << "Metal is unavailable on this machine";
+    }
+
+    const std::string path = RedFixturePath();
+    ASSERT_TRUE(std::filesystem::exists(path)) << path;
+
+    SceneState state;
+    state.viewportWidth = 100;
+    state.viewportHeight = 100;
+    state.backgroundColor = Color{0, 0, 0, 1};
+
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    EvaluatedMask groupMask;
+    groupMask.mode = MaskMode::Add;
+    groupMask.path = FullCanvasMaskPath();
+    group.masks.push_back(groupMask);
+
+    EvaluatedLayer imageLayer;
+    imageLayer.id = EntityId{2};
+    imageLayer.parentId = EntityId{1};
+    motion::EvaluatedImageItem image;
+    image.absolutePath = path;
+    image.containerSize = {100, 100};
+    image.intrinsicSize = {2, 2};
+    image.scaleMode = motion::ImageScaleMode::Stretch;
+    imageLayer.imageItem = std::move(image);
+    EvaluatedMask imageMask;
+    imageMask.mode = MaskMode::Add;
+    imageMask.path = FullCanvasMaskPath();
+    imageLayer.masks.push_back(imageMask);
+
+    state.layers.push_back(std::move(group));
+    state.layers.push_back(std::move(imageLayer));
 
     adapter->beginFrame(100, 100, state.backgroundColor, state.cornerRadius);
     PlayCommands(BuildCommands(state), *adapter);

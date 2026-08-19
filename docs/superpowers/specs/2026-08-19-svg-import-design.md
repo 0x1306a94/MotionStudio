@@ -9,7 +9,7 @@
 把 SVG 文件导入成 MotionStudio 自身的图层树（对标 Figma「导入 SVG → 可编辑图层」），而不是栅格图或不可编辑的渲染快照。
 
 1. 用 tgfx `SVGDOM` 解析 SVG（内部已走 `XMLDOM`）
-2. 所有形状节点统一变成 `LayerType::Shape` + `ShapePath` + `Animatable<VectorNetwork>`，便于钢笔二次编辑
+2. 均匀圆角（含直角）`<rect>` 建成 `ShapeRect`；其余形状建成 `ShapePath` + `VectorNetwork`，便于钢笔二次编辑
 3. 单独静态库实现导入，链接 **tgfx + core**；**不**把 tgfx 类型漏进 Core
 4. 保留 SVG 节点树（`LayerType::Group` + `parentId`）以及 transform / 可映射样式
 5. `<text>` 导入为可编辑 `LayerType::Text`（点文本）；`<textPath>` / 逐字定位本阶段跳过 + diagnostic
@@ -22,12 +22,14 @@
 | 不采用 | 自写 XML 语义（PAGX `SVGImporter` 那条路）；不调用 `SVGNode::asPath` / `SVGRenderContext`（私有实现） |
 | 库位置 | `src/import/svg/` + `include/MotionStudio/import/svg/`，静态库 `svg_import`（alias `motionstudio_svg_import`） |
 | 依赖 | PUBLIC `core`；PRIVATE 预编译 `tgfx`（须 `-DTGFX_BUILD_SVG=ON`） |
-| 形状几何 | 一律 `ShapePath.path`（`VectorNetwork`）；**不用** `ShapeRect` / `ShapeEllipse` |
+| 形状几何 | 均匀 `rx==ry` 的 `<rect>`（含直角）→ `ShapeRect`；`rx≠ry` 的 rect 以及 circle/ellipse/path/line/poly → `ShapePath` + `VectorNetwork`。**不用** `ShapeEllipse` |
 | 树结构 | 扁平 `Composition.layers` + `parentId`；`<g>` / 嵌套 `<svg>` → `LayerType::Group` |
 | Transform | SVG `Matrix` 分解为 `position` / `rotation` / `scale`；**`anchorPoint` = 局部 AABB 中心**，并补偿 `position` 使世界矩阵不变；含剪切则把残差 bake 进几何 |
 | 样式 | 映射到现有 `FillStyle` / `StrokeStyle` / `GradientPaint`；Core 没有的字段跳过并记 warning |
 | 文本 | `<text>`（含同样式 `<tspan>`）→ 点文本 `TextContent`；`<textPath>` / 逐字 x,y / `rotate` 跳过 + diagnostic |
-| 滤镜 / mask / pattern / dash | 本阶段跳过 + diagnostic |
+| 滤镜 / 平铺 pattern / dash | 本阶段跳过 + diagnostic |
+| 简单 `mask` | 均匀圆角 rect → 组/图 `cornerRadius`；否则单形状 → `Layer.masks`（同 clip-path） |
+| 简单 image pattern fill | 建成 `Image` 层（Figma 贴图导出） |
 | `<image>` | data URI → `Image` 层 + `Asset`；外部 href 跳过 + warning |
 | `<use>` | 经 `nodeIDMapper` 展开，深度上限 32，环检测 |
 | 产出 | **图层树**（根 `Group` + 扁平 `layers` + `parentId`），插入**当前合成**；不新建 `Document` / `Composition`，不改合成尺寸 |
@@ -41,7 +43,8 @@
 - 嵌入字体（`@font-face` / 外部 font 文件）
 - SVG 动画（SMIL / CSS animation）
 - `stroke-dasharray`（Core `StrokeStyle` 无 dash）
-- `pattern`、滤镜图元（`filter` / `fe*`）、`mask`、`marker`
+- **平铺** `pattern`（tile 小于填充盒）、pattern 内非单图内容、滤镜图元（`filter` / `fe*`）、`marker`
+- 复杂 `mask`（多子形状 / `use` / `maskContentUnits=objectBoundingBox`）
 - 为 SVG 增加 Core 字段（skew、dash）；不为 SVG 发明内外描边属性
 - 复用 `third_party/libpag/src/pagx/svg/SVGImporter.cpp`（那是 PAGX 节点树，模型不同）
 - 升 `schemaVersion`
@@ -88,13 +91,15 @@ PAGX `SVGImporter` 也是 `XMLDOM` + 自写 `convertToLayer`。MotionStudio **�
 | Core | 用途 |
 |---|---|
 | `LayerType::Shape` + `ShapeContent.geometry` | 单几何；Fill/Stroke 在 `Layer::styles` |
-| `ShapePath.path` : `Animatable<VectorNetwork>` | 权威可编辑路径 |
+| `ShapePath.path` : `Animatable<VectorNetwork>` | path / 椭圆 / 不等圆角 rect / 折线 |
+| `ShapeRect` | 均匀圆角（含直角）`<rect>`：`position` 为中心，`size` 为宽高，`cornerRadius = clamp(rx, 0, min(w,h)/2)` |
 | `BezierPathToVectorNetwork` / `Path::Iterator` | 轮廓 → Network |
 | `LayerType::Group` + `NullContent` + `parentId` | SVG 组（见 `ShapeElement.h` 注释） |
 | `Transform`：anchor / position / scale / rotation / opacity | 无 skew |
 | `FillStyle` / `StrokeStyle` | Color / Gradient / Shader；`StrokePosition` 已有 Center / Inside / Outside |
 | `GradientPaint` | Linear / Radial / Conic / Diamond；坐标是层局部 AABB 左上角空间 |
-| `Mask` : `Animatable<VectorNetwork>` | 可选：简单 `clip-path` |
+| `Mask` : `Animatable<VectorNetwork>` | 简单直角/复杂 `clip-path` 或 `mask`；圆角 rect clip 优先走 `cornerRadius` |
+| `ImageContent.cornerRadius` / `NullContent.cornerRadius` | 均匀圆角：pattern 填满图容器，或组上的圆角 clip/mask |
 | `LayerType::Image` + `Asset` | data URI 图 |
 | `AddLayerCommand` / `ImportImageAssetCommand` / `CompositeCommand` | 插入当前合成的 undo 单元 |
 | `UndoManager`（挂在 bridge `MSDocument`，不在 `Document` 上） | `ImportSvgInto` 的入参 |
@@ -232,7 +237,9 @@ Expected<ImportResult, std::string> ImportSvgFileInto(Document &document, UndoMa
 |---|---|---|
 | 根 `<svg>` | 根 `Group`（viewBox 映射挂在这层） | 不新建合成、不改画布尺寸 |
 | `<g>`、嵌套 `<svg>` | `LayerType::Group` | 子节点 `parentId = group.id` |
-| `path` / `rect` / `circle` / `ellipse` / `line` / `polygon` / `polyline` | `Shape` + `ShapePath` + `VectorNetwork` | 见 §6 |
+| `path` / `circle` / `ellipse` / `line` / `polygon` / `polyline` | `Shape` + `ShapePath` + `VectorNetwork` | 见 §6 |
+| `rect`（`rx==ry`，含缺省/直角） | `Shape` + `ShapeRect` | `position` = 中心；见 §6.1 |
+| `rect`（`rx≠ry`） | `Shape` + `ShapePath` + round-rect Network | 几何即剪影，不加 mask |
 | `<use>` | 展开引用子树（拷贝后当普通节点） | 环或超深 → skip |
 | `<image>` data URI | `Image` + 待插入的 `Asset` | `size` = 解析后的宽高 |
 | `<image>` 外部 href | 跳过 | `image.external` |
@@ -347,30 +354,36 @@ position = translation + Rotate(rotation) * Scale(scale) * anchor
 
 ### 5.3 几何空间
 
-形状点落在**该层局部**（未乘本层 transform）。SVG 几何属性在节点局部用户空间，resolve 后直接进 `VectorNetwork`，不再乘本层 `getTransform()`。
+形状点落在**该层局部**（未乘本层 transform）。SVG 几何属性在节点局部用户空间 resolve：`ShapeRect` 直接写中心/`size`/`cornerRadius`；`ShapePath` 进 `VectorNetwork`，不再乘本层 `getTransform()`。
 
 ---
 
-## 6. 形状 → VectorNetwork
+## 6. 形状几何
 
-### 6.1 先变成 `tgfx::Path`
+### 6.1 `<rect>` → `ShapeRect` 或 VectorNetwork
 
-在当前 viewport 的 `SVGLengthContext` 下：
+在当前 viewport 的 `SVGLengthContext` 下 resolve `x/y/width/height` 与可选 `rx/ry`。`rx/ry` 按 SVG：只写其中一个则另一个等于它；再夹到半宽/半高。零面积且无 stroke：跳过 + `shape.empty`。
+
+| 条件 | Core |
+|---|---|
+| `rx == ry`（含两者为 0 的直角 rect） | `ShapeRect`：`position = (x + w/2, y + h/2)`，`size = (w, h)`，`cornerRadius = rx`。**不**转 VectorNetwork，**不**用 mask 表示圆角 |
+| `rx ≠ ry` | `ShapePath` + `addRoundRect` 转成的 VectorNetwork。几何即剪影，不加 mask |
+
+含剪切的节点 transform 残差无法保持参数矩形：bake 时把该 `ShapeRect` 转成 `ShapePath` 再乘残差（与既有 path bake 同一路径）。
+
+### 6.2 其它标签 → `tgfx::Path` → VectorNetwork
 
 | 标签 | 构造 |
 |---|---|
 | `path` | `SVGPath::getShapePath()`（已解析） |
-| `rect` | resolve x/y/w/h 与可选 rx/ry → `addRect` / `addRoundRect` |
 | `circle` | cx/cy/r → `addOval` |
 | `ellipse` | cx/cy/rx/ry → `addOval` |
 | `line` | x1/y1 → x2/y2，`moveTo`/`lineTo`（开口，通常只有 stroke） |
 | `polygon` / `polyline` | `getPoints()` 折线；polygon `close()` |
 
-`rx/ry` 按 SVG 夹到半宽/半高。零面积且无 stroke 的形状：跳过 + `shape.empty`。
+**不**为 circle / ellipse 生成 `ShapeEllipse`。圆在 Network 里是若干段三次贝塞尔。
 
-**不**为了「保持参数矩形」而生成 `ShapeRect` / `ShapeEllipse`。圆角 rect / 圆在 Network 里是若干段三次贝塞尔，和 Figma 导入后的可编辑矢量一致。
-
-### 6.2 `Path` → `VectorNetwork`
+### 6.3 `Path` → `VectorNetwork`
 
 `tgfx::Path::Iterator` 的 verb：Move / Line / Quad / Conic / Cubic / Close。
 
@@ -428,7 +441,8 @@ SVG 初始值（节点链上都未指定时）：
 | `fill-rule` evenodd / nonzero | `FillRule::EvenOdd` / `NonZero` |
 | `currentColor` | 用继承的 `color` |
 | `url(#id)` 线性/径向渐变 | `paintMode = Gradient`，见 §7.4 |
-| `url(#id)` pattern / 缺失 | 跳过该 fill + `paint.unresolved` |
+| `url(#id)` 简单 image pattern | **不写 FillStyle**；改建成 `Image` 层，见 §8.4 |
+| `url(#id)` 平铺 / 非单图 pattern / 缺失 | 跳过该 fill + `paint.unresolved` |
 | style 级 blend | Core 有 `FillStyle.blendMode`；tgfx 不解析 `mix-blend-mode` → 保持 `Normal` |
 
 组上的 fill **不**复制到 Group 层（Group 的 `styles` 不参与绘制）。只写在叶子 Shape / Text 上。
@@ -473,11 +487,25 @@ stops < 2：该 paint 跳过 + `gradient.stops`。
 
 ### 7.5 clip-path（有限）
 
-`clip-path=url(#id)` 且 clip 内容是**单个**可转 Network 的形状、无额外滤镜：写入 `Layer.masks[0]`，`MaskMode::Add`，`opacity=1`，`inverted=false`。
+`clip-path=url(#id)` 且 clip 内容是**单个**形状、无额外滤镜：
+
+| clip 形状 | 目标层 | 导入 |
+|---|---|---|
+| 均匀圆角 rect（`rx==ry` 且 `rx>0`） | `Group` | `NullContent.cornerRadius = rx`（组局部 px），**不**写 `Layer.masks` |
+| 均匀圆角 rect，且 clip 经层局部逆变换后对齐 image 容器 `[0,w]×[0,h]` | `Image` | `ImageContent.cornerRadius`，不写 mask |
+| 直角 rect（`rx=0`）、`rx≠ry`、path / circle / 其它 | 任意 | `Layer.masks[0]`，`MaskMode::Add`，`opacity=1`，`inverted=false` |
+
+`group.cornerRadius` 裁的是**后代 AABB**，不是任意 SVG clip 矩形。Figma 式铺满画板的圆角 clip（与组包围盒同尺寸）对齐；clip 比 AABB 更小是接受的近似——若必须精确裁切，仍走 path mask。
 
 `clip-rule` evenodd：仍进同一个 Network，靠填充规则；Core Mask 无独立 fill-rule 字段时只转几何。
 
-多子节点 / `clipPath` 套 `use` 过深：跳过 + `clip.unsupported`。`mask` 属性一律跳过 + `mask.skipped`。
+多子节点 / `clipPath` 套 `use` 过深：跳过 + `clip.unsupported`。
+
+### 7.5.1 mask（有限，同 clip-path）
+
+`mask=url(#id)` 且 `<mask>` 内容是**单个**形状（无 `use` / 嵌套 `g`），`maskContentUnits` 为 `userSpaceOnUse`（缺省）：映射规则与 §7.5 相同（均匀圆角 rect → 组/图的 `cornerRadius`，否则 `Layer.masks`）。`mask-type`（alpha / luminance）忽略——单色 path 剪影两者等价。
+
+多子 / `use` / `g` / `maskContentUnits=objectBoundingBox`：跳过 + `mask.skipped`。成功导入时**不**报 `mask.skipped`。
 
 ### 7.6 明确不映射
 
@@ -507,9 +535,25 @@ stops < 2：该 paint 跳过 + `gradient.stops`。
 
 - `SVGIRI::DataURI`：解码像素（tgfx `SVGImage::LoadImage` 或 codec），`Asset{type=Image, name, width, height}`，`path` 记逻辑名 `"assets/<id>.png"`（**库不写盘**）。`ImageContent.assetId`、`size` = 元素 resolve 后的 w/h，`scaleMode = LetterBox`（有 `preserveAspectRatio` 时：`none` → Stretch，否则 LetterBox）。
 - 非 data URI：不建层，`image.external`。
-- 字节在 `SvgLayerTree.embeddedImages`；`ImportSvgInto` 执行后宿主仍可用同一份写盘。`<image>` 的 `x/y` 并进该节点矩阵（`T(x,y) * svgTransform`）再按 §5.2 分解；`ImageContent` 无独立平移字段。
+- 字节在 `SvgLayerTree.embeddedImages`；`ImportSvgInto` 执行后宿主仍可用同一份写盘。`<image>` 的 `x/y` 并进该节点矩阵（`T(x,y) * svgTransform`）再按 §5.2 分解；`ImageContent` 无独立平移字段。同一 data URI 多次引用（树上 `<image>` 与 pattern fill）共用一个 `Asset`。
 
-### 8.3 Text
+### 8.3 pattern fill → Image 层
+
+Figma 把位图导出为 `fill="url(#pattern)"`：`<pattern>` 内一个 `<image>` 或 `<use href="#imageId">`，`width/height=1`（`patternUnits` 缺省 objectBoundingBox，tile 覆盖整个填充盒）。Core 没有 ImagePattern fill，因此：
+
+1. `fill` IRI 解析到 `SVGPattern`
+2. 恰好一个子节点：`<image>` 或 `<use>` → data URI `<image>`
+3. tile 覆盖填充盒（objectBoundingBox 下 w/h 缺省或 ≥ 0.999；userSpaceOnUse 下 w/h ≥ 形状 AABB）：不把 fill 写成 `FillStyle`
+4. 建成 `Image` 层：解码与 §8.2 相同。`ImageContent.size` = 宿主图形盒（`<rect>` 用 `width/height`，其它形状用 AABB）。**忽略** pattern 内 `<use>` / `<image>` / `patternTransform` 的位移与缩放。`scaleMode` 一律 `Stretch`（不读 `preserveAspectRatio`）
+5. 层矩阵（锚点 0）：`nodeTransform * T(盒原点)`。均匀圆角 rect 另写 `cornerRadius = rx`
+6. 非均匀圆角 / 非 rect：形状 path 平移到盒局部原点后写入 `masks[0]`
+7. 若该形状还有 stroke：再保留一个无 fill 的 Shape 层
+
+不满足 2–3（多子、非图、tile 重复、无 data URI）：该 fill 走 `paint.unresolved`，形状仍按普通 Shape 导入。
+
+`fill-opacity` 乘到 Image 层 `transform.opacity`。层名用形状节点的 id。
+
+### 8.4 Text
 
 导入为**可编辑点文本**，不转字形轮廓。
 
@@ -553,13 +597,13 @@ M = getTransform() * T(x0+dx0 - alignX, y0+dy0 - ascent)
 | `tag.unknown` | 未支持标签 |
 | `shape.empty` | 零几何 |
 | `path.conic` | conic 已近似为 cubic |
-| `paint.unresolved` | fill/stroke IRI 无效或 pattern |
+| `paint.unresolved` | fill/stroke IRI 无效，或 pattern 不是可导入的单图覆盖填充 |
 | `stroke.dash` | dash 已丢 |
 | `gradient.stops` | stop 不足 |
 | `gradient.focal` | 径向焦点已丢 |
 | `gradient.spread` | pad 以外已丢 |
 | `clip.unsupported` | clip 过复杂 |
-| `mask.skipped` | `mask` 未导入 |
+| `mask.skipped` | `mask` 过复杂未导入 |
 | `filter.skipped` | 滤镜未导入 |
 | `use.missing` / `use.cycle` | use 失败 |
 | `image.external` | 外部图未导入 |
@@ -638,8 +682,8 @@ M = getTransform() * T(x0+dx0 - alignX, y0+dy0 - ascent)
 
 **几何**
 
-1. **一律 VectorNetwork**（采用）：与「二次编辑」一致
-2. rect/circle 保持参数几何：和需求冲突；圆角/变换残差还要特判
+1. **均匀 `<rect>` 用 `ShapeRect`，其余 VectorNetwork**（采用）：可编辑圆角走 Core `cornerRadius`；`rx≠ry` / 椭圆仍是 Network
+2. 一律 VectorNetwork：圆角 rect 要靠 mask 或贝塞尔近似，和面板上的矩形工具不一致
 
 **库位置**
 

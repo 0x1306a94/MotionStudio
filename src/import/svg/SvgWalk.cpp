@@ -1,14 +1,17 @@
 #include "SvgWalk.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <unordered_map>
 #include <vector>
 
 #include "MotionStudio/model/ImageContent.h"
 #include "MotionStudio/model/ImageScaleMode.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
 #include "SvgLength.h"
 #include "SvgPathConvert.h"
 #include "SvgStyle.h"
@@ -150,6 +153,90 @@ std::string LayerName(const tgfx::SVGNode &node) {
     return DefaultName(node.tag());
 }
 
+struct SvgRectGeom {
+    float x = 0.f;
+    float y = 0.f;
+    float width = 0.f;
+    float height = 0.f;
+    float rx = 0.f;
+    float ry = 0.f;
+};
+
+constexpr float UniformRadiusEpsilon = 1e-3f;
+
+bool ResolveSvgRectGeom(const tgfx::SVGNode &node, const tgfx::SVGLengthContext &lengthContext,
+                        SvgRectGeom *out) {
+    if (out == nullptr || node.tag() != tgfx::SVGTag::Rect) {
+        return false;
+    }
+    const auto &rect = static_cast<const tgfx::SVGRect &>(node);
+    const float x =
+        lengthContext.resolve(rect.getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float y =
+        lengthContext.resolve(rect.getY(), tgfx::SVGLengthContext::LengthType::Vertical);
+    const float width =
+        lengthContext.resolve(rect.getWidth(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    const float height =
+        lengthContext.resolve(rect.getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
+    if (width <= 0.f || height <= 0.f) {
+        return false;
+    }
+    float rx = 0.f;
+    float ry = 0.f;
+    if (rect.getRx().has_value()) {
+        rx = lengthContext.resolve(*rect.getRx(), tgfx::SVGLengthContext::LengthType::Horizontal);
+    }
+    if (rect.getRy().has_value()) {
+        ry = lengthContext.resolve(*rect.getRy(), tgfx::SVGLengthContext::LengthType::Vertical);
+    }
+    if (rx <= 0.f && ry > 0.f) {
+        rx = ry;
+    }
+    if (ry <= 0.f && rx > 0.f) {
+        ry = rx;
+    }
+    rx = std::min(rx, width * 0.5f);
+    ry = std::min(ry, height * 0.5f);
+    out->x = x;
+    out->y = y;
+    out->width = width;
+    out->height = height;
+    out->rx = rx;
+    out->ry = ry;
+    return true;
+}
+
+bool SvgRectHasUniformRadius(const SvgRectGeom &geom) {
+    return std::fabs(geom.rx - geom.ry) <= UniformRadiusEpsilon;
+}
+
+bool MappedRectMatchesImageBox(Vec2 p00, Vec2 p10, Vec2 p01, Vec2 p11, float rxLength,
+                               float ryLength, float imageWidth, float imageHeight,
+                               float *imageRadius) {
+    const float boxEpsilon = std::max(0.5f, 0.01f * std::min(imageWidth, imageHeight));
+    if (std::fabs(p10.y - p00.y) > boxEpsilon || std::fabs(p01.x - p00.x) > boxEpsilon) {
+        return false;
+    }
+    const float minX = std::min(std::min(p00.x, p10.x), std::min(p01.x, p11.x));
+    const float maxX = std::max(std::max(p00.x, p10.x), std::max(p01.x, p11.x));
+    const float minY = std::min(std::min(p00.y, p10.y), std::min(p01.y, p11.y));
+    const float maxY = std::max(std::max(p00.y, p10.y), std::max(p01.y, p11.y));
+    if (std::fabs(minX) > boxEpsilon || std::fabs(minY) > boxEpsilon) {
+        return false;
+    }
+    if (std::fabs(maxX - imageWidth) > boxEpsilon || std::fabs(maxY - imageHeight) > boxEpsilon) {
+        return false;
+    }
+    const float radiusEpsilon = std::max(UniformRadiusEpsilon, 0.01f * std::max(rxLength, ryLength));
+    if (std::fabs(rxLength - ryLength) > radiusEpsilon) {
+        return false;
+    }
+    if (imageRadius != nullptr) {
+        *imageRadius = 0.5f * (rxLength + ryLength);
+    }
+    return true;
+}
+
 bool NetworkHasArea(const VectorNetwork &network) {
     if (network.vertices.size() < 2) {
         return false;
@@ -177,39 +264,14 @@ tgfx::Path ShapePathFromNode(const tgfx::SVGNode &node,
             break;
         }
         case tgfx::SVGTag::Rect: {
-            const auto &rect = static_cast<const tgfx::SVGRect &>(node);
-            const float x =
-                lengthContext.resolve(rect.getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
-            const float y =
-                lengthContext.resolve(rect.getY(), tgfx::SVGLengthContext::LengthType::Vertical);
-            const float width = lengthContext.resolve(rect.getWidth(),
-                                                      tgfx::SVGLengthContext::LengthType::Horizontal);
-            const float height = lengthContext.resolve(
-                rect.getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
-            if (width <= 0.f || height <= 0.f) {
+            SvgRectGeom geom = {};
+            if (!ResolveSvgRectGeom(node, lengthContext, &geom)) {
                 break;
             }
-            const tgfx::Rect bounds = tgfx::Rect::MakeXYWH(x, y, width, height);
-            float rx = 0.f;
-            float ry = 0.f;
-            if (rect.getRx().has_value()) {
-                rx = lengthContext.resolve(*rect.getRx(),
-                                           tgfx::SVGLengthContext::LengthType::Horizontal);
-            }
-            if (rect.getRy().has_value()) {
-                ry = lengthContext.resolve(*rect.getRy(),
-                                           tgfx::SVGLengthContext::LengthType::Vertical);
-            }
-            if (rx <= 0.f && ry > 0.f) {
-                rx = ry;
-            }
-            if (ry <= 0.f && rx > 0.f) {
-                ry = rx;
-            }
-            rx = std::min(rx, width * 0.5f);
-            ry = std::min(ry, height * 0.5f);
-            if (rx > 0.f || ry > 0.f) {
-                path.addRoundRect(bounds, rx, ry);
+            const tgfx::Rect bounds =
+                tgfx::Rect::MakeXYWH(geom.x, geom.y, geom.width, geom.height);
+            if (geom.rx > 0.f || geom.ry > 0.f) {
+                path.addRoundRect(bounds, geom.rx, geom.ry);
             } else {
                 path.addRect(bounds);
             }
@@ -475,6 +537,41 @@ const tgfx::SVGNode *CollectSingleShape(const tgfx::SVGContainer &container) {
     return shape;
 }
 
+bool TryApplyUniformRoundedRectClip(Layer &layer, const tgfx::SVGNode &shape, WalkContext &ctx) {
+    SvgRectGeom geom = {};
+    if (!ResolveSvgRectGeom(shape, ctx.lengthContext, &geom) || !SvgRectHasUniformRadius(geom) ||
+        geom.rx <= 0.f) {
+        return false;
+    }
+    if (layer.type() == LayerType::Group) {
+        auto *content = static_cast<NullContent *>(layer.content.get());
+        content->cornerRadius.setStaticValue(geom.rx);
+        return true;
+    }
+    if (layer.type() != LayerType::Image) {
+        return false;
+    }
+    auto *content = static_cast<ImageContent *>(layer.content.get());
+    const Vec2 size = content->size.staticValue();
+    Mat3 inverse = {};
+    if (!layer.localTransform(0).tryInvert(inverse)) {
+        return false;
+    }
+    const Vec2 p00 = inverse.transformPoint({geom.x, geom.y});
+    const Vec2 p10 = inverse.transformPoint({geom.x + geom.width, geom.y});
+    const Vec2 p01 = inverse.transformPoint({geom.x, geom.y + geom.height});
+    const Vec2 p11 = inverse.transformPoint({geom.x + geom.width, geom.y + geom.height});
+    const Vec2 rxVec = inverse.transformVector({geom.rx, 0.f});
+    const Vec2 ryVec = inverse.transformVector({0.f, geom.ry});
+    float imageRadius = 0.f;
+    if (!MappedRectMatchesImageBox(p00, p10, p01, p11, std::hypot(rxVec.x, rxVec.y),
+                                   std::hypot(ryVec.x, ryVec.y), size.x, size.y, &imageRadius)) {
+        return false;
+    }
+    content->cornerRadius.setStaticValue(imageRadius);
+    return true;
+}
+
 bool AppendShapeMask(Layer &layer, const tgfx::SVGNode &shape, WalkContext &ctx) {
     bool usedConic = false;
     const VectorNetwork network =
@@ -507,7 +604,15 @@ void ApplyClipPath(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
     }
     const auto &clipPath = static_cast<const tgfx::SVGClipPath &>(*it->second);
     const tgfx::SVGNode *shape = CollectSingleShape(clipPath);
-    if (shape == nullptr || !AppendShapeMask(layer, *shape, ctx)) {
+    if (shape == nullptr) {
+        AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
+                      LayerName(node));
+        return;
+    }
+    if (TryApplyUniformRoundedRectClip(layer, *shape, ctx)) {
+        return;
+    }
+    if (!AppendShapeMask(layer, *shape, ctx)) {
         AddDiagnostic(*ctx.tree, "clip.unsupported", "clip-path is too complex to import",
                       LayerName(node));
     }
@@ -534,7 +639,14 @@ void ApplyMask(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
         return;
     }
     const tgfx::SVGNode *shape = CollectSingleShape(svgMask);
-    if (shape == nullptr || !AppendShapeMask(layer, *shape, ctx)) {
+    if (shape == nullptr) {
+        AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
+        return;
+    }
+    if (TryApplyUniformRoundedRectClip(layer, *shape, ctx)) {
+        return;
+    }
+    if (!AppendShapeMask(layer, *shape, ctx)) {
         AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
     }
 }
@@ -667,45 +779,6 @@ const tgfx::SVGImage *ResolvePatternImage(const tgfx::SVGPattern &pattern, WalkC
     return static_cast<const tgfx::SVGImage *>(found);
 }
 
-tgfx::Matrix PatternImageUserMatrix(const tgfx::SVGPattern &pattern, const tgfx::SVGUse *use,
-                                    const tgfx::SVGImage &image, Vec2 boundsMin, Vec2 boundsSize,
-                                    const tgfx::SVGLengthContext &userContext) {
-    const bool objectContent = pattern.getContentUnits().type() ==
-        tgfx::SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox;
-    const tgfx::SVGLengthContext boxContext(tgfx::Size::Make(1.f, 1.f));
-    const tgfx::SVGLengthContext &contentContext = objectContent ? boxContext : userContext;
-    tgfx::Matrix matrix = image.getTransform();
-    const float imageX =
-        contentContext.resolve(image.getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
-    const float imageY =
-        contentContext.resolve(image.getY(), tgfx::SVGLengthContext::LengthType::Vertical);
-    tgfx::Matrix imageOffset = tgfx::Matrix::MakeTrans(imageX, imageY);
-    imageOffset.preConcat(matrix);
-    matrix = imageOffset;
-    if (use != nullptr) {
-        const float useX =
-            contentContext.resolve(use->getX(), tgfx::SVGLengthContext::LengthType::Horizontal);
-        const float useY =
-            contentContext.resolve(use->getY(), tgfx::SVGLengthContext::LengthType::Vertical);
-        tgfx::Matrix useMatrix = tgfx::Matrix::MakeTrans(useX, useY);
-        useMatrix.preConcat(use->getTransform());
-        useMatrix.preConcat(matrix);
-        matrix = useMatrix;
-    }
-    if (objectContent) {
-        tgfx::Matrix box = tgfx::Matrix::MakeTrans(boundsMin.x, boundsMin.y);
-        box.preScale(boundsSize.x, boundsSize.y);
-        box.preConcat(matrix);
-        matrix = box;
-    }
-    if (pattern.getPatternTransform().has_value()) {
-        tgfx::Matrix patternTransform = *pattern.getPatternTransform();
-        patternTransform.preConcat(matrix);
-        matrix = patternTransform;
-    }
-    return matrix;
-}
-
 bool TryImportPatternFill(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
                           const ComputedStyle &style, const VectorNetwork &network) {
     if (style.fillIri.empty() || ctx.mapper == nullptr) {
@@ -719,31 +792,26 @@ bool TryImportPatternFill(const tgfx::SVGNode &node, EntityId parentId, WalkCont
     const auto &pattern = static_cast<const tgfx::SVGPattern &>(*mapped->second);
     Vec2 boundsMin = {};
     Vec2 boundsSize = {};
-    NetworkAabb(network, boundsMin, boundsSize);
+    SvgRectGeom fillRect = {};
+    const bool hasFillRect = ResolveSvgRectGeom(node, ctx.lengthContext, &fillRect);
+    if (hasFillRect) {
+        boundsMin = {fillRect.x, fillRect.y};
+        boundsSize = {fillRect.width, fillRect.height};
+    } else {
+        NetworkAabb(network, boundsMin, boundsSize);
+    }
     if (boundsSize.x <= 1e-6f || boundsSize.y <= 1e-6f) {
         return false;
     }
     if (!PatternTileCoversBox(pattern, boundsSize, ctx.lengthContext)) {
         return false;
     }
-    const tgfx::SVGUse *use = nullptr;
-    const tgfx::SVGImage *image = ResolvePatternImage(pattern, ctx, &use);
+    const tgfx::SVGImage *image = ResolvePatternImage(pattern, ctx, nullptr);
     if (image == nullptr) {
         return false;
     }
     const tgfx::SVGIRI &href = image->getHref();
     if (href.type() != tgfx::SVGIRI::Type::DataURI) {
-        return false;
-    }
-    const bool objectContent = pattern.getContentUnits().type() ==
-        tgfx::SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox;
-    const tgfx::SVGLengthContext boxContext(tgfx::Size::Make(1.f, 1.f));
-    const tgfx::SVGLengthContext &contentContext = objectContent ? boxContext : ctx.lengthContext;
-    const float imageWidth =
-        contentContext.resolve(image->getWidth(), tgfx::SVGLengthContext::LengthType::Horizontal);
-    const float imageHeight =
-        contentContext.resolve(image->getHeight(), tgfx::SVGLengthContext::LengthType::Vertical);
-    if (imageWidth <= 0.f || imageHeight <= 0.f) {
         return false;
     }
     EntityId assetId{};
@@ -752,40 +820,35 @@ bool TryImportPatternFill(const tgfx::SVGNode &node, EntityId parentId, WalkCont
                       LayerName(node));
         return false;
     }
-    tgfx::Matrix patternUser =
-        PatternImageUserMatrix(pattern, use, *image, boundsMin, boundsSize, ctx.lengthContext);
-    tgfx::Matrix inverse = {};
-    if (!patternUser.invert(&inverse)) {
-        return false;
-    }
-    tgfx::Path clipPath = ShapePathFromNode(node, ctx.lengthContext);
-    clipPath.transform(inverse);
-    bool usedConic = false;
-    const VectorNetwork maskNetwork = PathToVectorNetwork(clipPath, &usedConic);
-
+    const bool uniformRect = hasFillRect && SvgRectHasUniformRadius(fillRect);
     auto layer = std::make_unique<Layer>(LayerType::Image);
     layer->name = LayerName(node);
     layer->parentId = parentId;
     layer->visible = style.visible;
     auto *content = static_cast<ImageContent *>(layer->content.get());
     content->assetId = assetId;
-    content->size.setStaticValue({imageWidth, imageHeight});
-    if (image->getPreserveAspectRatio().align == tgfx::SVGPreserveAspectRatio::Align::None) {
-        content->scaleMode = ImageScaleMode::Stretch;
-    } else {
-        content->scaleMode = ImageScaleMode::LetterBox;
+    content->size.setStaticValue(boundsSize);
+    content->scaleMode = ImageScaleMode::Stretch;
+    if (uniformRect) {
+        content->cornerRadius.setStaticValue(fillRect.rx);
     }
     tgfx::Matrix layerMatrix = NodeTransformMatrix(node);
-    layerMatrix.preConcat(patternUser);
+    layerMatrix.preConcat(tgfx::Matrix::MakeTrans(boundsMin.x, boundsMin.y));
     ApplySvgMatrixToLayer(*layer, layerMatrix);
     ApplyNodeOpacity(*layer, node);
     const float opacity = layer->transform.opacity.staticValue();
     layer->transform.opacity.setStaticValue(opacity * style.fillOpacity);
-    if (NetworkHasArea(maskNetwork)) {
-        Mask mask = {};
-        mask.path.setStaticValue(maskNetwork);
-        mask.mode = MaskMode::Add;
-        layer->masks.push_back(mask);
+    if (!uniformRect) {
+        tgfx::Path clipPath = ShapePathFromNode(node, ctx.lengthContext);
+        clipPath.transform(tgfx::Matrix::MakeTrans(-boundsMin.x, -boundsMin.y));
+        bool usedConic = false;
+        const VectorNetwork maskNetwork = PathToVectorNetwork(clipPath, &usedConic);
+        if (NetworkHasArea(maskNetwork)) {
+            Mask mask = {};
+            mask.path.setStaticValue(maskNetwork);
+            mask.mode = MaskMode::Add;
+            layer->masks.push_back(mask);
+        }
     }
     ApplyNodeEffects(*layer, node, ctx);
     ctx.tree->layers.push_back(std::move(layer));
@@ -794,12 +857,18 @@ bool TryImportPatternFill(const tgfx::SVGNode &node, EntityId parentId, WalkCont
 
 void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
                    const ComputedStyle &style) {
-    const tgfx::Path path = ShapePathFromNode(node, ctx.lengthContext);
-    bool usedConic = false;
-    const VectorNetwork network = PathToVectorNetwork(path, &usedConic);
-    if (!NetworkHasArea(network) && !style.hasStroke) {
-        AddDiagnostic(*ctx.tree, "shape.empty", "empty shape skipped", LayerName(node));
-        return;
+    SvgRectGeom geom = {};
+    const bool uniformRect =
+        ResolveSvgRectGeom(node, ctx.lengthContext, &geom) && SvgRectHasUniformRadius(geom);
+    VectorNetwork network = {};
+    if (!uniformRect) {
+        const tgfx::Path path = ShapePathFromNode(node, ctx.lengthContext);
+        bool usedConic = false;
+        network = PathToVectorNetwork(path, &usedConic);
+        if (!NetworkHasArea(network) && !style.hasStroke) {
+            AddDiagnostic(*ctx.tree, "shape.empty", "empty shape skipped", LayerName(node));
+            return;
+        }
     }
     ComputedStyle remaining = style;
     if (TryImportPatternFill(node, parentId, ctx, style, network)) {
@@ -814,12 +883,23 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ct
     layer->parentId = parentId;
     layer->visible = remaining.visible;
     auto *content = static_cast<ShapeContent *>(layer->content.get());
-    auto geometry = std::make_unique<ShapePath>();
-    geometry->path.setStaticValue(network);
-    content->geometry = std::move(geometry);
     Vec2 boundsMin = {};
     Vec2 boundsSize = {};
-    NetworkAabb(network, boundsMin, boundsSize);
+    if (uniformRect) {
+        auto geometry = std::make_unique<ShapeRect>();
+        geometry->position.setStaticValue(
+            {geom.x + geom.width * 0.5f, geom.y + geom.height * 0.5f});
+        geometry->size.setStaticValue({geom.width, geom.height});
+        geometry->cornerRadius.setStaticValue(geom.rx);
+        content->geometry = std::move(geometry);
+        boundsMin = {geom.x, geom.y};
+        boundsSize = {geom.width, geom.height};
+    } else {
+        auto geometry = std::make_unique<ShapePath>();
+        geometry->path.setStaticValue(network);
+        content->geometry = std::move(geometry);
+        NetworkAabb(network, boundsMin, boundsSize);
+    }
     ApplyPaintStyles(*layer, remaining, ctx.mapper, boundsMin, boundsSize, &ctx.tree->diagnostics);
     ApplyNodeTransform(*layer, node);
     ApplyNodeEffects(*layer, node, ctx);

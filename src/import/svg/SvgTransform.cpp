@@ -1,12 +1,16 @@
 #include "SvgTransform.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/TextContent.h"
+#include "SvgPathConvert.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
 
@@ -92,8 +96,20 @@ bool LayerLocalBounds(const Layer &layer, Vec2 &minOut, Vec2 &maxOut) {
         return false;
     }
     auto *content = static_cast<const ShapeContent *>(layer.content.get());
-    if (content == nullptr || content->geometry == nullptr ||
-        content->geometry->type() != ShapeType::Path) {
+    if (content == nullptr || content->geometry == nullptr) {
+        return false;
+    }
+    if (content->geometry->type() == ShapeType::Rect) {
+        const auto *rect = static_cast<const ShapeRect *>(content->geometry.get());
+        const Vec2 center = rect->position.staticValue();
+        const Vec2 size = rect->size.staticValue();
+        const float halfWidth = std::max(size.x * 0.5f, 0.f);
+        const float halfHeight = std::max(size.y * 0.5f, 0.f);
+        minOut = {center.x - halfWidth, center.y - halfHeight};
+        maxOut = {center.x + halfWidth, center.y + halfHeight};
+        return size.x > 0.f || size.y > 0.f;
+    }
+    if (content->geometry->type() != ShapeType::Path) {
         return false;
     }
     auto *path = static_cast<const ShapePath *>(content->geometry.get());
@@ -219,13 +235,44 @@ DecomposedTransform DecomposeSvgMatrix(const tgfx::Matrix &matrix) {
     return out;
 }
 
+namespace {
+
+void ConvertShapeRectToPath(ShapeContent &content) {
+    if (content.geometry == nullptr || content.geometry->type() != ShapeType::Rect) {
+        return;
+    }
+    const auto *rect = static_cast<const ShapeRect *>(content.geometry.get());
+    const Vec2 center = rect->position.staticValue();
+    const Vec2 size = rect->size.staticValue();
+    const float radius = std::max(rect->cornerRadius.staticValue(), 0.f);
+    tgfx::Path path;
+    const tgfx::Rect bounds = tgfx::Rect::MakeXYWH(center.x - size.x * 0.5f, center.y - size.y * 0.5f,
+                                                   size.x, size.y);
+    if (radius > 0.f) {
+        path.addRoundRect(bounds, radius, radius);
+    } else {
+        path.addRect(bounds);
+    }
+    bool usedConic = false;
+    auto geometry = std::make_unique<ShapePath>();
+    geometry->path.setStaticValue(PathToVectorNetwork(path, &usedConic));
+    content.geometry = std::move(geometry);
+}
+
+}  // namespace
+
 void ApplyResidualBake(Layer &layer, const tgfx::Matrix &residual) {
     if (layer.type() != LayerType::Shape) {
         return;
     }
     auto *content = static_cast<ShapeContent *>(layer.content.get());
-    if (content == nullptr || content->geometry == nullptr ||
-        content->geometry->type() != ShapeType::Path) {
+    if (content == nullptr || content->geometry == nullptr) {
+        return;
+    }
+    if (content->geometry->type() == ShapeType::Rect) {
+        ConvertShapeRectToPath(*content);
+    }
+    if (content->geometry->type() != ShapeType::Path) {
         return;
     }
     auto *path = static_cast<ShapePath *>(content->geometry.get());

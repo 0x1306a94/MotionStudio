@@ -6,10 +6,14 @@
 #include "MotionStudio/import/svg/SvgImporter.h"
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/ImageScaleMode.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/LayerType.h"
+#include "MotionStudio/model/NullContent.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/ShapeRect.h"
 #include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TextContent.h"
@@ -93,7 +97,7 @@ TEST(SvgImporterTest, PathFillStrokeBecomesShapePath) {
     EXPECT_EQ(stroke->position, motion::StrokePosition::Center);
 }
 
-TEST(SvgImporterTest, RectCircleEllipseAreVectorNetworks) {
+TEST(SvgImporterTest, RectIsShapeRectCircleEllipseArePaths) {
     const std::string svg =
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\">"
         "<rect x=\"10\" y=\"20\" width=\"40\" height=\"30\" fill=\"#00ff00\"/>"
@@ -103,11 +107,51 @@ TEST(SvgImporterTest, RectCircleEllipseAreVectorNetworks) {
     const auto result = BuildSvgLayers(svg.data(), svg.size());
     ASSERT_TRUE(result.hasValue());
     ASSERT_EQ(result.value().layers.size(), 4u);
-    for (size_t i = 1; i < result.value().layers.size(); ++i) {
-        auto *content =
-            static_cast<motion::ShapeContent *>(result.value().layers[i]->content.get());
-        ASSERT_EQ(content->geometry->type(), motion::ShapeType::Path);
-    }
+    auto *rectContent =
+        static_cast<motion::ShapeContent *>(result.value().layers[1]->content.get());
+    ASSERT_EQ(rectContent->geometry->type(), motion::ShapeType::Rect);
+    auto *rect = static_cast<motion::ShapeRect *>(rectContent->geometry.get());
+    EXPECT_NEAR(rect->position.staticValue().x, 30.f, 1e-3f);
+    EXPECT_NEAR(rect->position.staticValue().y, 35.f, 1e-3f);
+    EXPECT_NEAR(rect->size.staticValue().x, 40.f, 1e-3f);
+    EXPECT_NEAR(rect->size.staticValue().y, 30.f, 1e-3f);
+    EXPECT_NEAR(rect->cornerRadius.staticValue(), 0.f, 1e-3f);
+    auto *circleContent =
+        static_cast<motion::ShapeContent *>(result.value().layers[2]->content.get());
+    EXPECT_EQ(circleContent->geometry->type(), motion::ShapeType::Path);
+    auto *ellipseContent =
+        static_cast<motion::ShapeContent *>(result.value().layers[3]->content.get());
+    EXPECT_EQ(ellipseContent->geometry->type(), motion::ShapeType::Path);
+}
+
+TEST(SvgImporterTest, UniformRoundedRectBecomesShapeRect) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\">"
+        "<rect x=\"0\" y=\"0\" width=\"40\" height=\"30\" rx=\"8\" fill=\"#000000\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    auto *content = static_cast<motion::ShapeContent *>(result.value().layers[1]->content.get());
+    ASSERT_EQ(content->geometry->type(), motion::ShapeType::Rect);
+    auto *rect = static_cast<motion::ShapeRect *>(content->geometry.get());
+    EXPECT_NEAR(rect->position.staticValue().x, 20.f, 1e-3f);
+    EXPECT_NEAR(rect->position.staticValue().y, 15.f, 1e-3f);
+    EXPECT_NEAR(rect->size.staticValue().x, 40.f, 1e-3f);
+    EXPECT_NEAR(rect->size.staticValue().y, 30.f, 1e-3f);
+    EXPECT_NEAR(rect->cornerRadius.staticValue(), 8.f, 1e-3f);
+    EXPECT_TRUE(result.value().layers[1]->masks.empty());
+}
+
+TEST(SvgImporterTest, UnequalRadiusRectStaysPath) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\">"
+        "<rect x=\"0\" y=\"0\" width=\"40\" height=\"30\" rx=\"8\" ry=\"4\" fill=\"#000000\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    auto *content = static_cast<motion::ShapeContent *>(result.value().layers[1]->content.get());
+    ASSERT_EQ(content->geometry->type(), motion::ShapeType::Path);
+    EXPECT_TRUE(result.value().layers[1]->masks.empty());
 }
 
 TEST(SvgImporterTest, AxisAlignedRectUsesCenterAnchor) {
@@ -404,9 +448,66 @@ TEST(SvgImporterTest, PatternImageFillCreatesImageLayer) {
     const motion::Layer *image = FindLayerByType(result.value(), motion::LayerType::Image);
     ASSERT_NE(image, nullptr);
     EXPECT_EQ(image->name, "photo");
+    auto *content = static_cast<motion::ImageContent *>(image->content.get());
+    EXPECT_NEAR(content->size.staticValue().x, 20.f, 1e-3f);
+    EXPECT_NEAR(content->size.staticValue().y, 10.f, 1e-3f);
+    EXPECT_EQ(content->scaleMode, motion::ImageScaleMode::Stretch);
+    EXPECT_TRUE(image->masks.empty());
     EXPECT_FALSE(result.value().assets.empty());
     EXPECT_FALSE(result.value().embeddedImages.empty());
     EXPECT_FALSE(HasDiagnostic(result.value(), "paint.unresolved"));
+}
+
+TEST(SvgImporterTest, PatternRoundedRectUsesImageCornerRadius) {
+    const std::string svg =
+        std::string("<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+                    "width=\"200\" height=\"200\">"
+                    "<defs>"
+                    "<pattern id=\"p\" patternContentUnits=\"objectBoundingBox\" width=\"1\" height=\"1\">"
+                    "<use xlink:href=\"#img\" transform=\"scale(0.5 0.5)\"/>"
+                    "</pattern>"
+                    "<image id=\"img\" width=\"2\" height=\"2\" preserveAspectRatio=\"none\" "
+                    "xlink:href=\"data:image/png;base64,") +
+        kOnePixelPng +
+        "\"/>"
+        "</defs>"
+        "<rect id=\"fg\" x=\"10\" y=\"10\" width=\"100\" height=\"100\" rx=\"8\" fill=\"url(#p)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *image = FindLayerByType(result.value(), motion::LayerType::Image);
+    ASSERT_NE(image, nullptr);
+    EXPECT_TRUE(image->masks.empty());
+    auto *content = static_cast<motion::ImageContent *>(image->content.get());
+    EXPECT_NEAR(content->size.staticValue().x, 100.f, 1e-3f);
+    EXPECT_NEAR(content->size.staticValue().y, 100.f, 1e-3f);
+    EXPECT_NEAR(content->cornerRadius.staticValue(), 8.f, 1e-3f);
+    EXPECT_EQ(content->scaleMode, motion::ImageScaleMode::Stretch);
+    EXPECT_NEAR(image->transform.scale.staticValue().x, 1.f, 1e-3f);
+    EXPECT_NEAR(image->transform.scale.staticValue().y, 1.f, 1e-3f);
+}
+
+TEST(SvgImporterTest, PatternOffsetImageUsesHostRectSize) {
+    const std::string svg =
+        std::string("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\">"
+                    "<defs><pattern id=\"p\" patternContentUnits=\"objectBoundingBox\" "
+                    "width=\"1\" height=\"1\">"
+                    "<image href=\"data:image/png;base64,") +
+        kOnePixelPng +
+        "\" width=\"2\" height=\"1\" transform=\"translate(-0.5 0)\"/>"
+        "</pattern></defs>"
+        "<rect width=\"20\" height=\"10\" fill=\"url(#p)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *image = FindLayerByType(result.value(), motion::LayerType::Image);
+    ASSERT_NE(image, nullptr);
+    EXPECT_TRUE(image->masks.empty());
+    auto *content = static_cast<motion::ImageContent *>(image->content.get());
+    EXPECT_NEAR(content->size.staticValue().x, 20.f, 1e-3f);
+    EXPECT_NEAR(content->size.staticValue().y, 10.f, 1e-3f);
+    EXPECT_NEAR(content->cornerRadius.staticValue(), 0.f, 1e-3f);
+    EXPECT_EQ(content->scaleMode, motion::ImageScaleMode::Stretch);
 }
 
 TEST(SvgImporterTest, PatternUseImageFillCreatesImageLayer) {
@@ -455,6 +556,26 @@ TEST(SvgImporterTest, SimpleClipPathBecomesMask) {
     const auto result = BuildSvgLayers(svg.data(), svg.size());
     ASSERT_TRUE(result.hasValue());
     EXPECT_EQ(result.value().layers.back()->masks.size(), 1u);
+}
+
+TEST(SvgImporterTest, RoundedGroupClipUsesCornerRadius) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\">"
+        "<defs><clipPath id=\"c\"><rect x=\"0\" y=\"0\" width=\"40\" height=\"40\" rx=\"8\"/></clipPath></defs>"
+        "<g clip-path=\"url(#c)\"><rect width=\"40\" height=\"40\" fill=\"#000\"/></g>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *group = nullptr;
+    for (const auto &layer : result.value().layers) {
+        if (layer->type() == motion::LayerType::Group && layer->name != "SVG") {
+            group = layer.get();
+        }
+    }
+    ASSERT_NE(group, nullptr);
+    EXPECT_TRUE(group->masks.empty());
+    auto *content = static_cast<motion::NullContent *>(group->content.get());
+    EXPECT_NEAR(content->cornerRadius.staticValue(), 8.f, 1e-3f);
 }
 
 TEST(SvgImporterTest, MaskAttributeBecomesMask) {

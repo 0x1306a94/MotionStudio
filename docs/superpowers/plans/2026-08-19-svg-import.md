@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 用 tgfx `SVGDOM` 把 SVG 转成可插入当前合成的 Core 图层树（`ShapePath` + `VectorNetwork`），一次 undo 整棵撤销。
+**Goal:** 用 tgfx `SVGDOM` 把 SVG 转成可插入当前合成的 Core 图层树（均匀 rect → `ShapeRect`，其余 `ShapePath` + `VectorNetwork`），一次 undo 整棵撤销。
 
 **Architecture:** 独立静态库 `svg_import`（`src/import/svg`）PUBLIC 链 `core`、PRIVATE 链预编译 tgfx。`BuildSvgLayers` 纯转换；`ImportSvgInto` 用一条 `CompositeCommand`（`ImportImageAssetCommand` + `AddLayerCommand`）写入现有 `Document`。公开头禁止出现 tgfx 类型。
 
@@ -15,7 +15,7 @@
 - 不改 Core 模型、schema、bridge、App。
 - `motionstudio_core` 不得 `#include` tgfx，也不得依赖 `svg_import`。
 - 公开头只有 `include/MotionStudio/import/svg/SvgImporter.h`；禁止 tgfx 类型出库。
-- 形状一律 `ShapePath` + `VectorNetwork`，不用 `ShapeRect` / `ShapeEllipse`。
+- 形状：均匀 `rx==ry` 的 `<rect>`（含直角）→ `ShapeRect`；`rx≠ry` 的 rect 以及 circle/ellipse/path/line/poly → `ShapePath` + `VectorNetwork`。不用 `ShapeEllipse`。
 - `<text>` → 点文本 `Text` 层（Task 9）；`<textPath>` / 逐字定位跳过 + diagnostic。
 - 不调用 `SVGNode::asPath` / `SVGRenderContext`（私有）。
 - Expected 用 `hasValue()` / `error()`，不用 `EXPECT_THROW`。
@@ -1397,6 +1397,10 @@ git commit -m "Add SVG import render dumps as WebP for visual review."
 | 不改 Core/schema/bridge/App | 全程 |
 | `TGFX_BUILD_SVG=ON` | 1 |
 
-**未列入实现（spec 非目标）：** Bridge/App UI、`<textPath>`、逐字定位、嵌入字体、SMIL、dash 实装、pattern、滤镜求值。
+**未列入实现（原 spec 非目标，已拆出 follow-up）：** Bridge/App UI、`<textPath>`、逐字定位、嵌入字体、SMIL、dash 实装、**平铺** pattern、滤镜求值。简单 image pattern、简单 `mask`、圆角 `cornerRadius` 映射见 [`2026-08-19-svg-pattern-mask.md`](./2026-08-19-svg-pattern-mask.md)。
 
 **类型一致性：** `BuildSvgLayers` / `ImportSvgInto` / `SvgLayerTree` / `ImportOptions` 与 spec §3 同名同字段。
+
+## Amendment: 均匀 rect → ShapeRect / cornerRadius
+
+后继变更（与 spec §6.1 / §7.5 / §8.3 同步）：均匀 `rx==ry` 的 `<rect>` 建成 `ShapeRect`；pattern 填满图容器时写 `ImageContent.cornerRadius` 而非 path mask；组上的均匀圆角 clip/mask 写 `NullContent.cornerRadius`。实现与测试见 pattern-mask plan Task 3。

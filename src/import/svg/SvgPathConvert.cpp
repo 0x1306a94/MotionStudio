@@ -9,13 +9,41 @@ namespace svg {
 namespace {
 
 constexpr float kZeroLengthEpsilon = 1e-6f;
+// Pattern inverse / viewBox transforms leave Close's final line a few ulps
+// long. Skipping that line without keeping currentId on the previous vertex
+// (or welding it to the start) yields an open network; CompileFillFaces then
+// emits no face and an Add mask hides the layer.
+constexpr float CLOSE_WELD_EPSILON = 1e-3f;
 
 Vec2 ToVec2(const tgfx::Point &point) {
     return {point.x, point.y};
 }
 
-bool PointsNear(Vec2 left, Vec2 right) {
-    return ApproxEqual(left, right, kZeroLengthEpsilon);
+bool PointsNear(Vec2 left, Vec2 right, float epsilon = kZeroLengthEpsilon) {
+    return ApproxEqual(left, right, epsilon);
+}
+
+void WeldCurrentToContourStart(VectorNetwork &network, uint32_t &currentId,
+                               uint32_t contourStartId) {
+    if (currentId == 0 || contourStartId == 0 || currentId == contourStartId) {
+        return;
+    }
+    const VectorNetwork::Vertex *current = FindVertex(network, currentId);
+    const VectorNetwork::Vertex *start = FindVertex(network, contourStartId);
+    if (current == nullptr || start == nullptr) {
+        return;
+    }
+    if (!PointsNear(current->point, start->point, CLOSE_WELD_EPSILON)) {
+        return;
+    }
+    const uint32_t removedId = current->id;
+    if (!network.edges.empty() && network.edges.back().end == removedId) {
+        network.edges.back().end = contourStartId;
+    }
+    if (!network.vertices.empty() && network.vertices.back().id == removedId) {
+        network.vertices.pop_back();
+    }
+    currentId = contourStartId;
 }
 
 uint32_t AppendVertex(VectorNetwork &network, uint32_t &nextId, Vec2 point) {
@@ -55,6 +83,13 @@ void AppendEdge(VectorNetwork &network, uint32_t &nextId, uint32_t start, uint32
 
 void AppendCubic(VectorNetwork &network, uint32_t &nextVertexId, uint32_t &nextEdgeId,
                  uint32_t &currentId, Vec2 p0, Vec2 c1, Vec2 c2, Vec2 p3) {
+    if (currentId != 0) {
+        const VectorNetwork::Vertex *current = FindVertex(network, currentId);
+        if (current != nullptr && PointsNear(current->point, p3, CLOSE_WELD_EPSILON) &&
+            PointsNear(c1 - p0, {}) && PointsNear(c2 - p3, {})) {
+            return;
+        }
+    }
     const uint32_t endId = AppendVertex(network, nextVertexId, p3);
     AppendEdge(network, nextEdgeId, currentId, endId, c1 - p0, c2 - p3);
     currentId = endId;
@@ -90,15 +125,14 @@ VectorNetwork PathToVectorNetwork(const tgfx::Path &path, bool *usedConic) {
     uint32_t nextEdgeId = 1;
     uint32_t contourStartId = 0;
     uint32_t currentId = 0;
-    Vec2 contourStartPoint = {};
     tgfx::Path::Iterator it = path.begin();
     const tgfx::Path::Iterator end = path.end();
     while (it != end) {
         const tgfx::Path::Segment &segment = *it;
         switch (segment.verb) {
             case tgfx::PathVerb::Move: {
-                contourStartPoint = ToVec2(segment.points[0]);
-                contourStartId = AppendVertex(network, nextVertexId, contourStartPoint);
+                WeldCurrentToContourStart(network, currentId, contourStartId);
+                contourStartId = AppendVertex(network, nextVertexId, ToVec2(segment.points[0]));
                 currentId = contourStartId;
                 break;
             }
@@ -130,20 +164,8 @@ VectorNetwork PathToVectorNetwork(const tgfx::Path &path, bool *usedConic) {
                 break;
             }
             case tgfx::PathVerb::Close: {
-                if (contourStartId != 0 && currentId != 0) {
-                    const VectorNetwork::Vertex *current = FindVertex(network, currentId);
-                    if (current != nullptr && PointsNear(current->point, contourStartPoint)) {
-                        if (currentId != contourStartId) {
-                            network.vertices.pop_back();
-                            currentId = contourStartId;
-                            if (!network.edges.empty() &&
-                                network.edges.back().end == current->id) {
-                                network.edges.back().end = contourStartId;
-                            }
-                        }
-                    }
-                    AppendEdge(network, nextEdgeId, currentId, contourStartId, {}, {});
-                }
+                WeldCurrentToContourStart(network, currentId, contourStartId);
+                AppendEdge(network, nextEdgeId, currentId, contourStartId, {}, {});
                 break;
             }
             case tgfx::PathVerb::Done: {
@@ -152,6 +174,7 @@ VectorNetwork PathToVectorNetwork(const tgfx::Path &path, bool *usedConic) {
         }
         ++it;
     }
+    WeldCurrentToContourStart(network, currentId, contourStartId);
     return network;
 }
 
