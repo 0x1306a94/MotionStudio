@@ -56,6 +56,13 @@ class Layer {
     // document: used to resolve parent layers.
     Mat3 worldTransform(FrameTime time, const Document &document) const;
 
+    // True when this layer and every ancestor is visible. Missing parents are
+    // treated as visible. document: used to walk the parent chain.
+    bool isEffectivelyVisible(const Document &document) const;
+    // True when this layer or any ancestor is locked. Missing parents are
+    // treated as unlocked. document: used to walk the parent chain.
+    bool isEffectivelyLocked(const Document &document) const;
+
     EntityId id = EntityId::Generate();
     std::string name;
 

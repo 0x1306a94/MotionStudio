@@ -55,6 +55,27 @@ struct SelectionHandlesSnapshot {
         return handles
     }
 
+    func contains(scenePoint: CGPoint) -> Bool {
+        guard valid, corners.count == 4 else {
+            return false
+        }
+        var sign: CGFloat = 0
+        for index in 0 ..< 4 {
+            let a = corners[index]
+            let b = corners[(index + 1) % 4]
+            let cross = (b.x - a.x) * (scenePoint.y - a.y) - (b.y - a.y) * (scenePoint.x - a.x)
+            if abs(cross) < 1e-6 {
+                continue
+            }
+            if sign == 0 {
+                sign = cross
+            } else if sign * cross < 0 {
+                return false
+            }
+        }
+        return true
+    }
+
     private static func points(fromX xValues: (Float, Float, Float, Float),
                                y yValues: (Float, Float, Float, Float)) -> [CGPoint]
     {

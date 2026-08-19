@@ -130,16 +130,28 @@ TEST(CommandBuilderTest, StrokeItemCarriesStrokeParameters) {
 
 TEST(CommandBuilderTest, MultipleLayersKeepRenderOrder) {
     SceneState state;
-    state.layers.push_back(EvaluatedLayer{});
-    state.layers.push_back(EvaluatedLayer{});
+    EvaluatedLayer bottom;
+    bottom.shapeItems.push_back(MakeFillItem());
+    EvaluatedLayer top;
+    top.shapeItems.push_back(MakeFillItem());
+    state.layers.push_back(std::move(bottom));
+    state.layers.push_back(std::move(top));
 
     auto commands = BuildCommands(state);
-    // Two empty layers: (Save/ConcatTransform/SetOpacity/SetBlendMode/Restore) x 2.
-    ASSERT_EQ(commands.size(), 10u);
+    ASSERT_EQ(commands.size(), 12u);
     EXPECT_EQ(commands[0].type, DrawCommandType::Save);
-    EXPECT_EQ(commands[4].type, DrawCommandType::Restore);
-    EXPECT_EQ(commands[5].type, DrawCommandType::Save);
-    EXPECT_EQ(commands[9].type, DrawCommandType::Restore);
+    EXPECT_EQ(commands[5].type, DrawCommandType::Restore);
+    EXPECT_EQ(commands[6].type, DrawCommandType::Save);
+    EXPECT_EQ(commands[11].type, DrawCommandType::Restore);
+}
+
+TEST(CommandBuilderTest, EmptyGroupEmitsNoDrawCommands) {
+    SceneState state;
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    state.layers.push_back(group);
+
+    EXPECT_TRUE(BuildCommands(state).empty());
 }
 
 TEST(CommandBuilderTest, SelectionOutlineBuildsStrokeForSelectedLayerBounds) {

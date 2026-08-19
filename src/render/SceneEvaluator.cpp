@@ -15,6 +15,7 @@
 #include "MotionStudio/model/GradientPaint.h"
 #include "MotionStudio/model/GradientType.h"
 #include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/Layer.h"
 #include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerFx.h"
 #include "MotionStudio/model/LayerStyle.h"
@@ -35,7 +36,7 @@ namespace motion {
 
 namespace {
 
-constexpr int kMaxPrecompDepth = 1024;
+constexpr int kMaxPrecompDepth = 64;
 
 std::string JoinProjectPath(const std::string &projectRoot, const std::string &relativePath) {
     if (projectRoot.empty() || relativePath.empty()) {
@@ -62,6 +63,7 @@ const Asset *FindAsset(const Document &document, EntityId assetId) {
 void FillCommonLayerFields(const Document &document, const Layer &layer, PreviewTime time,
                            const Mat3 &world, float opacity, EvaluatedLayer &evaluated) {
     evaluated.id = layer.id;
+    evaluated.parentId = layer.parentId;
     evaluated.worldTransform = world;
     evaluated.worldAnchor = world.transformPoint(layer.transform.anchorPoint.evaluatePreview(time));
     evaluated.opacity = opacity;
@@ -379,7 +381,10 @@ void EvaluateComposition(const Document &document, const Composition &compositio
 void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime time,
                    const Mat3 &contextTransform, float contextOpacity, int depth,
                    std::vector<EvaluatedLayer> &out) {
-    if (!layer.visible) {
+    if (layer.type() == LayerType::Precomp && depth >= kMaxPrecompDepth) {
+        return;
+    }
+    if (!layer.isEffectivelyVisible(document)) {
         return;
     }
     if (time < layer.inPoint || time >= layer.outPoint) {
@@ -391,9 +396,6 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     const float opacity = WorldOpacityOf(document, layer, time, contextOpacity, visiting);
 
     if (layer.type() == LayerType::Precomp) {
-        if (depth >= kMaxPrecompDepth) {
-            return;
-        }
         const auto &precomp = static_cast<const PrecompContent &>(*layer.content);
         const Composition *source = document.entityIndex().findComposition(precomp.compositionId);
         if (!source) {
@@ -501,8 +503,14 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         out.push_back(std::move(evaluated));
         return;
     }
+    if (layer.content->type() == LayerType::Group) {
+        EvaluatedLayer evaluated;
+        FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
+        out.push_back(std::move(evaluated));
+        return;
+    }
     if (layer.content->type() != LayerType::Shape) {
-        return;  // Group layers produce no draw items
+        return;
     }
     const auto &shapeContent = static_cast<const ShapeContent &>(*layer.content);
     EvaluatedLayer evaluated;

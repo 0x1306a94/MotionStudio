@@ -106,6 +106,37 @@ TEST(LayerTransformTest, WorldFallsBackToLocalWithDanglingParent) {
     EXPECT_TRUE(ApproxEqual(world.transformPoint({0, 0}), Vec2{5, 5}));
 }
 
+TEST(LayerVisibilityTest, ChildHiddenWhenAncestorHidden) {
+    TwoLayerScene scene;
+    ASSERT_TRUE(scene.childLayer->setParent(scene.parentLayer->id, scene.document));
+    EXPECT_TRUE(scene.childLayer->isEffectivelyVisible(scene.document));
+
+    scene.parentLayer->visible = false;
+    EXPECT_FALSE(scene.parentLayer->isEffectivelyVisible(scene.document));
+    EXPECT_FALSE(scene.childLayer->isEffectivelyVisible(scene.document));
+
+    scene.parentLayer->visible = true;
+    scene.childLayer->visible = false;
+    EXPECT_TRUE(scene.parentLayer->isEffectivelyVisible(scene.document));
+    EXPECT_FALSE(scene.childLayer->isEffectivelyVisible(scene.document));
+}
+
+TEST(LayerLockTest, ChildLockedWhenAncestorLocked) {
+    TwoLayerScene scene;
+    ASSERT_TRUE(scene.childLayer->setParent(scene.parentLayer->id, scene.document));
+    EXPECT_FALSE(scene.childLayer->isEffectivelyLocked(scene.document));
+
+    scene.parentLayer->locked = true;
+    EXPECT_TRUE(scene.parentLayer->isEffectivelyLocked(scene.document));
+    EXPECT_TRUE(scene.childLayer->isEffectivelyLocked(scene.document));
+    EXPECT_FALSE(scene.childLayer->locked);
+
+    scene.parentLayer->locked = false;
+    scene.childLayer->locked = true;
+    EXPECT_FALSE(scene.parentLayer->isEffectivelyLocked(scene.document));
+    EXPECT_TRUE(scene.childLayer->isEffectivelyLocked(scene.document));
+}
+
 TEST(LayerTest, ConstructorCreatesMatchingContent) {
     Layer shapeLayer{LayerType::Shape};
     EXPECT_EQ(shapeLayer.type(), LayerType::Shape);

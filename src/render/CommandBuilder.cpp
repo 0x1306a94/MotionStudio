@@ -161,12 +161,17 @@ void AppendTrackMatte(const SceneState &state, const EvaluatedLayer &layer,
     commands.push_back(endMask);
 }
 
+bool LayerHasDrawableContent(const EvaluatedLayer &layer) {
+    return !layer.shapeItems.empty() || layer.imageItem.has_value() || layer.textItem.has_value() ||
+        !layer.shapeNetwork.vertices.empty();
+}
+
 }  // namespace
 
 DrawCommandList BuildCommands(const SceneState &state) {
     DrawCommandList commands;
     for (const EvaluatedLayer &layer : state.layers) {
-        if (layer.usedAsMatteOnly) {
+        if (layer.usedAsMatteOnly || !LayerHasDrawableContent(layer)) {
             continue;
         }
 

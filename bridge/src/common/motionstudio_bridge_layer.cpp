@@ -75,6 +75,20 @@ bool ms_layer_locked(MSDocument *document, uint64_t layerId) {
     return layer != nullptr && layer->locked;
 }
 
+bool ms_layer_effectively_visible(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    motion::Document *doc = Doc(document);
+    return layer != nullptr && doc != nullptr && layer->isEffectivelyVisible(*doc);
+}
+
+bool ms_layer_effectively_locked(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    Layer *layer = FindLayer(document, layerId);
+    motion::Document *doc = Doc(document);
+    return layer != nullptr && doc != nullptr && layer->isEffectivelyLocked(*doc);
+}
+
 /* ============================ layer style queries ============================ */
 
 int ms_layer_style_count(MSDocument *document, uint64_t layerId) {

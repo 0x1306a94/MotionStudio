@@ -68,6 +68,31 @@ TEST(SelectionHandlesTest, MultiSelectBuildsAxisAlignedUnion) {
     EXPECT_EQ(handles.primaryLayerId, EntityId{2});
 }
 
+TEST(SelectionHandlesTest, GroupUsesDescendantUnion) {
+    SceneState state;
+    EvaluatedLayer group;
+    group.id = EntityId{1};
+    group.worldTransform = Mat3::Translate({10, 0});
+    group.worldAnchor = {10, 0};
+
+    EvaluatedLayer child = MakeLayer(EntityId{2}, Mat3::Translate({10, 0}));
+    child.parentId = EntityId{1};
+    state.layers.push_back(group);
+    state.layers.push_back(child);
+
+    SelectionHandles handles;
+    ASSERT_TRUE(BuildSelectionHandles(state, {EntityId{1}}, EntityId{1}, handles));
+    EXPECT_TRUE(handles.isOriented);
+    EXPECT_EQ(handles.primaryLayerId, EntityId{1});
+    EXPECT_FLOAT_EQ(handles.localMin.x, 0);
+    EXPECT_FLOAT_EQ(handles.localMin.y, 0);
+    EXPECT_FLOAT_EQ(handles.localMax.x, 10);
+    EXPECT_FLOAT_EQ(handles.localMax.y, 10);
+    EXPECT_FLOAT_EQ(handles.corners[0].x, 10);
+    EXPECT_FLOAT_EQ(handles.corners[2].x, 20);
+    EXPECT_EQ(handles.anchor, (motion::Vec2{10, 0}));
+}
+
 TEST(SelectionHandlesTest, HitTestPrefersAnchorOverScale) {
     SceneState state;
     state.layers.push_back(MakeLayer(EntityId{1}, Mat3::Identity()));

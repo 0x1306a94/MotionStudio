@@ -717,16 +717,35 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             }
         }
 
-        guard let layerID = hitTestLayer(at: viewPoint),
-              !document.core.layerIsLocked(layerID)
+        let hitLayerID = hitTestLayer(at: viewPoint)
+        if !shift,
+           selectedIDs.count == 1,
+           let groupID = selectedIDs.first,
+           document.core.layerType(groupID) == .GROUP,
+           !document.core.layerIsEffectivelyLocked(groupID)
+        {
+            let hitOnDescendant = hitLayerID.map { document.core.layer($0, isDescendantOf: groupID) } ?? false
+            let hitInsideBox = currentSelectionHandles()?.contains(scenePoint: scenePoint) ?? false
+            if hitOnDescendant || (hitLayerID == nil && hitInsideBox) {
+                beginMoveTransform(layerIDs: [groupID], scenePoint: scenePoint)
+                return
+            }
+        }
+
+        guard let layerID = hitLayerID,
+              !document.core.layerIsEffectivelyLocked(layerID)
         else {
             return
         }
         selectLayer(layerID, additive: shift)
-        let layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsLocked($0) }
+        let layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsEffectivelyLocked($0) }
         guard !layerIDs.isEmpty else {
             return
         }
+        beginMoveTransform(layerIDs: layerIDs, scenePoint: scenePoint)
+    }
+
+    private func beginMoveTransform(layerIDs: [UInt64], scenePoint: CGPoint) {
         let starts = FreeTransformDrag.makeLayerStarts(core: document.core, layerIDs: layerIDs, frame: evaluationFrame)
         document.core.beginMergeGroup()
         freeTransformDrag = FreeTransformDrag(kind: .move,
@@ -874,7 +893,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
             return
         }
 
-        var layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsLocked($0) }
+        var layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsEffectivelyLocked($0) }
         if hit == .ANCHOR {
             layerIDs = layerIDs.filter { $0 == handles.primaryLayerID }
         }
@@ -1069,7 +1088,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         if selectTool,
            editorState.pathEditTarget == nil,
            let layerID = primaryID,
-           !document.core.layerIsLocked(layerID),
+           !document.core.layerIsEffectivelyLocked(layerID),
            let styleIndex = document.core.firstGradientStyleIndex(layerID: layerID)
         {
             document.core.setGradientEditTarget(canvas: canvas, layerID: layerID, styleIndex: styleIndex)

@@ -549,6 +549,34 @@ TEST(BridgeCommandTest, LayerVisibleAndLockedUndo) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeCommandTest, EffectivelyLockedWalksParentChain) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t parentId = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t childId = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+    {
+        DocumentLock guard(document);
+        Layer *child = FindLayer(document, childId);
+        ASSERT_NE(child, nullptr);
+        ASSERT_TRUE(child->setParent(EntityId{parentId}, *Doc(document)));
+    }
+
+    EXPECT_TRUE(ms_layer_effectively_visible(document, childId));
+    EXPECT_FALSE(ms_layer_effectively_locked(document, childId));
+
+    ms_command_set_layer_locked(document, parentId, true);
+    EXPECT_TRUE(ms_layer_locked(document, parentId));
+    EXPECT_FALSE(ms_layer_locked(document, childId));
+    EXPECT_TRUE(ms_layer_effectively_locked(document, childId));
+
+    ms_command_set_layer_visible(document, parentId, false);
+    EXPECT_TRUE(ms_layer_visible(document, childId));
+    EXPECT_FALSE(ms_layer_effectively_visible(document, childId));
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeCommandTest, HitTestIncludesLockedLayer) {
     MSDocument *document = ms_document_create();
     const uint64_t compositionId = ms_document_composition_id_at(document, 0);

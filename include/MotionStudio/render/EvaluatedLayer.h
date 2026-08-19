@@ -19,10 +19,12 @@
 
 namespace motion {
 
-// A visible layer evaluated at one point in time. Paths in shapeItems are
+// A layer evaluated at one point in time. Groups have no draw items; their
+// worldTransform is used for selection chrome. Paths in shapeItems are
 // layer-local; precomp layers are flattened into the layer list.
 struct EvaluatedLayer {
     EntityId id;  // kept for UI hit-testing
+    EntityId parentId;
     Mat3 worldTransform;
     // World-space location of transform.anchorPoint (parent * position).
     Vec2 worldAnchor;

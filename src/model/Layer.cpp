@@ -90,4 +90,36 @@ Mat3 Layer::worldTransform(FrameTime time, const Document &document, int depth) 
     return parent->worldTransform(time, document, depth + 1) * local;
 }
 
+bool Layer::isEffectivelyVisible(const Document &document) const {
+    const Layer *current = this;
+    int depth = 0;
+    while (current != nullptr) {
+        if (!current->visible) {
+            return false;
+        }
+        if (!current->parentId.isValid() || depth >= 1024) {
+            return true;
+        }
+        current = document.entityIndex().findLayer(current->parentId);
+        depth += 1;
+    }
+    return true;
+}
+
+bool Layer::isEffectivelyLocked(const Document &document) const {
+    const Layer *current = this;
+    int depth = 0;
+    while (current != nullptr) {
+        if (current->locked) {
+            return true;
+        }
+        if (!current->parentId.isValid() || depth >= 1024) {
+            return false;
+        }
+        current = document.entityIndex().findLayer(current->parentId);
+        depth += 1;
+    }
+    return false;
+}
+
 }  // namespace motion

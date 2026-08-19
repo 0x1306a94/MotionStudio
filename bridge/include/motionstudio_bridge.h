@@ -419,6 +419,10 @@ int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId);
 uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId);
 bool ms_layer_visible(MSDocument *document, uint64_t layerId);
 bool ms_layer_locked(MSDocument *document, uint64_t layerId);
+// True when this layer and every ancestor is visible. False when missing.
+bool ms_layer_effectively_visible(MSDocument *document, uint64_t layerId);
+// True when this layer or any ancestor is locked. False when missing.
+bool ms_layer_effectively_locked(MSDocument *document, uint64_t layerId);
 // Layer-level blend mode (MS_BLEND_*); MS_BLEND_INVALID when the layer is missing.
 MS_BLEND ms_layer_blend_mode(MSDocument *document, uint64_t layerId);
 

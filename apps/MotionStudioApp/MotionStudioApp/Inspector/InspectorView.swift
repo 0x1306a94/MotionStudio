@@ -29,7 +29,7 @@ struct InspectorView: View {
                 let _ = core.panelRevision
                 let isVisible = core.layerIsVisible(layerID)
                 let isLocked = core.layerIsLocked(layerID)
-                let isEditable = isVisible && !isLocked
+                let isEditable = core.layerIsEffectivelyVisible(layerID) && !core.layerIsEffectivelyLocked(layerID)
                 let layerName = core.layerName(layerID)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {

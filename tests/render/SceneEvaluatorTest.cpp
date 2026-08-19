@@ -17,6 +17,7 @@
 #include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/render/SceneEvaluator.h"
+#include "MotionStudio/render/SelectionHandles.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
 using motion::BezierPath;
@@ -110,6 +111,15 @@ struct PathScene {
         return SceneEvaluator::Evaluate(document, composition->id, time);
     }
 };
+
+const motion::EvaluatedLayer *FindEvaluated(const SceneState &state, EntityId id) {
+    for (const motion::EvaluatedLayer &layer : state.layers) {
+        if (layer.id == id) {
+            return &layer;
+        }
+    }
+    return nullptr;
+}
 
 }  // namespace
 
@@ -300,10 +310,17 @@ TEST(SceneEvaluatorTest, ParentTransformChain) {
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    ASSERT_EQ(result->layers.size(), 1u);  // Group parent produces no items
-    const auto &evaluated = result->layers[0];
-    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{100, 0}));
-    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{100, 50}));
+    ASSERT_EQ(result->layers.size(), 2u);
+    const motion::EvaluatedLayer *evaluated = FindEvaluated(*result, scene.layer->id);
+    ASSERT_NE(evaluated, nullptr);
+    EXPECT_EQ(evaluated->worldTransform, Mat3::Translate(Vec2{100, 0}));
+    EXPECT_EQ(evaluated->shapeItems[0].geometry.center, (Vec2{100, 50}));
+    EXPECT_EQ(evaluated->parentId, parent->id);
+    const motion::EvaluatedLayer *group = FindEvaluated(*result, parent->id);
+    ASSERT_NE(group, nullptr);
+    EXPECT_TRUE(group->shapeItems.empty());
+    EXPECT_FALSE(group->imageItem.has_value());
+    EXPECT_FALSE(group->textItem.has_value());
 }
 
 TEST(SceneEvaluatorTest, OpacityInheritsFromParent) {
@@ -317,7 +334,9 @@ TEST(SceneEvaluatorTest, OpacityInheritsFromParent) {
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    EXPECT_FLOAT_EQ(result->layers[0].opacity, 0.25f);
+    const motion::EvaluatedLayer *evaluated = FindEvaluated(*result, scene.layer->id);
+    ASSERT_NE(evaluated, nullptr);
+    EXPECT_FLOAT_EQ(evaluated->opacity, 0.25f);
 }
 
 TEST(SceneEvaluatorTest, OutOfTimeRangeLayerSkipped) {
@@ -360,6 +379,20 @@ TEST(SceneEvaluatorTest, InvisibleLayerSkipped) {
     EXPECT_TRUE(result->layers.empty());
 }
 
+TEST(SceneEvaluatorTest, HiddenParentSkipsChild) {
+    RectScene scene;
+    Layer *parent =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    parent->outPoint = 100;
+    parent->visible = false;
+    scene.layer->parentId = parent->id;
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(FindEvaluated(*result, scene.layer->id), nullptr);
+    EXPECT_EQ(FindEvaluated(*result, parent->id), nullptr);
+}
+
 TEST(SceneEvaluatorTest, LayerGroupParentKeepsChildPathLocal) {
     RectScene scene;
     scene.rect->position.setStaticValue(Vec2{0, 0});
@@ -372,11 +405,28 @@ TEST(SceneEvaluatorTest, LayerGroupParentKeepsChildPathLocal) {
 
     Expected<SceneState, std::string> result = scene.Evaluate(0);
     ASSERT_TRUE(result.hasValue());
-    const auto &evaluated = result->layers[0];
-    EXPECT_EQ(evaluated.worldTransform, Mat3::Translate(Vec2{5, 5}));
-    EXPECT_EQ(evaluated.shapeItems[0].geometry.kind, motion::ShapeGeometryKind::Rect);
-    EXPECT_EQ(evaluated.shapeItems[0].geometry.center, (Vec2{0, 0}));
-    EXPECT_EQ(evaluated.shapeItems[0].geometry.size, (Vec2{10, 10}));
+    const motion::EvaluatedLayer *evaluated = FindEvaluated(*result, scene.layer->id);
+    ASSERT_NE(evaluated, nullptr);
+    EXPECT_EQ(evaluated->worldTransform, Mat3::Translate(Vec2{5, 5}));
+    EXPECT_EQ(evaluated->shapeItems[0].geometry.kind, motion::ShapeGeometryKind::Rect);
+    EXPECT_EQ(evaluated->shapeItems[0].geometry.center, (Vec2{0, 0}));
+    EXPECT_EQ(evaluated->shapeItems[0].geometry.size, (Vec2{10, 10}));
+}
+
+TEST(SceneEvaluatorTest, GroupSelectionHandlesUnionChildren) {
+    RectScene scene;
+    Layer *parent =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    parent->outPoint = 100;
+    scene.layer->parentId = parent->id;
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+    motion::SelectionHandles handles;
+    ASSERT_TRUE(motion::BuildSelectionHandles(*result, {parent->id}, parent->id, handles));
+    EXPECT_TRUE(handles.valid);
+    EXPECT_TRUE(handles.isOriented);
+    EXPECT_EQ(handles.primaryLayerId, parent->id);
 }
 
 TEST(SceneEvaluatorTest, StrokeItemCarriesWidthAndCaps) {

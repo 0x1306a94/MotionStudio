@@ -295,7 +295,7 @@ extension EditorViewController {
     }
 
     func nudgeSelection(dx: CGFloat, dy: CGFloat) {
-        let layerIDs = editorState.selectedLayerIDs
+        let layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsEffectivelyLocked($0) }
         guard !layerIDs.isEmpty else { return }
         let compositionID = document.core.firstCompositionID
         let frame = playheadClock.frame
@@ -365,7 +365,7 @@ extension EditorViewController {
     }
 
     func alignSelection(edge: LayerAlignEdge, name: String) {
-        let layerIDs = editorState.selectedLayerIDs
+        let layerIDs = editorState.selectedLayerIDs.filter { !document.core.layerIsEffectivelyLocked($0) }
         guard !layerIDs.isEmpty else { return }
         let compositionID = document.core.firstCompositionID
         let frame = playheadClock.frame

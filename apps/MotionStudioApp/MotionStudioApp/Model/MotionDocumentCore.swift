@@ -710,6 +710,33 @@ final class MotionDocumentCore {
         ms_layer_locked(handle, layerID)
     }
 
+    func layerIsEffectivelyVisible(_ layerID: UInt64) -> Bool {
+        ms_layer_effectively_visible(handle, layerID)
+    }
+
+    func layerIsEffectivelyLocked(_ layerID: UInt64) -> Bool {
+        ms_layer_effectively_locked(handle, layerID)
+    }
+
+    func layerParentID(_ layerID: UInt64) -> UInt64 {
+        ms_layer_parent_id(handle, layerID)
+    }
+
+    func layer(_ layerID: UInt64, isDescendantOf ancestorID: UInt64) -> Bool {
+        var current = layerParentID(layerID)
+        var seen = Set<UInt64>()
+        while current != 0 {
+            if current == ancestorID {
+                return true
+            }
+            if !seen.insert(current).inserted {
+                return false
+            }
+            current = layerParentID(current)
+        }
+        return false
+    }
+
     func layerInPoint(_ layerID: UInt64) -> Int64 {
         ms_layer_in_point(handle, layerID)
     }
