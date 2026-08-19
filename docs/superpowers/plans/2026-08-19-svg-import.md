@@ -49,6 +49,8 @@
 
 ### Task 1: 库骨架、CMake、解析失败与固有尺寸
 
+**Status:** ✅ Done
+
 **Files:**
 - Create: `include/MotionStudio/import/svg/SvgImporter.h`
 - Create: `src/import/svg/CMakeLists.txt`
@@ -62,7 +64,7 @@
 - Consumes: 无
 - Produces: `motion::svg::BuildSvgLayers` / `BuildSvgLayersFromFile`；`ImportSvgInto` / `ImportSvgFileInto` 本 Task 可先返回 `Unexpected("not implemented")`（Task 5 再填）
 
-- [ ] **Step 1: 写公开头**
+- [x] **Step 1: 写公开头**
 
 ```cpp
 #pragma once
@@ -136,7 +138,7 @@ Expected<ImportResult, std::string> ImportSvgFileInto(Document &document, UndoMa
 }  // namespace motion
 ```
 
-- [ ] **Step 2: 写会失败的测试**
+- [x] **Step 2: 写会失败的测试**
 
 `tests/import/svg/SvgImporterTest.cpp`：
 
@@ -174,7 +176,7 @@ TEST(SvgImporterTest, EmptySvgReportsSourceSizeAndRootGroup) {
 }
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 ```bash
 # 先改 CMake 再编；此时尚无 target 也算失败。加上 target 后未实现应 FAIL。
@@ -185,7 +187,7 @@ cmake --build build --target svg_import_tests
 
 Expected: 链接失败或 `EmptySvgReportsSourceSizeAndRootGroup` FAIL（尚未实现 / 返回 error）。
 
-- [ ] **Step 4: CMake 接入**
+- [x] **Step 4: CMake 接入**
 
 根 `CMakeLists.txt` 的 `TGFX_CMAKE_ARGS` 改为：
 
@@ -239,7 +241,7 @@ motionstudio_link_prebuilt_tgfx(svg_import_tests)
 gtest_discover_tests(svg_import_tests)
 ```
 
-- [ ] **Step 5: 实现解析 + 空 svg**
+- [x] **Step 5: 实现解析 + 空 svg**
 
 `SvgParse.h`：
 
@@ -285,7 +287,7 @@ int ResolveRootSourceSize(const tgfx::SVGRoot &root, float *outWidth, float *out
 
 `BuildSvgLayersFromFile`：读文件到 `std::string`，再调 `BuildSvgLayers`；读失败 → `"cannot read file"`。
 
-- [ ] **Step 6: 编测通过**
+- [x] **Step 6: 编测通过**
 
 ```bash
 cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON
@@ -295,7 +297,7 @@ cmake --build build --target svg_import_tests
 
 Expected: PASS。若 tgfx 预编译因 `TGFX_BUILD_SVG` 失效，等预编译完成。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add include/MotionStudio/import/svg/SvgImporter.h src/import/svg CMakeLists.txt tests/import/svg

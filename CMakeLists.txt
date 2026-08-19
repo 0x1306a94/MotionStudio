@@ -54,7 +54,7 @@ if (APPLE)
     set(TGFX_SOURCE_DIR "${LIBPAG_DIR}/third_party/tgfx")
     set(TGFX_INCLUDE_DIR "${TGFX_SOURCE_DIR}/include")
     set(TGFX_OUT_DIR "${CMAKE_BINARY_DIR}/tgfx_prebuilt")
-    set(TGFX_CMAKE_ARGS "-DTGFX_USE_METAL=ON -DTGFX_USE_OPENGL=OFF -DTGFX_USE_PNG_DECODE=ON -DTGFX_USE_PNG_ENCODE=ON -DTGFX_USE_JPEG_DECODE=ON -DTGFX_USE_JPEG_ENCODE=ON -DTGFX_USE_WEBP_DECODE=ON -DTGFX_USE_WEBP_ENCODE=ON")
+    set(TGFX_CMAKE_ARGS "-DTGFX_USE_METAL=ON -DTGFX_USE_OPENGL=OFF -DTGFX_USE_PNG_DECODE=ON -DTGFX_USE_PNG_ENCODE=ON -DTGFX_USE_JPEG_DECODE=ON -DTGFX_USE_JPEG_ENCODE=ON -DTGFX_USE_WEBP_DECODE=ON -DTGFX_USE_WEBP_ENCODE=ON -DTGFX_BUILD_SVG=ON")
 
     add_subdirectory(adapter/tgfx)
     add_subdirectory(adapter/avf)
@@ -62,6 +62,7 @@ if (APPLE)
     add_subdirectory(adapter/pag_codec)
     # Document → .pag (PRIVATE pag_codec); after pag_codec.
     add_subdirectory(src/export/pag)
+    add_subdirectory(src/import/svg)
 
     # C ABI bridge for platform UI shells; must come after adapter/tgfx on Apple
     # (the canvas API links the tgfx adapter).
