@@ -598,7 +598,7 @@ git commit --only \
 
 ### Task 3: 文档索引 + 手工验收
 
-**Status:** Pending
+**Status:** 文档已写；手工 picker 待点
 
 **Files:**
 - Modify: `docs/README.md`
@@ -608,7 +608,7 @@ git commit --only \
 - Consumes: Task 1–2 已实现行为
 - Produces: 文档链接
 
-- [ ] **Step 1: 索引**
+- [x] **Step 1: 索引**
 
 `docs/README.md` 表格在 SVG 导入库 spec 下加一行：
 
@@ -622,7 +622,7 @@ git commit --only \
 4. 导入带外链 `<image href="photo.png">`：成功 + Warning。
 5. 选坏文件：Alert，图层数不变。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit --only docs/README.md docs/architecture.md docs/superpowers/plans/2026-08-19-svg-import-ui.md \

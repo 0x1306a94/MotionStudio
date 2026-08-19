@@ -80,7 +80,7 @@ motionstudio/
 ├── bridge/                         # C++ ↔ Swift 桥接层（extern "C"）
 │   ├── include/motionstudio_bridge.h
 │   ├── src/motionstudio_bridge.cpp          # 文档/undo/查询/命令（跨平台）
-│   └── src/motionstudio_bridge_canvas.mm    # 画布 API（仅 Apple）
+│   └── src/apple/                           # 画布 / 导出 / SVG 导入 C ABI（仅 Apple）
 ├── apps/
 │   ├── gen_mac                     # 生成 gen_xcode（CMake Xcode 工程）的脚本
 │   ├── gen_xcode/                  # CMake 生成的 Xcode 工程，产物在 Products/
