@@ -40,6 +40,7 @@
 #include "MotionStudio/undo/SetLayerNameCommand.h"
 #include "MotionStudio/undo/SetMaskInvertedCommand.h"
 #include "MotionStudio/undo/SetMaskModeCommand.h"
+#include "MotionStudio/undo/SetParentCommand.h"
 #include "MotionStudio/undo/SetSpatialTangentsCommand.h"
 #include "MotionStudio/undo/SetStaticValueCommand.h"
 #include "MotionStudio/undo/SetStrokePositionCommand.h"
@@ -93,6 +94,7 @@ using motion::SetLayerEffectEnabledCommand;
 using motion::SetLayerNameCommand;
 using motion::SetMaskInvertedCommand;
 using motion::SetMaskModeCommand;
+using motion::SetParentCommand;
 using motion::SetSpatialTangentsCommand;
 using motion::SetStaticValueCommand;
 using motion::SetStrokePositionCommand;
@@ -171,6 +173,29 @@ TEST(AddLayerCommandTest, InsertsAtIndex) {
 
     scene.execute<AddLayerCommand>(scene.composition->id, std::move(layer), 0);
     EXPECT_EQ(scene.composition->layers[0]->id, layerId);
+}
+
+TEST(SetParentCommandTest, SetsParentAndUndo) {
+    Scene scene;
+    Layer *parent =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    scene.execute<SetParentCommand>(scene.layer->id, parent->id);
+    EXPECT_EQ(scene.layer->parentId, parent->id);
+
+    scene.undo.undo(scene.document);
+    EXPECT_FALSE(scene.layer->parentId.isValid());
+
+    scene.undo.redo(scene.document);
+    EXPECT_EQ(scene.layer->parentId, parent->id);
+}
+
+TEST(SetParentCommandTest, RejectsCycleWithoutChangingParent) {
+    Scene scene;
+    Layer *parent =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    ASSERT_TRUE(scene.layer->setParent(parent->id, scene.document));
+    scene.execute<SetParentCommand>(parent->id, scene.layer->id);
+    EXPECT_FALSE(parent->parentId.isValid());
 }
 
 TEST(RemoveLayerCommandTest, UndoRestoresSubtreeWithKeyframes) {

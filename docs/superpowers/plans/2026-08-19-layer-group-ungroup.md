@@ -37,7 +37,7 @@
 
 ### Task 1: `SetParentCommand`
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Create: `include/MotionStudio/undo/SetParentCommand.h`
@@ -49,7 +49,7 @@
 - Consumes: `Layer::setParent`、`UndoManager::execute`
 - Produces: `SetParentCommand(EntityId layerId, EntityId newParentId)`；`CommandKind::SetParent`；`describe()` = `"Set Parent"`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 在 `CommandsTest.cpp` 的 `Scene` fixture 后追加（`Scene` 已有一个 Shape 层）：
 
@@ -80,7 +80,7 @@ TEST(SetParentCommandTest, RejectsCycleWithoutChangingParent) {
 
 补 `#include "MotionStudio/undo/SetParentCommand.h"` 和 `using motion::SetParentCommand`。
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 ```bash
 cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filter='SetParentCommandTest.*'
@@ -88,7 +88,7 @@ cmake --build build --target core_tests && ./build/tests/core_tests --gtest_filt
 
 Expected: 编译失败（缺类型）或链接失败。
 
-- [ ] **Step 3: Implement `SetParentCommand`**
+- [x] **Step 3: Implement `SetParentCommand`**
 
 `CommandKind.h` 在 `MoveLayer` 后加 `SetParent,`。
 
@@ -127,7 +127,7 @@ class SetParentCommand : public Command {
 
 `execute`：`findLayer`；若 `!oldParentId_` 则记下当前 `parentId`；`setParent` 成功则 `applied_ = true`，失败保持原 parent 且不要把这次当成可 undo 的成功（`applied_` 仍 false，但 `oldParentId_` 已记——undo 时若 `!applied_` 直接 return）。`undo`：仅当 `applied_` 时 `setParent(*oldParentId_)`。
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 ./build/tests/core_tests --gtest_filter='SetParentCommandTest.*'
@@ -135,9 +135,9 @@ class SetParentCommand : public Command {
 
 Expected: PASS。
 
-- [ ] **Step 5: Update this plan** — Task 1 全部 `[x]`，`Status: ✅ Done`。
+- [x] **Step 5: Update this plan** — Task 1 全部 `[x]`，`Status: ✅ Done`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit --only include/MotionStudio/undo/SetParentCommand.h src/undo/SetParentCommand.cpp include/MotionStudio/undo/CommandKind.h tests/undo/CommandsTest.cpp docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Add an undoable set parent command."

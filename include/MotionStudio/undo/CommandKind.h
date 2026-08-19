@@ -8,6 +8,7 @@ enum class CommandKind {
     AddLayer,
     RemoveLayer,
     MoveLayer,
+    SetParent,
     SetStaticValue,
     AddKeyframe,
     RemoveKeyframe,
