@@ -47,7 +47,8 @@ add_executable(svg_import_tests ${SVG_IMPORT_TEST_SOURCES})
 add_source_group(SVG_IMPORT_TEST_SOURCES ${PROJECT_SOURCE_DIR}/tests/import/svg "Tests")
 disable_xcode_target_signing(svg_import_tests)
 target_include_directories(svg_import_tests PRIVATE
-                           "${CMAKE_CURRENT_SOURCE_DIR}")
+                           "${CMAKE_CURRENT_SOURCE_DIR}"
+                           "${TGFX_INCLUDE_DIR}")
 target_link_libraries(svg_import_tests PRIVATE svg_import GTest::gtest_main)
 motionstudio_link_asan_defaults(svg_import_tests)
 motionstudio_add_tgfx_prebuild(svg_import_tests)

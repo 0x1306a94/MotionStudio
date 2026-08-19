@@ -308,6 +308,8 @@ git commit -m "Add the svg_import library skeleton and parse failure tests."
 
 ### Task 2: `tgfx::Path` → `VectorNetwork`
 
+**Status:** ✅ Done
+
 **Files:**
 - Create: `src/import/svg/SvgPathConvert.h`
 - Create: `src/import/svg/SvgPathConvert.cpp`
@@ -317,7 +319,7 @@ git commit -m "Add the svg_import library skeleton and parse failure tests."
 - Consumes: Task 1 库
 - Produces: `VectorNetwork PathToVectorNetwork(const tgfx::Path &path, bool *usedConic);`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 测试文件可 `#include "SvgPathConvert.h"`（PRIVATE src 目录）。
 
@@ -349,7 +351,7 @@ TEST(SvgPathConvertTest, OpenLineHasOneEdge) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target svg_import_tests
@@ -358,7 +360,7 @@ cmake --build build --target svg_import_tests
 
 Expected: FAIL（未声明 `PathToVectorNetwork`）。
 
-- [ ] **Step 3: 实现转换**
+- [x] **Step 3: 实现转换**
 
 按 spec §6.2 迭代 `path`：
 
@@ -372,7 +374,7 @@ Expected: FAIL（未声明 `PathToVectorNetwork`）。
 
 `Iterator` 的 Line/Cubic `points[0]` 是当前点，`points[1..]` 是后续控制点/终点（以 tgfx `Path.h` Segment 注释为准）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgPathConvertTest.*'
@@ -380,7 +382,7 @@ Expected: FAIL（未声明 `PathToVectorNetwork`）。
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg/SvgPathConvert.h src/import/svg/SvgPathConvert.cpp tests/import/svg/SvgImporterTest.cpp
