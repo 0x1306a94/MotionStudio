@@ -102,7 +102,14 @@ CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ni
 
 ## 项目规范
 
-`.claude/rules/` 下的规范（自动加载，必须遵守）：`coding-style.md`（命名/禁异常与 dynamic_cast/注释约定等）、`git-workflow.md`（分支命名、commit 信息、pre-commit 格式化、自动提交规则、按 plan 实现时的状态同步）、`testing.md`（GoogleTest 约定：不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()` 断言、death test、round-trip 与 undo 一致性等专项模式）、`codegraph.md`（CodeGraph MCP 工具的使用规范）、`bridge-swift-enums.md`（`CF_CLOSED_ENUM` 导入 Swift 与 SwiftUI `CaseIterable`/`Identifiable` 扩展约定）。
+`.claude/rules/` 下的规范（自动加载，必须遵守）：
+
+- `coding-style.md`：命名、禁异常与 `dynamic_cast`、注释约定等
+- `git-workflow.md`：分支命名、commit 信息、pre-commit 格式化、自动提交、按 plan 实现时的状态同步
+- `spec-plan-commit.md`：撰写或修订 spec/plan 须等用户确认后再提交；不要拆成一串小 commit
+- `testing.md`：GoogleTest 约定（不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()`、death test、round-trip 与 undo 一致性等）
+- `codegraph.md`：CodeGraph MCP 工具的使用规范
+- `bridge-swift-enums.md`：`CF_CLOSED_ENUM` 导入 Swift 与 SwiftUI `CaseIterable`/`Identifiable` 扩展约定
 
 ### 按 plan 实现
 

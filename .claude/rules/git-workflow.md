@@ -19,9 +19,13 @@ alwaysApply: true
 - 源码格式化由 git hook `pre-commit` 在提交时自动处理（仅暂存的 C++/ObjC/Swift）；无需在每次提交前手动跑 `./codeformat.sh`。`./codeformat.sh` 仅用于需要全量格式化时的手动执行
 - **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
 
+### spec / plan 文档
+
+撰写或修订 `docs/superpowers/specs/`、`docs/superpowers/plans/`（及仅为此改的 `docs/README.md` 链接）时：**写完后先给用户看，等用户明确确认后再 commit**。禁止写完就自动提交，也禁止把多次 spec/plan 修订拆成一串小 commit。
+
 ### 自动提交
 
-完成任务后自动提交（仅 commit，**不自动推送**），无需用户额外指示：
+完成任务后自动提交（仅 commit，**不自动推送**），无需用户额外指示。**上一条 spec/plan 例外优先。**
 
 1. **NEVER** 在 master 分支直接提交，先按「分支命名」规范创建新分支；非 master 分支直接在当前分支提交即可
 2. **NEVER** 使用 `--amend` 修改已有 commit，始终创建新 commit
