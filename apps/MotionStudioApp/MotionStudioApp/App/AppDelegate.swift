@@ -32,6 +32,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                          input: "s",
                                          modifierFlags: [.command, .shift])
         // Not ⌘E: that conflicts with system Edit → Use Selection for Find.
+        let importSVGCommand = UIKeyCommand(title: "Import SVG...",
+                                            image: nil,
+                                            action: #selector(EditorViewController.importSVG),
+                                            input: "s",
+                                            modifierFlags: [.command, .alternate])
         let exportMP4Command = UIKeyCommand(title: "Export MP4...",
                                             image: nil,
                                             action: #selector(EditorViewController.exportMP4),
@@ -44,7 +49,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                             modifierFlags: [.command, .alternate])
         let saveMenu = UIMenu(title: "",
                               options: .displayInline,
-                              children: [saveCommand, saveAsCommand, exportMP4Command, exportPAGCommand])
+                              children: [saveCommand, saveAsCommand, importSVGCommand, exportMP4Command, exportPAGCommand])
         builder.insertSibling(saveMenu, beforeMenu: .close)
 
         let closeCommand = UIKeyCommand(title: "Close",

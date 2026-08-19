@@ -86,6 +86,7 @@ final class EditorViewController: UIViewController {
     var inspectorHostingController: UIHostingController<InspectorView>?
     var timelineViewController: TimelineViewController?
     var imageImportCoordinator: ImageImportCoordinator?
+    var svgImportCoordinator: SvgImportCoordinator?
     var timelineHeightConstraint: NSLayoutConstraint?
 
     var timelineHeight = Metrics.timelinePreferredHeight
@@ -178,6 +179,7 @@ final class EditorViewController: UIViewController {
             UIKeyCommand(input: "s", modifierFlags: [.command, .shift], action: #selector(saveDocumentAs)),
             UIKeyCommand(input: "e", modifierFlags: [.command, .alternate], action: #selector(exportMP4)),
             UIKeyCommand(input: "p", modifierFlags: [.command, .alternate], action: #selector(exportPAG)),
+            UIKeyCommand(input: "s", modifierFlags: [.command, .alternate], action: #selector(importSVG)),
             UIKeyCommand(input: "r", modifierFlags: [.command, .shift], action: #selector(addRectangleLayer)),
             UIKeyCommand(input: "e", modifierFlags: [.command, .shift], action: #selector(addEllipseLayer)),
             UIKeyCommand(input: "i", modifierFlags: [.command, .shift], action: #selector(addImageLayer)),
@@ -200,7 +202,8 @@ final class EditorViewController: UIViewController {
             !isExportInProgress && hasUnsavedChanges
         case #selector(saveDocumentAs),
              #selector(exportMP4),
-             #selector(exportPAG):
+             #selector(exportPAG),
+             #selector(importSVG):
             !isExportInProgress
         case #selector(requestCloseWindow),
              #selector(addRectangleLayer),

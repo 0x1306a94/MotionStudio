@@ -436,7 +436,7 @@ git commit --only bridge/include/motionstudio_bridge.h \
 
 ### Task 2: App 菜单 + 选文件
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`
@@ -450,7 +450,7 @@ git commit --only bridge/include/motionstudio_bridge.h \
 - Consumes: `ms_document_import_svg`
 - Produces: `MotionDocumentCore.importSvg`、`EditorViewController.importSVG`
 
-- [ ] **Step 1: `MotionDocumentCore.importSvg`**
+- [x] **Step 1: `MotionDocumentCore.importSvg`**
 
 放在 `importImageAsset` 附近：
 
@@ -504,7 +504,7 @@ func importSvg(compositionID: UInt64, data: Data, rootName: String?) throws -> S
 
 `withRootName` / `parseSvgDiagnostics` 用文件内 `private` 方法实现：JSON 只解析 `code` / `message` / `nodeName` 字符串字段。不要引入新 Swift 依赖；手写扫描或 `JSONSerialization`。
 
-- [ ] **Step 2: Coordinator + 编排**
+- [x] **Step 2: Coordinator + 编排**
 
 `SvgImportCoordinator.swift` 对齐 `ImageImportCoordinator` 的文件选择（两端同一套 `UIDocumentPicker`，不用 `NSOpenPanel`）：
 
@@ -553,7 +553,7 @@ final class SvgImportCoordinator: NSObject {
 成功：`editorState.selectedLayerID = outcome.rootLayerId`。  
 `diagnostics` 非空：`presentImportAlert(title: "SVG Import Warnings", message:)`，每行 `code: message`，有 `nodeName` 则 `code: message (name)`。
 
-- [ ] **Step 3: 菜单与快捷键**
+- [x] **Step 3: 菜单与快捷键**
 
 `AppDelegate.buildMenu` 的 `saveMenu` 在 Save As 与 Export 之间插入：
 
@@ -569,7 +569,7 @@ let importSVGCommand = UIKeyCommand(title: "Import SVG...",
 
 `EditorViewController` 增加 `svgImportCoordinator` 属性（与 `imageImportCoordinator` 并列）。
 
-- [ ] **Step 4: 编译 App**
+- [x] **Step 4: 编译 App**
 
 优先 Xcode MCP `BuildProject`（已打开 `MotionStudio.xcworkspace`）。不可用则：
 
@@ -580,7 +580,7 @@ xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configur
 
 Expected: **BUILD SUCCEEDED**。链接错误缺 `motionstudio_svg_import` 时先跑 `apps/gen_mac` 再编。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only \

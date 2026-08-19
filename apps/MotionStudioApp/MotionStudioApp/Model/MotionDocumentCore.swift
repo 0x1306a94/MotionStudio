@@ -20,6 +20,23 @@ enum PagExportError: Error {
     case failed(String)
 }
 
+struct SvgImportDiagnostic {
+    var code: String
+    var message: String
+    var nodeName: String
+}
+
+struct SvgImportOutcome {
+    var rootLayerId: UInt64
+    var sourceWidth: Int
+    var sourceHeight: Int
+    var diagnostics: [SvgImportDiagnostic]
+}
+
+enum SvgImportError: Error {
+    case failed(String)
+}
+
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
 ///
@@ -1121,6 +1138,34 @@ final class MotionDocumentCore {
         Self.takeString(ms_document_project_root(handle))
     }
 
+    func importSvg(compositionID: UInt64, data: Data, rootName: String?) throws -> SvgImportOutcome {
+        var options = MSSvgImportOptions()
+        options.insertIndex = -1
+        options.parentLayerId = 0
+        return try data.withUnsafeBytes { rawBuffer in
+            guard let base = rawBuffer.baseAddress, !rawBuffer.isEmpty else {
+                throw SvgImportError.failed("svg bytes are empty")
+            }
+            return try withRootName(rootName) { namePointer in
+                options.rootName = namePointer
+                var result = MSSvgImportResult()
+                var diagnosticsPtr: UnsafeMutablePointer<CChar>?
+                var errorPtr: UnsafeMutablePointer<CChar>?
+                let ok = ms_document_import_svg(handle, compositionID, base, rawBuffer.count, &options,
+                                                &result, &diagnosticsPtr, &errorPtr)
+                if !ok {
+                    throw SvgImportError.failed(Self.takeString(errorPtr) ?? "import failed")
+                }
+                let diagnosticsJson = Self.takeString(diagnosticsPtr)
+                changed()
+                return SvgImportOutcome(rootLayerId: result.rootLayerId,
+                                        sourceWidth: Int(result.sourceWidth),
+                                        sourceHeight: Int(result.sourceHeight),
+                                        diagnostics: Self.parseSvgDiagnostics(diagnosticsJson))
+            }
+        }
+    }
+
     /// Copies the file into `{projectRoot}/assets/` and registers a document asset.
     @discardableResult
     func importImageAsset(sourceURL: URL, preferredFileName: String?, width: Int, height: Int) -> UInt64 {
@@ -1957,6 +2002,29 @@ final class MotionDocumentCore {
             b = remainder
         }
         return max(a, 1)
+    }
+
+    private func withRootName<T>(_ rootName: String?,
+                                 body: (UnsafePointer<CChar>?) throws -> T) rethrows -> T
+    {
+        if let rootName {
+            return try rootName.withCString(body)
+        }
+        return try body(nil)
+    }
+
+    private nonisolated static func parseSvgDiagnostics(_ json: String?) -> [SvgImportDiagnostic] {
+        guard let json,
+              let data = json.data(using: .utf8),
+              let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else {
+            return []
+        }
+        return array.map { item in
+            SvgImportDiagnostic(code: item["code"] as? String ?? "",
+                                message: item["message"] as? String ?? "",
+                                nodeName: item["nodeName"] as? String ?? "")
+        }
     }
 
     private nonisolated static func takeString(_ cString: UnsafeMutablePointer<CChar>?) -> String? {
