@@ -1036,6 +1036,8 @@ git commit -m "Import SVG images and simple clip paths into Core layers."
 
 ### Task 9: `<text>` → 点文本 Text 层
 
+**Status:** ✅ Done
+
 **Files:**
 - Create: `src/import/svg/SvgText.h`
 - Create: `src/import/svg/SvgText.cpp`
@@ -1048,7 +1050,7 @@ git commit -m "Import SVG images and simple clip paths into Core layers."
 - Consumes: `SVGText` / `SVGTSpan` / `SVGTextLiteral`、`SVGText::getTextChildren()`、Font 度量（tgfx `Font` + `TextBlob`）
 - Produces: `LayerType::Text` + `TextContent`（`boxTextMode = false`）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SvgImporterTest, TextBecomesPointTextLayer) {
@@ -1133,7 +1135,7 @@ TEST(SvgImporterTest, TextPathIsSkipped) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.Text*:SvgImporterTest.SameStyle*'
@@ -1141,11 +1143,11 @@ TEST(SvgImporterTest, TextPathIsSkipped) {
 
 Expected: FAIL（text 仍被 walk 跳过）。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 按 spec §8.3：`CollectTextRuns` 深度优先拼字面量；遇到异样式或自带 x/y 的 tspan 则 flush 当前 run 再开新层。`M = getTransform() * T(x0+dx0-alignX, y0+dy0-ascent)` 再走 §5.2。`fontStyle`：`Bold` / `Italic` / `Bold Italic` / `""`。空字面量不建层。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.*'
@@ -1153,7 +1155,7 @@ Expected: FAIL（text 仍被 walk 跳过）。
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg tests/import/svg

@@ -36,10 +36,14 @@ struct ComputedStyle {
     std::string fontFamily;
     float fontSize = 16.f;
     std::string fontStyle;
+    bool fontBold = false;
     std::string textAnchor;
     std::string fillIri;
     std::string strokeIri;
 };
+
+std::string MappedFontStyle(const ComputedStyle &style);
+std::string FirstFontFamily(const std::string &family);
 
 ComputedStyle ResolveStyle(const tgfx::SVGNode &node, const ComputedStyle &parent,
                            const tgfx::SVGLengthContext &lengthContext);

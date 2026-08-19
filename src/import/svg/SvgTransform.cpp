@@ -6,6 +6,7 @@
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/model/TextContent.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
 
@@ -78,6 +79,15 @@ bool NetworkBounds(const VectorNetwork &network, Vec2 &minOut, Vec2 &maxOut) {
 }
 
 bool LayerLocalBounds(const Layer &layer, Vec2 &minOut, Vec2 &maxOut) {
+    if (layer.type() == LayerType::Text) {
+        const auto *content = static_cast<const TextContent *>(layer.content.get());
+        if (content == nullptr) {
+            return false;
+        }
+        minOut = {0.f, 0.f};
+        maxOut = content->size;
+        return maxOut.x >= 0.f && maxOut.y >= 0.f;
+    }
     if (layer.type() != LayerType::Shape) {
         return false;
     }
@@ -283,7 +293,7 @@ void AssignCenterAnchors(std::vector<std::unique_ptr<Layer>> &layers) {
         Vec2 minPoint = {};
         Vec2 maxPoint = {};
         bool hasBounds = false;
-        if (layer.type() == LayerType::Shape) {
+        if (layer.type() == LayerType::Shape || layer.type() == LayerType::Text) {
             hasBounds = LayerLocalBounds(layer, minPoint, maxPoint);
         } else if (layer.type() == LayerType::Group) {
             hasBounds = GroupBounds(layers, layer, minPoint, maxPoint);

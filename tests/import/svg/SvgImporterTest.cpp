@@ -10,6 +10,7 @@
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/StrokePosition.h"
+#include "MotionStudio/model/TextContent.h"
 #include "MotionStudio/undo/UndoManager.h"
 #include "SvgPathConvert.h"
 #include "tgfx/core/Path.h"
@@ -391,4 +392,84 @@ TEST(SvgImporterTest, ComplexClipPathIsUnsupported) {
         }
     }
     EXPECT_TRUE(found);
+}
+
+TEST(SvgImporterTest, TextBecomesPointTextLayer) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"100\">"
+        "<text x=\"20\" y=\"40\" font-size=\"24\" fill=\"#333333\">hello</text>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_EQ(result.value().layers.size(), 2u);
+    const motion::Layer *text = result.value().layers[1].get();
+    EXPECT_EQ(text->type(), motion::LayerType::Text);
+    auto *content = static_cast<motion::TextContent *>(text->content.get());
+    EXPECT_EQ(content->text.staticValue(), "hello");
+    EXPECT_FALSE(content->boxTextMode);
+    EXPECT_NEAR(content->fontSize, 24.f, 1e-3f);
+    EXPECT_EQ(content->align, motion::TextAlign::Left);
+    ASSERT_FALSE(text->styles.empty());
+    EXPECT_EQ(text->styles[0]->type(), motion::LayerStyleType::Fill);
+}
+
+TEST(SvgImporterTest, TextAnchorMiddleMapsToCenter) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"100\">"
+        "<text x=\"100\" y=\"50\" text-anchor=\"middle\" font-size=\"16\">ab</text>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_GE(result.value().layers.size(), 2u);
+    auto *content = static_cast<motion::TextContent *>(result.value().layers[1]->content.get());
+    EXPECT_EQ(content->align, motion::TextAlign::Center);
+}
+
+TEST(SvgImporterTest, SameStyleTspanConcatenates) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"100\">"
+        "<text x=\"0\" y=\"20\" font-size=\"16\">foo<tspan>bar</tspan></text>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().layers.size(), 2u);
+    auto *content = static_cast<motion::TextContent *>(result.value().layers[1]->content.get());
+    EXPECT_EQ(content->text.staticValue(), "foobar");
+}
+
+TEST(SvgImporterTest, DifferentFillTspanSplitsLayer) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"100\">"
+        "<text x=\"0\" y=\"20\" font-size=\"16\" fill=\"#000000\">"
+        "ab<tspan fill=\"#ff0000\">cd</tspan></text>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    int textCount = 0;
+    for (const auto &layer : result.value().layers) {
+        if (layer->type() == motion::LayerType::Text) {
+            textCount += 1;
+        }
+    }
+    EXPECT_EQ(textCount, 2);
+}
+
+TEST(SvgImporterTest, TextPathIsSkipped) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">"
+        "<defs><path id=\"p\" d=\"M0 50 H100\"/></defs>"
+        "<text><textPath href=\"#p\">curve</textPath></text>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    bool found = false;
+    for (const auto &d : result.value().diagnostics) {
+        if (d.code == "textPath.skipped") {
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+    for (const auto &layer : result.value().layers) {
+        EXPECT_NE(layer->type(), motion::LayerType::Text);
+    }
 }

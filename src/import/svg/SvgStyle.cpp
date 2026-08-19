@@ -278,6 +278,24 @@ ComputedStyle ResolveStyle(const tgfx::SVGNode &node, const ComputedStyle &paren
         }
     }
 
+    const auto &fontWeight = node.getFontWeight();
+    if (fontWeight.isValue()) {
+        switch (fontWeight->type()) {
+            case tgfx::SVGFontWeight::Type::W700:
+            case tgfx::SVGFontWeight::Type::W800:
+            case tgfx::SVGFontWeight::Type::W900:
+            case tgfx::SVGFontWeight::Type::Bold:
+            case tgfx::SVGFontWeight::Type::Bolder:
+                style.fontBold = true;
+                break;
+            case tgfx::SVGFontWeight::Type::Inherit:
+                break;
+            default:
+                style.fontBold = false;
+                break;
+        }
+    }
+
     const auto &textAnchor = node.getTextAnchor();
     if (textAnchor.isValue()) {
         switch (textAnchor->type()) {
@@ -299,6 +317,31 @@ ComputedStyle ResolveStyle(const tgfx::SVGNode &node, const ComputedStyle &paren
         style.fillIri.clear();
     }
     return style;
+}
+
+std::string MappedFontStyle(const ComputedStyle &style) {
+    if (style.fontBold && style.fontStyle == "Italic") {
+        return "Bold Italic";
+    }
+    if (style.fontBold) {
+        return "Bold";
+    }
+    return style.fontStyle;
+}
+
+std::string FirstFontFamily(const std::string &family) {
+    size_t start = 0;
+    while (start < family.size() && (family[start] == ' ' || family[start] == '\t' || family[start] == '"' || family[start] == '\'')) {
+        start += 1;
+    }
+    size_t end = start;
+    while (end < family.size() && family[end] != ',') {
+        end += 1;
+    }
+    while (end > start && (family[end - 1] == ' ' || family[end - 1] == '\t' || family[end - 1] == '"' || family[end - 1] == '\'')) {
+        end -= 1;
+    }
+    return family.substr(start, end - start);
 }
 
 void ApplyStyles(Layer &layer, const ComputedStyle &style) {

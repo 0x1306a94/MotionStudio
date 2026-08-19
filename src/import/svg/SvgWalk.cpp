@@ -11,6 +11,7 @@
 #include "SvgLength.h"
 #include "SvgPathConvert.h"
 #include "SvgStyle.h"
+#include "SvgText.h"
 #include "SvgTransform.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
@@ -124,6 +125,8 @@ std::string DefaultName(tgfx::SVGTag tag) {
             return "Group";
         case tgfx::SVGTag::Image:
             return "Image";
+        case tgfx::SVGTag::Text:
+            return "Text";
         default:
             return "Path";
     }
@@ -655,7 +658,19 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, WalkContext &ctx,
         return;
     }
     const tgfx::SVGTag tag = node.tag();
-    if (IsSkippedContainer(tag) || IsFilterPrimitive(tag) || IsTextNode(tag)) {
+    if (IsSkippedContainer(tag) || IsFilterPrimitive(tag)) {
+        return;
+    }
+    if (tag == tgfx::SVGTag::Text) {
+        ImportSvgText(static_cast<const tgfx::SVGText &>(node), parentId, *ctx.tree,
+                      ctx.lengthContext, ctx.mapper, parentStyle);
+        return;
+    }
+    if (tag == tgfx::SVGTag::TextPath) {
+        AddDiagnostic(*ctx.tree, "textPath.skipped", "textPath is not imported", LayerName(node));
+        return;
+    }
+    if (IsTextNode(tag)) {
         return;
     }
     if (tag == tgfx::SVGTag::G || tag == tgfx::SVGTag::Svg) {
