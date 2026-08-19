@@ -511,7 +511,7 @@ git commit --only apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineReo
 
 ### Task 6: 左侧 Layer 树缩进 UI + 拖拽/Arrange 扩子孙
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `TimelineSidebarView.swift`（`TimelineLayerCell` / `TimelinePropertyCell` leading constraint 改为可更新；`configure` 传入 depth）
@@ -521,7 +521,7 @@ git commit --only apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineReo
 - Consumes: `core.layerParentID` 建 `parentOf`；`TimelineLayerTree.leadingInset`
 - Produces: 左侧 Layer 树缩进可见；右侧轨道不缩进；拖 Group 子树整块移动
 
-- [ ] **Step 1: 给 cell 加 `NSLayoutConstraint` 成员**（layer stack leading、property name leading），`configure(..., depth: Int)` 里设 `constant`。
+- [x] **Step 1: 给 cell 加 `NSLayoutConstraint` 成员**（layer stack leading、property name leading），`configure(..., depth: Int)` 里设 `constant`。
 
 `configure(cell:)` 里：
 
@@ -535,7 +535,7 @@ let depth = TimelineLayerTree.parentDepth(layerID: row.layerID, parentOf: parent
 
 （可把 `parentOf` 提到 `reloadRows` 缓存，避免每行重建；v1 每行算也可以，层数不多。）
 
-- [ ] **Step 2: drag beginning**
+- [x] **Step 2: drag beginning**
 
 ```swift
 var parentOf: [UInt64: UInt64] = [:]
@@ -548,11 +548,11 @@ let moving = TimelineLayerTree.movingIDsIncludingDescendants(
 
 `EditorViewController+Commands.arrangeSelection` / `canArrangeSelection` 同样扩展 moving。
 
-- [ ] **Step 3: 无新单测则手动对照 spec：SVG 树或编组后子层缩进。** 本任务不写 UI 截图测试。
+- [x] **Step 3: 无新单测则手动对照 spec：SVG 树或编组后子层缩进。** 本任务不写 UI 截图测试。
 
-- [ ] **Step 4: Update this plan** — Task 6 `[x]`，`Status: ✅ Done`。
+- [x] **Step 4: Update this plan** — Task 6 `[x]`，`Status: ✅ Done`。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit --only apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/TimelineSidebarView.swift apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController+Commands.swift docs/superpowers/plans/2026-08-19-layer-group-ungroup.md -m "Indent the layer tree and drag a group with its children."

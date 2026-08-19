@@ -167,6 +167,11 @@ final class TimelineSidebarView: UIView {
 
     private func configure(cell: UITableViewCell, row: TimelineRow) {
         let core = document.core
+        var parentOf: [UInt64: UInt64] = [:]
+        for layerID in core.layerIDs(compositionID: core.firstCompositionID) {
+            parentOf[layerID] = core.layerParentID(layerID)
+        }
+        let depth = TimelineLayerTree.parentDepth(layerID: row.layerID, parentOf: parentOf)
         switch row.kind {
         case .layer:
             guard let layerCell = cell as? TimelineLayerCell else {
@@ -177,7 +182,8 @@ final class TimelineSidebarView: UIView {
             layerCell.configure(name: core.layerName(row.layerID),
                                 symbolName: layerSymbol(core.layerType(row.layerID)),
                                 visible: visible,
-                                locked: locked)
+                                locked: locked,
+                                depth: depth)
             layerCell.onTap = { [weak self] in
                 self?.editorState.selectLayer(row.layerID, additive: KeyboardModifiers.shiftPressed)
                 self?.refreshSelectionAppearance()
@@ -204,7 +210,7 @@ final class TimelineSidebarView: UIView {
             }
             let hasKeyframe = core.keyframes(entityID: row.layerID, path: path)
                 .contains { $0.frame == playheadClock.frame }
-            propertyCell.configure(label: label, hasKeyframeAtPlayhead: hasKeyframe)
+            propertyCell.configure(label: label, hasKeyframeAtPlayhead: hasKeyframe, depth: depth)
             propertyCell.onTap = { [weak self] in
                 guard let self else {
                     return
@@ -304,7 +310,13 @@ private extension TimelineSidebarView {
         }
         let compositionID = document.core.firstCompositionID
         let current = document.core.layerIDs(compositionID: compositionID)
-        let moving = Set(editorState.selectedLayerIDs)
+        var parentOf: [UInt64: UInt64] = [:]
+        for id in current {
+            parentOf[id] = document.core.layerParentID(id)
+        }
+        let moving = TimelineLayerTree.movingIDsIncludingDescendants(
+            order: current, parentOf: parentOf, moving: Set(editorState.selectedLayerIDs),
+        )
         guard let desired = TimelineReorder.arrangedLayerIDs(current: current, moving: moving, action: action) else {
             return
         }
@@ -376,8 +388,14 @@ extension TimelineSidebarView: UITableViewDragDelegate, UITableViewDropDelegate 
         if !editorState.isLayerSelected(layerID) {
             editorState.selectLayer(layerID)
         }
-        let moving = Set(editorState.selectedLayerIDs)
         let startOrder = document.core.layerIDs(compositionID: document.core.firstCompositionID)
+        var parentOf: [UInt64: UInt64] = [:]
+        for id in startOrder {
+            parentOf[id] = document.core.layerParentID(id)
+        }
+        let moving = TimelineLayerTree.movingIDsIncludingDescendants(
+            order: startOrder, parentOf: parentOf, moving: Set(editorState.selectedLayerIDs),
+        )
         session.localContext = LayerDragSessionContext(movingIDs: moving,
                                                        startOrder: startOrder,
                                                        lastDesired: startOrder)
@@ -464,6 +482,7 @@ private final class TimelineLayerCell: UITableViewCell {
     private let visibleButton = UIButton(type: .system)
     private let lockedButton = UIButton(type: .system)
     private let selectionBackground = UIView()
+    private var stackLeadingConstraint: NSLayoutConstraint?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -494,12 +513,15 @@ private final class TimelineLayerCell: UITableViewCell {
         stack.spacing = 6
         contentView.addSubview(stack)
 
+        let leading = stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor,
+                                                     constant: TimelineLayerTree.layerLeading)
+        stackLeadingConstraint = leading
         NSLayoutConstraint.activate([
             selectionBackground.topAnchor.constraint(equalTo: contentView.topAnchor),
             selectionBackground.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             selectionBackground.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             selectionBackground.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            leading,
             stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             stack.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             iconView.widthAnchor.constraint(equalToConstant: 16),
@@ -519,11 +541,12 @@ private final class TimelineLayerCell: UITableViewCell {
         nil
     }
 
-    func configure(name: String, symbolName: String, visible: Bool, locked: Bool) {
+    func configure(name: String, symbolName: String, visible: Bool, locked: Bool, depth: Int) {
         nameLabel.text = name
         iconView.image = UIImage(systemName: symbolName)
         visibleButton.setImage(UIImage(systemName: visible ? "eye.fill" : "eye.slash"), for: .normal)
         lockedButton.setImage(UIImage(systemName: locked ? "lock.fill" : "lock.open"), for: .normal)
+        stackLeadingConstraint?.constant = TimelineLayerTree.leadingInset(depth: depth, isProperty: false)
         contentView.alpha = 1
     }
 
@@ -559,6 +582,7 @@ private final class TimelinePropertyCell: UITableViewCell {
     private let nameLabel = UILabel()
     private let badgeView = UIImageView()
     private let selectionBackground = UIView()
+    private var nameLeadingConstraint: NSLayoutConstraint?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -584,12 +608,15 @@ private final class TimelinePropertyCell: UITableViewCell {
         contentView.addSubview(nameLabel)
         contentView.addSubview(badgeView)
 
+        let nameLeading = nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor,
+                                                             constant: TimelineLayerTree.propertyLeading)
+        nameLeadingConstraint = nameLeading
         NSLayoutConstraint.activate([
             selectionBackground.topAnchor.constraint(equalTo: contentView.topAnchor),
             selectionBackground.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             selectionBackground.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             selectionBackground.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 28),
+            nameLeading,
             nameLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             badgeView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             badgeView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
@@ -605,9 +632,10 @@ private final class TimelinePropertyCell: UITableViewCell {
         nil
     }
 
-    func configure(label: String, hasKeyframeAtPlayhead: Bool) {
+    func configure(label: String, hasKeyframeAtPlayhead: Bool, depth: Int) {
         nameLabel.text = label
         setHasKeyframeAtPlayhead(hasKeyframeAtPlayhead)
+        nameLeadingConstraint?.constant = TimelineLayerTree.leadingInset(depth: depth, isProperty: true)
         contentView.alpha = 1
     }
 
