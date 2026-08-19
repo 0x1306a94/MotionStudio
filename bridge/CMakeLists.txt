@@ -15,7 +15,7 @@ if (APPLE)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/apple
     )
     list(APPEND BRIDGE_ALL_SOURCES ${APPLE_SOURCES})
-    list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter motionstudio_avf_adapter pag_export)
+    list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter motionstudio_avf_adapter pag_export svg_import)
 endif()
 
 message(STATUS "BRIDGE_PUBLIC_HEADERS: ${BRIDGE_PUBLIC_HEADERS}")

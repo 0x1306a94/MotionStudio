@@ -38,7 +38,7 @@
 
 ### Task 1: Bridge `ms_document_import_svg` + 测试
 
-**Status:** Pending
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `bridge/include/motionstudio_bridge.h`（`#endif` before `ms_canvas_destroy` 之前）
@@ -51,7 +51,7 @@
 - Consumes: `motion::svg::ImportSvgInto` / `ImportOptions` / `ImportResult` / `EmbeddedImage`
 - Produces: `ms_document_import_svg`（签名见 Step 1）
 
-- [ ] **Step 1: 写失败测试（API 尚不存在）**
+- [x] **Step 1: 写失败测试（API 尚不存在）**
 
 Create `bridge/tests/SvgImportBridgeTest.cpp`:
 
@@ -103,7 +103,7 @@ TEST(SvgImportBridgeTest, InvalidXmlFails) {
 #endif
 ```
 
-- [ ] **Step 2: 确认测试编不过或失败**
+- [x] **Step 2: 确认测试编不过或失败**
 
 Run:
 
@@ -113,7 +113,7 @@ cmake --build build --target bridge_test
 
 Expected: compile error，`ms_document_import_svg` / `MSSvgImportOptions` undeclared.
 
-- [ ] **Step 3: 声明 + 实现 + 链接**
+- [x] **Step 3: 声明 + 实现 + 链接**
 
 In `bridge/include/motionstudio_bridge.h`，`ms_pag_export` 声明之后、`#endif`（Apple 段结束）之前插入：
 
@@ -301,7 +301,7 @@ list(APPEND BRIDGE_LINK_LIBRARIES motionstudio_tgfx_adapter motionstudio_avf_ada
 
 `Base.xcconfig` 的 `CORE_LINK_FLAGS` 在 `-lmotionstudio_bridge` 后加 `-lmotionstudio_svg_import`。
 
-- [ ] **Step 4: 补成功路径测试**
+- [x] **Step 4: 补成功路径测试**
 
 同一测试文件追加（kitchen sink 相对 `PROJECT_SOURCE_DIR` 不可用时，用内联小 SVG）：
 
@@ -399,7 +399,7 @@ TEST(SvgImportBridgeTest, ExternalImageReturnsDiagnostics) {
 
 若 `ms_document_asset_id_at` 不存在，用已有 `ms_document_asset_count` + 遍历 `ms_asset_path` 的现有 API（先搜 header；不要新造 asset 枚举 API）。
 
-- [ ] **Step 5: 跑测试**
+- [x] **Step 5: 跑测试**
 
 ```bash
 cmake --build build --target bridge_test
@@ -408,7 +408,7 @@ cmake --build build --target bridge_test
 
 Expected: 全部 PASS。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add bridge/include/motionstudio_bridge.h \

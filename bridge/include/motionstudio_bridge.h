@@ -903,6 +903,24 @@ typedef struct MSPagExportOptions {
 // frames (error message "cancelled"). On failure *errorOut is malloc'd (ms_string_free).
 bool ms_pag_export(MSDocument *document, uint64_t compositionId, const MSPagExportOptions *options,
                    const volatile int *cancelFlag, char **errorOut);
+
+/* ============================ svg import (Apple platforms) ============================ */
+
+typedef struct MSSvgImportOptions {
+    int insertIndex;
+    uint64_t parentLayerId;
+    const char *rootName;
+} MSSvgImportOptions;
+
+typedef struct MSSvgImportResult {
+    uint64_t rootLayerId;
+    int sourceWidth;
+    int sourceHeight;
+} MSSvgImportResult;
+
+bool ms_document_import_svg(MSDocument *document, uint64_t compositionId, const void *bytes,
+                            size_t length, const MSSvgImportOptions *options,
+                            MSSvgImportResult *out, char **diagnosticsJson, char **error);
 #endif
 
 void ms_canvas_destroy(MSCanvas *canvas);

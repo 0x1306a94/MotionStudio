@@ -57,6 +57,7 @@ struct ImportResult {
     EntityId rootLayerId;
     std::vector<EntityId> layerIds;
     std::vector<Diagnostic> diagnostics;
+    std::vector<EmbeddedImage> embeddedImages;
     int sourceWidth = 0;
     int sourceHeight = 0;
 };

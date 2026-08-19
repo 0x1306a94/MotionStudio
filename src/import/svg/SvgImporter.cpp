@@ -87,6 +87,7 @@ Expected<ImportResult, std::string> ImportSvgInto(Document &document, UndoManage
     out.sourceWidth = tree.sourceWidth;
     out.sourceHeight = tree.sourceHeight;
     out.diagnostics = tree.diagnostics;
+    out.embeddedImages = std::move(tree.embeddedImages);
     out.rootLayerId = tree.layers.front()->id;
     auto composite = std::make_unique<CompositeCommand>("Import SVG");
     for (Asset &asset : tree.assets) {
