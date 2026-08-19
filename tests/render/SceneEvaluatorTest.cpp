@@ -614,6 +614,65 @@ TEST(SceneEvaluatorTest, GroupTrackMatteMarksDescendantsMatteOnly) {
     EXPECT_EQ(targetEval->matteSourceId, group->id);
 }
 
+TEST(SceneEvaluatorTest, GroupTargetTrackMatteInheritsToChildren) {
+    RectScene scene;
+    Layer *matteLayer =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Shape));
+    matteLayer->outPoint = 100;
+    auto *matteContent = static_cast<ShapeContent *>(matteLayer->content.get());
+    auto matteRect = std::make_unique<ShapeRect>();
+    matteRect->size.setStaticValue(Vec2{20, 20});
+    matteContent->geometry = std::move(matteRect);
+    auto matteFill = std::make_unique<FillStyle>();
+    matteFill->color.setStaticValue(Color{1, 1, 1, 1});
+    matteLayer->styles.push_back(std::move(matteFill));
+
+    Layer *group =
+        scene.document.addLayer(scene.composition->id, std::make_unique<Layer>(LayerType::Group));
+    group->outPoint = 100;
+    group->trackMatteType = motion::TrackMatteType::Alpha;
+    group->trackMatteLayerId = matteLayer->id;
+    scene.layer->parentId = group->id;
+
+    Expected<SceneState, std::string> result = scene.Evaluate(0);
+    ASSERT_TRUE(result.hasValue());
+
+    const motion::EvaluatedLayer *groupEval = nullptr;
+    const motion::EvaluatedLayer *childEval = nullptr;
+    const motion::EvaluatedLayer *sourceEval = nullptr;
+    for (const auto &layer : result->layers) {
+        if (layer.id == group->id) {
+            groupEval = &layer;
+        }
+        if (layer.id == scene.layer->id) {
+            childEval = &layer;
+        }
+        if (layer.id == matteLayer->id) {
+            sourceEval = &layer;
+        }
+    }
+    ASSERT_NE(groupEval, nullptr);
+    ASSERT_NE(childEval, nullptr);
+    ASSERT_NE(sourceEval, nullptr);
+    EXPECT_EQ(groupEval->trackMatteType, motion::TrackMatteType::Alpha);
+    EXPECT_EQ(groupEval->matteSourceId, matteLayer->id);
+    EXPECT_EQ(childEval->trackMatteType, motion::TrackMatteType::Alpha);
+    EXPECT_EQ(childEval->matteSourceId, matteLayer->id);
+    EXPECT_FALSE(childEval->usedAsMatteOnly);
+    EXPECT_TRUE(sourceEval->usedAsMatteOnly);
+
+    const auto commands = BuildCommands(*result);
+    bool childHasMatte = false;
+    for (const auto &command : commands) {
+        if (command.type == DrawCommandType::BeginMask &&
+            command.maskApplyMode == MaskApplyMode::AlphaMatte) {
+            childHasMatte = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(childHasMatte);
+}
+
 TEST(SceneEvaluatorTest, PrecompTrackMatteMarksInnerLayersMatteOnly) {
     Document document;
     Composition *inner = document.addComposition(std::make_unique<Composition>());
