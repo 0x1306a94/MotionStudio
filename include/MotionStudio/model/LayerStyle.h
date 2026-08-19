@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/Color.h"
 #include "MotionStudio/common/EntityId.h"
@@ -9,6 +11,7 @@
 #include "MotionStudio/model/LineCap.h"
 #include "MotionStudio/model/LineJoin.h"
 #include "MotionStudio/model/ShaderUniformValues.h"
+#include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/StylePaintMode.h"
 
@@ -73,6 +76,9 @@ class StrokeStyle : public LayerStyle {
     Animatable<float> trimStart{0.0f};   // 0.0 ~ 1.0 fraction of path length
     Animatable<float> trimEnd{1.0f};     // 0.0 ~ 1.0 fraction of path length
     Animatable<float> trimOffset{0.0f};  // degrees, rotates the trim window
+    StrokeMode strokeMode = StrokeMode::Solid;
+    std::vector<float> dashes;
+    Animatable<float> dashOffset{0.0f};
 };
 
 }  // namespace motion
