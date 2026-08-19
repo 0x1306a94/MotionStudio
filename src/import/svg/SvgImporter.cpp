@@ -26,6 +26,8 @@ Expected<SvgLayerTree, std::string> BuildSvgLayers(const void *bytes, size_t len
     tree.layers.push_back(std::move(root));
     if (parsed.value().dom && parsed.value().dom->getRoot()) {
         WalkSvgRoot(*parsed.value().dom->getRoot(), tree);
+        ApplyRootViewBoxAndTransform(*tree.layers.front(), *parsed.value().dom->getRoot(),
+                                     tree.sourceWidth, tree.sourceHeight);
     }
     AssignCenterAnchors(tree.layers);
     return tree;

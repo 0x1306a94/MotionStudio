@@ -532,6 +532,8 @@ git commit -m "Import SVG primitives as center-anchored VectorNetwork shapes."
 
 ### Task 4: Group、节点 transform、viewBox
 
+**Status:** ✅ Done
+
 **Files:**
 - Modify: `src/import/svg/SvgTransform.cpp`
 - Modify: `src/import/svg/SvgWalk.cpp`
@@ -552,7 +554,7 @@ tgfx `Matrix` 行主序：
 
 对应 spec 的 `a=scaleX, b=skewY, c=skewX, d=scaleY, tx, ty`。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```cpp
 TEST(SvgImporterTest, GroupTransformParentsChild) {
@@ -590,11 +592,11 @@ TEST(SvgImporterTest, ViewBoxDoesNotResizeCallerComposition) {
 
 `localTransform` 必须等于 SVG 矩阵（允许 1e-3）。中心锚点补偿后用 `layer->localTransform(0)` 比直接比 position 更稳。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Expected: Group 无 rotation 或没有中间 Group → FAIL。
 
-- [ ] **Step 3: 实现分解 + viewBox**
+- [x] **Step 3: 实现分解 + viewBox**
 
 `DecomposeSvgMatrix`：
 
@@ -615,7 +617,7 @@ viewBox：根 Group 的矩阵 = `ComputeViewboxMatrix` 同语义（meet/slice + 
 
 opacity：节点 `getOpacity()` 为 Value → `transform.opacity`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.*'
@@ -623,7 +625,7 @@ opacity：节点 `getOpacity()` 为 Value → `transform.opacity`。
 
 Expected: PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/import/svg tests/import/svg

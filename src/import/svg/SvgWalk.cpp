@@ -7,6 +7,7 @@
 #include "SvgLength.h"
 #include "SvgPathConvert.h"
 #include "SvgStyle.h"
+#include "SvgTransform.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/node/SVGCircle.h"
@@ -17,6 +18,7 @@
 #include "tgfx/svg/node/SVGPath.h"
 #include "tgfx/svg/node/SVGPoly.h"
 #include "tgfx/svg/node/SVGRect.h"
+#include "tgfx/svg/node/SVGTransformableNode.h"
 
 namespace motion {
 namespace svg {
@@ -272,6 +274,38 @@ tgfx::Path ShapePathFromNode(const tgfx::SVGNode &node,
     return path;
 }
 
+void ApplyNodeOpacity(Layer &layer, const tgfx::SVGNode &node) {
+    const auto &opacity = node.getOpacity();
+    if (opacity.isValue()) {
+        layer.transform.opacity.setStaticValue(*opacity);
+    }
+}
+
+void ApplyNodeTransform(Layer &layer, const tgfx::SVGNode &node) {
+    const tgfx::SVGTag tag = node.tag();
+    switch (tag) {
+        case tgfx::SVGTag::Path:
+        case tgfx::SVGTag::Rect:
+        case tgfx::SVGTag::Circle:
+        case tgfx::SVGTag::Ellipse:
+        case tgfx::SVGTag::Line:
+        case tgfx::SVGTag::Polygon:
+        case tgfx::SVGTag::Polyline:
+        case tgfx::SVGTag::G:
+        case tgfx::SVGTag::Svg:
+        case tgfx::SVGTag::Image:
+        case tgfx::SVGTag::Use:
+        case tgfx::SVGTag::Text: {
+            const auto &transformable = static_cast<const tgfx::SVGTransformableNode &>(node);
+            ApplySvgMatrixToLayer(layer, transformable.getTransform());
+            break;
+        }
+        default:
+            break;
+    }
+    ApplyNodeOpacity(layer, node);
+}
+
 void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
                    const tgfx::SVGLengthContext &lengthContext) {
     const ComputedStyle style = ResolveNodeStyle(node, lengthContext);
@@ -294,6 +328,7 @@ void AddShapeLayer(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &t
     geometry->path.setStaticValue(network);
     content->geometry = std::move(geometry);
     ApplyStyles(*layer, style);
+    ApplyNodeTransform(*layer, node);
     tree.layers.push_back(std::move(layer));
 }
 
@@ -319,6 +354,7 @@ void WalkNode(const tgfx::SVGNode &node, EntityId parentId, SvgLayerTree &tree,
         auto group = std::make_unique<Layer>(LayerType::Group);
         group->name = LayerName(node);
         group->parentId = parentId;
+        ApplyNodeTransform(*group, node);
         const EntityId groupId = group->id;
         tree.layers.push_back(std::move(group));
         WalkChildren(static_cast<const tgfx::SVGContainer &>(node), groupId, tree, lengthContext);

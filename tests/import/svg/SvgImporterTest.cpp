@@ -130,3 +130,35 @@ TEST(SvgImporterTest, LineIsOpenStrokeOnly) {
     ASSERT_EQ(shape->styles.size(), 1u);
     EXPECT_EQ(shape->styles[0]->type(), motion::LayerStyleType::Stroke);
 }
+
+TEST(SvgImporterTest, GroupTransformParentsChild) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\">"
+        "<g transform=\"translate(10 20) rotate(90)\">"
+        "<rect x=\"0\" y=\"0\" width=\"20\" height=\"10\" fill=\"#000000\"/>"
+        "</g></svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    ASSERT_GE(result.value().layers.size(), 3u);
+    const motion::Layer *group = result.value().layers[1].get();
+    const motion::Layer *shape = result.value().layers[2].get();
+    EXPECT_EQ(group->type(), motion::LayerType::Group);
+    EXPECT_EQ(shape->parentId, group->id);
+    EXPECT_NEAR(group->transform.rotation.staticValue(), 90.f, 1e-2f);
+    const motion::Mat3 local = group->localTransform(0);
+    const motion::Vec2 mapped = local.transformPoint({0.f, 0.f});
+    EXPECT_NEAR(mapped.x, 10.f, 0.05f);
+    EXPECT_NEAR(mapped.y, 20.f, 0.05f);
+}
+
+TEST(SvgImporterTest, ViewBoxDoesNotResizeCallerComposition) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"50\" "
+        "viewBox=\"10 20 80 40\"></svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().sourceWidth, 100);
+    EXPECT_EQ(result.value().sourceHeight, 50);
+    const motion::Vec2 scale = result.value().layers[0]->transform.scale.staticValue();
+    EXPECT_GT(scale.x, 0.f);
+}
