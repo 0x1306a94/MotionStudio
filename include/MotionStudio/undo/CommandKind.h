@@ -53,6 +53,7 @@ enum class CommandKind {
     SetFollowPath,
     SetTextPath,
     ImportImageAsset,
+    RemoveAsset,
     SetImageAsset,
     SetImageScaleMode,
     SetTextBoxTextMode,

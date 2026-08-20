@@ -14,6 +14,7 @@
 #include "MotionStudio/model/Layer.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/ImportImageAssetCommand.h"
+#include "MotionStudio/undo/RemoveAssetCommand.h"
 #include "MotionStudio/undo/SetImageAssetCommand.h"
 #include "MotionStudio/undo/SetImageScaleModeCommand.h"
 
@@ -69,6 +70,28 @@ bool CopyFile(const std::filesystem::path &source, const std::filesystem::path &
     }
     std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing, error);
     return !error;
+}
+
+bool LayerReferencesAsset(const Layer &layer, EntityId assetId) {
+    if (layer.type() != LayerType::Image) {
+        return false;
+    }
+    const auto *content = static_cast<const ImageContent *>(layer.content.get());
+    return content->assetId == assetId;
+}
+
+bool AssetIsReferenced(const Document &document, EntityId assetId) {
+    for (const auto &composition : document.compositions) {
+        if (!composition) {
+            continue;
+        }
+        for (const auto &layer : composition->layers) {
+            if (layer && LayerReferencesAsset(*layer, assetId)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 }  // namespace
@@ -233,4 +256,20 @@ int ms_asset_type(MSDocument *document, uint64_t assetId) {
         return 0;
     }
     return 0;  // only Image assets remain
+}
+
+bool ms_document_remove_asset(MSDocument *document, uint64_t assetId) {
+    DocumentLock lock(document);
+    if (document == nullptr) {
+        return false;
+    }
+    const EntityId id{assetId};
+    if (FindAsset(*document->document, assetId) == nullptr) {
+        return false;
+    }
+    if (AssetIsReferenced(*document->document, id)) {
+        return false;
+    }
+    Execute(document, std::make_unique<motion::RemoveAssetCommand>(id));
+    return FindAsset(*document->document, assetId) == nullptr;
 }

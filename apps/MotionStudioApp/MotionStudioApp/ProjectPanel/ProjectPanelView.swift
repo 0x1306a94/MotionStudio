@@ -16,6 +16,7 @@ struct ProjectPanelView: View {
     let perform: (String, () -> Void) -> Void
 
     @State private var editingShaderID: UInt64?
+    @State private var assetDeleteBlockedReferences: [ProjectPanelAssetReference] = []
     @State private var shaderDeleteBlockedReferences: [ProjectPanelShaderReference] = []
 
     var body: some View {
@@ -69,6 +70,12 @@ struct ProjectPanelView: View {
                                 .font(.subheadline)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                                .contextMenu {
+                                    Button("Delete", role: .destructive) {
+                                        deleteAsset(assetID)
+                                    }
+                                }
                             }
                         }
                     }
@@ -172,6 +179,11 @@ struct ProjectPanelView: View {
                 editingShaderID = nil
             }
         }
+        .alert("Cannot Delete Image", isPresented: assetDeleteBlockedBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(assetDeleteBlockedMessage)
+        }
         .alert("Cannot Delete Shader", isPresented: shaderDeleteBlockedBinding) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -185,6 +197,26 @@ struct ProjectPanelView: View {
         } set: { newValue in
             editingShaderID = newValue?.id
         }
+    }
+
+    private var assetDeleteBlockedBinding: Binding<Bool> {
+        Binding {
+            !assetDeleteBlockedReferences.isEmpty
+        } set: { isPresented in
+            if !isPresented {
+                assetDeleteBlockedReferences = []
+            }
+        }
+    }
+
+    private var assetDeleteBlockedMessage: String {
+        guard !assetDeleteBlockedReferences.isEmpty else {
+            return "This image is still referenced by an Image layer."
+        }
+        let layerList = assetDeleteBlockedReferences
+            .map { "- \($0.layerName)" }
+            .joined(separator: "\n")
+        return "This image is still referenced by these layers:\n\(layerList)"
     }
 
     private var shaderDeleteBlockedBinding: Binding<Bool> {
@@ -205,6 +237,17 @@ struct ProjectPanelView: View {
             .map { "- \($0.layerName)" }
             .joined(separator: "\n")
         return "This shader is still referenced by these layers:\n\(layerList)"
+    }
+
+    private func deleteAsset(_ assetID: UInt64) {
+        let references = document.core.assetReferences(assetID)
+        if !references.isEmpty {
+            assetDeleteBlockedReferences = references
+            return
+        }
+        perform("Remove Image") {
+            _ = document.core.removeAsset(assetID)
+        }
     }
 
     private func addShader() {
@@ -239,51 +282,6 @@ struct ProjectPanelView: View {
             index += 1
         }
         return "Shader \(index)"
-    }
-}
-
-struct ProjectPanelShaderReference: Equatable, Identifiable {
-    let layerID: UInt64
-    let layerName: String
-
-    var id: UInt64 {
-        layerID
-    }
-}
-
-extension MotionDocumentCore {
-    func shaderReferences(_ shaderID: UInt64) -> [ProjectPanelShaderReference] {
-        var references: [ProjectPanelShaderReference] = []
-        var referencedLayerIDs = Set<UInt64>()
-
-        for compositionID in compositionIDs() {
-            for layerID in layerIDs(compositionID: compositionID) {
-                guard referencedLayerIDs.contains(layerID) == false else {
-                    continue
-                }
-                if layerReferencesShader(layerID: layerID, shaderID: shaderID) {
-                    referencedLayerIDs.insert(layerID)
-                    let name = layerName(layerID)
-                    references.append(ProjectPanelShaderReference(
-                        layerID: layerID,
-                        layerName: name.isEmpty ? "Layer \(layerID)" : name,
-                    ))
-                }
-            }
-        }
-
-        return references
-    }
-
-    private func layerReferencesShader(layerID: UInt64, shaderID: UInt64) -> Bool {
-        for index in 0 ..< styleCount(layerID: layerID) {
-            if stylePaintMode(layerID: layerID, index: index) == .SHADER,
-               styleShaderID(layerID: layerID, index: index) == shaderID
-            {
-                return true
-            }
-        }
-        return false
     }
 }
 

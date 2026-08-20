@@ -37,6 +37,24 @@ enum SvgImportError: Error {
     case failed(String)
 }
 
+struct ProjectPanelAssetReference: Equatable, Identifiable {
+    let layerID: UInt64
+    let layerName: String
+
+    var id: UInt64 {
+        layerID
+    }
+}
+
+struct ProjectPanelShaderReference: Equatable, Identifiable {
+    let layerID: UInt64
+    let layerName: String
+
+    var id: UInt64 {
+        layerID
+    }
+}
+
 /// Owns the C++ document handle and exposes queries, undoable edits, and
 /// serialization to the SwiftUI layer.
 ///
@@ -1265,6 +1283,67 @@ final class MotionDocumentCore {
         ms_layer_image_asset_id(handle, layerID)
     }
 
+    func assetReferences(_ assetID: UInt64) -> [ProjectPanelAssetReference] {
+        var references: [ProjectPanelAssetReference] = []
+        var referencedLayerIDs = Set<UInt64>()
+
+        for compositionID in compositionIDs() {
+            for layerID in layerIDs(compositionID: compositionID) {
+                guard referencedLayerIDs.contains(layerID) == false else {
+                    continue
+                }
+                if layerReferencesAsset(layerID: layerID, assetID: assetID) {
+                    referencedLayerIDs.insert(layerID)
+                    let name = layerName(layerID)
+                    references.append(ProjectPanelAssetReference(
+                        layerID: layerID,
+                        layerName: name.isEmpty ? "Layer \(layerID)" : name,
+                    ))
+                }
+            }
+        }
+
+        return references
+    }
+
+    func shaderReferences(_ shaderID: UInt64) -> [ProjectPanelShaderReference] {
+        var references: [ProjectPanelShaderReference] = []
+        var referencedLayerIDs = Set<UInt64>()
+
+        for compositionID in compositionIDs() {
+            for layerID in layerIDs(compositionID: compositionID) {
+                guard referencedLayerIDs.contains(layerID) == false else {
+                    continue
+                }
+                if layerReferencesShader(layerID: layerID, shaderID: shaderID) {
+                    referencedLayerIDs.insert(layerID)
+                    let name = layerName(layerID)
+                    references.append(ProjectPanelShaderReference(
+                        layerID: layerID,
+                        layerName: name.isEmpty ? "Layer \(layerID)" : name,
+                    ))
+                }
+            }
+        }
+
+        return references
+    }
+
+    private func layerReferencesAsset(layerID: UInt64, assetID: UInt64) -> Bool {
+        layerType(layerID) == .IMAGE && imageAssetID(layerID: layerID) == assetID
+    }
+
+    private func layerReferencesShader(layerID: UInt64, shaderID: UInt64) -> Bool {
+        for index in 0 ..< styleCount(layerID: layerID) {
+            if stylePaintMode(layerID: layerID, index: index) == .SHADER,
+               styleShaderID(layerID: layerID, index: index) == shaderID
+            {
+                return true
+            }
+        }
+        return false
+    }
+
     func imageScaleMode(layerID: UInt64) -> MS_IMAGE_SCALE {
         ms_layer_image_scale_mode(handle, layerID)
     }
@@ -1451,6 +1530,15 @@ final class MotionDocumentCore {
 
     func assetHeight(_ assetID: UInt64) -> Int {
         Int(ms_asset_height(handle, assetID))
+    }
+
+    @discardableResult
+    func removeAsset(_ assetID: UInt64) -> Bool {
+        let ok = ms_document_remove_asset(handle, assetID)
+        if ok {
+            changed()
+        }
+        return ok
     }
 
     func convertGeometryToPath(layerID: UInt64, frame: Int64) {

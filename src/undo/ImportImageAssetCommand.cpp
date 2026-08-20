@@ -1,8 +1,53 @@
 #include "MotionStudio/undo/ImportImageAssetCommand.h"
 
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/ImageContent.h"
+#include "MotionStudio/model/Layer.h"
+#include "MotionStudio/undo/RemoveAssetCommand.h"
 
 namespace motion {
+
+namespace {
+
+bool LayerReferencesAsset(const Layer &layer, EntityId assetId) {
+    if (layer.type() != LayerType::Image) {
+        return false;
+    }
+    const auto *content = static_cast<const ImageContent *>(layer.content.get());
+    return content->assetId == assetId;
+}
+
+bool LayersReferenceAsset(const std::vector<std::unique_ptr<Layer>> &layers, EntityId assetId) {
+    for (const auto &layer : layers) {
+        if (!layer) {
+            continue;
+        }
+        if (LayerReferencesAsset(*layer, assetId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AssetIsReferenced(const Document &document, EntityId assetId) {
+    for (const auto &composition : document.compositions) {
+        if (!composition) {
+            continue;
+        }
+        if (LayersReferenceAsset(composition->layers, assetId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace
 
 ImportImageAssetCommand::ImportImageAssetCommand(Asset asset)
     : asset_(std::move(asset)) {
@@ -36,6 +81,54 @@ CommandKind ImportImageAssetCommand::kind() const {
 
 std::string ImportImageAssetCommand::describe() const {
     return "Import Image Asset";
+}
+
+RemoveAssetCommand::RemoveAssetCommand(EntityId assetId)
+    : assetId_(assetId) {
+}
+
+void RemoveAssetCommand::execute(Document &document) {
+    if (!assetId_.isValid()) {
+        return;
+    }
+    if (AssetIsReferenced(document, assetId_)) {
+        return;
+    }
+    for (size_t index = 0; index < document.assets.size(); ++index) {
+        if (document.assets[index].id == assetId_) {
+            removedAsset_ = std::move(document.assets[index]);
+            index_ = static_cast<int>(index);
+            document.assets.erase(document.assets.begin() + static_cast<ptrdiff_t>(index));
+            return;
+        }
+    }
+}
+
+void RemoveAssetCommand::undo(Document &document) {
+    if (!removedAsset_) {
+        return;
+    }
+    for (const Asset &asset : document.assets) {
+        if (asset.id == assetId_) {
+            return;
+        }
+    }
+    const size_t insertIndex =
+        index_ < 0 ? document.assets.size()
+        : static_cast<size_t>(index_) > document.assets.size()
+        ? document.assets.size()
+        : static_cast<size_t>(index_);
+    document.assets.insert(document.assets.begin() + static_cast<ptrdiff_t>(insertIndex),
+                           std::move(*removedAsset_));
+    removedAsset_.reset();
+}
+
+CommandKind RemoveAssetCommand::kind() const {
+    return CommandKind::RemoveAsset;
+}
+
+std::string RemoveAssetCommand::describe() const {
+    return "Remove Image Asset";
 }
 
 }  // namespace motion

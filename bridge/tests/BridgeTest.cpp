@@ -1406,6 +1406,8 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
 
     ASSERT_TRUE(ms_layer_set_image_asset(document, layerId, assetId));
     EXPECT_EQ(ms_layer_image_asset_id(document, layerId), assetId);
+    EXPECT_FALSE(ms_document_remove_asset(document, assetId));
+    EXPECT_EQ(ms_document_asset_count(document), 1);
     ms_layer_set_image_scale_mode(document, layerId, MS_IMAGE_SCALE_STRETCH);
     EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), MS_IMAGE_SCALE_STRETCH);
 
@@ -1413,6 +1415,10 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
     EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), MS_IMAGE_SCALE_LETTER_BOX);
     ASSERT_TRUE(ms_document_undo(document));  // bind
     EXPECT_EQ(ms_layer_image_asset_id(document, layerId), 0u);
+    EXPECT_TRUE(ms_document_remove_asset(document, assetId));
+    EXPECT_EQ(ms_document_asset_count(document), 0);
+    EXPECT_TRUE(ms_document_undo(document));  // remove asset
+    EXPECT_EQ(ms_document_asset_count(document), 1);
     ASSERT_TRUE(ms_document_undo(document));  // add layer
     ASSERT_TRUE(ms_document_undo(document));  // import asset
     EXPECT_EQ(ms_document_asset_count(document), 0);
