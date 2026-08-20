@@ -12,6 +12,7 @@
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
 #include "MotionStudio/model/ShapeRect.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "SvgLength.h"
 #include "SvgPathConvert.h"
 #include "SvgStyle.h"
@@ -586,6 +587,51 @@ bool AppendShapeMask(Layer &layer, const tgfx::SVGNode &shape, WalkContext &ctx)
     return true;
 }
 
+bool AppendMaskShapeLayer(const tgfx::SVGNode &shape, EntityId parentId, WalkContext &ctx,
+                          EntityId *matteId) {
+    if (matteId == nullptr) {
+        return false;
+    }
+    SvgRectGeom geom = {};
+    const bool uniformRect =
+        ResolveSvgRectGeom(shape, ctx.lengthContext, &geom) && SvgRectHasUniformRadius(geom);
+    VectorNetwork network = {};
+    if (!uniformRect) {
+        bool usedConic = false;
+        network = PathToVectorNetwork(ShapePathFromNode(shape, ctx.lengthContext), &usedConic);
+        if (!NetworkHasArea(network)) {
+            return false;
+        }
+    }
+    auto layer = std::make_unique<Layer>(LayerType::Shape);
+    layer->name = LayerName(shape);
+    layer->parentId = parentId;
+    auto *content = static_cast<ShapeContent *>(layer->content.get());
+    Vec2 boundsMin = {};
+    Vec2 boundsSize = {};
+    if (uniformRect) {
+        auto geometry = std::make_unique<ShapeRect>();
+        geometry->position.setStaticValue(
+            {geom.x + geom.width * 0.5f, geom.y + geom.height * 0.5f});
+        geometry->size.setStaticValue({geom.width, geom.height});
+        geometry->cornerRadius.setStaticValue(geom.rx);
+        content->geometry = std::move(geometry);
+        boundsMin = {geom.x, geom.y};
+        boundsSize = {geom.width, geom.height};
+    } else {
+        auto geometry = std::make_unique<ShapePath>();
+        geometry->path.setStaticValue(network);
+        content->geometry = std::move(geometry);
+        NetworkAabb(network, boundsMin, boundsSize);
+    }
+    const ComputedStyle style = ResolveStyle(shape, ComputedStyle{}, ctx.lengthContext);
+    ApplyPaintStyles(*layer, style, ctx.mapper, boundsMin, boundsSize, &ctx.tree->diagnostics);
+    ApplyNodeTransform(*layer, shape);
+    *matteId = layer->id;
+    ctx.tree->layers.push_back(std::move(layer));
+    return true;
+}
+
 void ApplyClipPath(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
     const auto &clip = node.getClipPath();
     if (!clip.isValue() || clip->type() != tgfx::SVGFuncIRI::Type::IRI) {
@@ -646,8 +692,20 @@ void ApplyMask(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
     if (TryApplyUniformRoundedRectClip(layer, *shape, ctx)) {
         return;
     }
-    if (!AppendShapeMask(layer, *shape, ctx)) {
+    EntityId matteId{};
+    if (!AppendMaskShapeLayer(*shape, layer.parentId, ctx, &matteId)) {
         AddDiagnostic(*ctx.tree, "mask.skipped", "mask is not imported", LayerName(node));
+        return;
+    }
+    const std::string maskName = LayerName(svgMask);
+    if (!maskName.empty() && maskName != "Path") {
+        ctx.tree->layers.back()->name = maskName;
+    }
+    layer.trackMatteLayerId = matteId;
+    if (svgMask.getMaskType().type() == tgfx::SVGMaskType::Type::Alpha) {
+        layer.trackMatteType = TrackMatteType::Alpha;
+    } else {
+        layer.trackMatteType = TrackMatteType::Luma;
     }
 }
 

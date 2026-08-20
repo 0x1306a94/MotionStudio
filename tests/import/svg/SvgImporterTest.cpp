@@ -17,6 +17,7 @@
 #include "MotionStudio/model/StrokeMode.h"
 #include "MotionStudio/model/StrokePosition.h"
 #include "MotionStudio/model/TextContent.h"
+#include "MotionStudio/model/TrackMatteType.h"
 #include "MotionStudio/undo/UndoManager.h"
 #include "SvgPathConvert.h"
 #include "tgfx/core/Path.h"
@@ -586,8 +587,21 @@ TEST(SvgImporterTest, MaskAttributeBecomesMask) {
         "</svg>";
     const auto result = BuildSvgLayers(svg.data(), svg.size());
     ASSERT_TRUE(result.hasValue());
-    EXPECT_EQ(result.value().layers.back()->masks.size(), 1u);
+    const motion::Layer *target = result.value().layers.back().get();
+    EXPECT_TRUE(target->masks.empty());
+    EXPECT_EQ(target->trackMatteType, motion::TrackMatteType::Luma);
+    EXPECT_TRUE(target->trackMatteLayerId.isValid());
     EXPECT_FALSE(HasDiagnostic(result.value(), "mask.skipped"));
+    const motion::Layer *matte = nullptr;
+    for (const auto &layer : result.value().layers) {
+        if (layer->id == target->trackMatteLayerId) {
+            matte = layer.get();
+        }
+    }
+    ASSERT_NE(matte, nullptr);
+    EXPECT_EQ(matte->type(), motion::LayerType::Shape);
+    EXPECT_EQ(matte->parentId, target->parentId);
+    EXPECT_NE(matte->id, target->id);
 }
 
 TEST(SvgImporterTest, ComplexMaskAttributeIsSkipped) {
@@ -603,6 +617,7 @@ TEST(SvgImporterTest, ComplexMaskAttributeIsSkipped) {
     ASSERT_TRUE(result.hasValue());
     EXPECT_TRUE(HasDiagnostic(result.value(), "mask.skipped"));
     EXPECT_TRUE(result.value().layers.back()->masks.empty());
+    EXPECT_EQ(result.value().layers.back()->trackMatteType, motion::TrackMatteType::None);
 }
 
 TEST(SvgImporterTest, MaskOnGroupBecomesMask) {
@@ -615,14 +630,75 @@ TEST(SvgImporterTest, MaskOnGroupBecomesMask) {
         "</svg>";
     const auto result = BuildSvgLayers(svg.data(), svg.size());
     ASSERT_TRUE(result.hasValue());
-    bool found = false;
+    const motion::Layer *group = nullptr;
     for (const auto &layer : result.value().layers) {
-        if (layer->type() == motion::LayerType::Group && layer->masks.size() == 1u) {
-            found = true;
+        if (layer->type() == motion::LayerType::Group && layer->name != "SVG") {
+            group = layer.get();
         }
     }
-    EXPECT_TRUE(found);
+    ASSERT_NE(group, nullptr);
+    EXPECT_TRUE(group->masks.empty());
+    EXPECT_NE(group->trackMatteType, motion::TrackMatteType::None);
+    EXPECT_TRUE(group->trackMatteLayerId.isValid());
+    const motion::Layer *matte = nullptr;
+    for (const auto &layer : result.value().layers) {
+        if (layer->id == group->trackMatteLayerId) {
+            matte = layer.get();
+        }
+    }
+    ASSERT_NE(matte, nullptr);
+    EXPECT_EQ(matte->type(), motion::LayerType::Shape);
+    EXPECT_EQ(matte->parentId, group->parentId);
     EXPECT_FALSE(HasDiagnostic(result.value(), "mask.skipped"));
+}
+
+TEST(SvgImporterTest, RoundedGroupMaskUsesCornerRadius) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"40\">"
+        "<defs><mask id=\"m\" maskUnits=\"userSpaceOnUse\">"
+        "<rect x=\"0\" y=\"0\" width=\"40\" height=\"40\" rx=\"8\" fill=\"#fff\"/>"
+        "</mask></defs>"
+        "<g mask=\"url(#m)\"><rect width=\"40\" height=\"40\" fill=\"#000\"/></g>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    const motion::Layer *group = nullptr;
+    for (const auto &layer : result.value().layers) {
+        if (layer->type() == motion::LayerType::Group && layer->name != "SVG") {
+            group = layer.get();
+        }
+    }
+    ASSERT_NE(group, nullptr);
+    EXPECT_TRUE(group->masks.empty());
+    EXPECT_EQ(group->trackMatteType, motion::TrackMatteType::None);
+    auto *content = static_cast<motion::NullContent *>(group->content.get());
+    EXPECT_NEAR(content->cornerRadius.staticValue(), 8.f, 1e-3f);
+}
+
+TEST(SvgImporterTest, MaskTypeAlphaAttribute) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><mask id=\"m\" mask-type=\"alpha\">"
+        "<rect width=\"10\" height=\"10\" fill=\"#fff\"/>"
+        "</mask></defs>"
+        "<rect width=\"20\" height=\"20\" fill=\"#000\" mask=\"url(#m)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().layers.back()->trackMatteType, motion::TrackMatteType::Alpha);
+}
+
+TEST(SvgImporterTest, MaskTypeAlphaStyle) {
+    const std::string svg =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\">"
+        "<defs><mask id=\"m\" style=\"mask-type:alpha\">"
+        "<rect width=\"10\" height=\"10\" fill=\"#fff\"/>"
+        "</mask></defs>"
+        "<rect width=\"20\" height=\"20\" fill=\"#000\" mask=\"url(#m)\"/>"
+        "</svg>";
+    const auto result = BuildSvgLayers(svg.data(), svg.size());
+    ASSERT_TRUE(result.hasValue());
+    EXPECT_EQ(result.value().layers.back()->trackMatteType, motion::TrackMatteType::Alpha);
 }
 
 TEST(SvgImporterTest, FilterAttributeIsSkipped) {

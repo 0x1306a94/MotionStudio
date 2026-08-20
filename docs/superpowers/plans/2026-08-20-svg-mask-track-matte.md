@@ -34,7 +34,7 @@
 
 ### Task 1: SVG `mask=` → track matte
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/import/svg/SvgWalk.cpp`
@@ -44,7 +44,7 @@
 - Consumes: `CollectSingleShape`、`TryApplyUniformRoundedRectClip`、`ShapePathFromNode`、`PathToVectorNetwork`、`NetworkHasArea`、`ResolveStyle`、`ApplyPaintStyles`、`ApplyNodeTransform`、`tgfx::SVGMask::getMaskType()`
 - Produces: 目标层 `trackMatteLayerId` / `trackMatteType`；matte Shape 在 `tree.layers` 里且 `parentId == target.parentId`；成功时不写 `target.masks`、不报 `mask.skipped`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/import/svg/SvgImporterTest.cpp` 增加 `#include "MotionStudio/model/TrackMatteType.h"`。
 
@@ -136,7 +136,7 @@ TEST(SvgImporterTest, MaskTypeAlphaStyle) {
 
 `SimpleClipPathBecomesMask` 不改（仍 `masks.size()==1`）。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```
 cmake --build build --target svg_import_tests
@@ -145,7 +145,7 @@ cmake --build build --target svg_import_tests
 
 Expected: `MaskAttributeBecomesMask` / `MaskOnGroupBecomesMask` FAIL（仍是 path mask）；新用例 FAIL 或未编译。
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 `src/import/svg/SvgWalk.cpp` 增加 `#include "MotionStudio/model/TrackMatteType.h"`。
 
@@ -242,7 +242,7 @@ void ApplyMask(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
 
 `DefaultName(SVGTag::Mask)` 若走到会返回 `"Path"`；有 id 的 mask（`m` / `mask0_129_143`）用 `LayerName(svgMask)`。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```
 ./build/src/import/svg/svg_import_tests --gtest_filter='SvgImporterTest.*'
@@ -250,7 +250,7 @@ void ApplyMask(Layer &layer, const tgfx::SVGNode &node, WalkContext &ctx) {
 
 Expected: PASS。
 
-- [ ] **Step 5: 勾选本 Task 并 commit**
+- [x] **Step 5: 勾选本 Task 并 commit**
 
 ```
 git commit --only src/import/svg/SvgWalk.cpp tests/import/svg/SvgImporterTest.cpp docs/superpowers/plans/2026-08-20-svg-mask-track-matte.md -m "Import SVG masks as sibling track mattes."
