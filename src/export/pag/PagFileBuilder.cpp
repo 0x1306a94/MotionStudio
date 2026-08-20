@@ -1175,6 +1175,7 @@ pag::VectorComposition *PagFileBuilder::wrapGroupWithCornerClip(pag::VectorCompo
         rebuilt.push_back(layer);
     }
     host->layers = std::move(rebuilt);
+    layerByEntity_[group.id.value] = wrap;
 
     nestedCompositions_.push_back(inner);
     return inner;

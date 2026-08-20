@@ -1053,6 +1053,87 @@ TEST(PagExporterTest, GroupTrackMatteTargetWrappedInPrecomp) {
     EXPECT_EQ(matteIndex + 1, hostIndex);
 }
 
+TEST(PagExporterTest, NestedClipGroupKeepsTrackMatteWithTarget) {
+    // clip-path Group (cornerRadius) wrapping a mask Group (track matte) + matte sibling.
+    // Inner wrap must stay in the same composition as the matte source; otherwise PAG samples
+    // an empty matte and the export is blank.
+    Document document = MakeEmptyDoc(200, 200, 30);
+    Composition *composition = Primary(document);
+
+    Layer *innerGroup = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    innerGroup->name = "TargetGroup";
+    innerGroup->inPoint = 0;
+    innerGroup->outPoint = composition->duration;
+    innerGroup->trackMatteType = TrackMatteType::Alpha;
+
+    Layer *matte = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{80, 80});
+    matte->name = "Matte";
+    innerGroup->trackMatteLayerId = matte->id;
+
+    Layer *child = AddShapeRect(document, composition, Vec2{10, 10}, Vec2{80, 80});
+    child->name = "Child";
+    child->parentId = innerGroup->id;
+
+    Layer *clipGroup = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    clipGroup->name = "ClipGroup";
+    clipGroup->inPoint = 0;
+    clipGroup->outPoint = composition->duration;
+    static_cast<NullContent *>(clipGroup->content.get())->cornerRadius.setStaticValue(10.0f);
+    innerGroup->parentId = clipGroup->id;
+    matte->parentId = clipGroup->id;
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+
+    pag::Layer *target = nullptr;
+    pag::Layer *matteLayer = nullptr;
+    pag::Layer *clipHost = nullptr;
+    pag::VectorComposition *targetHost = nullptr;
+    pag::VectorComposition *matteHost = nullptr;
+    for (pag::Composition *pagComposition : file->compositions) {
+        if (pagComposition == nullptr || pagComposition->type() != pag::CompositionType::Vector) {
+            continue;
+        }
+        auto *vector = static_cast<pag::VectorComposition *>(pagComposition);
+        for (pag::Layer *layer : vector->layers) {
+            if (layer->name == "TargetGroup") {
+                target = layer;
+                targetHost = vector;
+            }
+            if (layer->name == "Matte") {
+                matteLayer = layer;
+                matteHost = vector;
+            }
+            if (layer->name == "ClipGroup") {
+                clipHost = layer;
+            }
+        }
+    }
+    ASSERT_NE(target, nullptr);
+    ASSERT_NE(matteLayer, nullptr);
+    ASSERT_NE(clipHost, nullptr);
+    ASSERT_EQ(clipHost->type(), pag::LayerType::PreCompose);
+    EXPECT_FALSE(clipHost->masks.empty());
+    ASSERT_EQ(targetHost, matteHost);
+    ASSERT_EQ(target->type(), pag::LayerType::PreCompose);
+    EXPECT_EQ(target->trackMatteType, pag::TrackMatteType::Alpha);
+    EXPECT_EQ(target->trackMatteLayer, matteLayer);
+    EXPECT_FALSE(matteLayer->isActive);
+    size_t targetIndex = targetHost->layers.size();
+    size_t matteIndex = targetHost->layers.size();
+    for (size_t i = 0; i < targetHost->layers.size(); ++i) {
+        if (targetHost->layers[i] == target) {
+            targetIndex = i;
+        }
+        if (targetHost->layers[i] == matteLayer) {
+            matteIndex = i;
+        }
+    }
+    EXPECT_EQ(matteIndex + 1, targetIndex);
+}
+
 TEST(PagExporterTest, ImageMaskRemappedToSourceSpace) {
     // MS masks live in container space; PAG ImageLayer masks live in source pixels.
     // 1x1 source into 100x100 LetterBox → fit 100; (50,50) must become (0.5, 0.5).
