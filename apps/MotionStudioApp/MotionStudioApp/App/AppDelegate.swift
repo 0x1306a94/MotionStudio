@@ -10,7 +10,7 @@ import UIKit
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_: UIApplication, didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        MotionProjectDocument.clearAssetTrashRootAsync()
         #if DEBUG
             print("Application directory: \(NSHomeDirectory())")
         #endif

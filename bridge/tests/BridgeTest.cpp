@@ -38,6 +38,23 @@ struct BridgeString {
     }
 };
 
+int RegularFileCount(const std::filesystem::path &directory) {
+    std::error_code error;
+    if (!std::filesystem::exists(directory, error) || error) {
+        return 0;
+    }
+    int count = 0;
+    for (const auto &entry : std::filesystem::directory_iterator(directory, error)) {
+        if (error) {
+            break;
+        }
+        if (entry.is_regular_file(error) && !error) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 TEST(BridgeDocumentTest, CreateHasDefaultComposition) {
     MSDocument *document = ms_document_create();
     ASSERT_NE(document, nullptr);
@@ -1377,6 +1394,8 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
         ("ms_image_bridge_" + std::to_string(reinterpret_cast<uintptr_t>(document)));
     std::filesystem::create_directories(root / "assets");
     ms_document_set_project_root(document, root.string().c_str());
+    const auto trashRoot = root / ".Trash";
+    ms_document_set_asset_trash_root(document, trashRoot.string().c_str());
 
     const auto source = root / "source.png";
     {
@@ -1409,6 +1428,7 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
     EXPECT_FALSE(ms_document_remove_asset(document, assetId));
     EXPECT_EQ(ms_document_asset_count(document), 1);
     EXPECT_TRUE(std::filesystem::exists(root / "assets" / "photo.png"));
+    EXPECT_EQ(RegularFileCount(trashRoot), 0);
     ms_layer_set_image_scale_mode(document, layerId, MS_IMAGE_SCALE_STRETCH);
     EXPECT_EQ(ms_layer_image_scale_mode(document, layerId), MS_IMAGE_SCALE_STRETCH);
 
@@ -1419,9 +1439,11 @@ TEST(BridgeCommandTest, ImageAssetImportAddLayerBindAndUndo) {
     EXPECT_TRUE(ms_document_remove_asset(document, assetId));
     EXPECT_EQ(ms_document_asset_count(document), 0);
     EXPECT_FALSE(std::filesystem::exists(root / "assets" / "photo.png"));
+    EXPECT_EQ(RegularFileCount(trashRoot), 1);
     EXPECT_TRUE(ms_document_undo(document));  // remove asset
     EXPECT_EQ(ms_document_asset_count(document), 1);
     EXPECT_TRUE(std::filesystem::exists(root / "assets" / "photo.png"));
+    EXPECT_EQ(RegularFileCount(trashRoot), 0);
     ASSERT_TRUE(ms_document_undo(document));  // add layer
     ASSERT_TRUE(ms_document_undo(document));  // import asset
     EXPECT_EQ(ms_document_asset_count(document), 0);

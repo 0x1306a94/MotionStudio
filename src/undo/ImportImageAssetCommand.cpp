@@ -2,9 +2,9 @@
 
 #include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -61,37 +61,23 @@ std::optional<std::filesystem::path> AssetFilePath(const Document &document, con
     return std::filesystem::path(document.projectRoot) / relativePath;
 }
 
-bool ReadFileContents(const std::filesystem::path &path, std::vector<unsigned char> &contents) {
-    std::ifstream input(path, std::ios::binary | std::ios::ate);
-    if (!input) {
-        return false;
+std::optional<std::filesystem::path> UniqueTrashFilePath(const Document &document, EntityId assetId, const std::filesystem::path &sourcePath) {
+    if (document.assetTrashRoot.empty()) {
+        return std::nullopt;
     }
-    const std::ifstream::pos_type size = input.tellg();
-    if (size < 0) {
-        return false;
-    }
-    contents.resize(static_cast<size_t>(size));
-    input.seekg(0, std::ios::beg);
-    if (!contents.empty()) {
-        input.read(reinterpret_cast<char *>(contents.data()), static_cast<std::streamsize>(contents.size()));
-    }
-    return input.good() || input.eof();
-}
-
-bool WriteFileContents(const std::filesystem::path &path, const std::vector<unsigned char> &contents) {
+    const std::filesystem::path trashRoot(document.assetTrashRoot);
+    const std::string fileName = sourcePath.filename().empty() ? "resource" : sourcePath.filename().string();
+    const std::string prefix = "asset_" + std::to_string(assetId.value) + "_";
     std::error_code error;
-    std::filesystem::create_directories(path.parent_path(), error);
-    if (error) {
-        return false;
+    for (int attempt = 0; attempt < 10000; ++attempt) {
+        const std::filesystem::path candidate =
+            trashRoot / (prefix + std::to_string(attempt) + "_" + fileName);
+        if (!std::filesystem::exists(candidate, error) && !error) {
+            return candidate;
+        }
+        error.clear();
     }
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
-    if (!output) {
-        return false;
-    }
-    if (!contents.empty()) {
-        output.write(reinterpret_cast<const char *>(contents.data()), contents.size());
-    }
-    return output.good();
+    return std::nullopt;
 }
 
 }  // namespace
@@ -135,6 +121,10 @@ RemoveAssetCommand::RemoveAssetCommand(EntityId assetId)
 }
 
 void RemoveAssetCommand::execute(Document &document) {
+    removedAsset_.reset();
+    removedFilePath_.clear();
+    trashFilePath_.clear();
+    movedFileToTrash_ = false;
     if (!assetId_.isValid()) {
         return;
     }
@@ -152,22 +142,25 @@ void RemoveAssetCommand::execute(Document &document) {
             if (error) {
                 return;
             }
-            removedFileContents_.clear();
-            removedFileExisted_ = fileExists;
             if (fileExists) {
                 if (!std::filesystem::is_regular_file(*assetFile, error) || error) {
-                    removedFileExisted_ = false;
                     return;
                 }
-                if (!ReadFileContents(*assetFile, removedFileContents_)) {
-                    removedFileExisted_ = false;
+                const std::optional<std::filesystem::path> trashFile = UniqueTrashFilePath(document, assetId_, *assetFile);
+                if (!trashFile) {
                     return;
                 }
-                if (!std::filesystem::remove(*assetFile, error) || error) {
-                    removedFileContents_.clear();
-                    removedFileExisted_ = false;
+                std::filesystem::create_directories(trashFile->parent_path(), error);
+                if (error) {
                     return;
                 }
+                std::filesystem::rename(*assetFile, *trashFile, error);
+                if (error) {
+                    return;
+                }
+                removedFilePath_ = assetFile->string();
+                trashFilePath_ = trashFile->string();
+                movedFileToTrash_ = true;
             }
             removedAsset_ = std::move(document.assets[index]);
             index_ = static_cast<int>(index);
@@ -186,17 +179,27 @@ void RemoveAssetCommand::undo(Document &document) {
             return;
         }
     }
-    if (removedFileExisted_) {
-        const std::optional<std::filesystem::path> assetFile = AssetFilePath(document, *removedAsset_);
-        if (!assetFile || !WriteFileContents(*assetFile, removedFileContents_)) {
+    if (movedFileToTrash_) {
+        if (removedFilePath_.empty() || trashFilePath_.empty()) {
+            return;
+        }
+        std::error_code error;
+        const std::filesystem::path removedFilePath(removedFilePath_);
+        std::filesystem::create_directories(removedFilePath.parent_path(), error);
+        if (error) {
+            return;
+        }
+        std::filesystem::rename(std::filesystem::path(trashFilePath_), removedFilePath, error);
+        if (error) {
             return;
         }
     }
     const size_t insertIndex = (index_ < 0 ? document.assets.size() : (static_cast<size_t>(index_) > document.assets.size() ? document.assets.size() : static_cast<size_t>(index_)));
     document.assets.insert(document.assets.begin() + static_cast<ptrdiff_t>(insertIndex), std::move(*removedAsset_));
     removedAsset_.reset();
-    removedFileContents_.clear();
-    removedFileExisted_ = false;
+    removedFilePath_.clear();
+    trashFilePath_.clear();
+    movedFileToTrash_ = false;
 }
 
 CommandKind RemoveAssetCommand::kind() const {

@@ -63,6 +63,9 @@ class Document {
     // Absolute path of the project package directory. Not serialized; set by
     // the host when opening a package so Asset.path can resolve to disk.
     std::string projectRoot;
+    // Absolute path of a host-managed trash directory for undoable resource
+    // deletion. Not serialized; cleared by the host on app launch.
+    std::string assetTrashRoot;
 
   private:
     EntityIndex entityIndex_;

@@ -1203,6 +1203,14 @@ final class MotionDocumentCore {
         }
     }
 
+    nonisolated func setAssetTrashRoot(_ absolutePath: String?) {
+        if let absolutePath {
+            absolutePath.withCString { ms_document_set_asset_trash_root(handle, $0) }
+        } else {
+            ms_document_set_asset_trash_root(handle, nil)
+        }
+    }
+
     nonisolated func projectRoot() -> String? {
         Self.takeString(ms_document_project_root(handle))
     }

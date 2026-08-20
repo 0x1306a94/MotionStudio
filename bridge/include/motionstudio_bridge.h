@@ -297,6 +297,8 @@ MSDocument *ms_document_load(const char *packagePath, char **errorOut);
 // Sets / gets the non-persistent project package root used to resolve Asset.path.
 void ms_document_set_project_root(MSDocument *document, const char *absolutePath);
 char *ms_document_project_root(MSDocument *document);
+// Sets the non-persistent host trash root used for undoable resource deletion.
+void ms_document_set_asset_trash_root(MSDocument *document, const char *absolutePath);
 
 void ms_document_destroy(MSDocument *document);
 
@@ -697,7 +699,7 @@ char *ms_asset_path(MSDocument *document, uint64_t assetId);
 int ms_asset_width(MSDocument *document, uint64_t assetId);
 int ms_asset_height(MSDocument *document, uint64_t assetId);
 int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 = image
-// Deletes an unreferenced asset and its backing file; false if referenced or file deletion fails.
+// Moves an unreferenced asset's backing file to the trash root; false if referenced or move fails.
 bool ms_document_remove_asset(MSDocument *document, uint64_t assetId);
 
 // ---- Document shader library (process color / Color Source) ----

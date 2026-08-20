@@ -109,6 +109,7 @@ MSDocument *ms_document_load(const char *packagePath, char **errorOut) {
         return nullptr;
     }
     handle->document->projectRoot = root.lexically_normal().string();
+    handle->document->assetTrashRoot = (root / ".Trash").lexically_normal().string();
     return handle;
 }
 
@@ -126,6 +127,14 @@ char *ms_document_project_root(MSDocument *document) {
         return nullptr;
     }
     return strdup(document->document->projectRoot.c_str());
+}
+
+void ms_document_set_asset_trash_root(MSDocument *document, const char *absolutePath) {
+    DocumentLock guard(document);
+    if (document == nullptr) {
+        return;
+    }
+    document->document->assetTrashRoot = absolutePath == nullptr ? std::string{} : absolutePath;
 }
 
 void ms_document_destroy(MSDocument *document) {
