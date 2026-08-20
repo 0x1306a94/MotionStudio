@@ -6,6 +6,7 @@
 //  stack itself lives in the timeline.
 //
 
+import MotionStudioBridging
 import SwiftUI
 
 struct ProjectPanelView: View {
@@ -15,7 +16,7 @@ struct ProjectPanelView: View {
     let perform: (String, () -> Void) -> Void
 
     @State private var editingShaderID: UInt64?
-    @State private var showDeleteFailedAlert = false
+    @State private var shaderDeleteBlockedReferences: [ProjectPanelShaderReference] = []
 
     var body: some View {
         let core = document.core
@@ -171,10 +172,10 @@ struct ProjectPanelView: View {
                 editingShaderID = nil
             }
         }
-        .alert("Cannot Delete Shader", isPresented: $showDeleteFailedAlert) {
+        .alert("Cannot Delete Shader", isPresented: shaderDeleteBlockedBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("This shader is still referenced by a Fill or Stroke.")
+            Text(shaderDeleteBlockedMessage)
         }
     }
 
@@ -184,6 +185,26 @@ struct ProjectPanelView: View {
         } set: { newValue in
             editingShaderID = newValue?.id
         }
+    }
+
+    private var shaderDeleteBlockedBinding: Binding<Bool> {
+        Binding {
+            !shaderDeleteBlockedReferences.isEmpty
+        } set: { isPresented in
+            if !isPresented {
+                shaderDeleteBlockedReferences = []
+            }
+        }
+    }
+
+    private var shaderDeleteBlockedMessage: String {
+        guard !shaderDeleteBlockedReferences.isEmpty else {
+            return "This shader is still referenced by a Fill or Stroke."
+        }
+        let layerList = shaderDeleteBlockedReferences
+            .map { "- \($0.layerName)" }
+            .joined(separator: "\n")
+        return "This shader is still referenced by these layers:\n\(layerList)"
     }
 
     private func addShader() {
@@ -198,8 +219,9 @@ struct ProjectPanelView: View {
     }
 
     private func deleteShader(_ shaderID: UInt64) {
-        if document.core.shaderIsReferenced(shaderID) {
-            showDeleteFailedAlert = true
+        let references = document.core.shaderReferences(shaderID)
+        if !references.isEmpty {
+            shaderDeleteBlockedReferences = references
             return
         }
         perform("Remove Shader") {
@@ -217,6 +239,51 @@ struct ProjectPanelView: View {
             index += 1
         }
         return "Shader \(index)"
+    }
+}
+
+struct ProjectPanelShaderReference: Equatable, Identifiable {
+    let layerID: UInt64
+    let layerName: String
+
+    var id: UInt64 {
+        layerID
+    }
+}
+
+extension MotionDocumentCore {
+    func shaderReferences(_ shaderID: UInt64) -> [ProjectPanelShaderReference] {
+        var references: [ProjectPanelShaderReference] = []
+        var referencedLayerIDs = Set<UInt64>()
+
+        for compositionID in compositionIDs() {
+            for layerID in layerIDs(compositionID: compositionID) {
+                guard referencedLayerIDs.contains(layerID) == false else {
+                    continue
+                }
+                if layerReferencesShader(layerID: layerID, shaderID: shaderID) {
+                    referencedLayerIDs.insert(layerID)
+                    let name = layerName(layerID)
+                    references.append(ProjectPanelShaderReference(
+                        layerID: layerID,
+                        layerName: name.isEmpty ? "Layer \(layerID)" : name,
+                    ))
+                }
+            }
+        }
+
+        return references
+    }
+
+    private func layerReferencesShader(layerID: UInt64, shaderID: UInt64) -> Bool {
+        for index in 0 ..< styleCount(layerID: layerID) {
+            if stylePaintMode(layerID: layerID, index: index) == .SHADER,
+               styleShaderID(layerID: layerID, index: index) == shaderID
+            {
+                return true
+            }
+        }
+        return false
     }
 }
 
