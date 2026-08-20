@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "MotionStudio/common/EntityId.h"
 #include "MotionStudio/model/Asset.h"
@@ -10,7 +11,7 @@
 namespace motion {
 
 // Removes a document asset when no image layer references it.
-// Disk files under assets/ are left in place, matching ImportImageAssetCommand undo.
+// The backing asset file is deleted and restored on undo.
 class RemoveAssetCommand : public Command {
   public:
     explicit RemoveAssetCommand(EntityId assetId);
@@ -23,7 +24,9 @@ class RemoveAssetCommand : public Command {
   private:
     EntityId assetId_ = {};
     std::optional<Asset> removedAsset_;
+    std::vector<unsigned char> removedFileContents_;
     int index_ = -1;
+    bool removedFileExisted_ = false;
 };
 
 }  // namespace motion

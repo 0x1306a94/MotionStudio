@@ -696,8 +696,9 @@ char *ms_asset_name(MSDocument *document, uint64_t assetId);
 char *ms_asset_path(MSDocument *document, uint64_t assetId);
 int ms_asset_width(MSDocument *document, uint64_t assetId);
 int ms_asset_height(MSDocument *document, uint64_t assetId);
-int ms_asset_type(MSDocument *document, uint64_t assetId);              // 0 = image
-bool ms_document_remove_asset(MSDocument *document, uint64_t assetId);  // false if referenced
+int ms_asset_type(MSDocument *document, uint64_t assetId);  // 0 = image
+// Deletes an unreferenced asset and its backing file; false if referenced or file deletion fails.
+bool ms_document_remove_asset(MSDocument *document, uint64_t assetId);
 
 // ---- Document shader library (process color / Color Source) ----
 
