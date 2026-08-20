@@ -27,8 +27,10 @@ struct ImportOptions {
 
 // A skipped or unsupported SVG feature recorded during conversion.
 struct Diagnostic {
-    enum class Severity { Warning,
-                          Error };
+    enum class Severity {
+        Warning,
+        Error,
+    };
     Severity severity = Severity::Warning;
     std::string code;
     std::string message;

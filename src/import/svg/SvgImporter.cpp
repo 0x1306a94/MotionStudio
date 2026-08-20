@@ -101,15 +101,13 @@ Expected<SvgLayerTree, std::string> BuildSvgLayers(const void *bytes, size_t len
     tree.layers.push_back(std::move(root));
     if (parsed.value().dom && parsed.value().dom->getRoot()) {
         WalkSvgRoot(*parsed.value().dom->getRoot(), parsed.value().dom->nodeIDMapper(), tree);
-        ApplyRootViewBoxAndTransform(*tree.layers.front(), *parsed.value().dom->getRoot(),
-                                     tree.sourceWidth, tree.sourceHeight);
+        ApplyRootViewBoxAndTransform(*tree.layers.front(), *parsed.value().dom->getRoot(), tree.sourceWidth, tree.sourceHeight);
     }
     AssignCenterAnchors(tree.layers);
     return tree;
 }
 
-Expected<SvgLayerTree, std::string> BuildSvgLayersFromFile(const std::string &path,
-                                                           const ImportOptions &options) {
+Expected<SvgLayerTree, std::string> BuildSvgLayersFromFile(const std::string &path, const ImportOptions &options) {
     std::string contents;
     if (!ReadFileContents(path, contents)) {
         return Unexpected<std::string>("cannot read file");
@@ -155,8 +153,7 @@ Expected<ImportResult, std::string> ImportSvgInto(Document &document, UndoManage
     int index = options.insertIndex;
     for (size_t i = 0; i < tree.layers.size(); ++i) {
         out.layerIds.push_back(tree.layers[i]->id);
-        composite->add(std::make_unique<AddLayerCommand>(compositionId, std::move(tree.layers[i]),
-                                                         index));
+        composite->add(std::make_unique<AddLayerCommand>(compositionId, std::move(tree.layers[i]), index));
         if (index >= 0) {
             index += 1;
         }

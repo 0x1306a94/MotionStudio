@@ -56,9 +56,7 @@ char *DiagnosticsToJson(const std::vector<motion::svg::Diagnostic> &diagnostics)
     return strdup(json.c_str());
 }
 
-bool WriteEmbeddedImages(const std::string &projectRoot,
-                         const std::vector<motion::svg::EmbeddedImage> &images,
-                         std::string &error) {
+bool WriteEmbeddedImages(const std::string &projectRoot, const std::vector<motion::svg::EmbeddedImage> &images, std::string &error) {
     if (images.empty()) {
         return true;
     }
@@ -119,16 +117,13 @@ bool ms_document_import_svg(MSDocument *document, uint64_t compositionId, const 
             importOptions.rootName = options->rootName;
         }
     }
-    auto imported = motion::svg::ImportSvgInto(*document->document, *document->undoManager,
-                                               motion::EntityId{compositionId}, bytes, length,
-                                               importOptions);
+    auto imported = motion::svg::ImportSvgInto(*document->document, *document->undoManager, motion::EntityId{compositionId}, bytes, length, importOptions);
     if (!imported.hasValue()) {
         SetError(error, imported.error());
         return false;
     }
     std::string writeError;
-    if (!WriteEmbeddedImages(document->document->projectRoot, imported.value().embeddedImages,
-                             writeError)) {
+    if (!WriteEmbeddedImages(document->document->projectRoot, imported.value().embeddedImages, writeError)) {
         document->undoManager->undo(*document->document);
         SetError(error, writeError);
         return false;
