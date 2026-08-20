@@ -955,6 +955,104 @@ TEST(PagExporterTest, GroupCornerRadiusApproximatedWarning) {
     EXPECT_TRUE(found);
 }
 
+TEST(PagExporterTest, GroupPathMaskWrappedInPrecomp) {
+    Document document = MakeEmptyDoc(200, 200, 30);
+    Composition *composition = Primary(document);
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    group->name = "MaskedGroup";
+    group->inPoint = 0;
+    group->outPoint = composition->duration;
+    Mask mask;
+    BezierPath path =
+        MakeSingleContour({{Vec2{0, 0}, {}, {}}, {Vec2{40, 0}, {}, {}}, {Vec2{40, 40}, {}, {}}}, true);
+    mask.path.setStaticValue(BezierPathToVectorNetwork(path));
+    mask.mode = MaskMode::Add;
+    group->masks.push_back(mask);
+    Layer *child = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{80, 80});
+    child->name = "Child";
+    child->parentId = group->id;
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    for (const auto &warning : result.value().warnings) {
+        EXPECT_NE(warning.code, "GroupCornerRadiusApproximated");
+    }
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::Layer *host = nullptr;
+    for (pag::Layer *layer : vector->layers) {
+        if (layer->name == "MaskedGroup") {
+            host = layer;
+        }
+        EXPECT_NE(layer->name, "Child");
+    }
+    ASSERT_NE(host, nullptr);
+    ASSERT_EQ(host->type(), pag::LayerType::PreCompose);
+    EXPECT_FALSE(host->masks.empty());
+    auto *precomp = static_cast<pag::PreComposeLayer *>(host);
+    auto *inner = static_cast<pag::VectorComposition *>(precomp->composition);
+    ASSERT_NE(inner, nullptr);
+    bool foundChild = false;
+    for (pag::Layer *innerLayer : inner->layers) {
+        if (innerLayer->name == "Child") {
+            foundChild = true;
+        }
+        EXPECT_TRUE(innerLayer->masks.empty());
+    }
+    EXPECT_TRUE(foundChild);
+}
+
+TEST(PagExporterTest, GroupTrackMatteTargetWrappedInPrecomp) {
+    Document document = MakeEmptyDoc(200, 200, 30);
+    Composition *composition = Primary(document);
+    Layer *matte = AddShapeRect(document, composition, Vec2{0, 0}, Vec2{80, 80});
+    matte->name = "Matte";
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    group->name = "TargetGroup";
+    group->inPoint = 0;
+    group->outPoint = composition->duration;
+    group->trackMatteType = TrackMatteType::Alpha;
+    group->trackMatteLayerId = matte->id;
+    Layer *child = AddShapeRect(document, composition, Vec2{10, 10}, Vec2{80, 80});
+    child->name = "Child";
+    child->parentId = group->id;
+
+    auto result = PagExporter::Export(document, {});
+    ASSERT_TRUE(result.hasValue()) << static_cast<int>(result.error().kind);
+    auto file = DecodeBytes(result.value().bytes);
+    ASSERT_NE(file, nullptr);
+    auto *vector = static_cast<pag::VectorComposition *>(file->compositions.back());
+    pag::Layer *host = nullptr;
+    pag::Layer *matteLayer = nullptr;
+    for (pag::Layer *layer : vector->layers) {
+        if (layer->name == "TargetGroup") {
+            host = layer;
+        }
+        if (layer->name == "Matte") {
+            matteLayer = layer;
+        }
+        EXPECT_NE(layer->name, "Child");
+    }
+    ASSERT_NE(host, nullptr);
+    ASSERT_NE(matteLayer, nullptr);
+    ASSERT_EQ(host->type(), pag::LayerType::PreCompose);
+    EXPECT_EQ(host->trackMatteType, pag::TrackMatteType::Alpha);
+    EXPECT_EQ(host->trackMatteLayer, matteLayer);
+    EXPECT_FALSE(matteLayer->isActive);
+    size_t hostIndex = vector->layers.size();
+    size_t matteIndex = vector->layers.size();
+    for (size_t i = 0; i < vector->layers.size(); ++i) {
+        if (vector->layers[i] == host) {
+            hostIndex = i;
+        }
+        if (vector->layers[i] == matteLayer) {
+            matteIndex = i;
+        }
+    }
+    EXPECT_EQ(matteIndex + 1, hostIndex);
+}
+
 TEST(PagExporterTest, ImageMaskRemappedToSourceSpace) {
     // MS masks live in container space; PAG ImageLayer masks live in source pixels.
     // 1x1 source into 100x100 LetterBox → fit 100; (50,50) must become (0.5, 0.5).

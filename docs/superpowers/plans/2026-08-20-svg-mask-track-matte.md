@@ -260,7 +260,7 @@ git commit --only src/import/svg/SvgWalk.cpp tests/import/svg/SvgImporterTest.cp
 
 ### Task 2: PAG Group isolation wrap（path mask + track matte 目标）
 
-**Status:** 待开始
+**Status:** ✅ Done
 
 **Files:**
 - Modify: `src/export/pag/PagFileBuilder.cpp`（`applyGroupCornerRadiusClip`、`wrapGroupWithCornerClip`）
@@ -271,7 +271,7 @@ git commit --only src/import/svg/SvgWalk.cpp tests/import/svg/SvgImporterTest.cp
 - Consumes: 现有 `wrapGroupWithCornerClip`、`collectDescendants`、`appendMasks`、`buildComposition` 里已排好的 track matte 邻接
 - Produces: 满足 `cornerRadius>0 || !masks.empty() || trackMatteType != None` 的 Group 在 host 上变成 `PreComposeLayer`；已有 masks / trackMatte 在宿主上；仅 `radius>0` 时追加 AABB 圆角 mask 并 warning `GroupCornerRadiusApproximated`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/export/pag/PagExporterTest.cpp` 在 `GroupCornerRadiusApproximatedWarning` 后追加：
 
@@ -377,7 +377,7 @@ TEST(PagExporterTest, GroupTrackMatteTargetWrappedInPrecomp) {
 
 `GroupCornerRadiusApproximatedWarning` 不改，必须继续 PASS。
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```
 cmake --build build --target core_tests
@@ -386,7 +386,7 @@ cmake --build build --target core_tests
 
 Expected: 两个新用例 FAIL（Group 仍是 NullLayer，Child 还在 host `layers` 里）。
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 `applyGroupCornerRadiusClip`：不要在半径 ≤ 0 时 `continue`。改为：
 
@@ -424,7 +424,7 @@ pag::VectorComposition *nested =
 
 `PagFileBuilder.h` 给 `applyGroupCornerRadiusClip` 补一句：非空 path mask 或 Group 作为 track matte 目标时同样 wrap。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```
 ./build/tests/core_tests --gtest_filter='PagExporterTest.*'
@@ -433,7 +433,7 @@ pag::VectorComposition *nested =
 
 Expected: PASS。
 
-- [ ] **Step 5: 勾选本 Task 并 commit**
+- [x] **Step 5: 勾选本 Task 并 commit**
 
 ```
 git commit --only src/export/pag/PagFileBuilder.cpp src/export/pag/PagFileBuilder.h tests/export/pag/PagExporterTest.cpp docs/superpowers/plans/2026-08-20-svg-mask-track-matte.md -m "Wrap isolated groups so PAG masks and track mattes clip children."

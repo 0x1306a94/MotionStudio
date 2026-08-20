@@ -92,6 +92,9 @@ class PagFileBuilder {
     pag::VectorComposition *wrapCompositionWithCornerClip(pag::VectorComposition *inner,
                                                           const Composition &composition);
     void applyGroupCornerRadiusClip(pag::VectorComposition *host, const Composition &composition);
+    // Wraps a Group NullLayer plus descendants into an export-only Precomp. Used for
+    // corner-radius clip, non-empty path masks, and Group track-matte targets. radius==0
+    // keeps existing masks and does not append an AABB rounded clip.
     pag::VectorComposition *wrapGroupWithCornerClip(pag::VectorComposition *host, const Layer &group,
                                                     Vec2 minPoint, Vec2 maxPoint, float radius);
     // Group track-matte sources keep children as siblings in the host composition. Wrap the

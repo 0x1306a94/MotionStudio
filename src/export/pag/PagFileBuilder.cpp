@@ -1030,11 +1030,11 @@ void PagFileBuilder::applyGroupCornerRadiusClip(pag::VectorComposition *host,
                 continue;
             }
             const auto &content = static_cast<const NullContent &>(*layerPtr->content);
-            if (!content.cornerRadius.isAnimated() && content.cornerRadius.staticValue() <= 0.0f) {
-                continue;
-            }
             const float radius = std::max(content.cornerRadius.evaluate(layerPtr->inPoint), 0.0f);
-            if (radius <= 0.0f) {
+            const bool hasRadius = radius > 0.0f;
+            const bool hasMasks = !layerPtr->masks.empty();
+            const bool hasTrackMatte = layerPtr->trackMatteType != TrackMatteType::None;
+            if (!hasRadius && !hasMasks && !hasTrackMatte) {
                 continue;
             }
             auto pagIt = layerByEntity_.find(layerPtr->id.value);
@@ -1043,16 +1043,19 @@ void PagFileBuilder::applyGroupCornerRadiusClip(pag::VectorComposition *host,
             }
             Expected<SceneState, std::string> state =
                 SceneEvaluator::Evaluate(document_, composition.id, layerPtr->inPoint);
-            Vec2 minPoint;
-            Vec2 maxPoint;
-            if (!state.hasValue() ||
-                !BoundsOfDescendantUnionLocal(*state, layerPtr->id, minPoint, maxPoint)) {
+            Vec2 minPoint = {};
+            Vec2 maxPoint = {};
+            const bool hasAabb = state.hasValue() &&
+                BoundsOfDescendantUnionLocal(*state, layerPtr->id, minPoint, maxPoint);
+            if (hasRadius && !hasAabb) {
                 continue;
             }
-            Warn(&warnings_, layerPtr->id, "GroupCornerRadiusApproximated",
-                 "Group corner radius exported as precomp clip mask");
+            if (hasRadius) {
+                Warn(&warnings_, layerPtr->id, "GroupCornerRadiusApproximated",
+                     "Group corner radius exported as precomp clip mask");
+            }
             pag::VectorComposition *nested =
-                wrapGroupWithCornerClip(current, *layerPtr, minPoint, maxPoint, radius);
+                wrapGroupWithCornerClip(current, *layerPtr, minPoint, maxPoint, hasRadius ? radius : 0.0f);
             wrapped.insert(layerPtr->id.value);
             if (nested != nullptr) {
                 queue.push_back(nested);
@@ -1139,20 +1142,22 @@ pag::VectorComposition *PagFileBuilder::wrapGroupWithCornerClip(pag::VectorCompo
     groupPag->layerStyles.clear();
     groupPag->masks.clear();
 
-    const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
-    const float clamped = ClampCornerRadius(radius, size);
-    BezierPath maskPath = ShapeGeometryToBezierPath(
-        MakeRectGeometry((minPoint + maxPoint) * 0.5f, size, clamped));
-    Animatable<BezierPath> maskAnimatable;
-    maskAnimatable.setStaticValue(maskPath);
-    auto *mask = new pag::MaskData();
-    mask->id = nextMaskId_++;
-    mask->inverted = false;
-    mask->maskMode = pag::MaskMode::Add;
-    mask->maskPath = ConvertBezierPath(maskAnimatable, &warnings_, group.id);
-    mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
-    mask->maskExpansion = new pag::Property<float>(0);
-    wrap->masks.push_back(mask);
+    if (radius > 0.0f) {
+        const Vec2 size{maxPoint.x - minPoint.x, maxPoint.y - minPoint.y};
+        const float clamped = ClampCornerRadius(radius, size);
+        BezierPath maskPath = ShapeGeometryToBezierPath(
+            MakeRectGeometry((minPoint + maxPoint) * 0.5f, size, clamped));
+        Animatable<BezierPath> maskAnimatable;
+        maskAnimatable.setStaticValue(maskPath);
+        auto *mask = new pag::MaskData();
+        mask->id = nextMaskId_++;
+        mask->inverted = false;
+        mask->maskMode = pag::MaskMode::Add;
+        mask->maskPath = ConvertBezierPath(maskAnimatable, &warnings_, group.id);
+        mask->maskOpacity = new pag::Property<pag::Opacity>(pag::Opaque);
+        mask->maskExpansion = new pag::Property<float>(0);
+        wrap->masks.push_back(mask);
+    }
 
     std::vector<pag::Layer *> rebuilt;
     rebuilt.reserve(original.size());
