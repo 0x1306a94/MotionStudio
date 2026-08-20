@@ -43,7 +43,11 @@ extension EditorViewController {
 
     func updateWindowCloseAvailability() {
         #if targetEnvironment(macCatalyst)
-            view.window?.windowScene?.windowingBehaviors?.isClosable = !hasUnsavedChanges
+            if #available(iOS 27.0, *) {
+                view.window?.windowScene?.windowingBehaviors?.isClosable = true
+            } else {
+                view.window?.windowScene?.windowingBehaviors?.isClosable = !hasUnsavedChanges
+            }
         #endif
     }
 

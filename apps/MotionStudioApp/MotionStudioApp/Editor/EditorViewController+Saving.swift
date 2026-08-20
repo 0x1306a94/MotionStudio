@@ -24,6 +24,7 @@ extension EditorViewController {
         saveButton.tintColor = hasUnsavedChanges ? Palette.buttonTint : .secondaryLabel
         saveButton.backgroundColor = hasUnsavedChanges ? Palette.buttonBackground : .clear
         updateDocumentStatusView()
+        updateClosureConfirmation()
         updateWindowCloseAvailability()
         UIMenuSystem.main.setNeedsRevalidate()
     }
@@ -33,6 +34,28 @@ extension EditorViewController {
         documentDirtyIndicator.isHidden = !hasUnsavedChanges
         documentStatusLabel.text = hasUnsavedChanges ? "\(projectName) · Modified" : projectName
         documentStatusLabel.textColor = hasUnsavedChanges ? .label : .secondaryLabel
+    }
+
+    func updateClosureConfirmation() {
+        guard let windowScene = view.window?.windowScene else {
+            return
+        }
+
+        if #available(iOS 27.0, *) {
+            guard hasUnsavedChanges else {
+                windowScene.closureConfirmation = nil
+                return
+            }
+
+            let projectName = title ?? document.saveURL.deletingPathExtension().lastPathComponent
+            let discardAction = UIAlertAction(title: "Discard Changes", style: .destructive)
+            let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+            windowScene.closureConfirmation = UISceneClosureConfirmation(
+                title: "Unsaved Changes",
+                message: "Closing \(projectName) will discard unsaved changes.",
+                actions: [discardAction, cancelAction],
+            )
+        }
     }
 
     @objc func saveCurrentDocument() {
