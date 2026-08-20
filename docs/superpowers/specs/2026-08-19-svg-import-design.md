@@ -28,7 +28,7 @@
 | 样式 | 映射到现有 `FillStyle` / `StrokeStyle` / `GradientPaint`；Core 没有的字段跳过并记 warning |
 | 文本 | `<text>`（含同样式 `<tspan>`）→ 点文本 `TextContent`；`<textPath>` / 逐字 x,y / `rotate` 跳过 + diagnostic |
 | 滤镜 / 平铺 pattern / dash | 本阶段跳过 + diagnostic |
-| 简单 `mask` | 均匀圆角 rect → 组/图 `cornerRadius`；否则单形状 → `Layer.masks`（同 clip-path） |
+| 简单 `mask` | 均匀圆角 rect → 组/图 `cornerRadius`；否则单形状 → 同级 Shape track matte（见 [SVG mask → Track Matte](./2026-08-20-svg-mask-track-matte-design.md)） |
 | 简单 image pattern fill | 建成 `Image` 层（Figma 贴图导出） |
 | `<image>` | data URI → `Image` 层 + `Asset`；外部 href 跳过 + warning |
 | `<use>` | 经 `nodeIDMapper` 展开，深度上限 32，环检测 |
@@ -501,9 +501,16 @@ stops < 2：该 paint 跳过 + `gradient.stops`。
 
 多子节点 / `clipPath` 套 `use` 过深：跳过 + `clip.unsupported`。
 
-### 7.5.1 mask（有限，同 clip-path）
+### 7.5.1 mask（有限）
 
-`mask=url(#id)` 且 `<mask>` 内容是**单个**形状（无 `use` / 嵌套 `g`），`maskContentUnits` 为 `userSpaceOnUse`（缺省）：映射规则与 §7.5 相同（均匀圆角 rect → 组/图的 `cornerRadius`，否则 `Layer.masks`）。`mask-type`（alpha / luminance）忽略——单色 path 剪影两者等价。
+`mask=url(#id)` 且 `<mask>` 内容是**单个**形状（无 `use` / 嵌套 `g`），`maskContentUnits` 为 `userSpaceOnUse`（缺省）：
+
+| mask 形状 | 导入 |
+|---|---|
+| 均匀圆角 rect（`rx==ry` 且 `rx>0`） | 同 §7.5：组/图 `cornerRadius`，不写 mask、不建 matte |
+| 直角 rect、`rx≠ry`、path / circle / 其它 | 同级 Shape 作 track matte 源；目标 `trackMatteType` 由 `mask-type` 决定（alpha → Alpha，默认 luminance → Luma） |
+
+细则见 [SVG mask → Track Matte](./2026-08-20-svg-mask-track-matte-design.md)。`clip-path` 仍走 §7.5（非圆角仍是 path mask）。
 
 多子 / `use` / `g` / `maskContentUnits=objectBoundingBox`：跳过 + `mask.skipped`。成功导入时**不**报 `mask.skipped`。
 

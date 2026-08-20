@@ -141,8 +141,8 @@ Restore
 **PAG**
 
 - Image：容器空间加圆角矩形 mask（接到 `applyImageContainerFit` 的裁剪 mask）。半径有关键帧 → 用 in-point 烘焙，warning `ImageCornerRadiusAnimationBaked`。
-- Group：PAG `NullLayer` 的 mask 裁不到子层。`radius > 0` 时把子树包进 Precomp，用 in-point 的 AABB + 半径做圆角 mask，warning `GroupCornerRadiusApproximated`。
-- Group 上已有的用户 mask / track matte 仍走现有导出。
+- Group：PAG `NullLayer` 的 mask / track matte 裁不到子层。`radius > 0`、非空 `masks`、或自身是 track matte **目标** 时，把子树包进 Precomp；已有 mask / trackMatte 挂在宿主 `PreComposeLayer`。仅半径触发时 warning `GroupCornerRadiusApproximated`。
+- 细则见 [SVG mask → Track Matte](./2026-08-20-svg-mask-track-matte-design.md) §2。
 
 **MP4 / 预览**
 
