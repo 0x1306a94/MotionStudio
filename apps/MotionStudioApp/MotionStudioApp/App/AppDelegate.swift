@@ -21,6 +21,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         super.buildMenu(with: builder)
         guard builder.system == UIMenuSystem.main else { return }
 
+        builder.remove(menu: UIMenu.Identifier.find)
+        builder.remove(menu: UIMenu.Identifier.substitutions)
+        builder.remove(menu: UIMenu.Identifier.substitutionsPanel)
+        builder.remove(menu: UIMenu.Identifier.substitutionOptions)
+        builder.remove(menu: UIMenu.Identifier.transformations)
+        builder.remove(menu: UIMenu.Identifier.speech)
+        builder.remove(menu: UIMenu.Identifier.spelling)
+        builder.remove(menu: UIMenu.Identifier.spellingPanel)
+        builder.remove(menu: UIMenu.Identifier.spellingOptions)
+        builder.remove(menu: UIMenu.Identifier.autoFill)
+        builder.remove(menu: UIMenu.Identifier.format)
+
+        if #available(iOS 26.0, *) {
+            builder.remove(menu: UIMenu.Identifier.findPanel)
+        }
+
         let saveCommand = UIKeyCommand(title: "Save",
                                        image: nil,
                                        action: #selector(EditorViewController.saveCurrentDocument),
@@ -94,8 +110,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                          action: #selector(EditorViewController.ungroupSelectedLayers),
                                          input: "g",
                                          modifierFlags: [.command, .shift])
-        let arrangeMenu = UIMenu(title: "Arrange",
-                                 children: [groupLayers, ungroupLayers, bringToFront, bringForward, sendBackward, sendToBack])
+        let arrangeMenu = UIMenu(title: "Arrange", children: [groupLayers, ungroupLayers, bringToFront, bringForward, sendBackward, sendToBack])
         builder.insertSibling(arrangeMenu, afterMenu: .edit)
     }
 
