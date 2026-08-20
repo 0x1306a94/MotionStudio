@@ -30,40 +30,32 @@ void ms_vector_network_free(MSVectorNetwork *network) {
     free(network);
 }
 
-MSBezierPath *ms_bezier_move_vertex(const MSBezierPath *path, size_t index, float x, float y,
-                                    bool linkedHandles) {
+MSBezierPath *ms_bezier_move_vertex(const MSBezierPath *path, size_t index, float x, float y, bool linkedHandles) {
     if (path == nullptr) {
         return nullptr;
     }
-    return AllocateMSBezierPath(
-        motion::MoveVertex(FromMSBezierPath(path), index, Vec2{x, y}, linkedHandles));
+    return AllocateMSBezierPath(motion::MoveVertex(FromMSBezierPath(path), index, Vec2{x, y}, linkedHandles));
 }
 
-MSBezierPath *ms_bezier_move_in_tangent(const MSBezierPath *path, size_t index, float x, float y,
-                                        bool mirrorOut) {
+MSBezierPath *ms_bezier_move_in_tangent(const MSBezierPath *path, size_t index, float x, float y, bool mirrorOut) {
     if (path == nullptr) {
         return nullptr;
     }
-    return AllocateMSBezierPath(
-        motion::MoveInTangent(FromMSBezierPath(path), index, Vec2{x, y}, mirrorOut));
+    return AllocateMSBezierPath(motion::MoveInTangent(FromMSBezierPath(path), index, Vec2{x, y}, mirrorOut));
 }
 
-MSBezierPath *ms_bezier_move_out_tangent(const MSBezierPath *path, size_t index, float x, float y,
-                                         bool mirrorIn) {
+MSBezierPath *ms_bezier_move_out_tangent(const MSBezierPath *path, size_t index, float x, float y, bool mirrorIn) {
     if (path == nullptr) {
         return nullptr;
     }
-    return AllocateMSBezierPath(
-        motion::MoveOutTangent(FromMSBezierPath(path), index, Vec2{x, y}, mirrorIn));
+    return AllocateMSBezierPath(motion::MoveOutTangent(FromMSBezierPath(path), index, Vec2{x, y}, mirrorIn));
 }
 
-MSBezierPath *ms_bezier_insert_vertex_on_segment(const MSBezierPath *path, size_t segmentIndex,
-                                                 float t) {
+MSBezierPath *ms_bezier_insert_vertex_on_segment(const MSBezierPath *path, size_t segmentIndex, float t) {
     if (path == nullptr) {
         return nullptr;
     }
-    return AllocateMSBezierPath(
-        motion::InsertVertexOnSegment(FromMSBezierPath(path), segmentIndex, t));
+    return AllocateMSBezierPath(motion::InsertVertexOnSegment(FromMSBezierPath(path), segmentIndex, t));
 }
 
 MSBezierPath *ms_bezier_remove_vertex(const MSBezierPath *path, size_t index) {

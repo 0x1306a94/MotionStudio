@@ -126,8 +126,7 @@ void ms_property_static_vec2(MSDocument *document, uint64_t entityId, const char
     }
 }
 
-void ms_property_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y,
-                             float *z) {
+void ms_property_static_vec3(MSDocument *document, uint64_t entityId, const char *path, float *x, float *y, float *z) {
     DocumentLock guard(document);
     const Animatable<Vec3> *property = AsVec3(FindProperty(document, entityId, path));
     if (property == nullptr) {
@@ -188,8 +187,7 @@ MSBezierPath *ms_property_static_bezier_path(MSDocument *document, uint64_t enti
 MSVectorNetwork *ms_property_static_vector_network(MSDocument *document, uint64_t entityId,
                                                    const char *path) {
     DocumentLock guard(document);
-    const Animatable<motion::VectorNetwork> *property =
-        AsVectorNetwork(FindProperty(document, entityId, path));
+    const Animatable<motion::VectorNetwork> *property = AsVectorNetwork(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return nullptr;
     }
@@ -225,8 +223,7 @@ int ms_property_keyframe_count(MSDocument *document, uint64_t entityId, const ch
             return static_cast<int>(static_cast<const Animatable<std::string> *>(property)->keyframes().size());
         }
         case AnimatableType::Vec4: {
-            return static_cast<int>(
-                static_cast<const Animatable<motion::Vec4> *>(property)->keyframes().size());
+            return static_cast<int>(static_cast<const Animatable<motion::Vec4> *>(property)->keyframes().size());
         }
     }
     return 0;
@@ -324,8 +321,7 @@ bool ms_property_keyframe_spatial_at(MSDocument *document, uint64_t entityId, co
                                      int index, bool *hasIn, float *inX, float *inY, bool *hasOut,
                                      float *outX, float *outY) {
     DocumentLock guard(document);
-    const Keyframe<Vec2> *keyframe =
-        KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
+    const Keyframe<Vec2> *keyframe = KeyframeAt(AsVec2(FindProperty(document, entityId, path)), index);
     if (keyframe == nullptr) {
         return false;
     }
@@ -451,8 +447,7 @@ void ms_property_evaluate_color(MSDocument *document, uint64_t entityId, const c
     }
 }
 
-MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
-                                               int64_t frame) {
+MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
     const Animatable<motion::VectorNetwork> *property = AsVectorNetwork(FindProperty(document, entityId, path));
     if (property == nullptr) {
@@ -461,11 +456,9 @@ MSBezierPath *ms_property_evaluate_bezier_path(MSDocument *document, uint64_t en
     return AllocateMSBezierPath(BridgePathFromNetwork(property->evaluate(static_cast<FrameTime>(frame))));
 }
 
-MSVectorNetwork *ms_property_evaluate_vector_network(MSDocument *document, uint64_t entityId,
-                                                     const char *path, int64_t frame) {
+MSVectorNetwork *ms_property_evaluate_vector_network(MSDocument *document, uint64_t entityId, const char *path, int64_t frame) {
     DocumentLock guard(document);
-    const Animatable<motion::VectorNetwork> *property =
-        AsVectorNetwork(FindProperty(document, entityId, path));
+    const Animatable<motion::VectorNetwork> *property = AsVectorNetwork(FindProperty(document, entityId, path));
     if (property == nullptr) {
         return nullptr;
     }

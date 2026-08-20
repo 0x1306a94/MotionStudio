@@ -230,9 +230,7 @@ void ms_canvas_set_gradient_edit_target(MSCanvas *canvas, uint64_t layerId, int 
     canvas->gradientEditTarget.styleIndex = styleIndex;
 }
 
-MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *document,
-                                               uint64_t compositionId, double frameTime,
-                                               float sceneX, float sceneY) {
+MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *document, uint64_t compositionId, double frameTime, float sceneX, float sceneY) {
     if (canvas == nullptr || canvas->adapter == nullptr || document == nullptr ||
         canvas->hasPathEditTarget || !canvas->hasGradientEditTarget) {
         return MS_GRADIENT_HANDLE_NONE;
@@ -247,8 +245,7 @@ MS_GRADIENT_HANDLE ms_canvas_hit_gradient_edit(MSCanvas *canvas, MSDocument *doc
     if (!motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
         return MS_GRADIENT_HANDLE_NONE;
     }
-    const float viewUnit =
-        canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+    const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
     // Slightly larger than drawn chrome (~7pt) so press→pan threshold still hits.
     const float handleRadius = 12.0f * viewUnit;
     switch (motion::HitTestGradientEdit(handles, {sceneX, sceneY}, handleRadius)) {
@@ -396,8 +393,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     canvas->frameCommandCache.invalidateIfStale(compositionId, document->contentRevision);
     const bool usedFrameCache = canvas->frameCommandCache.find(previewTime) != nullptr;
     const auto buildStart = ProfileClock::now();
-    const motion::DrawCommandList *commands =
-        EnsureSceneCommands(canvas, document, compositionId, previewTime, state);
+    const motion::DrawCommandList *commands = EnsureSceneCommands(canvas, document, compositionId, previewTime, state);
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = usedFrameCache ? 0.0 : Milliseconds(buildStart, buildEnd);
     profile.usedFrameCache = usedFrameCache;
@@ -413,8 +409,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         const float outlineWidth = 1.5f * viewUnit;
         const float handleSize = 7.0f * viewUnit;
         constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
-        std::vector<motion::PathOverlayItem> pathOverlays =
-            motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
+        std::vector<motion::PathOverlayItem> pathOverlays = motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
         pathOverlays.insert(pathOverlays.end(), canvas->customPathOverlays.begin(), canvas->customPathOverlays.end());
         pathOverlayCommands = motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
 
@@ -435,30 +430,25 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
 
         if (!canvas->hasPathEditTarget) {
             for (EntityId layerId : canvas->selectedLayerIds) {
-                const int selectedKeyframe =
-                    layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
+                const int selectedKeyframe = layerId == canvas->motionPathLayerId ? canvas->motionPathSelectedKeyframe : -1;
                 motion::MotionPathChrome chrome;
-                if (!motion::BuildMotionPathChrome(*document->document, layerId, previewTime, selectedKeyframe,
-                                                   chrome)) {
+                if (!motion::BuildMotionPathChrome(*document->document, layerId, previewTime, selectedKeyframe, chrome)) {
                     continue;
                 }
-                motion::DrawCommandList layerCommands =
-                    motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
+                motion::DrawCommandList layerCommands = motion::BuildMotionPathCommands(chrome, outlineWidth, handleSize);
                 motionPathCommands.insert(motionPathCommands.end(), layerCommands.begin(), layerCommands.end());
             }
         }
 
         if (!canvas->hasPathEditTarget) {
-            const motion::EntityId primaryLayerId =
-                canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
+            const motion::EntityId primaryLayerId = canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
             selectionCommands = motion::BuildSelectionOutlineCommands(
                 state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
                 canvas->showSelectionAnchor, canvas->showSelectionScaleHandles);
         }
         selectionCommands.insert(selectionCommands.end(), gradientEditCommands.begin(), gradientEditCommands.end());
     }
-    profile.drawCommandCount = commands->size() + pathOverlayCommands.size() + pathEditCommands.size() +
-        motionPathCommands.size() + selectionCommands.size();
+    profile.drawCommandCount = commands->size() + pathOverlayCommands.size() + pathEditCommands.size() + motionPathCommands.size() + selectionCommands.size();
 
     const auto beginFrameStart = ProfileClock::now();
     canvas->adapter->beginFrame(viewportWidth, viewportHeight, backgroundColor, cornerRadius);

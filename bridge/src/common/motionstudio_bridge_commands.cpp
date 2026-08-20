@@ -106,22 +106,17 @@ void ms_command_set_static_color(MSDocument *document, uint64_t entityId, const 
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(Color{r, g, b, a})));
 }
 
-void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
-                                       const MSBezierPath *value) {
+void ms_command_set_static_bezier_path(MSDocument *document, uint64_t entityId, const char *path, const MSBezierPath *value) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(BridgeNetworkFromPath(FromMSBezierPath(value)))));
 }
 
-void ms_command_set_static_vector_network(MSDocument *document, uint64_t entityId, const char *path,
-                                          const MSVectorNetwork *value) {
+void ms_command_set_static_vector_network(MSDocument *document, uint64_t entityId, const char *path, const MSVectorNetwork *value) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::SetStaticValueCommand>(
-                MakePath(entityId, path), motion::PropertyValue(FromMSVectorNetwork(value))));
+    Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(FromMSVectorNetwork(value))));
 }
 
-void ms_command_set_static_string(MSDocument *document, uint64_t entityId, const char *path,
-                                  const char *value) {
+void ms_command_set_static_string(MSDocument *document, uint64_t entityId, const char *path, const char *value) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStaticValueCommand>(MakePath(entityId, path), motion::PropertyValue(value == nullptr ? std::string{} : std::string(value))));
 }
@@ -174,8 +169,7 @@ void ms_command_set_composition_frame_rate(MSDocument *document, uint64_t compos
     settings.width = composition->width;
     settings.height = composition->height;
     settings.duration = composition->duration;
-    settings.frameRate = {static_cast<uint32_t>(frameRateNum),
-                          static_cast<uint32_t>(frameRateDen)};
+    settings.frameRate = {static_cast<uint32_t>(frameRateNum), static_cast<uint32_t>(frameRateDen)};
     Execute(document, std::make_unique<motion::SetCompositionSettingsCommand>(EntityId{compositionId}, settings));
 }
 
@@ -189,19 +183,14 @@ void ms_command_add_keyframe_vec2(MSDocument *document, uint64_t entityId, const
     Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec2{x, y}))));
 }
 
-void ms_command_add_keyframe_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x,
-                                  float y, float z) {
+void ms_command_add_keyframe_vec3(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y, float z) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec3{x, y, z}))));
 }
 
-void ms_command_add_keyframe_vec4(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x,
-                                  float y, float z, float w) {
+void ms_command_add_keyframe_vec4(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float x, float y, float z, float w) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::AddKeyframeCommand>(
-                MakePath(entityId, path),
-                motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec4{x, y, z, w}))));
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Vec4{x, y, z, w}))));
 }
 
 void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, float r, float g, float b, float a) {
@@ -209,18 +198,12 @@ void ms_command_add_keyframe_color(MSDocument *document, uint64_t entityId, cons
     Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), Color{r, g, b, a}))));
 }
 
-void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path,
-                                         int64_t frame, const MSBezierPath *value) {
+void ms_command_add_keyframe_bezier_path(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSBezierPath *value) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::AddKeyframeCommand>(
-                MakePath(entityId, path),
-                motion::KeyframeData(
-                    MakeKeyframe(static_cast<FrameTime>(frame), BridgeNetworkFromPath(FromMSBezierPath(value))))));
+    Execute(document, std::make_unique<motion::AddKeyframeCommand>(MakePath(entityId, path), motion::KeyframeData(MakeKeyframe(static_cast<FrameTime>(frame), BridgeNetworkFromPath(FromMSBezierPath(value))))));
 }
 
-void ms_command_add_keyframe_vector_network(MSDocument *document, uint64_t entityId, const char *path,
-                                            int64_t frame, const MSVectorNetwork *value) {
+void ms_command_add_keyframe_vector_network(MSDocument *document, uint64_t entityId, const char *path, int64_t frame, const MSVectorNetwork *value) {
     DocumentLock guard(document);
     Execute(document,
             std::make_unique<motion::AddKeyframeCommand>(
@@ -332,8 +315,7 @@ void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fro
     Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, fromIndex, toIndex));
 }
 
-uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId,
-                                 const uint64_t *layerIds, size_t count) {
+uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId, const uint64_t *layerIds, size_t count) {
     if (count > 0 && layerIds == nullptr) {
         return 0;
     }
@@ -348,8 +330,7 @@ uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId,
         ids.push_back(EntityId{layerIds[index]});
     }
     EntityId groupId;
-    std::unique_ptr<motion::Command> command =
-        motion::MakeGroupLayersCommand(*doc, EntityId{compositionId}, ids, groupId);
+    std::unique_ptr<motion::Command> command = motion::MakeGroupLayersCommand(*doc, EntityId{compositionId}, ids, groupId);
     if (command == nullptr) {
         return 0;
     }
@@ -357,8 +338,7 @@ uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId,
     return groupId.value;
 }
 
-bool ms_command_ungroup_layers(MSDocument *document, uint64_t compositionId,
-                               const uint64_t *layerIds, size_t count, int64_t frame) {
+bool ms_command_ungroup_layers(MSDocument *document, uint64_t compositionId, const uint64_t *layerIds, size_t count, int64_t frame) {
     if (count > 0 && layerIds == nullptr) {
         return false;
     }
@@ -372,9 +352,7 @@ bool ms_command_ungroup_layers(MSDocument *document, uint64_t compositionId,
     for (size_t index = 0; index < count; ++index) {
         ids.push_back(EntityId{layerIds[index]});
     }
-    std::unique_ptr<motion::Command> command =
-        motion::MakeUngroupLayersCommand(*doc, EntityId{compositionId}, ids,
-                                         static_cast<FrameTime>(frame));
+    std::unique_ptr<motion::Command> command = motion::MakeUngroupLayersCommand(*doc, EntityId{compositionId}, ids, static_cast<FrameTime>(frame));
     if (command == nullptr) {
         return false;
     }
@@ -443,20 +421,17 @@ void ms_command_set_stroke_join(MSDocument *document, uint64_t layerId, int inde
     Execute(document, std::make_unique<motion::SetStrokeJoinCommand>(EntityId{layerId}, index, MakeLineJoin(join)));
 }
 
-void ms_command_set_stroke_miter_limit(MSDocument *document, uint64_t layerId, int index,
-                                       float miterLimit) {
+void ms_command_set_stroke_miter_limit(MSDocument *document, uint64_t layerId, int index, float miterLimit) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStrokeMiterLimitCommand>(EntityId{layerId}, index, miterLimit));
 }
 
-void ms_command_set_stroke_mode(MSDocument *document, uint64_t layerId, int index,
-                                MS_STROKE_MODE strokeMode) {
+void ms_command_set_stroke_mode(MSDocument *document, uint64_t layerId, int index, MS_STROKE_MODE strokeMode) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetStrokeModeCommand>(EntityId{layerId}, index, MakeStrokeMode(strokeMode)));
 }
 
-void ms_command_set_stroke_dashes(MSDocument *document, uint64_t layerId, int index,
-                                  const float *values, int count) {
+void ms_command_set_stroke_dashes(MSDocument *document, uint64_t layerId, int index, const float *values, int count) {
     DocumentLock guard(document);
     std::vector<float> dashes;
     if (values != nullptr && count > 0) {
@@ -480,20 +455,17 @@ void ms_command_remove_layer_effect(MSDocument *document, uint64_t layerId, int 
     Execute(document, std::make_unique<motion::RemoveLayerEffectCommand>(EntityId{layerId}, index));
 }
 
-void ms_command_move_layer_effect(MSDocument *document, uint64_t layerId, int fromIndex,
-                                  int toIndex) {
+void ms_command_move_layer_effect(MSDocument *document, uint64_t layerId, int fromIndex, int toIndex) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveLayerEffectCommand>(EntityId{layerId}, fromIndex, toIndex));
 }
 
-void ms_command_set_layer_effect_enabled(MSDocument *document, uint64_t layerId, int index,
-                                         bool enabled) {
+void ms_command_set_layer_effect_enabled(MSDocument *document, uint64_t layerId, int index, bool enabled) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetLayerEffectEnabledCommand>(EntityId{layerId}, index, enabled));
 }
 
-void ms_command_set_gaussian_blur_repeat_edge(MSDocument *document, uint64_t layerId, int index,
-                                              bool repeatEdgePixels) {
+void ms_command_set_gaussian_blur_repeat_edge(MSDocument *document, uint64_t layerId, int index, bool repeatEdgePixels) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetGaussianBlurRepeatEdgeCommand>(EntityId{layerId}, index, repeatEdgePixels));
 }
@@ -533,8 +505,7 @@ void ms_command_set_layer_fx_blend_mode(MSDocument *document, uint64_t layerId, 
     Execute(document, std::make_unique<motion::SetLayerFxBlendModeCommand>(EntityId{layerId}, index, MakeBlendMode(blendMode)));
 }
 
-void ms_command_set_layer_fx_stroke_position(MSDocument *document, uint64_t layerId, int index,
-                                             MS_STROKE_POSITION position) {
+void ms_command_set_layer_fx_stroke_position(MSDocument *document, uint64_t layerId, int index, MS_STROKE_POSITION position) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetLayerFxStrokePositionCommand>(EntityId{layerId}, index, MakeStrokePosition(position)));
 }
@@ -569,16 +540,12 @@ void ms_command_set_mask_inverted(MSDocument *document, uint64_t layerId, int in
     Execute(document, std::make_unique<motion::SetMaskInvertedCommand>(EntityId{layerId}, index, inverted));
 }
 
-void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId,
-                                MS_TRACK_MATTE type) {
+void ms_command_set_track_matte(MSDocument *document, uint64_t layerId, uint64_t matteLayerId, MS_TRACK_MATTE type) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::SetTrackMatteCommand>(EntityId{layerId}, EntityId{matteLayerId}, MakeTrackMatteType(type)));
 }
 
-void ms_command_set_follow_path(MSDocument *document, uint64_t layerId, bool enabled,
-                                uint64_t pathLayerId, bool orientAlongPath) {
+void ms_command_set_follow_path(MSDocument *document, uint64_t layerId, bool enabled, uint64_t pathLayerId, bool orientAlongPath) {
     DocumentLock guard(document);
-    Execute(document,
-            std::make_unique<motion::SetFollowPathCommand>(EntityId{layerId}, enabled,
-                                                           EntityId{pathLayerId}, orientAlongPath));
+    Execute(document, std::make_unique<motion::SetFollowPathCommand>(EntityId{layerId}, enabled, EntityId{pathLayerId}, orientAlongPath));
 }

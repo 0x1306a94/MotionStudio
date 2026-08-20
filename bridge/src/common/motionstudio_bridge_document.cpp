@@ -93,15 +93,13 @@ MSDocument *ms_document_load(const char *packagePath, char **errorOut) {
         }
         return nullptr;
     }
-    const std::string documentJson((std::istreambuf_iterator<char>(documentInput)),
-                                   std::istreambuf_iterator<char>());
+    const std::string documentJson((std::istreambuf_iterator<char>(documentInput)), std::istreambuf_iterator<char>());
 
     std::string shadersJson;
     const std::filesystem::path shadersPath = root / "shader.json";
     std::ifstream shadersInput(shadersPath, std::ios::binary);
     if (shadersInput) {
-        shadersJson.assign((std::istreambuf_iterator<char>(shadersInput)),
-                           std::istreambuf_iterator<char>());
+        shadersJson.assign((std::istreambuf_iterator<char>(shadersInput)), std::istreambuf_iterator<char>());
     }
 
     MSDocument *handle = ms_document_load_json_with_shaders(

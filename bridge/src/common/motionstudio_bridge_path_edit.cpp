@@ -52,8 +52,7 @@ EntityId CompositionIdForLayer(Document &document, EntityId layerId) {
     return {};
 }
 
-bool ScenePointToLocal(Document &document, EntityId layerId, FrameTime frame, Vec2 scenePoint,
-                       Vec2 &localOut) {
+bool ScenePointToLocal(Document &document, EntityId layerId, FrameTime frame, Vec2 scenePoint, Vec2 &localOut) {
     const EntityId compositionId = CompositionIdForLayer(document, layerId);
     if (!compositionId.isValid()) {
         return false;
@@ -202,8 +201,7 @@ bool ms_layer_transform_local_point(MSDocument *document, uint64_t layerId, int6
         return false;
     }
     motion::Mat3 world = motion::Mat3::Identity();
-    if (!LayerWorldTransform(*document->document, EntityId{layerId},
-                             static_cast<FrameTime>(frame), world)) {
+    if (!LayerWorldTransform(*document->document, EntityId{layerId}, static_cast<FrameTime>(frame), world)) {
         return false;
     }
     const Vec2 scene = world.transformPoint(Vec2{localX, localY});
@@ -220,8 +218,7 @@ bool ms_layer_transform_scene_point(MSDocument *document, uint64_t layerId, int6
         return false;
     }
     Vec2 local;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, static_cast<FrameTime>(frame),
-                           {sceneX, sceneY}, local)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, static_cast<FrameTime>(frame), {sceneX, sceneY}, local)) {
         return false;
     }
     *localX = local.x;
@@ -239,13 +236,10 @@ void ms_command_path_edit_move_vertex(MSDocument *document, uint64_t layerId, MS
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
-    motion::BezierPath edited =
-        motion::MoveVertex(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime),
-                           index, localPoint, linkedHandles);
+    motion::BezierPath edited = motion::MoveVertex(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), index, localPoint, linkedHandles);
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -259,8 +253,7 @@ void ms_command_path_edit_move_in_tangent(MSDocument *document, uint64_t layerId
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
     motion::BezierPath current = CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime);
@@ -283,8 +276,7 @@ void ms_command_path_edit_move_out_tangent(MSDocument *document, uint64_t layerI
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
     motion::BezierPath current = CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime);
@@ -293,8 +285,7 @@ void ms_command_path_edit_move_out_tangent(MSDocument *document, uint64_t layerI
         return;
     }
     const Vec2 localOut = localPoint - contour->vertices[index].point;
-    motion::BezierPath edited =
-        motion::MoveOutTangent(std::move(current), index, localOut, mirrorIn);
+    motion::BezierPath edited = motion::MoveOutTangent(std::move(current), index, localOut, mirrorIn);
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -307,8 +298,7 @@ void ms_command_path_edit_insert_on_segment(MSDocument *document, uint64_t layer
     }
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
-    motion::BezierPath edited = motion::InsertVertexOnSegment(
-        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), segmentIndex, t);
+    motion::BezierPath edited = motion::InsertVertexOnSegment(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), segmentIndex, t);
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -320,8 +310,7 @@ void ms_command_path_edit_remove_vertex(MSDocument *document, uint64_t layerId, 
     }
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
-    motion::BezierPath edited = motion::RemoveVertex(
-        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), index);
+    motion::BezierPath edited = motion::RemoveVertex(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), index);
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -337,8 +326,7 @@ void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_
         motion::ClosePath(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime));
     if (kind == MS_PATH_EDIT_SHAPE) {
         motion::Mat3 world = motion::Mat3::Identity();
-        const bool hasWorld =
-            LayerWorldTransform(*document->document, EntityId{layerId}, frameTime, world);
+        const bool hasWorld = LayerWorldTransform(*document->document, EntityId{layerId}, frameTime, world);
         Vec2 localCenter{};
         edited = motion::RecenterPath(std::move(edited), localCenter);
         const Animatable<Vec2> *positionProperty =
@@ -349,8 +337,7 @@ void ms_command_path_edit_close(MSDocument *document, uint64_t layerId, MS_PATH_
             const Vec2 newPosition = positionProperty->evaluate(frameTime) + delta;
             document->undoManager->beginMergeGroup();
             WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
-            WriteVec2AtPlayheadUnlocked(document, layerId, "transform.position", frameTime,
-                                        newPosition);
+            WriteVec2AtPlayheadUnlocked(document, layerId, "transform.position", frameTime, newPosition);
             document->undoManager->endMergeGroup();
             return;
         }
@@ -367,14 +354,12 @@ void ms_command_path_edit_append_vertex(MSDocument *document, uint64_t layerId, 
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
     motion::BezierPath::Vertex vertex;
     vertex.point = localPoint;
-    motion::BezierPath edited = motion::AppendVertex(
-        CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), vertex);
+    motion::BezierPath edited = motion::AppendVertex(CurrentBezierPath(document, layerId, propertyPath.c_str(), frameTime), vertex);
     WriteBezierPathUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -387,8 +372,7 @@ void ms_command_path_edit_set_mirror_mode(MSDocument *document, uint64_t layerId
     }
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
-    motion::VectorNetwork network =
-        CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime);
+    motion::VectorNetwork network = CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime);
     motion::VertexMirrorMode mirrorMode = motion::VertexMirrorMode::None;
     if (mode == MS_VERTEX_MIRROR_ANGLE) {
         mirrorMode = motion::VertexMirrorMode::Angle;
@@ -420,14 +404,11 @@ void ms_command_network_edit_add_vertex(MSDocument *document, uint64_t layerId, 
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
     uint32_t vertexId = 0;
-    motion::VectorNetwork edited =
-        motion::AddVertex(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime),
-                          localPoint, &vertexId);
+    motion::VectorNetwork edited = motion::AddVertex(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), localPoint, &vertexId);
     WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
     if (outVertexId != nullptr) {
         *outVertexId = vertexId;
@@ -447,9 +428,7 @@ void ms_command_network_edit_add_edge(MSDocument *document, uint64_t layerId, MS
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     uint32_t edgeId = 0;
-    motion::VectorNetwork edited =
-        motion::AddEdge(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), startId,
-                        endId, &edgeId);
+    motion::VectorNetwork edited = motion::AddEdge(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), startId, endId, &edgeId);
     if (edgeId == 0) {
         return;
     }
@@ -469,12 +448,10 @@ void ms_command_network_edit_move_vertex(MSDocument *document, uint64_t layerId,
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
-    motion::VectorNetwork edited = motion::MoveVertex(
-        CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), vertexId, localPoint);
+    motion::VectorNetwork edited = motion::MoveVertex(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), vertexId, localPoint);
     WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -489,12 +466,10 @@ void ms_command_network_edit_move_edge_tangent(MSDocument *document, uint64_t la
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     Vec2 localPoint;
-    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY},
-                           localPoint)) {
+    if (!ScenePointToLocal(*document->document, EntityId{layerId}, frameTime, {sceneX, sceneY}, localPoint)) {
         return;
     }
-    motion::VectorNetwork network =
-        CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime);
+    motion::VectorNetwork network = CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime);
     const motion::VectorNetwork::Edge *edge = motion::FindEdge(network, edgeId);
     if (edge == nullptr) {
         return;
@@ -522,9 +497,7 @@ void ms_command_network_edit_insert_on_edge(MSDocument *document, uint64_t layer
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
     uint32_t vertexId = 0;
-    motion::VectorNetwork edited =
-        motion::InsertVertexOnEdge(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime),
-                                   edgeId, t, &vertexId);
+    motion::VectorNetwork edited = motion::InsertVertexOnEdge(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), edgeId, t, &vertexId);
     WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
     if (outVertexId != nullptr) {
         *outVertexId = vertexId;
@@ -539,8 +512,7 @@ void ms_command_network_edit_remove_vertex(MSDocument *document, uint64_t layerI
     }
     const std::string propertyPath = PathEditPropertyPath(kind, maskIndex);
     const FrameTime frameTime = static_cast<FrameTime>(frame);
-    motion::VectorNetwork edited = motion::RemoveVertex(
-        CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), vertexId);
+    motion::VectorNetwork edited = motion::RemoveVertex(CurrentNetwork(document, layerId, propertyPath.c_str(), frameTime), vertexId);
     WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frameTime, edited);
 }
 
@@ -593,32 +565,25 @@ bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, do
     if (AsVectorNetwork(FindProperty(document, layerId, "path")) != nullptr) {
         motion::VectorNetwork network = CurrentNetwork(document, layerId, "path", frame);
         if (!network.vertices.empty()) {
-            WriteNetworkUnlocked(document, layerId, "path", frame,
-                                 ScaleNetworkAboutPivot(std::move(network), pivot, scaleX, scaleY));
+            WriteNetworkUnlocked(document, layerId, "path", frame, ScaleNetworkAboutPivot(std::move(network), pivot, scaleX, scaleY));
         }
-    } else if (AsVec2(FindProperty(document, layerId, "size")) != nullptr &&
-               AsVec2(FindProperty(document, layerId, "position")) != nullptr) {
+    } else if (AsVec2(FindProperty(document, layerId, "size")) != nullptr && AsVec2(FindProperty(document, layerId, "position")) != nullptr) {
         const Animatable<Vec2> *sizeProperty = AsVec2(FindProperty(document, layerId, "size"));
-        const Animatable<Vec2> *positionProperty =
-            AsVec2(FindProperty(document, layerId, "position"));
+        const Animatable<Vec2> *positionProperty = AsVec2(FindProperty(document, layerId, "position"));
         const Vec2 size = sizeProperty->evaluate(frame);
         const Vec2 position = positionProperty->evaluate(frame);
-        WriteVec2AtPlayheadUnlocked(document, layerId, "position", frame,
-                                    ScaleAboutPivot(position, pivot, scaleX, scaleY));
-        WriteVec2AtPlayheadUnlocked(document, layerId, "size", frame,
-                                    Vec2{ScaledExtent(size.x, scaleX), ScaledExtent(size.y, scaleY)});
+        WriteVec2AtPlayheadUnlocked(document, layerId, "position", frame, ScaleAboutPivot(position, pivot, scaleX, scaleY));
+        WriteVec2AtPlayheadUnlocked(document, layerId, "size", frame, Vec2{ScaledExtent(size.x, scaleX), ScaledExtent(size.y, scaleY)});
     }
 
     const int maskCount = static_cast<int>(layer->masks.size());
     for (int index = 0; index < maskCount; ++index) {
         const std::string propertyPath = PathEditPropertyPath(MS_PATH_EDIT_MASK, index);
-        motion::VectorNetwork network =
-            CurrentNetwork(document, layerId, propertyPath.c_str(), frame);
+        motion::VectorNetwork network = CurrentNetwork(document, layerId, propertyPath.c_str(), frame);
         if (network.vertices.empty()) {
             continue;
         }
-        WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frame,
-                             ScaleNetworkAboutPivot(std::move(network), pivot, scaleX, scaleY));
+        WriteNetworkUnlocked(document, layerId, propertyPath.c_str(), frame, ScaleNetworkAboutPivot(std::move(network), pivot, scaleX, scaleY));
     }
 
     return true;

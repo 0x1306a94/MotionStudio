@@ -45,8 +45,7 @@ Asset *FindAsset(Document &document, uint64_t assetId) {
     return nullptr;
 }
 
-std::string UniqueAssetFileName(const std::filesystem::path &assetsDir,
-                                const std::string &preferredName) {
+std::string UniqueAssetFileName(const std::filesystem::path &assetsDir, const std::string &preferredName) {
     std::filesystem::path preferred(preferredName.empty() ? "image.png" : preferredName);
     std::string stem = preferred.stem().string();
     std::string extension = preferred.extension().string();
@@ -68,15 +67,13 @@ bool CopyFile(const std::filesystem::path &source, const std::filesystem::path &
     if (error) {
         return false;
     }
-    std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing,
-                               error);
+    std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing, error);
     return !error;
 }
 
 }  // namespace
 
-uint64_t ms_command_import_image_asset(MSDocument *document, const char *sourceAbsolutePath,
-                                       const char *preferredFileName, int width, int height) {
+uint64_t ms_command_import_image_asset(MSDocument *document, const char *sourceAbsolutePath, const char *preferredFileName, int width, int height) {
     DocumentLock lock(document);
     if (document == nullptr || sourceAbsolutePath == nullptr || width <= 0 || height <= 0) {
         return 0;
@@ -86,8 +83,7 @@ uint64_t ms_command_import_image_asset(MSDocument *document, const char *sourceA
     }
     const std::filesystem::path root(document->document->projectRoot);
     const std::filesystem::path assetsDir = root / "assets";
-    const std::string fileName =
-        UniqueAssetFileName(assetsDir, preferredFileName == nullptr ? "" : preferredFileName);
+    const std::string fileName = UniqueAssetFileName(assetsDir, preferredFileName == nullptr ? "" : preferredFileName);
     const std::filesystem::path destination = assetsDir / fileName;
     if (!CopyFile(sourceAbsolutePath, destination)) {
         return 0;
@@ -118,8 +114,7 @@ uint64_t ms_command_add_image_layer(MSDocument *document, uint64_t compositionId
     layer->inPoint = 0;
     layer->outPoint = composition->duration;
     layer->transform.anchorPoint.setStaticValue(Vec2{100.0f, 100.0f});
-    layer->transform.position.setStaticValue(
-        Vec2{composition->width * 0.5f, composition->height * 0.5f});
+    layer->transform.position.setStaticValue(Vec2{composition->width * 0.5f, composition->height * 0.5f});
     auto *content = static_cast<ImageContent *>(layer->content.get());
     content->size.setStaticValue(Vec2{200.0f, 200.0f});
     content->scaleMode = ImageScaleMode::LetterBox;
@@ -177,8 +172,7 @@ MS_IMAGE_SCALE ms_layer_image_scale_mode(MSDocument *document, uint64_t layerId)
     if (layer == nullptr || layer->type() != LayerType::Image) {
         return MS_IMAGE_SCALE_LETTER_BOX;
     }
-    return static_cast<MS_IMAGE_SCALE>(
-        static_cast<ImageContent *>(layer->content.get())->scaleMode);
+    return static_cast<MS_IMAGE_SCALE>(static_cast<ImageContent *>(layer->content.get())->scaleMode);
 }
 
 int ms_document_asset_count(MSDocument *document) {
