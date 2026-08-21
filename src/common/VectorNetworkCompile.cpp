@@ -1,8 +1,11 @@
 #include "MotionStudio/common/VectorNetworkCompile.h"
 
+#include "MotionStudio/common/GeometryRevision.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <list>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -580,15 +583,7 @@ BezierPath BoundedFillFacesFromNetwork(const VectorNetwork &network) {
     return result;
 }
 
-}  // namespace
-
-BezierPath CompileFillFaces(const VectorNetwork &network) {
-    // Visual enclosure: subdivide cubics, split at crossings, then extract
-    // bounded faces. Stroke still uses the original cubic edges.
-    return BoundedFillFacesFromNetwork(BuildCurvePlanarNetwork(network));
-}
-
-BezierPath CompileStrokeEdges(const VectorNetwork &network) {
+BezierPath CompileStrokeEdgesUncached(const VectorNetwork &network) {
     BezierPath result;
     const std::vector<size_t> activeEdges = UniqueUndirectedEdgeIndices(network);
     if (activeEdges.empty()) {
@@ -713,6 +708,58 @@ BezierPath CompileStrokeEdges(const VectorNetwork &network) {
     }
 
     return result;
+}
+
+}  // namespace
+
+CompiledVectorNetwork CompileUncached(const VectorNetwork &network) {
+    CompiledVectorNetwork compiled;
+    compiled.fill = BoundedFillFacesFromNetwork(BuildCurvePlanarNetwork(network));
+    compiled.stroke = CompileStrokeEdgesUncached(network);
+    GeometryRevisionAccess::Stamp(compiled.fill);
+    GeometryRevisionAccess::Stamp(compiled.stroke);
+    return compiled;
+}
+
+struct CompileCache {
+    static constexpr size_t Capacity = 64;
+    std::list<std::pair<uint64_t, CompiledVectorNetwork>> order;
+    std::unordered_map<uint64_t, std::list<std::pair<uint64_t, CompiledVectorNetwork>>::iterator> index;
+    CompiledVectorNetwork uncached;
+};
+
+CompileCache &ThreadCompileCache() {
+    static thread_local CompileCache cache;
+    return cache;
+}
+
+const CompiledVectorNetwork &CompileVectorNetwork(const VectorNetwork &network) {
+    CompileCache &cache = ThreadCompileCache();
+    const uint64_t revision = GeometryRevisionAccess::Get(network);
+    if (revision == 0) {
+        cache.uncached = CompileUncached(network);
+        return cache.uncached;
+    }
+    const auto found = cache.index.find(revision);
+    if (found != cache.index.end()) {
+        cache.order.splice(cache.order.begin(), cache.order, found->second);
+        return found->second->second;
+    }
+    if (cache.order.size() >= CompileCache::Capacity) {
+        cache.index.erase(cache.order.back().first);
+        cache.order.pop_back();
+    }
+    cache.order.push_front({revision, CompileUncached(network)});
+    cache.index.emplace(revision, cache.order.begin());
+    return cache.order.front().second;
+}
+
+BezierPath CompileFillFaces(const VectorNetwork &network) {
+    return CompileVectorNetwork(network).fill;
+}
+
+BezierPath CompileStrokeEdges(const VectorNetwork &network) {
+    return CompileVectorNetwork(network).stroke;
 }
 
 }  // namespace motion

@@ -6,6 +6,7 @@
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/GeometryRevision.h"
 #include "MotionStudio/common/VectorNetwork.h"
+#include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
 #include "MotionStudio/common/VectorNetworkEdit.h"
 #include "MotionStudio/model/Composition.h"
@@ -169,4 +170,35 @@ TEST(GeometryRevisionTest, JsonRoundTripOmitsRevisionAndRestamps) {
     EXPECT_NE(revB, 0u);
     EXPECT_NE(revA, revB);
     EXPECT_EQ(a->path.staticValue(), b->path.staticValue());
+}
+
+TEST(GeometryRevisionTest, StampedCompileHitsKeepFillRevision) {
+    VectorNetwork network = motion::BezierPathToVectorNetwork(
+        motion::MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true));
+    const BezierPath first = motion::CompileFillFaces(network);
+    const BezierPath second = motion::CompileFillFaces(network);
+    EXPECT_EQ(first, second);
+    EXPECT_NE(motion::GeometryRevisionAccess::Get(first), 0u);
+    EXPECT_EQ(motion::GeometryRevisionAccess::Get(first), motion::GeometryRevisionAccess::Get(second));
+}
+
+TEST(GeometryRevisionTest, UnstampedCompileDoesNotShareFillRevision) {
+    VectorNetwork network;
+    network.vertices = {{1, {0, 0}}, {2, {10, 0}}, {3, {0, 10}}};
+    network.edges = {{1, 1, 2, {}, {}}, {2, 2, 3, {}, {}}, {3, 3, 1, {}, {}}};
+    ASSERT_EQ(motion::GeometryRevisionAccess::Get(network), 0u);
+    const BezierPath first = motion::CompileFillFaces(network);
+    const BezierPath second = motion::CompileFillFaces(network);
+    EXPECT_EQ(first, second);
+    EXPECT_NE(motion::GeometryRevisionAccess::Get(first), motion::GeometryRevisionAccess::Get(second));
+}
+
+TEST(GeometryRevisionTest, CompileVectorNetworkSharesLookup) {
+    VectorNetwork network = motion::BezierPathToVectorNetwork(
+        motion::MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true));
+    const motion::CompiledVectorNetwork compiled = motion::CompileVectorNetwork(network);
+    EXPECT_EQ(compiled.fill, motion::CompileFillFaces(network));
+    EXPECT_EQ(compiled.stroke, motion::CompileStrokeEdges(network));
+    EXPECT_EQ(motion::GeometryRevisionAccess::Get(compiled.fill),
+              motion::GeometryRevisionAccess::Get(motion::CompileFillFaces(network)));
 }

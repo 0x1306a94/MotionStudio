@@ -406,7 +406,7 @@ cmake --build build --target core_tests
   - `const CompiledVectorNetwork &CompileVectorNetwork(const VectorNetwork &network);` — 引用只在同线程下一次 `CompileVectorNetwork` 之前有效
   - 现有 `CompileFillFaces` / `CompileStrokeEdges` 变成从 `CompileVectorNetwork` 拷出结果的薄封装
 
-- [ ] **Step 1: 写失败的编译缓存测试**
+- [x] **Step 1: 写失败的编译缓存测试**
 
 追加到 `tests/common/GeometryRevisionTest.cpp`：
 
@@ -447,7 +447,7 @@ TEST(GeometryRevisionTest, CompileVectorNetworkSharesLookup) {
 
 立刻把 `CompiledVectorNetwork` 拷出来，不要把返回的引用跨另一次 compile 使用。
 
-- [ ] **Step 2: 跑测试，确认失败**
+- [x] **Step 2: 跑测试，确认失败**
 
 ```bash
 cmake --build build --target core_tests
@@ -456,7 +456,7 @@ cmake --build build --target core_tests
 
 预期：编译失败（没有 `CompileVectorNetwork`），或 FAIL（已 stamp 的 compile 两次 fill revision 不同）。
 
-- [ ] **Step 3: 实现 LRU**
+- [x] **Step 3: 实现 LRU**
 
 `include/MotionStudio/common/VectorNetworkCompile.h`：
 
@@ -529,7 +529,7 @@ BezierPath CompileStrokeEdges(const VectorNetwork &network) {
 
 LRU 不要用 lambda，写显式函数。
 
-- [ ] **Step 4: 跑测试**
+- [x] **Step 4: 跑测试**
 
 ```bash
 cmake --build build --target core_tests
@@ -538,11 +538,11 @@ cmake --build build --target core_tests
 
 预期：PASS。原有 compile 测试仍检查 contour 数量。
 
-- [ ] **Step 5: 勾选本 Task 并 commit**
+- [x] **Step 5: 勾选本 Task 并 commit**
 
 把本 Task 的 **Status:** 改为 ✅ Done，勾上上面步骤。然后 commit。示例信息：`Cache compiled fill and stroke paths by VectorNetwork revision.`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 ---
 
