@@ -1,9 +1,23 @@
 #include "MotionStudio/common/BezierPath.h"
 
+#include "GeometryRevision.h"
+
 #include <algorithm>
 #include <utility>
 
 namespace motion {
+
+namespace detail {
+
+uint64_t GeometryRevision(const BezierPath &path) {
+    return path.revision_;
+}
+
+void StampGeometryRevision(BezierPath &path) {
+    path.revision_ = GenerateGeometryRevision();
+}
+
+}  // namespace detail
 
 bool BezierPath::Vertex::operator==(const Vertex &other) const {
     return point == other.point && inTangent == other.inTangent &&

@@ -1,10 +1,18 @@
 #pragma once
 
+#include <cstdint>
 #include <vector>
 
 #include "MotionStudio/common/Vec2.h"
 
 namespace motion {
+
+struct BezierPath;
+
+namespace detail {
+uint64_t GeometryRevision(const BezierPath &path);
+void StampGeometryRevision(BezierPath &path);
+}  // namespace detail
 
 // Bezier path whose tangents are offsets relative to the vertex — control
 // points are (point + outTangent) for the outgoing handle and
@@ -41,6 +49,11 @@ struct BezierPath {
 
     bool operator==(const BezierPath &other) const;
     bool operator!=(const BezierPath &other) const;
+
+  private:
+    uint64_t revision_ = 0;
+    friend uint64_t detail::GeometryRevision(const BezierPath &);
+    friend void detail::StampGeometryRevision(BezierPath &);
 };
 
 // Builds a BezierPath consisting of a single contour with the given vertices.

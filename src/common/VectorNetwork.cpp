@@ -1,8 +1,28 @@
 #include "MotionStudio/common/VectorNetwork.h"
 
+#include "GeometryRevision.h"
+
 #include <algorithm>
+#include <atomic>
 
 namespace motion {
+
+uint64_t GenerateGeometryRevision() {
+    static std::atomic<uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
+namespace detail {
+
+uint64_t GeometryRevision(const VectorNetwork &network) {
+    return network.revision_;
+}
+
+void StampGeometryRevision(VectorNetwork &network) {
+    network.revision_ = GenerateGeometryRevision();
+}
+
+}  // namespace detail
 
 bool VectorNetwork::Vertex::operator==(const Vertex &other) const {
     return id == other.id && point == other.point && mirrorMode == other.mirrorMode;
