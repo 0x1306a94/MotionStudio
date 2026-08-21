@@ -665,7 +665,7 @@ cmake --build build --target core_tests
 - 依赖：`GeometryRevisionAccess::Get(const BezierPath &)`
 - 产出：Path 类型且 revision 非 0 时，`HashGeometry` 的 `contentHash` 用 revision；Rect / Ellipse / 未 stamp 的 Path 仍走逐点哈希
 
-- [ ] **Step 1: 写失败的 HashGeometry 测试**
+- [x] **Step 1: 写失败的 HashGeometry 测试**
 
 追加到 `adapter/tgfx/tests/TgfxPathCacheTest.cpp`：
 
@@ -695,7 +695,7 @@ TEST(TgfxPathCacheTest, UnstampedPathHashFollowsVertices) {
 }
 ```
 
-- [ ] **Step 2: 跑测试，确认失败**
+- [x] **Step 2: 跑测试，确认失败**
 
 ```bash
 cmake --build build --target tgfx_adapter_test
@@ -704,7 +704,7 @@ cmake --build build --target tgfx_adapter_test
 
 二进制路径若不同，改用 `ctest --test-dir build -R 'TgfxPathCacheTest.PathHash' --output-on-failure`。预期：第一条 FAIL（现在的 hash 会吃进 strokePath 顶点 / 忽略 revision）。
 
-- [ ] **Step 3: 切换 Path 哈希**
+- [x] **Step 3: 切换 Path 哈希**
 
 `adapter/tgfx/src/TgfxPathBuilder.cpp` 的 `HashGeometry`，Path 分支：
 
@@ -733,11 +733,11 @@ ctest --test-dir build -R 'TgfxPathCacheTest' --output-on-failure
 
 预期：PASS。
 
-- [ ] **Step 5: 勾选本 Task 并 commit**
+- [x] **Step 5: 勾选本 Task 并 commit**
 
 把本 Task 的 **Status:** 改为 ✅ Done，勾上上面步骤。然后 commit。示例信息：`Hash stamped path geometry by BezierPath revision.`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 ---
 

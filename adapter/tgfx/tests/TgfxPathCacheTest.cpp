@@ -2,10 +2,13 @@
 
 #include <tgfx/core/Rect.h>
 
+#include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/GeometryRevision.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/FillRule.h"
 #include "MotionStudio/render/ShapeGeometry.h"
 
+#include "TgfxPathBuilder.h"
 #include "TgfxPathCache.h"
 
 using motion::FillRule;
@@ -75,4 +78,25 @@ TEST(TgfxPathCacheTest, ClearDropsCachedPathRefs) {
         cache.ResolveMaskExpanded(geometry, FillRule::NonZero, 8.0f, after);
     EXPECT_FALSE(before.isSame(after));
     EXPECT_FALSE(expanded.isSame(expandedAfter));
+}
+
+TEST(TgfxPathCacheTest, PathHashUsesRevisionWhenStamped) {
+    motion::BezierPath path =
+        motion::MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true);
+    motion::ShapeGeometry geometry = motion::MakePathGeometry(path);
+    const uint64_t hash = motion::HashGeometry(geometry, motion::FillRule::NonZero);
+    geometry.strokePath.contours.push_back(path.contours.front());
+    EXPECT_EQ(hash, motion::HashGeometry(geometry, motion::FillRule::NonZero));
+    motion::GeometryRevisionAccess::Stamp(geometry.path);
+    EXPECT_NE(hash, motion::HashGeometry(geometry, motion::FillRule::NonZero));
+}
+
+TEST(TgfxPathCacheTest, UnstampedPathHashFollowsVertices) {
+    motion::BezierPath path;
+    path.contours.push_back({{{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true});
+    ASSERT_EQ(motion::GeometryRevisionAccess::Get(path), 0u);
+    motion::ShapeGeometry geometry = motion::MakePathGeometry(path);
+    const uint64_t hash = motion::HashGeometry(geometry, motion::FillRule::NonZero);
+    geometry.path.contours[0].vertices[1].point = {11, 0};
+    EXPECT_NE(hash, motion::HashGeometry(geometry, motion::FillRule::NonZero));
 }

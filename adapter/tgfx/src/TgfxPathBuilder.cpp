@@ -5,6 +5,7 @@
 
 #include <tgfx/core/Rect.h>
 
+#include "MotionStudio/common/GeometryRevision.h"
 #include "TgfxTypeConvert.h"
 
 namespace motion {
@@ -102,6 +103,11 @@ uint64_t HashGeometry(const ShapeGeometry &geometry, FillRule fillRule) {
     hash = MixHash(hash, static_cast<uint64_t>(fillRule));
     switch (geometry.kind) {
         case ShapeGeometryKind::Path: {
+            const uint64_t revision = GeometryRevisionAccess::Get(geometry.path);
+            if (revision != 0) {
+                hash = MixHash(hash, revision);
+                break;
+            }
             hash = MixHash(hash, geometry.path.contours.size());
             for (const BezierPath::Contour &contour : geometry.path.contours) {
                 hash = MixHash(hash, contour.closed ? 1ULL : 0ULL);
