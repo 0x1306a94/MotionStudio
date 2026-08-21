@@ -1,7 +1,7 @@
 # Geometry revision 缓存 — 设计说明
 
 日期：2026-08-21
-状态：待确认
+状态：已实现
 关联：[时间轴求值](../../timeline-evaluation.md)、[渲染](../../rendering.md)、[PreviewSceneCache](./2026-08-12-preview-scene-cache-design.md)
 
 ## 目标

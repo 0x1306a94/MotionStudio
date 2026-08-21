@@ -745,7 +745,7 @@ ctest --test-dir build -R 'TgfxPathCacheTest' --output-on-failure
 
 **文件：** 只改本 plan 的 checkbox（以及 Step 3 的 spec 状态）
 
-- [ ] **Step 1: 开 ASan 构建并跑相关测试**
+- [x] **Step 1: 开 ASan 构建并跑相关测试**
 
 ```bash
 cmake -B build -G Ninja -DMOTIONSTUDIO_ENABLE_ASAN=ON
@@ -756,15 +756,19 @@ ctest --test-dir build -R 'TgfxPathCacheTest' --output-on-failure
 
 预期：列出的测试全 PASS，无 ASan 报告。
 
-- [ ] **Step 2: 确认 JSON 仍无 revision 字段**
+- [x] **Step 2: 确认 JSON 仍无 revision 字段**
 
 再跑 `GeometryRevisionTest.JsonRoundTripOmitsRevisionAndRestamps`。预期：PASS。
 
-- [ ] **Step 3: 更新 spec 状态（先改文件，等用户确认再 commit）**
+- [x] **Step 3: 更新 spec 状态（先改文件，等用户确认再 commit）**
 
 上述测试通过后，把 `docs/superpowers/specs/2026-08-21-geometry-revision-cache-design.md` 的 `状态：待确认` 改成 `状态：已实现`。spec / plan / `docs/README.md` 随本 Task 一并 commit。
 
-- [ ] **Step 4: 勾选本 Task**
+- [x] **Step 4: 勾选本 Task**
+
+本 Task 无代码变更，不单独 commit。
+
+**Status:** ✅ Done
 
 本 Task 无代码变更，不单独 commit。
 
