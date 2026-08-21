@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "MotionStudio/common/GeometryRevision.h"
 #include "MotionStudio/common/Mat3.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/model/ShapeContent.h"
@@ -57,6 +58,7 @@ void TransformNetwork(VectorNetwork &network, const tgfx::Matrix &matrix) {
         edge.startTangent = startControl - start->point;
         edge.endTangent = endControl - end->point;
     }
+    GeometryRevisionAccess::Stamp(network);
 }
 
 bool NetworkBounds(const VectorNetwork &network, Vec2 &minOut, Vec2 &maxOut) {

@@ -7,12 +7,7 @@
 
 namespace motion {
 
-struct BezierPath;
-
-namespace detail {
-uint64_t GeometryRevision(const BezierPath &path);
-void StampGeometryRevision(BezierPath &path);
-}  // namespace detail
+class GeometryRevisionAccess;
 
 // Bezier path whose tangents are offsets relative to the vertex — control
 // points are (point + outTangent) for the outgoing handle and
@@ -52,8 +47,7 @@ struct BezierPath {
 
   private:
     uint64_t revision_ = 0;
-    friend uint64_t detail::GeometryRevision(const BezierPath &);
-    friend void detail::StampGeometryRevision(BezierPath &);
+    friend class GeometryRevisionAccess;
 };
 
 // Builds a BezierPath consisting of a single contour with the given vertices.

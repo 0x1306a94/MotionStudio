@@ -9,6 +9,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [architecture.md](architecture.md) | 总体架构：三层分层（Core / Bridge / App）、模块划分、目录结构、extern "C" 桥接层设计、依赖与构建 |
 | [data-model.md](data-model.md) | 动画数据结构：时间表示、EntityId、Document→Composition→Layer→Shape 层级、`Animatable<T>`、Transform 与父子继承、Command 模式 undo/redo、序列化与 DTO |
 | [figma-to-motionstudio.md](figma-to-motionstudio.md) | Figma Design / Motion → MotionStudio：毫秒↔帧、旋转符号与 Design+Motion 关键帧 |
+| [superpowers/specs/2026-08-21-geometry-revision-cache-design.md](superpowers/specs/2026-08-21-geometry-revision-cache-design.md) | VectorNetwork / BezierPath 进程内 revision：CompileFillFaces 与 tgfx::Path 身份缓存 |
 | [superpowers/specs/2026-08-19-stroke-dash-design.md](superpowers/specs/2026-08-19-stroke-dash-design.md) | Stroke dash + Cap/Join Inspector（Trim 后再 `MakeDash`） |
 | [superpowers/specs/2026-08-19-svg-import-design.md](superpowers/specs/2026-08-19-svg-import-design.md) | SVG 导入：tgfx `SVGDOM` → Core 图层树 + `VectorNetwork`（独立 `svg_import` 库） |
 | [superpowers/specs/2026-08-20-svg-mask-track-matte-design.md](superpowers/specs/2026-08-20-svg-mask-track-matte-design.md) | SVG `mask=` → track matte；Group PAG isolation Precomp 包装 |

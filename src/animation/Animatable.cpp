@@ -8,6 +8,7 @@
 #include "MotionStudio/animation/Interpolator.h"
 #include "MotionStudio/common/BezierPath.h"
 #include "MotionStudio/common/Color.h"
+#include "MotionStudio/common/GeometryRevision.h"
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/Vec3.h"
 #include "MotionStudio/common/Vec4.h"
@@ -37,6 +38,9 @@ Animatable<T>::Animatable(T staticValue)
 
 template <typename T>
 void Animatable<T>::addKeyframe(Keyframe<T> keyframe) {
+    if constexpr (std::is_same_v<T, VectorNetwork> || std::is_same_v<T, BezierPath>) {
+        GeometryRevisionAccess::Stamp(keyframe.value);
+    }
     auto it = lowerBound(keyframe.time);
     if (it != keyframes_.end() && it->time == keyframe.time) {
         *it = std::move(keyframe);
@@ -69,6 +73,9 @@ bool Animatable<T>::updateKeyframe(FrameTime time, Keyframe<T> keyframe) {
     auto it = find(time);
     if (it == keyframes_.end()) {
         return false;
+    }
+    if constexpr (std::is_same_v<T, VectorNetwork> || std::is_same_v<T, BezierPath>) {
+        GeometryRevisionAccess::Stamp(keyframe.value);
     }
     keyframe.time = time;
     *it = std::move(keyframe);
@@ -126,6 +133,9 @@ const T &Animatable<T>::staticValue() const {
 
 template <typename T>
 void Animatable<T>::setStaticValue(T value) {
+    if constexpr (std::is_same_v<T, VectorNetwork> || std::is_same_v<T, BezierPath>) {
+        GeometryRevisionAccess::Stamp(value);
+    }
     value_ = std::move(value);
 }
 

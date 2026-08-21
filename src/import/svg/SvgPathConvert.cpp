@@ -1,5 +1,6 @@
 #include "SvgPathConvert.h"
 
+#include "MotionStudio/common/GeometryRevision.h"
 #include "MotionStudio/common/Vec2.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -175,6 +176,7 @@ VectorNetwork PathToVectorNetwork(const tgfx::Path &path, bool *usedConic) {
         ++it;
     }
     WeldCurrentToContourStart(network, currentId, contourStartId);
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 

@@ -1,23 +1,11 @@
 #include "MotionStudio/common/BezierPath.h"
 
-#include "GeometryRevision.h"
+#include "MotionStudio/common/GeometryRevision.h"
 
 #include <algorithm>
 #include <utility>
 
 namespace motion {
-
-namespace detail {
-
-uint64_t GeometryRevision(const BezierPath &path) {
-    return path.revision_;
-}
-
-void StampGeometryRevision(BezierPath &path) {
-    path.revision_ = GenerateGeometryRevision();
-}
-
-}  // namespace detail
 
 bool BezierPath::Vertex::operator==(const Vertex &other) const {
     return point == other.point && inTangent == other.inTangent &&
@@ -84,6 +72,7 @@ BezierPath MakeSingleContour(std::vector<BezierPath::Vertex> vertices, bool clos
     contour.vertices = std::move(vertices);
     contour.closed = closed;
     path.contours.push_back(std::move(contour));
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 

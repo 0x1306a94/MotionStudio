@@ -1,5 +1,6 @@
 #include "MotionStudio/common/VectorNetworkEdit.h"
 
+#include "MotionStudio/common/GeometryRevision.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -106,6 +107,7 @@ VectorNetwork AddVertex(VectorNetwork network, Vec2 point, uint32_t *outId) {
     if (outId != nullptr) {
         *outId = id;
     }
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 
@@ -125,6 +127,7 @@ VectorNetwork AddEdge(VectorNetwork network, uint32_t start, uint32_t end, uint3
     if (outId != nullptr) {
         *outId = id;
     }
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 
@@ -134,6 +137,7 @@ VectorNetwork MoveVertex(VectorNetwork network, uint32_t id, Vec2 point) {
         return network;
     }
     vertex->point = point;
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 
@@ -149,6 +153,7 @@ VectorNetwork MoveEdgeTangent(VectorNetwork network, uint32_t edgeId, bool atSta
     } else {
         edge->endTangent = tangent;
     }
+    GeometryRevisionAccess::Stamp(network);
     if (!mirror) {
         return network;
     }
@@ -212,6 +217,7 @@ VectorNetwork InsertVertexOnEdge(VectorNetwork network, uint32_t edgeId, float t
     if (outId != nullptr) {
         *outId = midId;
     }
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 
@@ -236,6 +242,7 @@ VectorNetwork RemoveVertex(VectorNetwork network, uint32_t id) {
         }
     }
     network.vertices = std::move(vertices);
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 
@@ -247,7 +254,11 @@ VectorNetwork RemoveEdge(VectorNetwork network, uint32_t id) {
             kept.push_back(edge);
         }
     }
+    if (kept.size() == network.edges.size()) {
+        return network;
+    }
     network.edges = std::move(kept);
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 
@@ -257,6 +268,7 @@ VectorNetwork SetVertexMirrorMode(VectorNetwork network, uint32_t vertexId, Vert
         return network;
     }
     vertex->mirrorMode = mode;
+    GeometryRevisionAccess::Stamp(network);
     if (VertexDegree(network, vertexId) != 2) {
         return network;
     }
@@ -386,6 +398,7 @@ VectorNetwork RecenterNetwork(VectorNetwork network, Vec2 &localCenterOut) {
     for (VectorNetwork::Vertex &vertex : network.vertices) {
         vertex.point = vertex.point - center;
     }
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 

@@ -7,12 +7,7 @@
 
 namespace motion {
 
-struct VectorNetwork;
-
-namespace detail {
-uint64_t GeometryRevision(const VectorNetwork &network);
-void StampGeometryRevision(VectorNetwork &network);
-}  // namespace detail
+class GeometryRevisionAccess;
 
 // Figma-style handle mirroring at a vertex (Inspector Mirroring control).
 enum class VertexMirrorMode : uint8_t {
@@ -54,8 +49,7 @@ struct VectorNetwork {
 
   private:
     uint64_t revision_ = 0;
-    friend uint64_t detail::GeometryRevision(const VectorNetwork &);
-    friend void detail::StampGeometryRevision(VectorNetwork &);
+    friend class GeometryRevisionAccess;
 };
 
 // Counts edges that touch vertexId as start or end. Returns 0 if missing.

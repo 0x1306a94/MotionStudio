@@ -1,5 +1,6 @@
 #include "MotionStudio/common/PathGeometryEdit.h"
 
+#include "MotionStudio/common/GeometryRevision.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -74,9 +75,11 @@ BezierPath MoveVertex(BezierPath path, size_t index, Vec2 newPoint, bool linkedH
         vertex.point = newPoint;
         vertex.inTangent = absoluteIn - newPoint;
         vertex.outTangent = absoluteOut - newPoint;
+        GeometryRevisionAccess::Stamp(path);
         return path;
     }
     vertex.point = newPoint;
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -90,6 +93,7 @@ BezierPath MoveInTangent(BezierPath path, size_t index, Vec2 newIn, bool mirrorO
     if (mirrorOut) {
         vertex.outTangent = -newIn;
     }
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -103,6 +107,7 @@ BezierPath MoveOutTangent(BezierPath path, size_t index, Vec2 newOut, bool mirro
     if (mirrorIn) {
         vertex.inTangent = -newOut;
     }
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -124,6 +129,7 @@ BezierPath InsertVertexOnSegment(BezierPath path, size_t segmentIndex, float t) 
     to.inTangent = split.rightInTangent;
     contour->vertices.insert(contour->vertices.begin() + static_cast<std::ptrdiff_t>(nextIndex),
                              split.mid);
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -134,6 +140,7 @@ BezierPath RemoveVertex(BezierPath path, size_t index) {
         return path;
     }
     contour->vertices.erase(contour->vertices.begin() + static_cast<std::ptrdiff_t>(index));
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -143,6 +150,7 @@ BezierPath ClosePath(BezierPath path) {
         return path;
     }
     contour->closed = true;
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -155,6 +163,7 @@ BezierPath AppendVertex(BezierPath path, BezierPath::Vertex vertex) {
         return path;
     }
     contour->vertices.push_back(std::move(vertex));
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -168,6 +177,7 @@ BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
     if (!isCorner) {
         vertex.inTangent = {};
         vertex.outTangent = {};
+        GeometryRevisionAccess::Stamp(path);
         return path;
     }
 
@@ -210,6 +220,7 @@ BezierPath ToggleVertexSmooth(BezierPath path, size_t index) {
         hasNext ? std::sqrt(LengthSquared(nextPoint - point)) / 3.0f : 0.0f;
     vertex.inTangent = direction * (-inLength);
     vertex.outTangent = direction * outLength;
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -247,6 +258,7 @@ BezierPath RecenterPath(BezierPath path, Vec2 &localCenterOut) {
             vertex.point = vertex.point - center;
         }
     }
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 

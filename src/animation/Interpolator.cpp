@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "MotionStudio/animation/PathResample.h"
+#include "MotionStudio/common/GeometryRevision.h"
 
 namespace motion {
 
@@ -76,6 +77,12 @@ Color Interpolator<Color>::Lerp(const Color &from, const Color &to, float t) {
 
 BezierPath Interpolator<BezierPath>::Lerp(const BezierPath &from, const BezierPath &to,
                                           float t) {
+    if (t <= 0.0f) {
+        return from;
+    }
+    if (t >= 1.0f) {
+        return to;
+    }
     if (from.contours.size() != to.contours.size()) {
         return from;
     }
@@ -115,11 +122,18 @@ BezierPath Interpolator<BezierPath>::Lerp(const BezierPath &from, const BezierPa
         }
         result.contours.push_back(std::move(outContour));
     }
+    GeometryRevisionAccess::Stamp(result);
     return result;
 }
 
 VectorNetwork Interpolator<VectorNetwork>::Lerp(const VectorNetwork &from, const VectorNetwork &to,
                                                 float t) {
+    if (t <= 0.0f) {
+        return from;
+    }
+    if (t >= 1.0f) {
+        return to;
+    }
     if (!SameNetworkTopology(from, to)) {
         return from;
     }
@@ -150,6 +164,7 @@ VectorNetwork Interpolator<VectorNetwork>::Lerp(const VectorNetwork &from, const
         edge.startTangent = Interpolator<Vec2>::Lerp(edge.startTangent, found->second->startTangent, t);
         edge.endTangent = Interpolator<Vec2>::Lerp(edge.endTangent, found->second->endTangent, t);
     }
+    GeometryRevisionAccess::Stamp(result);
     return result;
 }
 

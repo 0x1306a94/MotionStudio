@@ -1,4 +1,5 @@
 #include "MotionStudio/common/BezierPathTransform.h"
+#include "MotionStudio/common/GeometryRevision.h"
 
 namespace motion {
 
@@ -17,6 +18,9 @@ BezierPath TransformBezierPath(const BezierPath &path, const Mat3 &matrix) {
             transformedContour.vertices.push_back(transformed);
         }
         result.contours.push_back(std::move(transformedContour));
+    }
+    if (!result.contours.empty()) {
+        GeometryRevisionAccess::Stamp(result);
     }
     return result;
 }

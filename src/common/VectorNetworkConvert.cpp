@@ -1,5 +1,6 @@
 #include "MotionStudio/common/VectorNetworkConvert.h"
 
+#include "MotionStudio/common/GeometryRevision.h"
 #include <unordered_map>
 #include <utility>
 
@@ -33,6 +34,7 @@ VectorNetwork ContourToVectorNetwork(const BezierPath::Contour &contour) {
         edge.endTangent = contour.vertices[next].inTangent;
         network.edges.push_back(edge);
     }
+    GeometryRevisionAccess::Stamp(network);
     return network;
 }
 

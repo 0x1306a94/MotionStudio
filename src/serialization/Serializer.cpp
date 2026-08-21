@@ -14,6 +14,7 @@
 
 #include "MotionStudio/animation/Animatable.h"
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/GeometryRevision.h"
 #include "MotionStudio/common/Vec3.h"
 #include "MotionStudio/common/Vec4.h"
 #include "MotionStudio/common/VectorNetwork.h"
@@ -333,6 +334,7 @@ Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
             }
             path.contours.push_back(*contour);
         }
+        GeometryRevisionAccess::Stamp(path);
         return path;
     }
     Expected<BezierPath::Contour, std::string> contour = ContourFromJson(node);
@@ -341,6 +343,7 @@ Expected<BezierPath, std::string> BezierPathFromJson(const json &node) {
     }
     BezierPath path;
     path.contours.push_back(*contour);
+    GeometryRevisionAccess::Stamp(path);
     return path;
 }
 
@@ -412,6 +415,7 @@ Expected<VectorNetwork, std::string> VectorNetworkFromJson(const json &node) {
             }
             network.edges.push_back({*id, *start, *end, *startTangent, *endTangent});
         }
+        GeometryRevisionAccess::Stamp(network);
         return network;
     }
 
