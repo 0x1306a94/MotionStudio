@@ -105,8 +105,8 @@ CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ni
 `.claude/rules/` 下的规范（自动加载，必须遵守）：
 
 - `coding-style.md`：命名、禁异常与 `dynamic_cast`、注释约定等
-- `git-workflow.md`：分支命名、commit 信息、pre-commit 格式化、自动提交、按 plan 实现时的状态同步
-- `spec-plan-commit.md`：撰写或修订 spec/plan 须等用户确认后再提交；不要拆成一串小 commit
+- `git-workflow.md`：分支命名、commit 信息、pre-commit 格式化、自动提交、可见界面等确认后再提交、按 plan 实现时的状态同步
+- `spec-plan-commit.md`：撰写或修订 spec/plan 须等用户确认；确认后先单独提交再开始实现；确认前不要拆成一串小 commit
 - `testing.md`：GoogleTest 约定（不用 `EXPECT_THROW`、`Expected` 用 `hasValue()`/`error()`、death test、round-trip 与 undo 一致性等）
 - `codegraph.md`：CodeGraph MCP 工具的使用规范
 - `bridge-swift-enums.md`：`CF_CLOSED_ENUM` 导入 Swift 与 SwiftUI `CaseIterable`/`Identifiable` 扩展约定
@@ -117,7 +117,7 @@ CI（GitHub Actions，macOS runner）执行：`sync_deps.sh` → 带 ASan 的 Ni
 
 1. **每完成一个 Step（或整个 Task）必须立刻同步更新 plan 文件**：对应 checkbox 改为 `[x]`；Task 级标注 `**Status:** ✅ Done`（或进行中/阻塞原因）。
 2. **禁止**攒到全部做完再统一勾选；漏更新视为该步未完成。
-3. plan 状态变更随该步相关 commit 一并提交（或紧随其后单独 commit），勿只改代码不改 plan。
+3. plan 状态变更随该步相关 commit 一并提交（或紧随其后单独 commit），勿只改代码不改 plan。若该步含可见界面，等用户确认后再提交。
 
 <!-- CODEGRAPH_START -->
 CodeGraph 使用规范见 `.claude/rules/codegraph.md`。

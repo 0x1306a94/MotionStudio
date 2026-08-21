@@ -22,11 +22,30 @@ alwaysApply: true
 
 ### spec / plan 文档
 
-撰写或修订 `docs/superpowers/specs/`、`docs/superpowers/plans/`（及仅为此改的 `docs/README.md` 链接）时：**写完后先给用户看，等用户明确确认后再 commit**。禁止写完就自动提交，也禁止把多次 spec/plan 修订拆成一串小 commit。
+见 `spec-plan-commit.md`。确认后先单独提交 spec/plan，再开始实现。
+
+### UI 改动
+
+涉及可见界面的 Task / plan step **不要自动提交**。做完后停下来给用户看，等确认后再 commit。
+
+以下任一表述视为确认并授权提交（不必再问一遍）：「确认」「可以」「可以了」「OK」「LGTM」。
+
+**算可见界面：**
+
+- SwiftUI `View`、Inspector、Canvas overlay、Timeline chrome（标尺 / 播放头 / 轨道控件）
+- 这些界面用到的 App 资源图 / 颜色 / 字体
+
+**不算：**
+
+- `Bridge/` 类型封装与 C ABI 映射
+- 不改变布局或交互的非界面 ViewModel
+- Core / adapter / 非视觉测试
+
+同一步只要碰了可见界面，整步（含 C++、plan 状态勾选）都等确认后再一起提交。禁止把 UI 文件拆出去单独等、其余先交。
 
 ### 自动提交
 
-完成任务后自动提交（仅 commit，**不自动推送**），无需用户额外指示。**上一条 spec/plan 例外优先。**
+完成任务后自动提交（仅 commit，**不自动推送**），无需用户额外指示。**spec/plan 与 UI 例外优先。**
 
 1. **NEVER** 在 master 分支直接提交，先按「分支命名」规范创建新分支；非 master 分支直接在当前分支提交即可
 2. **NEVER** 使用 `--amend` 修改已有 commit，始终创建新 commit
@@ -46,7 +65,7 @@ alwaysApply: true
 
 1. **每完成一个 Step（或整个 Task）必须立刻**在 plan 文件中把对应 `- [ ]` 改为 `- [x]`，并更新该 Task 的 `**Status:**`（如 `✅ Done` / 进行中 / 阻塞原因）
 2. **禁止**全部做完再一次性勾选；未同步更新 plan 视为该步未完成
-3. plan 状态变更与该步代码变更一并 commit，或紧随其后单独 commit
+3. plan 状态变更与该步代码变更一并 commit，或紧随其后单独 commit。若该步含可见界面，等用户确认后再提交（见「UI 改动」）
 
 ## Worktree
 
