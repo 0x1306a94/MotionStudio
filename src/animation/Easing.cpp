@@ -152,8 +152,7 @@ float ApplyEasing(const Easing &easing, float progress) {
         case EasingType::EaseOut:
         case EasingType::EaseInOut:
         case EasingType::CubicBezier: {
-            return SolveBezierEasing(easing.inX, easing.inY, easing.outX, easing.outY,
-                                     progress);
+            return SolveBezierEasing(easing.inX, easing.inY, easing.outX, easing.outY, progress);
         }
     }
     return progress;

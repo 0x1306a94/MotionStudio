@@ -90,9 +90,7 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
     for (size_t k = 0; k < vertexCount; ++k) {
         const float target = total * static_cast<float>(k) / static_cast<float>(spanCount);
         const auto it = std::lower_bound(cumulative.begin(), cumulative.end(), target);
-        const size_t sampleIndex =
-            std::clamp(static_cast<size_t>(it - cumulative.begin()), static_cast<size_t>(1),
-                       cumulative.size() - 1);
+        const size_t sampleIndex = std::clamp(static_cast<size_t>(it - cumulative.begin()), static_cast<size_t>(1), cumulative.size() - 1);
         const size_t segment = (sampleIndex - 1) / kSamplesPerSegment;
         const BezierPath::Vertex &from = contour->vertices[segment];
         const BezierPath::Vertex &to = contour->vertices[(segment + 1) % count];
@@ -112,9 +110,7 @@ BezierPath ResamplePath(const BezierPath &path, size_t vertexCount) {
                 tHi = mid;
             }
         }
-        resultVertices.push_back(SplitVertex(from.point, from.outTangent,
-                                             to.inTangent, to.point,
-                                             (tLo + tHi) * 0.5f));
+        resultVertices.push_back(SplitVertex(from.point, from.outTangent, to.inTangent, to.point, (tLo + tHi) * 0.5f));
     }
     return MakeSingleContour(std::move(resultVertices), contour->closed);
 }

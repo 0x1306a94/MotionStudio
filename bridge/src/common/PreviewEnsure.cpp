@@ -20,8 +20,7 @@ motion::Expected<const motionstudio::PreviewSceneCache::Entry *, std::string> En
     if (const motionstudio::PreviewSceneCache::Entry *hit = handle->previewSceneCache.find(time)) {
         return hit;
     }
-    auto evaluated =
-        motion::SceneEvaluator::EvaluatePreview(*handle->document, motion::EntityId{compositionId}, time);
+    auto evaluated = motion::SceneEvaluator::EvaluatePreview(*handle->document, motion::EntityId{compositionId}, time);
     if (!evaluated.hasValue()) {
         return motion::Unexpected(evaluated.error());
     }
@@ -29,8 +28,7 @@ motion::Expected<const motionstudio::PreviewSceneCache::Entry *, std::string> En
     entry->time = time;
     entry->state = std::move(evaluated).value();
     ResolvePointTextContainerSizes(entry->state);
-    motionstudio::PreviewSceneCache::Entry *stored =
-        handle->previewSceneCache.put(time, std::move(entry));
+    motionstudio::PreviewSceneCache::Entry *stored = handle->previewSceneCache.put(time, std::move(entry));
     if (stored == nullptr) {
         return motion::Unexpected(std::string("failed to cache scene state"));
     }
@@ -57,8 +55,7 @@ const motion::DrawCommandList *EnsureSceneCommands(MSCanvas *canvas, MSDocument 
     entry->frameRate = state.frameRate;
     entry->layerCount = state.layers.size();
     entry->commands = motion::BuildCommands(state);
-    motionstudio::FrameCommandCache::Entry *stored =
-        canvas->frameCommandCache.put(time, std::move(entry));
+    motionstudio::FrameCommandCache::Entry *stored = canvas->frameCommandCache.put(time, std::move(entry));
     if (stored == nullptr) {
         return nullptr;
     }

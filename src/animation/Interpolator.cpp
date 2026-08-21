@@ -84,16 +84,14 @@ BezierPath Interpolator<BezierPath>::Lerp(const BezierPath &from, const BezierPa
     for (size_t contourIndex = 0; contourIndex < from.contours.size(); ++contourIndex) {
         const BezierPath::Contour &fromContour = from.contours[contourIndex];
         const BezierPath::Contour &toContour = to.contours[contourIndex];
-        assert(fromContour.closed == toContour.closed &&
-               "BezierPath interpolation requires matching closed flags");
+        assert(fromContour.closed == toContour.closed && "BezierPath interpolation requires matching closed flags");
         if (fromContour.closed != toContour.closed) {
             return from;
         }
         BezierPath fromSingle = MakeSingleContour(fromContour.vertices, fromContour.closed);
         BezierPath toSingle = MakeSingleContour(toContour.vertices, toContour.closed);
         if (fromContour.vertices.size() != toContour.vertices.size()) {
-            const size_t targetCount =
-                std::max(fromContour.vertices.size(), toContour.vertices.size());
+            const size_t targetCount = std::max(fromContour.vertices.size(), toContour.vertices.size());
             fromSingle = ResamplePath(fromSingle, targetCount);
             toSingle = ResamplePath(toSingle, targetCount);
         }
@@ -149,8 +147,7 @@ VectorNetwork Interpolator<VectorNetwork>::Lerp(const VectorNetwork &from, const
         if (found == toEdges.end()) {
             return from;
         }
-        edge.startTangent =
-            Interpolator<Vec2>::Lerp(edge.startTangent, found->second->startTangent, t);
+        edge.startTangent = Interpolator<Vec2>::Lerp(edge.startTangent, found->second->startTangent, t);
         edge.endTangent = Interpolator<Vec2>::Lerp(edge.endTangent, found->second->endTangent, t);
     }
     return result;
@@ -158,8 +155,7 @@ VectorNetwork Interpolator<VectorNetwork>::Lerp(const VectorNetwork &from, const
 
 Vec2 CubicBezierPoint(Vec2 p0, Vec2 p1, Vec2 p2, Vec2 p3, float t) {
     const float mt = 1 - t;
-    return p0 * (mt * mt * mt) + p1 * (3 * mt * mt * t) + p2 * (3 * mt * t * t) +
-        p3 * (t * t * t);
+    return p0 * (mt * mt * mt) + p1 * (3 * mt * mt * t) + p2 * (3 * mt * t * t) + p3 * (t * t * t);
 }
 
 Vec2 EvaluateSpatial(const Keyframe<Vec2> &from, const Keyframe<Vec2> &to,

@@ -139,8 +139,7 @@ PathSample PointAndTangentAtArcLength(const BezierPath &path, float arcLength) {
                     frac = (local - walked) / stepLength;
                 }
                 frac = std::clamp(frac, 0.0f, 1.0f);
-                const float t0 = static_cast<float>(step - 1) /
-                    static_cast<float>(kSamplesPerSegment);
+                const float t0 = static_cast<float>(step - 1) / static_cast<float>(kSamplesPerSegment);
                 const float sampleT = t0 + (t - t0) * frac;
                 sample.point = CubicBezierPoint(p0, p1, p2, p3, sampleT);
                 sample.tangent = CubicBezierTangent(p0, p1, p2, p3, sampleT);

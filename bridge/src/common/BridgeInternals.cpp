@@ -440,16 +440,14 @@ void ResolvePointTextContainerSizes(motion::SceneState &state) {
             item.useExactLocalBounds = true;
             item.localBoundsMin = bounds.min;
             item.localBoundsMax = bounds.max;
-            item.containerSize = {std::max(1.0f, bounds.max.x - bounds.min.x),
-                                  std::max(1.0f, bounds.max.y - bounds.min.y)};
+            item.containerSize = {std::max(1.0f, bounds.max.x - bounds.min.x), std::max(1.0f, bounds.max.y - bounds.min.y)};
             continue;
         }
         if (item.boxTextMode) {
             continue;
         }
         item.useExactLocalBounds = false;
-        item.containerSize = MeasurePointTextSize(item.text, item.fontSize, item.align, item.fontFamily,
-                                                  item.fontStyle);
+        item.containerSize = MeasurePointTextSize(item.text, item.fontSize, item.align, item.fontFamily, item.fontStyle);
         item.localBoundsMin = {0.0f, 0.0f};
         item.localBoundsMax = item.containerSize;
     }

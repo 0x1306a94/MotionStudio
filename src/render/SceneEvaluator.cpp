@@ -416,11 +416,8 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
         FillCommonLayerFields(document, layer, time, world, opacity, stub);
         out.push_back(std::move(stub));
         const size_t innerBegin = out.size();
-        const double inner =
-            static_cast<double>(time - layer.inPoint) * layer.timeStretch +
-            static_cast<double>(layer.startTime);
-        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world, opacity, depth + 1,
-                            out);
+        const double inner = static_cast<double>(time - layer.inPoint) * layer.timeStretch + static_cast<double>(layer.startTime);
+        EvaluateComposition(document, *source, static_cast<PreviewTime>(inner), world, opacity, depth + 1, out);
         for (size_t index = innerBegin; index < out.size(); ++index) {
             if (!out[index].parentId.isValid()) {
                 out[index].parentId = layer.id;
@@ -440,8 +437,7 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
             imageItem.intrinsicSize = {static_cast<float>(asset->width), static_cast<float>(asset->height)};
             imageItem.absolutePath = JoinProjectPath(document.projectRoot, asset->path);
         }
-        const float radius =
-            ClampCornerRadius(imageContent.cornerRadius.evaluatePreview(time), imageItem.containerSize);
+        const float radius = ClampCornerRadius(imageContent.cornerRadius.evaluatePreview(time), imageItem.containerSize);
         imageItem.cornerRadius = radius;
         evaluated.cornerRadius = radius;
         evaluated.imageItem = std::move(imageItem);

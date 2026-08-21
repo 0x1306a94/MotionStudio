@@ -97,16 +97,13 @@ T Animatable<T>::evaluatePreview(PreviewTime time) const {
         return keyframes_.back().value;
     }
 
-    auto it = std::upper_bound(keyframes_.begin(), keyframes_.end(), time,
-                               [](PreviewTime value, const Keyframe<T> &keyframe) {
-                                   return value < static_cast<PreviewTime>(keyframe.time);
-                               });
+    auto it = std::upper_bound(keyframes_.begin(), keyframes_.end(), time, [](PreviewTime value, const Keyframe<T> &keyframe) {
+        return value < static_cast<PreviewTime>(keyframe.time);
+    });
     const Keyframe<T> &from = *(it - 1);
     const Keyframe<T> &to = *it;
 
-    const float progress = static_cast<float>(
-        (time - static_cast<PreviewTime>(from.time)) /
-        static_cast<PreviewTime>(to.time - from.time));
+    const float progress = static_cast<float>((time - static_cast<PreviewTime>(from.time)) / static_cast<PreviewTime>(to.time - from.time));
     const float easedProgress = ApplyEasing(from.easing, progress);
 
     if constexpr (std::is_same_v<T, Vec2>) {
@@ -139,15 +136,13 @@ const std::vector<Keyframe<T>> &Animatable<T>::keyframes() const {
 
 template <typename T>
 typename std::vector<Keyframe<T>>::iterator Animatable<T>::lowerBound(FrameTime time) {
-    return std::lower_bound(keyframes_.begin(), keyframes_.end(), time,
-                            KeyframeBeforeTime<T>);
+    return std::lower_bound(keyframes_.begin(), keyframes_.end(), time, KeyframeBeforeTime<T>);
 }
 
 template <typename T>
 typename std::vector<Keyframe<T>>::const_iterator Animatable<T>::upperBound(
     FrameTime time) const {
-    return std::upper_bound(keyframes_.begin(), keyframes_.end(), time,
-                            TimeBeforeKeyframe<T>);
+    return std::upper_bound(keyframes_.begin(), keyframes_.end(), time, TimeBeforeKeyframe<T>);
 }
 
 template <typename T>
