@@ -16,6 +16,7 @@ using motion::EntityId;
 using motion::Expected;
 using motion::FrameTime;
 using motion::H264Profile;
+using motion::VideoContainer;
 using motion::VideoEncoder;
 using motion::VideoExporter;
 using motion::VideoExportOptions;
@@ -163,6 +164,22 @@ TEST(VideoExporterTest, RejectsEmptyOutputPath) {
         VideoExporter::Export(document, document.compositions[0]->id, options, source, encoder);
     ASSERT_FALSE(result.hasValue());
     EXPECT_NE(result.error().find("path"), std::string::npos);
+}
+
+TEST(VideoExporterTest, PassesContainerAndNetworkOptimize) {
+    Document document = MakeDoc(64, 64, 1);
+    const EntityId compId = document.compositions[0]->id;
+    FakeSource source;
+    FakeEncoder encoder;
+    VideoExportOptions options;
+    options.outputPath = "/tmp/motionstudio_export_test.mov";
+    options.container = VideoContainer::Mov;
+    options.optimizeForNetworkUse = true;
+
+    const auto result = VideoExporter::Export(document, compId, options, source, encoder);
+    ASSERT_TRUE(result.hasValue()) << result.error();
+    EXPECT_EQ(encoder.begun.container, VideoContainer::Mov);
+    EXPECT_TRUE(encoder.begun.optimizeForNetworkUse);
 }
 
 TEST(VideoExporterTest, AttachAudioDefaultFails) {

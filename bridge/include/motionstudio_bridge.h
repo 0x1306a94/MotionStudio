@@ -909,6 +909,11 @@ MSCanvas *ms_canvas_create(void *mtkView);
 
 /* ============================ video export (Apple platforms) ============================ */
 
+typedef CF_CLOSED_ENUM(int, MS_VIDEO_CONTAINER) {
+    MS_VIDEO_CONTAINER_MP4 = 0,
+    MS_VIDEO_CONTAINER_MOV = 1,
+};
+
 typedef struct MSVideoExportOptions {
     const char *outputPath;
     int64_t startFrame;  // <0 → 0
@@ -920,9 +925,11 @@ typedef struct MSVideoExportOptions {
     int bitrateBps;
     int keyframeInterval;
     int profile;  // 0 Baseline / 1 Main / 2 High
+    MS_VIDEO_CONTAINER container;
+    bool optimizeForNetworkUse;  // MP4 only; ignored for MOV
 } MSVideoExportOptions;
 
-// Exports composition to H.264 MP4. progress may be NULL. Returns false to cancel.
+// Exports composition to H.264 MP4 or MOV. progress may be NULL. Returns false to cancel.
 // cancelFlag non-null and non-zero also cancels. On failure *errorOut is malloc'd
 // (ms_string_free); may be NULL when the caller does not need the message.
 bool ms_video_export(MSDocument *document, uint64_t compositionId,

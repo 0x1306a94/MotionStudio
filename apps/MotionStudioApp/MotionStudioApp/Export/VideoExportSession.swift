@@ -2,7 +2,7 @@
 //  VideoExportSession.swift
 //  MotionStudioApp
 //
-//  Temporary output paths and cancel flag for one MP4 export.
+//  Temporary output paths and cancel flag for one video export.
 //
 
 import Foundation
@@ -40,7 +40,7 @@ final class VideoExportSession {
     private(set) var outputURL: URL?
     let cancelState = VideoExportCancelState()
 
-    func prepareOutputURL(projectName: String) throws -> URL {
+    func prepareOutputURL(projectName: String, fileExtension: String) throws -> URL {
         cleanup()
 
         let temporaryDirectoryURL = FileManager.default.temporaryDirectory
@@ -50,7 +50,7 @@ final class VideoExportSession {
         let safeName = projectName.isEmpty ? "Untitled" : projectName
         let outputURL = temporaryDirectoryURL
             .appendingPathComponent(safeName)
-            .appendingPathExtension("mp4")
+            .appendingPathExtension(fileExtension)
         self.temporaryDirectoryURL = temporaryDirectoryURL
         self.outputURL = outputURL
         return outputURL

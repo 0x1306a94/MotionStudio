@@ -7,6 +7,7 @@
 
 import CoreGraphics
 import Foundation
+import MotionStudioBridging
 
 enum VideoExportQuality: Int, CaseIterable {
     case low
@@ -22,6 +23,8 @@ struct VideoExportResolvedSettings: Equatable {
     var frameRateDen: Int
     var bitrateBps: Int
     var profile: Int
+    var container: MS_VIDEO_CONTAINER
+    var optimizeForNetworkUse: Bool
 }
 
 enum VideoExportOptionsBuilder {
@@ -37,7 +40,9 @@ enum VideoExportOptionsBuilder {
     nonisolated static func resolve(size: CGSize,
                                     duration: Int64,
                                     frameRate: Double,
-                                    quality: VideoExportQuality) -> VideoExportResolvedSettings
+                                    quality: VideoExportQuality,
+                                    container: MS_VIDEO_CONTAINER = .MP4,
+                                    optimizeForNetworkUse: Bool = false) -> VideoExportResolvedSettings
     {
         let width = evenFloor(Int(size.width.rounded()))
         let height = evenFloor(Int(size.height.rounded()))
@@ -57,12 +62,15 @@ enum VideoExportOptionsBuilder {
             profile = 2
         }
         let num = max(1, Int(fps.rounded()))
+        let resolvedContainer = container == .MOV ? MS_VIDEO_CONTAINER.MOV : .MP4
         return VideoExportResolvedSettings(width: width,
                                            height: height,
                                            durationFrames: max(0, duration),
                                            frameRateNum: num,
                                            frameRateDen: 1,
                                            bitrateBps: bitrate,
-                                           profile: profile)
+                                           profile: profile,
+                                           container: resolvedContainer,
+                                           optimizeForNetworkUse: resolvedContainer == .MP4 && optimizeForNetworkUse)
     }
 }

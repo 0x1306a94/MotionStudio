@@ -21,6 +21,18 @@ NSString *ProfileLevel(H264Profile profile) {
     return AVVideoProfileLevelH264HighAutoLevel;
 }
 
+AVFileType FileTypeForContainer(VideoContainer container) {
+    switch (container) {
+        case VideoContainer::Mov: {
+            return AVFileTypeQuickTimeMovie;
+        }
+        case VideoContainer::Mp4: {
+            return AVFileTypeMPEG4;
+        }
+    }
+    return AVFileTypeMPEG4;
+}
+
 bool WaitReady(AVAssetWriterInput *input, NSError **error, CFTimeInterval timeoutSeconds = 60.0) {
     const CFTimeInterval deadline = CACurrentMediaTime() + timeoutSeconds;
     while (!input.readyForMoreMediaData) {
@@ -123,13 +135,12 @@ Expected<void, std::string> AvfVideoEncoder::begin(const VideoExportOptions &opt
 
     NSURL *url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:options.outputPath.c_str()]];
     NSError *error = nil;
-    AVAssetWriter *writer = [[AVAssetWriter alloc] initWithURL:url fileType:AVFileTypeMPEG4 error:&error];
+    AVAssetWriter *writer = [[AVAssetWriter alloc] initWithURL:url fileType:FileTypeForContainer(options.container) error:&error];
     if (writer == nil) {
         return Unexpected<std::string>(NsErrorMessage(error, "failed to create AVAssetWriter"));
     }
-    // Keep false for export memory: optimizing for network rewrites the file and can
-    // retain a large intermediate working set on long clips.
-    writer.shouldOptimizeForNetworkUse = NO;
+    // MP4 only: rewriting the file for fast-start can retain a large working set on long clips.
+    writer.shouldOptimizeForNetworkUse = (options.container == VideoContainer::Mp4 && options.optimizeForNetworkUse) ? YES : NO;
 
     NSDictionary *compression = @{
         AVVideoAverageBitRateKey: @(options.bitrateBps),

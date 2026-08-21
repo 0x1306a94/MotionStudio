@@ -34,4 +34,12 @@ TEST(VideoExportBridgeTest, EmptyPathFails) {
     ms_document_destroy(document);
 }
 
+TEST(VideoExportBridgeTest, AcceptsMovContainerTag) {
+    MSVideoExportOptions options{};
+    options.outputPath = "/tmp/x.mov";
+    options.container = MS_VIDEO_CONTAINER_MOV;
+    options.optimizeForNetworkUse = true;
+    EXPECT_EQ(options.container, MS_VIDEO_CONTAINER_MOV);
+}
+
 #endif

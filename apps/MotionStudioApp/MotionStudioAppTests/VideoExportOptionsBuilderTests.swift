@@ -5,6 +5,7 @@
 
 import CoreGraphics
 @testable import MotionStudio
+import MotionStudioBridging
 import Testing
 
 @MainActor
@@ -35,5 +36,33 @@ struct VideoExportOptionsBuilderTests {
         #expect(high.bitrateBps >= medium.bitrateBps)
         #expect(medium.width == 64)
         #expect(medium.height == 64)
+        #expect(medium.container == .MP4)
+        #expect(!medium.optimizeForNetworkUse)
+    }
+
+    @Test
+    func `mp4 keeps network optimize flag`() {
+        let size = CGSize(width: 64, height: 64)
+        let resolved = VideoExportOptionsBuilder.resolve(size: size,
+                                                         duration: 10,
+                                                         frameRate: 30,
+                                                         quality: .medium,
+                                                         container: .MP4,
+                                                         optimizeForNetworkUse: true)
+        #expect(resolved.container == .MP4)
+        #expect(resolved.optimizeForNetworkUse)
+    }
+
+    @Test
+    func `mov clears network optimize flag`() {
+        let size = CGSize(width: 64, height: 64)
+        let resolved = VideoExportOptionsBuilder.resolve(size: size,
+                                                         duration: 10,
+                                                         frameRate: 30,
+                                                         quality: .medium,
+                                                         container: .MOV,
+                                                         optimizeForNetworkUse: true)
+        #expect(resolved.container == .MOV)
+        #expect(!resolved.optimizeForNetworkUse)
     }
 }

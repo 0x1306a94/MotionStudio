@@ -7,7 +7,7 @@
 
 namespace motion {
 
-// H.264 + MP4 encoder backed by AVAssetWriter.
+// H.264 encoder backed by AVAssetWriter (MP4 or QuickTime).
 class AvfVideoEncoder : public VideoEncoder {
   public:
     AvfVideoEncoder();

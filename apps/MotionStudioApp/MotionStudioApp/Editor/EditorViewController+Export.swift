@@ -38,9 +38,9 @@ extension EditorViewController {
         let summary = "\(sizeText) · \(duration) frames · \(fpsText) fps"
 
         let settings = VideoExportSettingsViewController(summary: summary, durationFrames: duration)
-        settings.onExport = { [weak self] quality in
+        settings.onExport = { [weak self] exportSettings in
             self?.dismiss(animated: true) {
-                self?.beginVideoExport(quality: quality,
+                self?.beginVideoExport(settings: exportSettings,
                                        compositionID: compositionID,
                                        size: size,
                                        duration: duration,
@@ -56,7 +56,7 @@ extension EditorViewController {
         present(navigation, animated: true)
     }
 
-    func beginVideoExport(quality: VideoExportQuality,
+    func beginVideoExport(settings: VideoExportSettings,
                           compositionID: UInt64,
                           size: CGSize,
                           duration: Int64,
@@ -68,14 +68,17 @@ extension EditorViewController {
         let resolved = VideoExportOptionsBuilder.resolve(size: size,
                                                          duration: duration,
                                                          frameRate: frameRate,
-                                                         quality: quality)
+                                                         quality: settings.quality,
+                                                         container: settings.container,
+                                                         optimizeForNetworkUse: settings.optimizeForNetworkUse)
         let projectName = document.isTemporaryDraft
             ? "Untitled"
             : document.saveURL.deletingPathExtension().lastPathComponent
 
         let outputURL: URL
         do {
-            outputURL = try session.prepareOutputURL(projectName: projectName)
+            outputURL = try session.prepareOutputURL(projectName: projectName,
+                                                     fileExtension: settings.container.fileExtension)
         } catch {
             videoExportSession = nil
             updateExportButtonState()

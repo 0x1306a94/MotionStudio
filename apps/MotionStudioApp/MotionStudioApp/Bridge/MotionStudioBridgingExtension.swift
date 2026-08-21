@@ -513,6 +513,34 @@ extension MS_GRADIENT_TYPE: @retroactive CaseIterable, @retroactive Identifiable
     }
 }
 
+extension MS_VIDEO_CONTAINER: @retroactive CaseIterable, @retroactive Identifiable {
+    public static var allCases: [MS_VIDEO_CONTAINER] {
+        [.MP4, .MOV]
+    }
+
+    public var id: Int32 {
+        rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .MOV:
+            "MOV"
+        default:
+            "MP4"
+        }
+    }
+
+    var fileExtension: String {
+        switch self {
+        case .MOV:
+            "mov"
+        default:
+            "mp4"
+        }
+    }
+}
+
 extension MS_PAG_BMP_SEQUENCE_TYPE: @retroactive CaseIterable, @retroactive Identifiable {
     public static var allCases: [MS_PAG_BMP_SEQUENCE_TYPE] {
         [.AUTO, .VIDEO, .BITMAP]

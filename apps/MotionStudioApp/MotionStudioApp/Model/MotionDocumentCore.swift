@@ -418,6 +418,8 @@ final class MotionDocumentCore {
             options.bitrateBps = Int32(resolved.bitrateBps)
             options.keyframeInterval = 0
             options.profile = Int32(resolved.profile)
+            options.container = resolved.container
+            options.optimizeForNetworkUse = resolved.optimizeForNetworkUse
 
             var error: UnsafeMutablePointer<CChar>?
             let ok = ms_video_export(

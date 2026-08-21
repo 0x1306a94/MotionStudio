@@ -33,6 +33,18 @@ motion::H264Profile MapProfile(int profile) {
     }
 }
 
+motion::VideoContainer MapContainer(MS_VIDEO_CONTAINER container) {
+    switch (container) {
+        case MS_VIDEO_CONTAINER_MOV: {
+            return motion::VideoContainer::Mov;
+        }
+        case MS_VIDEO_CONTAINER_MP4:
+        default: {
+            return motion::VideoContainer::Mp4;
+        }
+    }
+}
+
 }  // namespace
 
 bool ms_video_export(MSDocument *document, uint64_t compositionId,
@@ -77,6 +89,9 @@ bool ms_video_export(MSDocument *document, uint64_t compositionId,
     exportOptions.bitrateBps = options->bitrateBps;
     exportOptions.keyframeInterval = options->keyframeInterval;
     exportOptions.profile = MapProfile(options->profile);
+    exportOptions.container = MapContainer(options->container);
+    exportOptions.optimizeForNetworkUse = options->optimizeForNetworkUse &&
+        exportOptions.container == motion::VideoContainer::Mp4;
 
     motion::TgfxVideoFrameSource source;
     motion::AvfVideoEncoder encoder;

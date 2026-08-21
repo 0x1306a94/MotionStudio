@@ -6,9 +6,16 @@
 
 namespace motion {
 
-enum class H264Profile { Baseline,
-                         Main,
-                         High };
+enum class H264Profile {
+    Baseline,
+    Main,
+    High
+};
+
+enum class VideoContainer {
+    Mp4,
+    Mov
+};
 
 struct VideoExportOptions {
     std::string outputPath;
@@ -19,6 +26,8 @@ struct VideoExportOptions {
     int bitrateBps = 0;
     int keyframeInterval = 0;
     H264Profile profile = H264Profile::High;
+    VideoContainer container = VideoContainer::Mp4;
+    bool optimizeForNetworkUse = false;
 };
 
 struct VideoExportProgress {

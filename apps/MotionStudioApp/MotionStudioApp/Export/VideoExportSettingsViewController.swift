@@ -2,21 +2,31 @@
 //  VideoExportSettingsViewController.swift
 //  MotionStudioApp
 //
-//  Quality settings sheet for MP4 export.
+//  Quality, container, and MP4 network-optimize settings for video export.
 //
 
+import MotionStudioBridging
 import UIKit
+
+struct VideoExportSettings {
+    var quality: VideoExportQuality = .medium
+    var container: MS_VIDEO_CONTAINER = .MP4
+    var optimizeForNetworkUse: Bool = false
+}
 
 @MainActor
 final class VideoExportSettingsViewController: UIViewController {
-    var quality: VideoExportQuality = .medium
-    var onExport: ((VideoExportQuality) -> Void)?
+    var onExport: ((VideoExportSettings) -> Void)?
     var onCancel: (() -> Void)?
 
     private let summary: String
     private let durationFrames: Int64
     private let summaryLabel = UILabel()
+    private let formatControl = UISegmentedControl(items: ["MP4", "MOV"])
     private let qualityControl = UISegmentedControl(items: ["Low", "Medium", "High"])
+    private let optimizeLabel = UILabel()
+    private let optimizeSwitch = UISwitch()
+    private let optimizeRow = UIStackView()
     private let exportButton = UIButton(type: .system)
 
     init(summary: String, durationFrames: Int64) {
@@ -33,7 +43,7 @@ final class VideoExportSettingsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        title = "Export MP4"
+        title = "Export Video"
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel,
                                                             target: self,
                                                             action: #selector(cancelTapped))
@@ -45,9 +55,25 @@ final class VideoExportSettingsViewController: UIViewController {
         summaryLabel.textColor = .secondaryLabel
         summaryLabel.translatesAutoresizingMaskIntoConstraints = false
 
+        formatControl.selectedSegmentIndex = 0
+        formatControl.addTarget(self, action: #selector(formatChanged), for: .valueChanged)
+        formatControl.translatesAutoresizingMaskIntoConstraints = false
+
         qualityControl.selectedSegmentIndex = VideoExportQuality.medium.rawValue
-        qualityControl.addTarget(self, action: #selector(qualityChanged), for: .valueChanged)
         qualityControl.translatesAutoresizingMaskIntoConstraints = false
+
+        optimizeLabel.text = "Optimize for network"
+        optimizeLabel.font = .preferredFont(forTextStyle: .body)
+        optimizeLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        optimizeSwitch.isOn = false
+        optimizeSwitch.translatesAutoresizingMaskIntoConstraints = false
+
+        optimizeRow.axis = .horizontal
+        optimizeRow.alignment = .center
+        optimizeRow.distribution = .equalSpacing
+        optimizeRow.addArrangedSubview(optimizeLabel)
+        optimizeRow.addArrangedSubview(optimizeSwitch)
 
         var exportConfig = UIButton.Configuration.filled()
         exportConfig.title = "Export"
@@ -56,7 +82,9 @@ final class VideoExportSettingsViewController: UIViewController {
         exportButton.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
         exportButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let stack = UIStackView(arrangedSubviews: [summaryLabel, qualityControl, exportButton])
+        let stack = UIStackView(arrangedSubviews: [
+            summaryLabel, formatControl, qualityControl, optimizeRow, exportButton,
+        ])
         stack.axis = .vertical
         stack.spacing = 20
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -66,13 +94,14 @@ final class VideoExportSettingsViewController: UIViewController {
             stack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
             stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
+            formatControl.heightAnchor.constraint(equalToConstant: 32),
             qualityControl.heightAnchor.constraint(equalToConstant: 32),
             exportButton.heightAnchor.constraint(equalToConstant: 44),
         ])
     }
 
-    @objc private func qualityChanged() {
-        quality = VideoExportQuality(rawValue: qualityControl.selectedSegmentIndex) ?? .medium
+    @objc private func formatChanged() {
+        optimizeRow.isHidden = formatControl.selectedSegmentIndex != 0
     }
 
     @objc private func cancelTapped() {
@@ -80,7 +109,6 @@ final class VideoExportSettingsViewController: UIViewController {
     }
 
     @objc private func exportTapped() {
-        quality = VideoExportQuality(rawValue: qualityControl.selectedSegmentIndex) ?? .medium
         guard durationFrames > 0 else {
             let alert = UIAlertController(title: "Export Failed",
                                           message: "Composition has no frames to export.",
@@ -89,6 +117,10 @@ final class VideoExportSettingsViewController: UIViewController {
             present(alert, animated: true)
             return
         }
-        onExport?(quality)
+        let container: MS_VIDEO_CONTAINER = formatControl.selectedSegmentIndex == 1 ? .MOV : .MP4
+        let quality = VideoExportQuality(rawValue: qualityControl.selectedSegmentIndex) ?? .medium
+        onExport?(VideoExportSettings(quality: quality,
+                                      container: container,
+                                      optimizeForNetworkUse: container == .MP4 && optimizeSwitch.isOn))
     }
 }
