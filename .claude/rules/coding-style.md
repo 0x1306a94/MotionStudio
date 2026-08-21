@@ -13,7 +13,8 @@ alwaysApply: true
 - 修复编译或运行时错误时，必须定位根本原因并从源头修复，禁止通过强制类型转换、添加多余默认参数、注释代码等方式绕过错误
 - 复用项目已有功能，避免重复代码。变更应完整覆盖所有受影响的代码路径，不保留向后兼容层
 - 驼峰命名法：大写开头（类静态方法、全局函数/变量、枚举值）、小写开头（成员方法/变量、局部变量）、全大写下划线（常量）。不加 `k` 前缀
-- 代码不刻意按列宽断行，能写一行就写一行
+- 代码不刻意按列宽断行，能写一行就写一行（赋值、调用、表达式不要在 `=` 或中间断开）
+- `enum class` 每个 enumerator 单独一行，`{` 后立即换行；不要把第一个 enumerator 跟 `{` 写在同一行再对齐后续项
 - 避免 lambda 表达式，改用显式方法或函数
 - 禁止使用 `dynamic_cast` 和 C++ 异常（`throw`/`try`/`catch`）
 - C++ 成员必须初始化使用 `= {}` 风格
@@ -22,3 +23,58 @@ alwaysApply: true
 - `include/` 目录 API 需详细注释含参数描述，其他公开方法一段话描述主要功能，私有方法不加注释
 - 函数内代码不加行注释。对非显而易见的算法选择、特殊边界处理、或绕过已知问题的 workaround 需加注释说明原因
 - 不要全部写到同一文件，根据功能或者语义合理的拆分文件
+
+
+## Examples
+
+- enum
+```c++
+// bad
+enum class H264Profile { Baseline,
+                         Main,
+                         High };
+
+// good
+enum class H264Profile {
+    Baseline,
+    Main,
+    High
+};
+```
+
+- switch
+```c++
+// bad
+AVFileType FileTypeForContainer(VideoContainer container) {
+    switch (container) {
+        case VideoContainer::Mov:
+            return AVFileTypeQuickTimeMovie;
+        case VideoContainer::Mp4:
+            return AVFileTypeMPEG4;
+    }
+    return AVFileTypeMPEG4;
+}
+
+// good
+AVFileType FileTypeForContainer(VideoContainer container) {
+    switch (container) {
+        case VideoContainer::Mov: {
+            return AVFileTypeQuickTimeMovie;
+        }
+        case VideoContainer::Mp4: {
+            return AVFileTypeMPEG4;
+        }
+    }
+    return AVFileTypeMPEG4;
+}
+```
+
+- assignment
+```c++
+// bad
+const auto path =
+        (std::filesystem::temp_directory_path() / "motionstudio_avf_smoke.mp4").string();
+
+// good 左右在同一行
+const auto path = (std::filesystem::temp_directory_path() / "motionstudio_avf_smoke.mp4").string();
+```

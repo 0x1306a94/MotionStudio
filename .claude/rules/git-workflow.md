@@ -18,6 +18,7 @@ alwaysApply: true
 
 - 源码格式化由 git hook `pre-commit` 在提交时自动处理（仅暂存的 C++/ObjC/Swift）；无需在每次提交前手动跑 `./codeformat.sh`。`./codeformat.sh` 仅用于需要全量格式化时的手动执行
 - **NEVER** 自动执行 `git stash`、`git reset`、`git checkout` 等改变暂存区或工作区状态的命令，除非**暂存区为空**或**用户明确要求**
+- **NEVER** 使用 `git add -A`、`git add --all`、`git add .` 或 `git commit -a`。始终显式列出文件（`git add <file>...` / `git commit --only <file>...`）
 
 ### spec / plan 文档
 
