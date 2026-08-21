@@ -475,7 +475,7 @@ const CompiledVectorNetwork &CompileVectorNetwork(const VectorNetwork &network);
 
 ```cpp
 struct CompileCache {
-    static constexpr size_t Capacity = 64;
+    static constexpr size_t Capacity = 256;
     std::list<std::pair<uint64_t, CompiledVectorNetwork>> order;
     std::unordered_map<uint64_t, std::list<std::pair<uint64_t, CompiledVectorNetwork>>::iterator> index;
     CompiledVectorNetwork uncached;
@@ -788,7 +788,7 @@ ctest --test-dir build -R 'TgfxPathCacheTest' --output-on-failure
 | no-op 编辑不换号 | 2 |
 | evaluate / Hold 拷贝保留 revision | 2 |
 | JSON 不写 revision；反序列化重新 stamp | 2 |
-| `CompileVectorNetwork` LRU 64、thread_local、key = network revision | 3 |
+| `CompileVectorNetwork` LRU 256、thread_local、key = network revision | 3 |
 | revision 0 不进 LRU | 3 |
 | fill / stroke 各自 stamp | 3 |
 | ShapePath 一次 evaluate + 一次 compile | 4 |

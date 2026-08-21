@@ -722,7 +722,7 @@ CompiledVectorNetwork CompileUncached(const VectorNetwork &network) {
 }
 
 struct CompileCache {
-    static constexpr size_t Capacity = 64;
+    static constexpr size_t Capacity = 256;
     std::list<std::pair<uint64_t, CompiledVectorNetwork>> order;
     std::unordered_map<uint64_t, std::list<std::pair<uint64_t, CompiledVectorNetwork>>::iterator> index;
     CompiledVectorNetwork uncached;

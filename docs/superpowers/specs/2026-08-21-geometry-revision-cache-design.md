@@ -151,7 +151,7 @@ else {
 }
 ```
 
-- LRU 容量 **64**，thread_local（预览 / 导出 / 测试线程各一份，无全局锁）
+- LRU 容量 **256**，thread_local（预览 / 导出 / 测试线程各一份，无全局锁）
 - 返回的 `const CompiledVectorNetwork &` 只在下一次同线程 `CompileVectorNetwork` 之前有效。调用方立刻拷出 `fill` / `stroke`。`CompileFillFaces` / `CompileStrokeEdges` 仍按值返回
 - 未命中才跑现有 `BuildCurvePlanarNetwork` + face walk / stroke walk
 - 内部中间 `VectorNetwork`（planar）**不** stamp
