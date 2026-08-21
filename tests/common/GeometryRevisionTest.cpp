@@ -12,8 +12,10 @@
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/model/ShapeContent.h"
 #include "MotionStudio/model/ShapePath.h"
+#include "MotionStudio/render/SceneEvaluator.h"
 #include "MotionStudio/serialization/Serializer.h"
 
 using motion::BezierPath;
@@ -201,4 +203,37 @@ TEST(GeometryRevisionTest, CompileVectorNetworkSharesLookup) {
     EXPECT_EQ(compiled.stroke, motion::CompileStrokeEdges(network));
     EXPECT_EQ(motion::GeometryRevisionAccess::Get(compiled.fill),
               motion::GeometryRevisionAccess::Get(motion::CompileFillFaces(network)));
+}
+
+TEST(GeometryRevisionTest, StaticShapePathKeepsCompiledRevisionAcrossFrames) {
+    motion::Document document;
+    motion::Composition *composition = document.addComposition(std::make_unique<motion::Composition>());
+    composition->duration = 100;
+    motion::Layer *layer =
+        document.addLayer(composition->id, std::make_unique<motion::Layer>(motion::LayerType::Shape));
+    layer->outPoint = 100;
+    auto *content = static_cast<motion::ShapeContent *>(layer->content.get());
+    auto shape = std::make_unique<motion::ShapePath>();
+    shape->path.setStaticValue(motion::BezierPathToVectorNetwork(
+        motion::MakeSingleContour({{{0, 0}, {}, {}}, {{10, 0}, {}, {}}, {{0, 10}, {}, {}}}, true)));
+    content->geometry = std::move(shape);
+    auto fill = std::make_unique<motion::FillStyle>();
+    fill->color.setStaticValue(motion::Color{1, 0, 0, 1});
+    layer->styles.push_back(std::move(fill));
+
+    auto frame0 = motion::SceneEvaluator::Evaluate(document, composition->id, 0);
+    auto frame1 = motion::SceneEvaluator::Evaluate(document, composition->id, 1);
+    ASSERT_TRUE(frame0.hasValue());
+    ASSERT_TRUE(frame1.hasValue());
+    ASSERT_FALSE(frame0->layers.empty());
+    ASSERT_FALSE(frame0->layers[0].shapeItems.empty());
+    const uint64_t rev0 =
+        motion::GeometryRevisionAccess::Get(frame0->layers[0].shapeItems[0].geometry.path);
+    const uint64_t rev1 =
+        motion::GeometryRevisionAccess::Get(frame1->layers[0].shapeItems[0].geometry.path);
+    EXPECT_NE(rev0, 0u);
+    EXPECT_EQ(rev0, rev1);
+    EXPECT_EQ(frame0->layers[0].shapeNetwork, frame1->layers[0].shapeNetwork);
+    EXPECT_EQ(motion::GeometryRevisionAccess::Get(frame0->layers[0].shapeNetwork),
+              motion::GeometryRevisionAccess::Get(frame1->layers[0].shapeNetwork));
 }

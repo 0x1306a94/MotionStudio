@@ -556,7 +556,7 @@ cmake --build build --target core_tests
 - 依赖：Task 3 的 `CompileVectorNetwork`
 - 产出：ShapePath 只 evaluate 一次 network；fill+stroke 来自一次 cache 查找；`shapeNetwork` 就是这份 network
 
-- [ ] **Step 1: 写跨帧 identity 测试**
+- [x] **Step 1: 写跨帧 identity 测试**
 
 加到 `tests/common/GeometryRevisionTest.cpp`，include SceneEvaluator 相关头：
 
@@ -600,7 +600,7 @@ TEST(GeometryRevisionTest, StaticShapePathKeepsCompiledRevisionAcrossFrames) {
 }
 ```
 
-- [ ] **Step 2: 跑测试，看是失败还是已经绿**
+- [x] **Step 2: 跑测试，看是失败还是已经绿**
 
 ```bash
 cmake --build build --target core_tests
@@ -609,7 +609,7 @@ cmake --build build --target core_tests
 
 若 Task 3 的 `CompileFillFaces` 封装已经让它通过，仍保留为回归，并继续做 Step 3（双 evaluate 仍是浪费）。失败则由 Step 3 修。
 
-- [ ] **Step 3: 一次 evaluate，一次 compile**
+- [x] **Step 3: 一次 evaluate，一次 compile**
 
 `CollectGeometry` 的 Path 分支现在自己 evaluate。不要改它给别的调用方用的语义。在 Shape 图层分支（`src/render/SceneEvaluator.cpp` 的 `LayerType::Shape`）就地 compile：
 
@@ -638,7 +638,7 @@ if (!layer.styles.empty()) {
 
 立刻把 `compiled.fill` / `compiled.stroke` 拷进 `ShapeGeometry`，不要把 `CompiledVectorNetwork &` 留过下一次 compile。
 
-- [ ] **Step 4: 跑测试**
+- [x] **Step 4: 跑测试**
 
 ```bash
 cmake --build build --target core_tests
@@ -647,11 +647,11 @@ cmake --build build --target core_tests
 
 预期：PASS。
 
-- [ ] **Step 5: 勾选本 Task 并 commit**
+- [x] **Step 5: 勾选本 Task 并 commit**
 
 把本 Task 的 **Status:** 改为 ✅ Done，勾上上面步骤。然后 commit。示例信息：`Evaluate ShapePath networks once and reuse compiled geometry.`
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 ---
 

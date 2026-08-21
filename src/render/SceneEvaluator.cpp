@@ -537,15 +537,19 @@ void EvaluateLayer(const Document &document, const Layer &layer, PreviewTime tim
     const auto &shapeContent = static_cast<const ShapeContent &>(*layer.content);
     EvaluatedLayer evaluated;
     FillCommonLayerFields(document, layer, time, world, opacity, evaluated);
+    std::vector<ShapeGeometry> geometries;
     if (shapeContent.geometry != nullptr && shapeContent.geometry->type() == ShapeType::Path) {
         const auto &shape = static_cast<const ShapePath &>(*shapeContent.geometry);
-        evaluated.shapeNetwork = shape.path.evaluatePreview(time);
+        const VectorNetwork network = shape.path.evaluatePreview(time);
+        evaluated.shapeNetwork = network;
+        const CompiledVectorNetwork &compiled = CompileVectorNetwork(network);
+        ShapeGeometry geometry = MakePathGeometry(compiled.fill);
+        geometry.strokePath = compiled.stroke;
+        geometries.push_back(std::move(geometry));
+    } else if (shapeContent.geometry) {
+        CollectGeometry(*shapeContent.geometry, time, geometries);
     }
     if (!layer.styles.empty()) {
-        std::vector<ShapeGeometry> geometries;
-        if (shapeContent.geometry) {
-            CollectGeometry(*shapeContent.geometry, time, geometries);
-        }
         ApplyLayerStyles(document, layer, time, 1.0f, geometries, evaluated.shapeItems);
     }
     // Path networks without styles still need an evaluated layer for path edit.
