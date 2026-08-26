@@ -111,6 +111,41 @@ TEST(GroupLayersTest, StripsDescendantsOfSelectedAncestors) {
     EXPECT_EQ(child->parentId, group->id);
 }
 
+TEST(GroupLayersTest, KeepsExistingSubtreeContiguous) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *base = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *faceShape = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *label = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Text));
+    Layer *face = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    ASSERT_TRUE(faceShape->setParent(face->id, document));
+    ASSERT_TRUE(label->setParent(face->id, document));
+
+    EntityId groupId;
+    std::unique_ptr<motion::Command> command =
+        MakeGroupLayersCommand(document, composition->id, {face->id, base->id}, groupId);
+    ASSERT_NE(command, nullptr);
+    undo.execute(document, std::move(command));
+
+    EXPECT_EQ(face->parentId, groupId);
+    EXPECT_EQ(base->parentId, groupId);
+    EXPECT_EQ(faceShape->parentId, face->id);
+    EXPECT_EQ(label->parentId, face->id);
+    EXPECT_EQ(IndexOf(*composition, base->id), 0);
+    EXPECT_EQ(IndexOf(*composition, faceShape->id), 1);
+    EXPECT_EQ(IndexOf(*composition, label->id), 2);
+    EXPECT_EQ(IndexOf(*composition, face->id), 3);
+    EXPECT_EQ(IndexOf(*composition, groupId), 4);
+
+    undo.undo(document);
+    EXPECT_EQ(document.entityIndex().findLayer(groupId), nullptr);
+    EXPECT_EQ(IndexOf(*composition, base->id), 0);
+    EXPECT_EQ(IndexOf(*composition, faceShape->id), 1);
+    EXPECT_EQ(IndexOf(*composition, label->id), 2);
+    EXPECT_EQ(IndexOf(*composition, face->id), 3);
+}
+
 TEST(GroupLayersTest, UngroupIdentityRestoresParentAndWorld) {
     Document document;
     UndoManager undo;

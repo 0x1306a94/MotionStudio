@@ -241,7 +241,15 @@ std::unique_ptr<Command> MakeGroupLayersCommand(
         current.push_back(layer->id);
     }
 
-    std::unordered_set<EntityId> idSet(ids.begin(), ids.end());
+    // The timeline renders the layer array as a flat list indented by parent depth, so a group's
+    // descendants must stay adjacent to it. Move the whole subtree block, not just the picked layers.
+    std::unordered_set<EntityId> topLevelSet(ids.begin(), ids.end());
+    std::unordered_set<EntityId> idSet = topLevelSet;
+    for (const auto &layer : composition->layers) {
+        if (HasSelectedAncestor(document, layer->id, topLevelSet)) {
+            idSet.insert(layer->id);
+        }
+    }
     int topIndex = -1;
     for (int index = 0; index < static_cast<int>(current.size()); ++index) {
         if (idSet.find(current[static_cast<size_t>(index)]) != idSet.end()) {
@@ -301,6 +309,9 @@ std::unique_ptr<Command> MakeGroupLayersCommand(
         composite->add(std::make_unique<MoveLayerCommand>(compositionId, step.first, step.second));
     }
     for (const EntityId &id : selectedOrder) {
+        if (topLevelSet.find(id) == topLevelSet.end()) {
+            continue;
+        }
         composite->add(std::make_unique<SetParentCommand>(id, outGroupId));
     }
     return composite;
