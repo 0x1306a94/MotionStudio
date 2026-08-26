@@ -41,21 +41,23 @@ extension EditorViewController {
             return
         }
 
-        if #available(iOS 27.0, *) {
-            guard hasUnsavedChanges else {
-                windowScene.closureConfirmation = nil
-                return
-            }
+        #if swift(>=6.4)
+            if #available(iOS 27.0, *) {
+                guard hasUnsavedChanges else {
+                    windowScene.closureConfirmation = nil
+                    return
+                }
 
-            let projectName = title ?? document.saveURL.deletingPathExtension().lastPathComponent
-            let discardAction = UIAlertAction(title: "Discard Changes", style: .destructive)
-            let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
-            windowScene.closureConfirmation = UISceneClosureConfirmation(
-                title: "Unsaved Changes",
-                message: "Closing \(projectName) will discard unsaved changes.",
-                actions: [discardAction, cancelAction],
-            )
-        }
+                let projectName = title ?? document.saveURL.deletingPathExtension().lastPathComponent
+                let discardAction = UIAlertAction(title: "Discard Changes", style: .destructive)
+                let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+                windowScene.closureConfirmation = UISceneClosureConfirmation(
+                    title: "Unsaved Changes",
+                    message: "Closing \(projectName) will discard unsaved changes.",
+                    actions: [discardAction, cancelAction],
+                )
+            }
+        #endif
     }
 
     @objc func saveCurrentDocument() {
