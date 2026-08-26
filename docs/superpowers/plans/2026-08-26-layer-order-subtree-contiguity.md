@@ -159,11 +159,12 @@ spec 用例 13–14：
 
 ### Task 4: C ABI apply_layer_order + parent_depth
 
-**Status:** ⬜ Not started
+**Status:** ✅ Done
 
 **文件：**
 - 修改：`bridge/include/motionstudio_bridge.h`
 - 修改：`bridge/src/common/motionstudio_bridge_commands.cpp`
+- 修改：`bridge/src/common/motionstudio_bridge_layer.cpp`
 - 测试：`bridge/tests/BridgeTest.cpp`
 
 **接口：**
@@ -172,22 +173,24 @@ spec 用例 13–14：
   - `bool ms_command_apply_layer_order(MSDocument *, uint64_t compositionId, const uint64_t *layerIds, size_t count)`
   - `int ms_layer_parent_depth(MSDocument *, uint64_t layerId)`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `bridge/tests/BridgeTest.cpp` 补 spec 用例 15–17：
 - 传打乱顺序 → 落地为 normalize 后的顺序，一次 undo 全部还原
 - 传当前顺序 → 返回 false，不产生 undo 条目
 - `ms_layer_parent_depth`：根 = 0、两级嵌套 = 2、缺失 id = 0
 
-- [ ] **Step 2: 实现**
+用例初版构造有误：请求的顺序 normalize 后恰好等于当前顺序，于是合法地返回 false。已改为「只列出父层不列其子层」，验证 normalize 会把子层一起拖过去。
+
+- [x] **Step 2: 实现**
 
 `ms_command_apply_layer_order`：`DocumentLock` → normalize → `LayerMoveSteps` → 包一个 `CompositeCommand("Reorder Layers")` 经 `Execute` 下发；steps 为空返回 false。`layerIds == nullptr && count > 0` 直接返回 false（沿用 `ms_command_group_layers` 的入参校验风格）。
 
-`ms_layer_parent_depth`：走 `EntityIndex`，缺失返回 0。
+`ms_layer_parent_depth`：实现放 `motionstudio_bridge_layer.cpp`（与 `ms_layer_parent_id` 同文件），走 `EntityIndex` 走父链，带 `visiting` 集合防环，缺失返回 0。
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
-`ctest --test-dir build -R 'BridgeTest' --output-on-failure`，随后全量 ctest。
+`ctest --test-dir build -R 'BridgeTest' --output-on-failure`，随后全量 ctest。858 个用例全绿。
 
 ---
 

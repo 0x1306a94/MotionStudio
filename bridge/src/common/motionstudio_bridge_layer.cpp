@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <unordered_set>
 
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/LayerEffect.h"
@@ -15,6 +16,7 @@
 using namespace bridge;
 
 using motion::Composition;
+using motion::EntityId;
 using motion::FillStyle;
 using motion::Layer;
 using motion::StrokeStyle;
@@ -61,6 +63,33 @@ uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId) {
     DocumentLock guard(document);
     Layer *layer = FindLayer(document, layerId);
     return layer != nullptr ? layer->parentId.value : 0;
+}
+
+int ms_layer_parent_depth(MSDocument *document, uint64_t layerId) {
+    DocumentLock guard(document);
+    motion::Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return 0;
+    }
+    Layer *layer = FindLayer(document, layerId);
+    if (layer == nullptr) {
+        return 0;
+    }
+    int depth = 0;
+    EntityId cursor = layer->parentId;
+    std::unordered_set<EntityId> visiting;
+    while (cursor.isValid()) {
+        if (!visiting.insert(cursor).second) {
+            break;
+        }
+        const Layer *ancestor = doc->entityIndex().findLayer(cursor);
+        if (ancestor == nullptr) {
+            break;
+        }
+        depth += 1;
+        cursor = ancestor->parentId;
+    }
+    return depth;
 }
 
 bool ms_layer_visible(MSDocument *document, uint64_t layerId) {

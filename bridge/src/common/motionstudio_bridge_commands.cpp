@@ -14,12 +14,14 @@
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/LayerEffect.h"
 #include "MotionStudio/model/LayerFx.h"
+#include "MotionStudio/model/LayerOrder.h"
 #include "MotionStudio/model/LayerStyle.h"
 #include "MotionStudio/undo/AddKeyframeCommand.h"
 #include "MotionStudio/undo/AddLayerEffectCommand.h"
 #include "MotionStudio/undo/AddLayerFxCommand.h"
 #include "MotionStudio/undo/AddLayerStyleCommand.h"
 #include "MotionStudio/undo/AddMaskCommand.h"
+#include "MotionStudio/undo/CompositeCommand.h"
 #include "MotionStudio/undo/ConvertGeometryToPathCommand.h"
 #include "MotionStudio/undo/GroupLayers.h"
 #include "MotionStudio/undo/MoveKeyframeCommand.h"
@@ -313,6 +315,42 @@ void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint6
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex) {
     DocumentLock guard(document);
     Execute(document, std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, fromIndex, toIndex));
+}
+
+bool ms_command_apply_layer_order(MSDocument *document, uint64_t compositionId, const uint64_t *layerIds, size_t count) {
+    if (count > 0 && layerIds == nullptr) {
+        return false;
+    }
+    DocumentLock guard(document);
+    motion::Document *doc = Doc(document);
+    if (doc == nullptr) {
+        return false;
+    }
+    const motion::Composition *composition = doc->entityIndex().findComposition(EntityId{compositionId});
+    if (composition == nullptr) {
+        return false;
+    }
+    std::vector<EntityId> requested;
+    requested.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+        requested.push_back(EntityId{layerIds[index]});
+    }
+    std::vector<EntityId> current;
+    current.reserve(composition->layers.size());
+    for (const auto &layer : composition->layers) {
+        current.push_back(layer->id);
+    }
+    const std::vector<EntityId> desired = motion::NormalizeSubtreeContiguousOrder(requested, *composition);
+    const std::vector<std::pair<int, int>> steps = motion::LayerMoveSteps(current, desired);
+    if (steps.empty()) {
+        return false;
+    }
+    auto composite = std::make_unique<motion::CompositeCommand>("Reorder Layers");
+    for (const std::pair<int, int> &step : steps) {
+        composite->add(std::make_unique<motion::MoveLayerCommand>(EntityId{compositionId}, step.first, step.second));
+    }
+    Execute(document, std::move(composite));
+    return true;
 }
 
 uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId, const uint64_t *layerIds, size_t count) {

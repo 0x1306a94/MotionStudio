@@ -1788,6 +1788,83 @@ TEST(BridgeGroupLayersTest, GroupAndUngroup) {
     ms_document_destroy(document);
 }
 
+TEST(BridgeGroupLayersTest, ApplyLayerOrderNormalizesSubtreesAndUndoRestores) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t base = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t child = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t parent = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+    {
+        DocumentLock guard(document);
+        Layer *layer = FindLayer(document, child);
+        ASSERT_NE(layer, nullptr);
+        ASSERT_TRUE(layer->setParent(EntityId{parent}, *Doc(document)));
+        NormalizeLayerOrder(document, compositionId);
+    }
+
+    std::vector<uint64_t> before;
+    for (int index = 0; index < ms_composition_layer_count(document, compositionId); ++index) {
+        before.push_back(ms_layer_id_at(document, compositionId, index));
+    }
+
+    // Ask for the parent subtree below `base`, listing the parent without its child; normalize
+    // must drag the child along so the two stay adjacent.
+    const uint64_t requested[] = {parent, base};
+    EXPECT_TRUE(ms_command_apply_layer_order(document, compositionId, requested, 2));
+    EXPECT_EQ(ms_layer_id_at(document, compositionId, 0), child);
+    EXPECT_EQ(ms_layer_id_at(document, compositionId, 1), parent);
+    EXPECT_EQ(ms_layer_id_at(document, compositionId, 2), base);
+
+    EXPECT_TRUE(ms_document_undo(document));
+    for (int index = 0; index < ms_composition_layer_count(document, compositionId); ++index) {
+        EXPECT_EQ(ms_layer_id_at(document, compositionId, index), before[static_cast<size_t>(index)]);
+    }
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeGroupLayersTest, ApplyLayerOrderIsNoopForCurrentOrder) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t first = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t second = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+
+    const uint64_t current[] = {first, second};
+    EXPECT_FALSE(ms_command_apply_layer_order(document, compositionId, current, 2));
+    EXPECT_FALSE(ms_command_apply_layer_order(document, compositionId, nullptr, 2));
+    EXPECT_FALSE(ms_command_apply_layer_order(nullptr, compositionId, current, 2));
+
+    ms_document_destroy(document);
+}
+
+TEST(BridgeLayerTest, ParentDepthCountsAncestorHops) {
+    MSDocument *document = ms_document_create();
+    const uint64_t compositionId = ms_document_composition_id_at(document, 0);
+    const uint64_t root = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t middle = ms_command_add_rect_layer(document, compositionId);
+    const uint64_t leaf = ms_command_add_rect_layer(document, compositionId);
+    ms_document_end_merge_group(document);
+    {
+        DocumentLock guard(document);
+        Layer *middleLayer = FindLayer(document, middle);
+        Layer *leafLayer = FindLayer(document, leaf);
+        ASSERT_NE(middleLayer, nullptr);
+        ASSERT_NE(leafLayer, nullptr);
+        ASSERT_TRUE(middleLayer->setParent(EntityId{root}, *Doc(document)));
+        ASSERT_TRUE(leafLayer->setParent(EntityId{middle}, *Doc(document)));
+        NormalizeLayerOrder(document, compositionId);
+    }
+
+    EXPECT_EQ(ms_layer_parent_depth(document, root), 0);
+    EXPECT_EQ(ms_layer_parent_depth(document, middle), 1);
+    EXPECT_EQ(ms_layer_parent_depth(document, leaf), 2);
+    EXPECT_EQ(ms_layer_parent_depth(document, 999999), 0);
+
+    ms_document_destroy(document);
+}
+
 TEST(BridgeGroupLayersTest, NullDocumentIsNoop) {
     EXPECT_EQ(ms_command_group_layers(nullptr, 1, nullptr, 0), 0u);
     EXPECT_FALSE(ms_command_ungroup_layers(nullptr, 1, nullptr, 0, 0));

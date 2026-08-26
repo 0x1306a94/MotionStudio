@@ -442,6 +442,8 @@ int64_t ms_layer_in_point(MSDocument *document, uint64_t layerId);
 int64_t ms_layer_out_point(MSDocument *document, uint64_t layerId);
 // Parent layer ID, 0 when the layer has no parent or does not exist.
 uint64_t ms_layer_parent_id(MSDocument *document, uint64_t layerId);
+// Number of parentId hops from the layer up to its root. 0 for a root or missing layer.
+int ms_layer_parent_depth(MSDocument *document, uint64_t layerId);
 bool ms_layer_visible(MSDocument *document, uint64_t layerId);
 bool ms_layer_locked(MSDocument *document, uint64_t layerId);
 // True when this layer and every ancestor is visible. False when missing.
@@ -828,6 +830,13 @@ bool ms_command_resize_layer_geometry(MSDocument *document, uint64_t layerId, do
                                       float scaleY);
 void ms_command_remove_layer(MSDocument *document, uint64_t compositionId, uint64_t layerId);
 void ms_command_move_layer(MSDocument *document, uint64_t compositionId, int fromIndex, int toIndex);
+// Applies an absolute model order (bottom -> top, index 0 = bottommost). The ids are
+// normalized first so every layer's descendants stay immediately below it, then applied as a
+// single undo unit. Ids missing from the composition are ignored; composition layers missing
+// from the list keep their relative order at the end. Returns false when the resulting order
+// matches the current one (no command is pushed) or on invalid input.
+bool ms_command_apply_layer_order(MSDocument *document, uint64_t compositionId,
+                                  const uint64_t *layerIds, size_t count);
 // Wraps sibling layers in a new Group. Returns the new Group id, or 0 on no-op.
 uint64_t ms_command_group_layers(MSDocument *document, uint64_t compositionId,
                                  const uint64_t *layerIds, size_t count);
