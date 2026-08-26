@@ -24,6 +24,12 @@ std::unique_ptr<Command> MakeUngroupLayersCommand(
     const Document &document, EntityId compositionId,
     const std::vector<EntityId> &layerIds, FrameTime time);
 
+// Reparents a layer and repositions its subtree so the composition stays subtree-contiguous
+// (descendants immediately below their parent). Returns nullptr when either layer is missing
+// or the new parent would form a cycle.
+std::unique_ptr<Command> MakeSetParentCommand(const Document &document, EntityId compositionId,
+                                              EntityId layerId, EntityId newParentId);
+
 // Removes a layer and every descendant in the parentId tree as one undo unit.
 // Always returns a command; missing targets no-op on execute.
 std::unique_ptr<Command> MakeRemoveLayerCommand(

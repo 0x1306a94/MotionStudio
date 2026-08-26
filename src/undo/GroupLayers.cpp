@@ -65,6 +65,23 @@ bool HasSelectedAncestor(const Document &document, EntityId layerId,
     return false;
 }
 
+// Mirrors the cycle / dangling checks in Layer::setParent so the factory can reject up front
+// instead of emitting a composite whose first command silently no-ops.
+bool CanReparent(const Document &document, EntityId layerId, EntityId newParentId) {
+    EntityId cursor = newParentId;
+    while (cursor.isValid()) {
+        if (cursor == layerId) {
+            return false;
+        }
+        const Layer *ancestor = document.entityIndex().findLayer(cursor);
+        if (ancestor == nullptr) {
+            return false;
+        }
+        cursor = ancestor->parentId;
+    }
+    return true;
+}
+
 int ParentDepth(const Document &document, EntityId layerId) {
     const Layer *layer = document.entityIndex().findLayer(layerId);
     if (layer == nullptr) {
@@ -376,6 +393,35 @@ std::unique_ptr<Command> MakeUngroupLayersCommand(
         desired.push_back(id);
     }
     for (const std::pair<int, int> &step : LayerMoveSteps(afterRemove, desired)) {
+        composite->add(std::make_unique<MoveLayerCommand>(compositionId, step.first, step.second));
+    }
+    return composite;
+}
+
+std::unique_ptr<Command> MakeSetParentCommand(const Document &document, EntityId compositionId,
+                                              EntityId layerId, EntityId newParentId) {
+    const Composition *composition = document.entityIndex().findComposition(compositionId);
+    if (composition == nullptr) {
+        return nullptr;
+    }
+    if (IndexInComposition(*composition, layerId) < 0) {
+        return nullptr;
+    }
+    if (newParentId.isValid() && !CanReparent(document, layerId, newParentId)) {
+        return nullptr;
+    }
+
+    std::vector<EntityId> current;
+    for (const auto &layer : composition->layers) {
+        current.push_back(layer->id);
+    }
+    std::unordered_map<EntityId, EntityId> parentOverrides;
+    parentOverrides[layerId] = newParentId;
+    const std::vector<EntityId> desired = NormalizeSubtreeContiguousOrder(current, *composition, parentOverrides);
+
+    auto composite = std::make_unique<CompositeCommand>("Set Parent");
+    composite->add(std::make_unique<SetParentCommand>(layerId, newParentId));
+    for (const std::pair<int, int> &step : LayerMoveSteps(current, desired)) {
         composite->add(std::make_unique<MoveLayerCommand>(compositionId, step.first, step.second));
     }
     return composite;

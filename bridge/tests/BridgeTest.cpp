@@ -14,8 +14,10 @@
 #include "FrameCommandCache.h"
 #include "MSDocument.h"
 #include "MotionStudio/common/EntityId.h"
+#include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerOrder.h"
 #include "PreviewSceneCache.h"
 #include "PreviewTimeKey.h"
 #include "motionstudio_bridge.h"
@@ -26,6 +28,23 @@ using motion::EntityId;
 using motion::Layer;
 
 namespace {
+
+// Layer::setParent only rewrites parentId. Commands additionally keep a layer's descendants
+// immediately below it, so a test that reparents directly must restore that shape itself.
+void NormalizeLayerOrder(MSDocument *document, uint64_t compositionId) {
+    motion::Composition *composition = Doc(document)->entityIndex().findComposition(EntityId{compositionId});
+    if (composition == nullptr) {
+        return;
+    }
+    std::vector<EntityId> current;
+    for (const auto &layer : composition->layers) {
+        current.push_back(layer->id);
+    }
+    for (const std::pair<int, int> &step :
+         motion::LayerMoveSteps(current, motion::NormalizeSubtreeContiguousOrder(current, *composition))) {
+        Doc(document)->moveLayer(EntityId{compositionId}, step.first, step.second);
+    }
+}
 
 // RAII wrapper for malloc'd strings returned by the bridge.
 struct BridgeString {
@@ -577,6 +596,7 @@ TEST(BridgeCommandTest, EffectivelyLockedWalksParentChain) {
         Layer *child = FindLayer(document, childId);
         ASSERT_NE(child, nullptr);
         ASSERT_TRUE(child->setParent(EntityId{parentId}, *Doc(document)));
+        NormalizeLayerOrder(document, compositionId);
     }
 
     EXPECT_TRUE(ms_layer_effectively_visible(document, childId));
@@ -1737,6 +1757,7 @@ TEST(BridgeCompositionTest, MapCompositionDeltaAccountsForRotatedParent) {
         Layer *child = FindLayer(document, childId);
         ASSERT_NE(child, nullptr);
         ASSERT_TRUE(child->setParent(EntityId{parentId}, *Doc(document)));
+        NormalizeLayerOrder(document, compositionId);
     }
     float outX = 0;
     float outY = 0;

@@ -21,6 +21,7 @@ using motion::Layer;
 using motion::LayerType;
 using motion::MakeGroupLayersCommand;
 using motion::MakeRemoveLayerCommand;
+using motion::MakeSetParentCommand;
 using motion::MakeUngroupLayersCommand;
 using motion::Mat3;
 using motion::UndoManager;
@@ -35,6 +36,19 @@ int IndexOf(const Composition &composition, EntityId layerId) {
         }
     }
     return -1;
+}
+
+// Layer::setParent only rewrites parentId, so a hand-built hierarchy still needs the layer
+// array itself brought into the contiguous shape every command path maintains.
+void NormalizeOrder(Document &document, Composition &composition) {
+    std::vector<EntityId> current;
+    for (const auto &layer : composition.layers) {
+        current.push_back(layer->id);
+    }
+    for (const std::pair<int, int> &step :
+         motion::LayerMoveSteps(current, motion::NormalizeSubtreeContiguousOrder(current, composition))) {
+        document.moveLayer(composition.id, step.first, step.second);
+    }
 }
 
 }  // namespace
@@ -244,16 +258,7 @@ TEST(GroupLayersTest, UngroupKeepsRemainingSubtreesContiguous) {
     ASSERT_TRUE(inner->setParent(outer->id, document));
     ASSERT_TRUE(leaf->setParent(inner->id, document));
     ASSERT_TRUE(sibling->setParent(outer->id, document));
-    // setParent only rewrites parentId, so bring the array itself into the contiguous shape
-    // the timeline expects before exercising ungroup.
-    std::vector<EntityId> initial;
-    for (const auto &layer : composition->layers) {
-        initial.push_back(layer->id);
-    }
-    for (const std::pair<int, int> &step :
-         motion::LayerMoveSteps(initial, motion::NormalizeSubtreeContiguousOrder(initial, *composition))) {
-        document.moveLayer(composition->id, step.first, step.second);
-    }
+    NormalizeOrder(document, *composition);
     ASSERT_TRUE(motion::IsSubtreeContiguousOrder(*composition));
 
     std::unique_ptr<motion::Command> command =
@@ -270,6 +275,51 @@ TEST(GroupLayersTest, UngroupKeepsRemainingSubtreesContiguous) {
 
     undo.undo(document);
     EXPECT_TRUE(motion::IsSubtreeContiguousOrder(*composition));
+}
+
+TEST(GroupLayersTest, SetParentMovesSubtreeAndUndoRestores) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *group = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *stranger = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *mover = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+
+    std::vector<EntityId> before;
+    for (const auto &layer : composition->layers) {
+        before.push_back(layer->id);
+    }
+
+    std::unique_ptr<motion::Command> command =
+        MakeSetParentCommand(document, composition->id, mover->id, group->id);
+    ASSERT_NE(command, nullptr);
+    undo.execute(document, std::move(command));
+
+    EXPECT_EQ(mover->parentId, group->id);
+    EXPECT_TRUE(motion::IsSubtreeContiguousOrder(*composition));
+    EXPECT_EQ(IndexOf(*composition, mover->id) + 1, IndexOf(*composition, group->id));
+
+    undo.undo(document);
+    EXPECT_FALSE(mover->parentId.isValid());
+    std::vector<EntityId> after;
+    for (const auto &layer : composition->layers) {
+        after.push_back(layer->id);
+    }
+    EXPECT_EQ(after, before);
+    EXPECT_EQ(IndexOf(*composition, stranger->id), 1);
+}
+
+TEST(GroupLayersTest, SetParentRejectsCyclesAndMissingLayers) {
+    Document document;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *outer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *inner = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    ASSERT_TRUE(inner->setParent(outer->id, document));
+
+    EXPECT_EQ(MakeSetParentCommand(document, composition->id, outer->id, inner->id), nullptr);
+    EXPECT_EQ(MakeSetParentCommand(document, composition->id, outer->id, outer->id), nullptr);
+    EXPECT_EQ(MakeSetParentCommand(document, composition->id, EntityId::Generate(), outer->id), nullptr);
+    EXPECT_EQ(MakeSetParentCommand(document, composition->id, outer->id, EntityId::Generate()), nullptr);
 }
 
 TEST(GroupLayersTest, UngroupIgnoresNonGroupSelection) {
@@ -291,6 +341,7 @@ TEST(GroupLayersTest, RemovingGroupDeletesDescendants) {
     ASSERT_TRUE(child->setParent(group->id, document));
     ASSERT_TRUE(nested->setParent(group->id, document));
     ASSERT_TRUE(grandchild->setParent(nested->id, document));
+    NormalizeOrder(document, *composition);
     const EntityId groupId = group->id;
     const EntityId childId = child->id;
     const EntityId nestedId = nested->id;

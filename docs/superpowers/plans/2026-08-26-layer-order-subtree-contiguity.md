@@ -120,40 +120,40 @@
 
 ### Task 3: MakeSetParentCommand + UndoManager assert
 
-**Status:** ⬜ Not started
+**Status:** ✅ Done
 
 **文件：**
 - 修改：`include/MotionStudio/undo/GroupLayers.h`
 - 修改：`src/undo/GroupLayers.cpp`
 - 修改：`src/undo/UndoManager.cpp`
-- 测试：`tests/undo/GroupLayersTest.cpp`
+- 测试：`tests/undo/GroupLayersTest.cpp`、`bridge/tests/BridgeTest.cpp`
 
 **接口：**
 - 依赖：Task 1、Task 2
 - 产出：`MakeSetParentCommand(document, compositionId, layerId, newParentId)`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 spec 用例 13–14：
 - 把层挂到已有 group 下，数组位置随之移动，`IsSubtreeContiguousOrder` 成立；undo 完全还原（顺序与 `parentId` 都回原样）
 - 环（挂到自己的后代下）/ 目标层缺失 → 返回 nullptr
 
-- [ ] **Step 2: 实现 MakeSetParentCommand**
+- [x] **Step 2: 实现 MakeSetParentCommand**
 
 组成 `CompositeCommand("Set Parent")`：`SetParentCommand` + normalize 后的 `MoveLayerCommand` steps。
-- 先用 `Layer::canSetParent` 或等价的环检测前置判断（`setParent` 已拒环，工厂需提前返回 nullptr 而非产出半残命令）——实现时确认 `Layer` 是否已暴露只读的环检测；若无，在 `LayerOrder` 或本文件加文件内静态辅助函数
+- `Layer` 没有只读的环检测（`setParent` 内联做），故在 `GroupLayers.cpp` 匿名命名空间加 `CanReparent`，镜像 `setParent` 的环 / 悬空父级判断，工厂提前返回 nullptr
 - `parentOverrides = { layerId: newParentId }`
 - 裸 `SetParentCommand` 保留不动
 
-- [ ] **Step 3: UndoManager debug assert**
+- [x] **Step 3: UndoManager debug assert**
 
-`execute` / `undo` / `redo` 末尾，debug 构建下对文档内所有 composition 断言 `IsSubtreeContiguousOrder`。参照项目现有 `documentFingerprint` 式 debug 校验的接法（先查明现有宏 / 开关约定，勿自造新机制）。
+`execute` / `undo` / `redo` 末尾，debug 构建下对文档内所有 composition 断言 `IsSubtreeContiguousOrder`。项目无 `documentFingerprint` 式机制，按既有约定用标准 `<cassert>` + `assert(cond && "message")`（同 `src/animation/Interpolator.cpp`），以 `#ifndef NDEBUG` 包裹。
 
-⚠️ 此步可能让既有测试暴露出别处破坏不变量的路径。若发生，**停下来向用户汇报**该路径，不要静默放宽 assert。
+⚠️ 此步如期抓出两处破坏：`GroupLayersTest.RemovingGroupDeletesDescendants` 与 `BridgeCommandTest.EffectivelyLockedWalksParentChain`。已向用户汇报并确认：两处都是**测试搭建**用裸 `Layer::setParent` 直接写 `parentId`、从未修正数组顺序，文档在命令执行前就已违约，非命令 bug。按确认的方案 A 修测试搭建（各加一个 normalize 辅助函数），assert 保持严格。`Layer::setParent` 作为底层数据 API 仍允许留下待整理状态 —— 契约边界在命令层。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
-全量 ctest（debug + ASan）全绿。
+全量 ctest（debug + ASan）全绿。855 个用例全绿。
 
 ---
 

@@ -1,11 +1,31 @@
 #include "MotionStudio/undo/UndoManager.h"
 
+#include <cassert>
 #include <utility>
 
+#include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
+#include "MotionStudio/model/LayerOrder.h"
 #include "MotionStudio/undo/CompositeCommand.h"
 
 namespace motion {
+namespace {
+
+// The timeline renders composition.layers as a flat list indented by parent depth, so a
+// layer's descendants must occupy the slots immediately below it. Any command that reorders
+// layers or rewrites parentId has to preserve that; catch violations at their source rather
+// than as a mangled layer tree in the UI.
+void AssertSubtreeContiguity(const Document &document) {
+#ifndef NDEBUG
+    for (const auto &composition : document.compositions) {
+        assert(IsSubtreeContiguousOrder(*composition) && "command left layer subtrees non-contiguous");
+    }
+#else
+    (void)document;
+#endif
+}
+
+}  // namespace
 
 UndoManager::UndoManager(size_t maxHistory, std::chrono::milliseconds mergeWindow)
     : maxHistory_(maxHistory)
@@ -26,6 +46,7 @@ void UndoManager::absorbIntoComposite(std::unique_ptr<Command> command) {
 
 void UndoManager::execute(Document &document, std::unique_ptr<Command> command) {
     command->execute(document);
+    AssertSubtreeContiguity(document);
 
     const auto now = std::chrono::steady_clock::now();
 
@@ -76,6 +97,7 @@ void UndoManager::undo(Document &document) {
     std::unique_ptr<Command> command = std::move(undoStack_.back());
     undoStack_.pop_back();
     command->undo(document);
+    AssertSubtreeContiguity(document);
     redoStack_.push_back(std::move(command));
 }
 
@@ -88,6 +110,7 @@ void UndoManager::redo(Document &document) {
     std::unique_ptr<Command> command = std::move(redoStack_.back());
     redoStack_.pop_back();
     command->execute(document);
+    AssertSubtreeContiguity(document);
     undoStack_.push_back(std::move(command));
 }
 
