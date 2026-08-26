@@ -244,26 +244,14 @@ extension EditorViewController {
     func canArrangeSelection(_ action: LayerArrangeAction) -> Bool {
         let compositionID = document.core.firstCompositionID
         let current = document.core.layerIDs(compositionID: compositionID)
-        var parentOf: [UInt64: UInt64] = [:]
-        for id in current {
-            parentOf[id] = document.core.layerParentID(id)
-        }
-        let moving = TimelineLayerTree.movingIDsIncludingDescendants(
-            order: current, parentOf: parentOf, moving: Set(editorState.selectedLayerIDs),
-        )
+        let moving = Set(editorState.selectedLayerIDs)
         return TimelineReorder.arrangedLayerIDs(current: current, moving: moving, action: action) != nil
     }
 
     func arrangeSelection(_ action: LayerArrangeAction, actionName: String) {
         let compositionID = document.core.firstCompositionID
         let current = document.core.layerIDs(compositionID: compositionID)
-        var parentOf: [UInt64: UInt64] = [:]
-        for id in current {
-            parentOf[id] = document.core.layerParentID(id)
-        }
-        let moving = TimelineLayerTree.movingIDsIncludingDescendants(
-            order: current, parentOf: parentOf, moving: Set(editorState.selectedLayerIDs),
-        )
+        let moving = Set(editorState.selectedLayerIDs)
         guard let desired = TimelineReorder.arrangedLayerIDs(current: current, moving: moving,
                                                              action: action)
         else {

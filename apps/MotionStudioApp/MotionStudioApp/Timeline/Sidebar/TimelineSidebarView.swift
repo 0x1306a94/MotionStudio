@@ -167,11 +167,7 @@ final class TimelineSidebarView: UIView {
 
     private func configure(cell: UITableViewCell, row: TimelineRow) {
         let core = document.core
-        var parentOf: [UInt64: UInt64] = [:]
-        for layerID in core.layerIDs(compositionID: core.firstCompositionID) {
-            parentOf[layerID] = core.layerParentID(layerID)
-        }
-        let depth = TimelineLayerTree.parentDepth(layerID: row.layerID, parentOf: parentOf)
+        let depth = core.layerParentDepth(row.layerID)
         switch row.kind {
         case .layer:
             guard let layerCell = cell as? TimelineLayerCell else {
@@ -375,13 +371,7 @@ private extension TimelineSidebarView {
         }
         let compositionID = document.core.firstCompositionID
         let current = document.core.layerIDs(compositionID: compositionID)
-        var parentOf: [UInt64: UInt64] = [:]
-        for id in current {
-            parentOf[id] = document.core.layerParentID(id)
-        }
-        let moving = TimelineLayerTree.movingIDsIncludingDescendants(
-            order: current, parentOf: parentOf, moving: Set(editorState.selectedLayerIDs),
-        )
+        let moving = Set(editorState.selectedLayerIDs)
         guard let desired = TimelineReorder.arrangedLayerIDs(current: current, moving: moving, action: action) else {
             return
         }
@@ -454,13 +444,7 @@ extension TimelineSidebarView: UITableViewDragDelegate, UITableViewDropDelegate 
             editorState.selectLayer(layerID)
         }
         let startOrder = document.core.layerIDs(compositionID: document.core.firstCompositionID)
-        var parentOf: [UInt64: UInt64] = [:]
-        for id in startOrder {
-            parentOf[id] = document.core.layerParentID(id)
-        }
-        let moving = TimelineLayerTree.movingIDsIncludingDescendants(
-            order: startOrder, parentOf: parentOf, moving: Set(editorState.selectedLayerIDs),
-        )
+        let moving = Set(editorState.selectedLayerIDs)
         session.localContext = LayerDragSessionContext(movingIDs: moving,
                                                        startOrder: startOrder,
                                                        lastDesired: startOrder)

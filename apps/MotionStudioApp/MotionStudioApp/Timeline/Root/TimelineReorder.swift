@@ -61,27 +61,6 @@ enum TimelineReorder {
         return result
     }
 
-    nonisolated static func moveSteps(from: [UInt64], to: [UInt64]) -> [(from: Int, to: Int)] {
-        guard from.count == to.count, Set(from) == Set(to) else {
-            return []
-        }
-        var order = from
-        var steps: [(from: Int, to: Int)] = []
-        for targetIndex in to.indices {
-            let wanted = to[targetIndex]
-            guard let sourceIndex = order.firstIndex(of: wanted) else {
-                return []
-            }
-            if sourceIndex == targetIndex {
-                continue
-            }
-            let layer = order.remove(at: sourceIndex)
-            order.insert(layer, at: targetIndex)
-            steps.append((sourceIndex, targetIndex))
-        }
-        return steps
-    }
-
     nonisolated static func arrangedLayerIDs(current: [UInt64], moving: Set<UInt64>,
                                              action: LayerArrangeAction) -> [UInt64]?
     {
@@ -175,25 +154,6 @@ enum TimelineLayerTree {
     nonisolated static let propertyLeading: CGFloat = 28
     nonisolated static let indentPerDepth: CGFloat = 12
 
-    nonisolated static func parentDepth(layerID: UInt64, parentOf: [UInt64: UInt64]) -> Int {
-        var depth = 0
-        var current = layerID
-        var visiting = Set<UInt64>()
-        while true {
-            if visiting.contains(current) {
-                break
-            }
-            visiting.insert(current)
-            let parent = parentOf[current] ?? 0
-            if parent == 0 {
-                break
-            }
-            depth += 1
-            current = parent
-        }
-        return depth
-    }
-
     nonisolated static func leadingInset(depth: Int, isProperty: Bool) -> CGFloat {
         let base: CGFloat = if isProperty {
             propertyLeading
@@ -201,21 +161,6 @@ enum TimelineLayerTree {
             layerLeading
         }
         return base + CGFloat(max(depth, 0)) * indentPerDepth
-    }
-
-    nonisolated static func movingIDsIncludingDescendants(
-        order: [UInt64], parentOf: [UInt64: UInt64], moving: Set<UInt64>,
-    ) -> Set<UInt64> {
-        var result = moving
-        for id in order {
-            if result.contains(id) {
-                continue
-            }
-            if hasSelectedAncestor(layerID: id, selected: moving, parentOf: parentOf) {
-                result.insert(id)
-            }
-        }
-        return result
     }
 
     nonisolated static func groupingIDsStrippingNested(

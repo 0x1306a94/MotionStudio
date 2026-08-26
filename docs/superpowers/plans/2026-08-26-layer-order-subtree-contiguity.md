@@ -196,7 +196,7 @@ spec 用例 13–14：
 
 ### Task 5: Swift 去重（涉及可见界面）
 
-**Status:** ⬜ Not started
+**Status:** ✅ Done
 
 **⚠️ 本 Task 改动 Timeline 缩进与拖拽行为，属可见界面：做完停下来给用户确认，确认后才 commit。**
 
@@ -204,37 +204,43 @@ spec 用例 13–14：
 - 修改：`apps/MotionStudioApp/MotionStudioApp/Timeline/Root/TimelineReorder.swift`
 - 修改：`apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift`
 - 修改：`apps/MotionStudioApp/MotionStudioApp/Timeline/Sidebar/TimelineSidebarView.swift`
+- 修改：`apps/MotionStudioApp/MotionStudioApp/Editor/EditorViewController+Commands.swift`
 
 **接口：**
 - 依赖：Task 4 的两个 C ABI
 - 产出：Swift 侧不再自行推导树结构
 
-- [ ] **Step 1: MotionDocumentCore 转发**
+- [x] **Step 1: MotionDocumentCore 转发**
 
 `applyLayerOrder`（`MotionDocumentCore.swift:1855`）改为直接调 `ms_command_apply_layer_order`，删掉 Swift 侧的 `current != desired` 比较与 `TimelineReorder.moveSteps` 调用；返回 true 时 `changed()`。新增 `layerParentDepth(_ layerID: UInt64) -> Int` 转发 `ms_layer_parent_depth`。
 
-- [ ] **Step 2: 删重复实现**
+另删掉 `moveLayer(compositionID:fromIndex:toIndex:)` —— 本次改动后它已无调用方（唯一调用者是被删掉的 `moveSteps` 循环）。
+
+- [x] **Step 2: 删重复实现**
 
 从 `TimelineReorder.swift` 删除：
 - `TimelineReorder.moveSteps`（:64）
 - `TimelineLayerTree.parentDepth`（:178）
 - `TimelineLayerTree.movingIDsIncludingDescendants`（:206）
-- 若 `hasSelectedAncestor`（:268）随之无引用则一并删（`groupingIDsStrippingNested` / `canGroup` 仍在用则保留）
+- `hasSelectedAncestor`（:268）**保留** —— `groupingIDsStrippingNested` / `canGroup` 仍在用
 
 **保留**：`arrangedLayerIDs` / `reorderedLayerIDs` / `uiInsertSlot` / `layerBlockFrames` —— UI 落点几何，不是树结构推导。
 
-- [ ] **Step 3: 更新调用点**
+- [x] **Step 3: 更新调用点**
 
 `TimelineSidebarView.swift`：
-- `:174` 缩进改用 `document.core.layerParentDepth(row.layerID)`
-- `:382`（Arrange）、`:461`：去掉 `movingIDsIncludingDescendants` 包装，直接传选中层集合
-- `:431`/`:439`（拖拽落点）：同上
+- 缩进改用 `document.core.layerParentDepth(row.layerID)`，顺带去掉了每个 cell 重建整张 `parentOf` 字典的开销
+- Arrange 与拖拽起始：去掉 `movingIDsIncludingDescendants` 包装，直接传选中层集合
 
-删除因此变成孤儿的 `parentOf` 字典构造（仅 `canGroup` 仍需要则保留）。
+`EditorViewController+Commands.swift`（计划未列出，实际也有两处同样的包装）：`canArrangeSelection` / `arrangeSelection` 同上，并删掉随之变成孤儿的 `parentOf` 字典构造。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 优先 Xcode MCP 编译 `MotionStudioApp`（Mac Catalyst），不可用回退 `xcodebuild`。然后**手动验证**（见下）并把结果给用户看，等确认后再 commit。
+
+Xcode MCP 本会话未连接，回退 `xcodebuild`。初次编译在**与本任务无关**的既有文件 `EditorViewController+Saving.swift:46,53` 上失败：`UIWindowScene.closureConfirmation` / `UISceneClosureConfirmation` 在 Xcode 26.4.1 的 SDK 缺失（来自已提交的 `039591c`；`#available(iOS 27.0)` 只管运行期，挡不住编译期符号缺失）。用户随后为该处加了 `#if swift(>=6.4)` 编译期门控（Swift 6.3.1 = Xcode 26.4.1 跳过，6.4 = Xcode 27 beta 编入），阻塞解除。
+
+`xcodebuild -workspace MotionStudio.xcworkspace -scheme MotionStudioApp -configuration Debug -destination "generic/platform=macOS,variant=Mac Catalyst,name=Any Mac" ARCHS="arm64"` → **BUILD SUCCEEDED**。用户在 App 内验证 Group / Ungroup / 拖拽行为通过并确认提交。
 
 ---
 

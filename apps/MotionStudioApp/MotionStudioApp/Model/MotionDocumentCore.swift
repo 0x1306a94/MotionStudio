@@ -742,6 +742,11 @@ final class MotionDocumentCore {
         ms_layer_parent_id(handle, layerID)
     }
 
+    /// Number of parentId hops up to the root. 0 for a root or missing layer.
+    func layerParentDepth(_ layerID: UInt64) -> Int {
+        Int(ms_layer_parent_depth(handle, layerID))
+    }
+
     func layer(_ layerID: UInt64, isDescendantOf ancestorID: UInt64) -> Bool {
         var current = layerParentID(layerID)
         var seen = Set<UInt64>()
@@ -1846,21 +1851,16 @@ final class MotionDocumentCore {
         changed()
     }
 
-    func moveLayer(compositionID: UInt64, fromIndex: Int, toIndex: Int) {
-        ms_command_move_layer(handle, compositionID, Int32(fromIndex), Int32(toIndex))
-        changed()
-    }
-
-    /// Applies an absolute model-order (bottom → top). No-op when already equal.
+    /// Applies an absolute model-order (bottom → top). The core normalizes the ids so every
+    /// layer's descendants stay directly below it. No-op when the result equals the current order.
     func applyLayerOrder(compositionID: UInt64, desired: [UInt64]) {
-        let current = layerIDs(compositionID: compositionID)
-        guard current != desired else {
-            return
+        var ids = desired
+        let changedOrder = ids.withUnsafeBufferPointer { buffer in
+            ms_command_apply_layer_order(handle, compositionID, buffer.baseAddress, ids.count)
         }
-        for step in TimelineReorder.moveSteps(from: current, to: desired) {
-            ms_command_move_layer(handle, compositionID, Int32(step.from), Int32(step.to))
+        if changedOrder {
+            changed()
         }
-        changed()
     }
 
     @discardableResult
