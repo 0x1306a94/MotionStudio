@@ -20,7 +20,9 @@ std::vector<EntityId> NormalizeSubtreeContiguousOrder(const std::vector<EntityId
 
 // Same as above, but `parentOverrides` wins over Layer::parentId. Lets command factories
 // normalize against the parent relationships they are about to establish, before those
-// relationships exist in the document.
+// relationships exist in the document. Ids that appear in `parentOverrides` are kept even
+// when the composition does not contain them yet, so a layer about to be added can be
+// ordered alongside its future children.
 std::vector<EntityId> NormalizeSubtreeContiguousOrder(
     const std::vector<EntityId> &desired, const Composition &composition,
     const std::unordered_map<EntityId, EntityId> &parentOverrides);

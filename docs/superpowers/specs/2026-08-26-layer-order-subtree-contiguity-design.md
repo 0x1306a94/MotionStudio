@@ -173,7 +173,9 @@ desired = NormalizeSubtreeContiguousOrder(desired, *composition);
 
 ```cpp
 // Same as above, but `parentOverrides` wins over Layer::parentId. Lets command factories
-// normalize against the parent relationships they are about to establish.
+// normalize against the parent relationships they are about to establish. Ids that appear
+// in `parentOverrides` are kept even when the composition does not contain them yet, so a
+// layer about to be added can be ordered alongside its future children.
 std::vector<EntityId> NormalizeSubtreeContiguousOrder(
     const std::vector<EntityId> &desired, const Composition &composition,
     const std::unordered_map<EntityId, EntityId> &parentOverrides);
@@ -184,6 +186,8 @@ std::vector<EntityId> NormalizeSubtreeContiguousOrder(
 ### `MakeUngroupLayersCommand`
 
 `RemoveLayerCommand` 移除 group 后，原孩子的位置目前靠运气正确。改为在末尾追加 normalize 后的 move steps，`parentOverrides` 把被 ungroup 的孩子指向 `restoredParent`。
+
+注意 normalize 会把「composition 里有、`desired` 里缺」的层按 composition 顺序追加回来，因此待删除的 group 必须在 normalize **之后**再滤掉一次。此时它们已是无子的根，移除不破坏其余子树的连续性。
 
 ### `UndoManager` debug assert
 

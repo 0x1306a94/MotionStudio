@@ -14,6 +14,15 @@ struct SubtreeWalk {
     std::vector<EntityId> result;
 };
 
+EntityId OverriddenParent(EntityId layerId,
+                          const std::unordered_map<EntityId, EntityId> &parentOverrides) {
+    const auto found = parentOverrides.find(layerId);
+    if (found != parentOverrides.end()) {
+        return found->second;
+    }
+    return {};
+}
+
 EntityId EffectiveParent(EntityId layerId, const Layer &layer,
                          const std::unordered_map<EntityId, EntityId> &parentOverrides) {
     const auto found = parentOverrides.find(layerId);
@@ -47,6 +56,15 @@ const Layer *FindLayer(const Composition &composition, EntityId layerId) {
     return nullptr;
 }
 
+bool IsKnownId(const Composition &composition, EntityId layerId,
+               const std::unordered_map<EntityId, EntityId> &parentOverrides) {
+    if (FindLayer(composition, layerId) != nullptr) {
+        return true;
+    }
+    // A command factory can name a layer it is about to add, so keep overridden ids too.
+    return parentOverrides.find(layerId) != parentOverrides.end();
+}
+
 }  // namespace
 
 std::vector<EntityId> NormalizeSubtreeContiguousOrder(const std::vector<EntityId> &desired,
@@ -60,7 +78,7 @@ std::vector<EntityId> NormalizeSubtreeContiguousOrder(
     std::vector<EntityId> ordered;
     std::unordered_set<EntityId> present;
     for (const EntityId &id : desired) {
-        if (FindLayer(composition, id) == nullptr) {
+        if (!IsKnownId(composition, id, parentOverrides)) {
             continue;
         }
         if (!present.insert(id).second) {
@@ -78,10 +96,8 @@ std::vector<EntityId> NormalizeSubtreeContiguousOrder(
     std::vector<EntityId> roots;
     for (const EntityId &id : ordered) {
         const Layer *layer = FindLayer(composition, id);
-        if (layer == nullptr) {
-            continue;
-        }
-        const EntityId parentId = EffectiveParent(id, *layer, parentOverrides);
+        const EntityId parentId = layer != nullptr ? EffectiveParent(id, *layer, parentOverrides)
+                                                   : OverriddenParent(id, parentOverrides);
         if (parentId.isValid() && present.find(parentId) != present.end()) {
             walk.childrenOf[parentId].push_back(id);
             continue;

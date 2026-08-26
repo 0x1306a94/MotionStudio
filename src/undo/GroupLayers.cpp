@@ -11,6 +11,7 @@
 #include "MotionStudio/model/Composition.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerOrder.h"
 #include "MotionStudio/model/PropertyPath.h"
 #include "MotionStudio/undo/AddLayerCommand.h"
 #include "MotionStudio/undo/CompositeCommand.h"
@@ -62,36 +63,6 @@ bool HasSelectedAncestor(const Document &document, EntityId layerId,
         cursor = ancestor->parentId;
     }
     return false;
-}
-
-std::vector<std::pair<int, int>> MoveSteps(const std::vector<EntityId> &from,
-                                           const std::vector<EntityId> &to) {
-    if (from.size() != to.size()) {
-        return {};
-    }
-    std::vector<EntityId> order = from;
-    std::vector<std::pair<int, int>> steps;
-    for (size_t targetIndex = 0; targetIndex < to.size(); ++targetIndex) {
-        const EntityId wanted = to[targetIndex];
-        int sourceIndex = -1;
-        for (size_t index = 0; index < order.size(); ++index) {
-            if (order[index] == wanted) {
-                sourceIndex = static_cast<int>(index);
-                break;
-            }
-        }
-        if (sourceIndex < 0) {
-            return {};
-        }
-        if (sourceIndex == static_cast<int>(targetIndex)) {
-            continue;
-        }
-        const EntityId layerId = order[static_cast<size_t>(sourceIndex)];
-        order.erase(order.begin() + sourceIndex);
-        order.insert(order.begin() + static_cast<std::ptrdiff_t>(targetIndex), layerId);
-        steps.push_back({sourceIndex, static_cast<int>(targetIndex)});
-    }
-    return steps;
 }
 
 int ParentDepth(const Document &document, EntityId layerId) {
@@ -241,15 +212,7 @@ std::unique_ptr<Command> MakeGroupLayersCommand(
         current.push_back(layer->id);
     }
 
-    // The timeline renders the layer array as a flat list indented by parent depth, so a group's
-    // descendants must stay adjacent to it. Move the whole subtree block, not just the picked layers.
-    std::unordered_set<EntityId> topLevelSet(ids.begin(), ids.end());
-    std::unordered_set<EntityId> idSet = topLevelSet;
-    for (const auto &layer : composition->layers) {
-        if (HasSelectedAncestor(document, layer->id, topLevelSet)) {
-            idSet.insert(layer->id);
-        }
-    }
+    std::unordered_set<EntityId> idSet(ids.begin(), ids.end());
     int topIndex = -1;
     for (int index = 0; index < static_cast<int>(current.size()); ++index) {
         if (idSet.find(current[static_cast<size_t>(index)]) != idSet.end()) {
@@ -299,19 +262,25 @@ std::unique_ptr<Command> MakeGroupLayersCommand(
     desired.push_back(outGroupId);
     desired.insert(desired.end(), remaining.begin() + insertAt, remaining.end());
 
+    // The group and its new parent links do not exist yet, so normalize against the
+    // relationships this command is about to establish.
+    std::unordered_map<EntityId, EntityId> parentOverrides;
+    parentOverrides[outGroupId] = commonParent;
+    for (const EntityId &id : selectedOrder) {
+        parentOverrides[id] = outGroupId;
+    }
+    desired = NormalizeSubtreeContiguousOrder(desired, *composition, parentOverrides);
+
     std::vector<EntityId> afterAdd = current;
     afterAdd.push_back(outGroupId);
 
     auto composite = std::make_unique<CompositeCommand>("Group");
     composite->add(std::make_unique<AddLayerCommand>(compositionId, std::move(group), -1));
-    const std::vector<std::pair<int, int>> steps = MoveSteps(afterAdd, desired);
+    const std::vector<std::pair<int, int>> steps = LayerMoveSteps(afterAdd, desired);
     for (const std::pair<int, int> &step : steps) {
         composite->add(std::make_unique<MoveLayerCommand>(compositionId, step.first, step.second));
     }
     for (const EntityId &id : selectedOrder) {
-        if (topLevelSet.find(id) == topLevelSet.end()) {
-            continue;
-        }
         composite->add(std::make_unique<SetParentCommand>(id, outGroupId));
     }
     return composite;
@@ -346,6 +315,7 @@ std::unique_ptr<Command> MakeUngroupLayersCommand(
     std::unordered_set<EntityId> ungrouping(groups.begin(), groups.end());
 
     auto composite = std::make_unique<CompositeCommand>("Ungroup");
+    std::unordered_map<EntityId, EntityId> parentOverrides;
     for (const EntityId &groupId : groups) {
         const Layer *group = document.entityIndex().findLayer(groupId);
         if (group == nullptr) {
@@ -381,8 +351,32 @@ std::unique_ptr<Command> MakeUngroupLayersCommand(
                 }
             }
             composite->add(std::make_unique<SetParentCommand>(childId, restoredParent));
+            parentOverrides[childId] = restoredParent;
         }
         composite->add(std::make_unique<RemoveLayerCommand>(compositionId, groupId));
+    }
+
+    // Removing the groups leaves the freed children wherever they were, which can split a
+    // subtree apart. Restore contiguity against the parent links established above.
+    std::vector<EntityId> afterRemove;
+    for (const auto &layer : composition->layers) {
+        if (ungrouping.find(layer->id) != ungrouping.end()) {
+            continue;
+        }
+        afterRemove.push_back(layer->id);
+    }
+    // Normalize re-appends composition layers that `afterRemove` omits, so drop the doomed
+    // groups again afterwards. Each is a childless root by now, so removing them keeps the
+    // remaining subtrees contiguous.
+    std::vector<EntityId> desired;
+    for (const EntityId &id : NormalizeSubtreeContiguousOrder(afterRemove, *composition, parentOverrides)) {
+        if (ungrouping.find(id) != ungrouping.end()) {
+            continue;
+        }
+        desired.push_back(id);
+    }
+    for (const std::pair<int, int> &step : LayerMoveSteps(afterRemove, desired)) {
+        composite->add(std::make_unique<MoveLayerCommand>(compositionId, step.first, step.second));
     }
     return composite;
 }

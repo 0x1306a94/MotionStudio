@@ -79,7 +79,7 @@
 
 ### Task 2: Group / Ungroup 接入 normalize
 
-**Status:** ⬜ Not started
+**Status:** ✅ Done
 
 **文件：**
 - 修改：`src/undo/GroupLayers.cpp`
@@ -89,11 +89,13 @@
 - 依赖：Task 1 的 `NormalizeSubtreeContiguousOrder`（含 overrides 重载）、`LayerMoveSteps`
 - 产出：无新公开接口；`GroupLayers.cpp` 内部改为委托 Task 1
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/undo/GroupLayersTest.cpp` 补 spec 用例 12：Ungroup 后剩余层仍满足 `IsSubtreeContiguousOrder`。构造 group 内含 group 的两级结构，ungroup 外层后断言不变量与各层 index。
 
-- [ ] **Step 2: 实现**
+实测该用例初版断言有误：`setParent` 只改 `parentId` 不动数组，所以测试搭建出的初始状态本就不连续，undo 忠实还原它并不算 bug。已在用例开头先把初始顺序归一化，再 ungroup。
+
+- [x] **Step 2: 实现**
 
 `MakeGroupLayersCommand`：
 - 删掉 commit `6c7e395` 引入的 `topLevelSet` 后代枚举（`idSet` 恢复为仅选中层）
@@ -106,11 +108,13 @@
 - 末尾追加 normalize 后的 move steps；`parentOverrides` 把被 ungroup 的孩子指向 `restoredParent`
 - 注意 `RemoveLayerCommand` 会移除 group 本身，normalize 的 `desired` 不含被移除的 group id
 
-删掉 `GroupLayers.cpp` 内的本地 `MoveSteps` 与 `ParentDepth`（改用 Task 1 的 `LayerMoveSteps`；`ParentDepth` 仅 `SortGroupsDeepFirst` 用，评估是否也搬去 `LayerOrder`——若只此一处使用可保留在原文件）。
+删掉 `GroupLayers.cpp` 内的本地 `MoveSteps`（改用 Task 1 的 `LayerMoveSteps`）。`ParentDepth` 仅 `SortGroupsDeepFirst` 一处使用，保留在原文件。
 
-- [ ] **Step 3: 验证**
+实现中发现 normalize 需两处补强，已同步到 spec：`parentOverrides` 里出现的 id 即使还不在 composition 中也要保留（新 group 尚未 add），且 Ungroup 后要重新滤掉待删除的 group（normalize 会把 composition 里缺失的层追加回来）。
 
-`GroupLayersTest.*` 全绿（含既有 `KeepsExistingSubtreeContiguous`），随后全量 ctest。
+- [x] **Step 3: 验证**
+
+`GroupLayersTest.*` 全绿（含既有 `KeepsExistingSubtreeContiguous`），随后全量 ctest。853 个用例全绿。
 
 ---
 

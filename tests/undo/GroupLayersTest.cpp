@@ -1,4 +1,6 @@
 #include <memory>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -7,6 +9,7 @@
 #include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/model/Document.h"
 #include "MotionStudio/model/Layer.h"
+#include "MotionStudio/model/LayerOrder.h"
 #include "MotionStudio/undo/GroupLayers.h"
 #include "MotionStudio/undo/UndoManager.h"
 
@@ -228,6 +231,45 @@ TEST(GroupLayersTest, UngroupSkipsKeyframedChildPosition) {
 
     ASSERT_EQ(a->transform.position.keyframes().size(), 1u);
     EXPECT_EQ(a->transform.position.keyframes()[0].value, (Vec2{10, 0}));
+}
+
+TEST(GroupLayersTest, UngroupKeepsRemainingSubtreesContiguous) {
+    Document document;
+    UndoManager undo;
+    Composition *composition = document.addComposition(std::make_unique<Composition>());
+    Layer *outer = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *inner = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Group));
+    Layer *leaf = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    Layer *sibling = document.addLayer(composition->id, std::make_unique<Layer>(LayerType::Shape));
+    ASSERT_TRUE(inner->setParent(outer->id, document));
+    ASSERT_TRUE(leaf->setParent(inner->id, document));
+    ASSERT_TRUE(sibling->setParent(outer->id, document));
+    // setParent only rewrites parentId, so bring the array itself into the contiguous shape
+    // the timeline expects before exercising ungroup.
+    std::vector<EntityId> initial;
+    for (const auto &layer : composition->layers) {
+        initial.push_back(layer->id);
+    }
+    for (const std::pair<int, int> &step :
+         motion::LayerMoveSteps(initial, motion::NormalizeSubtreeContiguousOrder(initial, *composition))) {
+        document.moveLayer(composition->id, step.first, step.second);
+    }
+    ASSERT_TRUE(motion::IsSubtreeContiguousOrder(*composition));
+
+    std::unique_ptr<motion::Command> command =
+        MakeUngroupLayersCommand(document, composition->id, {outer->id}, 0);
+    ASSERT_NE(command, nullptr);
+    undo.execute(document, std::move(command));
+
+    EXPECT_EQ(document.entityIndex().findLayer(outer->id), nullptr);
+    EXPECT_FALSE(inner->parentId.isValid());
+    EXPECT_FALSE(sibling->parentId.isValid());
+    EXPECT_EQ(leaf->parentId, inner->id);
+    EXPECT_TRUE(motion::IsSubtreeContiguousOrder(*composition));
+    EXPECT_EQ(IndexOf(*composition, leaf->id) + 1, IndexOf(*composition, inner->id));
+
+    undo.undo(document);
+    EXPECT_TRUE(motion::IsSubtreeContiguousOrder(*composition));
 }
 
 TEST(GroupLayersTest, UngroupIgnoresNonGroupSelection) {
