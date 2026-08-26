@@ -29,7 +29,7 @@
 
 ### Task 1: LayerOrder 权威纯函数
 
-**Status:** ⬜ Not started
+**Status:** ✅ Done
 
 **文件：**
 - 新建：`include/MotionStudio/model/LayerOrder.h`
@@ -44,9 +44,9 @@
   - `IsSubtreeContiguousOrder(composition)`
   - `LayerMoveSteps(from, to)`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
-新建 `tests/model/LayerOrderTest.cpp`（`tests/CMakeLists.txt` 若非自动 glob 则需登记）。覆盖 spec 测试清单 1–10：
+新建 `tests/model/LayerOrderTest.cpp`（`tests/model` 已由 `add_files_by_extension` 自动 glob，无需登记）。覆盖 spec 测试清单 1–10：
 
 - 空 / 单层 → 原样
 - 无父子关系的扁平列表 → 原样（normalize 不打乱）
@@ -59,7 +59,7 @@
 - `IsSubtreeContiguousOrder` 正例 / 反例
 - `LayerMoveSteps`：非排列 → 空；正常逐步应用后等于 `to`
 
-- [ ] **Step 2: 实现**
+- [x] **Step 2: 实现**
 
 `src/model/LayerOrder.cpp` 按 spec 伪代码实现稳定 DFS。要点：
 
@@ -71,9 +71,9 @@
 - 避免 lambda：DFS 用显式递归函数（文件内静态函数）
 - `LayerMoveSteps` 从 `src/undo/GroupLayers.cpp` 的 `MoveSteps` 原样搬来，改为公开命名
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
-`./build/tests/core_tests --gtest_filter='LayerOrderTest.*'` 全绿，随后全量 ctest。
+`./build/tests/core_tests --gtest_filter='LayerOrderTest.*'` 全绿，随后全量 ctest。852 个用例全绿（新增 11 个）。
 
 ---
 
