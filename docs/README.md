@@ -10,6 +10,7 @@ Motion Studio 是一个 2D 动效（Motion Graphics）动画制作工具：图�
 | [data-model.md](data-model.md) | 动画数据结构：时间表示、EntityId、Document→Composition→Layer→Shape 层级、`Animatable<T>`、Transform 与父子继承、Command 模式 undo/redo、序列化与 DTO |
 | [figma-to-motionstudio.md](figma-to-motionstudio.md) | Figma Design / Motion → MotionStudio：毫秒↔帧、旋转符号与 Design+Motion 关键帧 |
 | [superpowers/specs/2026-08-26-layer-order-subtree-contiguity-design.md](superpowers/specs/2026-08-26-layer-order-subtree-contiguity-design.md) | 图层顺序子树连续性：扁平 `layers[]` 保持后代紧贴父级，Core 集中强制 |
+| [superpowers/specs/2026-09-02-shapepath-resize-preview-matrix-design.md](superpowers/specs/2026-09-02-shapepath-resize-preview-matrix-design.md) | ShapePath 缩放拖动：Canvas 局部预览矩阵，松手 bake 几何（[plan](superpowers/plans/2026-09-02-shapepath-resize-preview-matrix.md)） |
 | [superpowers/specs/2026-08-21-geometry-revision-cache-design.md](superpowers/specs/2026-08-21-geometry-revision-cache-design.md) | VectorNetwork / BezierPath 进程内 revision：CompileFillFaces 与 tgfx::Path 身份缓存 |
 | [superpowers/specs/2026-08-19-stroke-dash-design.md](superpowers/specs/2026-08-19-stroke-dash-design.md) | Stroke dash + Cap/Join Inspector（Trim 后再 `MakeDash`） |
 | [superpowers/specs/2026-08-19-svg-import-design.md](superpowers/specs/2026-08-19-svg-import-design.md) | SVG 导入：tgfx `SVGDOM` → Core 图层树 + `VectorNetwork`（独立 `svg_import` 库） |
