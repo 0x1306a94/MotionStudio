@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <unordered_map>
 #include <utility>
@@ -511,6 +512,95 @@ VectorNetwork BuildCurvePlanarNetwork(const VectorNetwork &source) {
     return planar;
 }
 
+bool ContourContainsPoint(const BezierPath::Contour &contour, Vec2 point) {
+    if (contour.vertices.size() < 3) {
+        return false;
+    }
+    int winding = 0;
+    const size_t count = contour.vertices.size();
+    for (size_t index = 0; index < count; ++index) {
+        const Vec2 a = contour.vertices[index].point;
+        const Vec2 b = contour.vertices[(index + 1) % count].point;
+        if (a.y <= point.y) {
+            if (b.y > point.y && (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x) > 0.0f) {
+                ++winding;
+            }
+        } else if (b.y <= point.y &&
+                   (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x) < 0.0f) {
+            --winding;
+        }
+    }
+    return winding != 0;
+}
+
+Vec2 ContourRepresentativePoint(const BezierPath::Contour &contour) {
+    Vec2 sum = {};
+    for (const BezierPath::Vertex &vertex : contour.vertices) {
+        sum = sum + vertex.point;
+    }
+    const float count = static_cast<float>(contour.vertices.size());
+    return {sum.x / count, sum.y / count};
+}
+
+void ReverseContour(BezierPath::Contour &contour) {
+    if (contour.vertices.size() < 2) {
+        return;
+    }
+    std::reverse(contour.vertices.begin(), contour.vertices.end());
+    for (BezierPath::Vertex &vertex : contour.vertices) {
+        const Vec2 inTangent = vertex.inTangent;
+        vertex.inTangent = vertex.outTangent;
+        vertex.outTangent = inTangent;
+    }
+}
+
+// Disconnected hole rings (letter O/e) are emitted as separate contours. For
+// NonZero fills they must oppose their containing outer contour; reverse any
+// nested contour that currently shares the outer's signed-area sign.
+void OrientNestedHoleContours(BezierPath &path) {
+    if (path.contours.size() < 2) {
+        return;
+    }
+    std::vector<float> signedAreas(path.contours.size(), 0.0f);
+    std::vector<float> absAreas(path.contours.size(), 0.0f);
+    for (size_t index = 0; index < path.contours.size(); ++index) {
+        std::vector<Vec2> points;
+        points.reserve(path.contours[index].vertices.size());
+        for (const BezierPath::Vertex &vertex : path.contours[index].vertices) {
+            points.push_back(vertex.point);
+        }
+        signedAreas[index] = PolygonSignedArea(points);
+        absAreas[index] = std::fabs(signedAreas[index]);
+    }
+    for (size_t holeIndex = 0; holeIndex < path.contours.size(); ++holeIndex) {
+        if (absAreas[holeIndex] <= 1e-6f) {
+            continue;
+        }
+        size_t parentIndex = path.contours.size();
+        float parentArea = std::numeric_limits<float>::max();
+        const Vec2 sample = ContourRepresentativePoint(path.contours[holeIndex]);
+        for (size_t outerIndex = 0; outerIndex < path.contours.size(); ++outerIndex) {
+            if (outerIndex == holeIndex || absAreas[outerIndex] <= absAreas[holeIndex] + 1e-6f) {
+                continue;
+            }
+            if (!ContourContainsPoint(path.contours[outerIndex], sample)) {
+                continue;
+            }
+            if (absAreas[outerIndex] < parentArea) {
+                parentArea = absAreas[outerIndex];
+                parentIndex = outerIndex;
+            }
+        }
+        if (parentIndex >= path.contours.size()) {
+            continue;
+        }
+        if (signedAreas[holeIndex] * signedAreas[parentIndex] > 0.0f) {
+            ReverseContour(path.contours[holeIndex]);
+            signedAreas[holeIndex] = -signedAreas[holeIndex];
+        }
+    }
+}
+
 BezierPath BoundedFillFacesFromNetwork(const VectorNetwork &network) {
     BezierPath result;
     if (network.edges.empty() || network.vertices.empty()) {
@@ -580,6 +670,7 @@ BezierPath BoundedFillFacesFromNetwork(const VectorNetwork &network) {
             result.contours.push_back(std::move(contour));
         }
     }
+    OrientNestedHoleContours(result);
     return result;
 }
 

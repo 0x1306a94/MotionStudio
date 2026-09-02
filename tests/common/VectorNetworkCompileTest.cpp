@@ -1,6 +1,9 @@
+#include <cmath>
+
 #include <gtest/gtest.h>
 
 #include "MotionStudio/common/BezierPath.h"
+#include "MotionStudio/common/Vec2.h"
 #include "MotionStudio/common/VectorNetwork.h"
 #include "MotionStudio/common/VectorNetworkCompile.h"
 #include "MotionStudio/common/VectorNetworkConvert.h"
@@ -226,4 +229,77 @@ TEST(VectorNetworkCompileTest, BowedTriangleWithoutCrossingStillOneFace) {
     ASSERT_EQ(fill.contours.size(), 1u);
     EXPECT_TRUE(fill.contours[0].closed);
     EXPECT_GE(fill.contours[0].vertices.size(), 3u);
+}
+
+namespace {
+
+float ContourSignedArea(const BezierPath::Contour &contour) {
+    if (contour.vertices.size() < 3) {
+        return 0.0f;
+    }
+    float area = 0.0f;
+    for (size_t index = 0; index < contour.vertices.size(); ++index) {
+        const motion::Vec2 &a = contour.vertices[index].point;
+        const motion::Vec2 &b = contour.vertices[(index + 1) % contour.vertices.size()].point;
+        area += a.x * b.y - b.x * a.y;
+    }
+    return area * 0.5f;
+}
+
+VectorNetwork MakeNestedRingSquare() {
+    // Outer CW square + disconnected inner CW square (letter-O style hole).
+    // NonZero fill requires the hole contour to oppose the outer after compile.
+    VectorNetwork network;
+    network.vertices = {
+        {1, {0, 0}},
+        {2, {10, 0}},
+        {3, {10, 10}},
+        {4, {0, 10}},
+        {5, {3, 3}},
+        {6, {7, 3}},
+        {7, {7, 7}},
+        {8, {3, 7}},
+    };
+    network.edges = {
+        {1, 1, 2, {}, {}},
+        {2, 2, 3, {}, {}},
+        {3, 3, 4, {}, {}},
+        {4, 4, 1, {}, {}},
+        {5, 5, 6, {}, {}},
+        {6, 6, 7, {}, {}},
+        {7, 7, 8, {}, {}},
+        {8, 8, 5, {}, {}},
+    };
+    return network;
+}
+
+}  // namespace
+
+TEST(VectorNetworkCompileTest, DisconnectedHoleContourOpposesOuterForNonZero) {
+    const BezierPath fill = CompileFillFaces(MakeNestedRingSquare());
+    ASSERT_EQ(fill.contours.size(), 2u);
+    const float outerArea = ContourSignedArea(fill.contours[0]);
+    const float holeArea = ContourSignedArea(fill.contours[1]);
+    // Assign by |area|: larger is outer.
+    const float large = std::fabs(outerArea) >= std::fabs(holeArea) ? outerArea : holeArea;
+    const float small = std::fabs(outerArea) >= std::fabs(holeArea) ? holeArea : outerArea;
+    EXPECT_GT(std::fabs(large), std::fabs(small));
+    EXPECT_LT(large * small, 0.0f);
+}
+
+TEST(VectorNetworkCompileTest, DisconnectedHoleStillOpposesOuterAfterUniformScale) {
+    VectorNetwork network = MakeNestedRingSquare();
+    for (VectorNetwork::Vertex &vertex : network.vertices) {
+        vertex.point.x *= 0.05f;
+        vertex.point.y *= 0.05f;
+    }
+    const BezierPath fill = CompileFillFaces(network);
+    ASSERT_EQ(fill.contours.size(), 2u);
+    float areas[2] = {ContourSignedArea(fill.contours[0]), ContourSignedArea(fill.contours[1])};
+    if (std::fabs(areas[0]) < std::fabs(areas[1])) {
+        const float tmp = areas[0];
+        areas[0] = areas[1];
+        areas[1] = tmp;
+    }
+    EXPECT_LT(areas[0] * areas[1], 0.0f);
 }
