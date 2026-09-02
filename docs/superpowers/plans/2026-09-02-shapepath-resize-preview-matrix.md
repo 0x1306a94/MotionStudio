@@ -21,7 +21,7 @@
 - 空拖动 / cancel：无 undo
 - UI 可见改动等用户确认后再 commit（本仓库 git-workflow）
 
-**Status:** 未开始
+**Status:** ✅ Done
 
 ---
 
@@ -41,7 +41,7 @@
   - `MSCanvas.previewTransforms: std::unordered_map<motion::EntityId, motion::Mat3>`
 - Consumes: `EnsurePreviewScene`, `BuildCommands`, `BuildSelectionOutlineCommands`, `CollectMaskPathOverlays`
 
-- [ ] **Step 1: 写失败测试（无 Metal 也可测状态副作用）**
+- [x] **Step 1: 写失败测试（无 Metal 也可测状态副作用）**
 
 在 `bridge/tests` 增加用例，覆盖：
 
@@ -92,7 +92,7 @@ TEST(CanvasPreviewTransformTest, ApplyMultipliesWorldOnRight) {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 ```bash
 cmake --build build --target bridge_test
@@ -101,7 +101,7 @@ cmake --build build --target bridge_test
 
 Expected: 链接失败或未定义 `ms_canvas_set_preview_transform` / `ApplyPreviewTransformsToScene`
 
-- [ ] **Step 3: 实现 API + Apply + draw 分支**
+- [x] **Step 3: 实现 API + Apply + draw 分支**
 
 `MSCanvas.h` 增加：
 
@@ -151,7 +151,7 @@ if (hasPreview) {
 
 整数帧 `ms_canvas_draw_frame_profiled` 若只是转调 at_time，则无需再改。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 ```bash
 cmake --build build --target bridge_test
@@ -160,7 +160,7 @@ cmake --build build --target bridge_test
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**（用户确认后；本会话默认不自动 commit）
+- [x] **Step 5: Commit**（用户确认后；本会话默认不自动 commit）
 
 ```bash
 git commit --only bridge/src/common/MSCanvas.h bridge/include/motionstudio_bridge.h bridge/src/common/motionstudio_bridge_canvas.cpp bridge/src/common/PreviewTransformApply.h bridge/src/common/PreviewTransformApply.cpp bridge/tests/CanvasPreviewTransformTest.cpp -m "Add canvas preview transforms that skip command cache during path resize."
@@ -181,7 +181,7 @@ git commit --only bridge/src/common/MSCanvas.h bridge/include/motionstudio_bridg
 - Consumes: Task 1 的 `ms_canvas_set/clear(_all)_preview_transform`
 - Produces: 拖动中零 Document 写；松手一次 `applyShapeGeometryResize` 语义 bake
 
-- [ ] **Step 1: Core 封装（可选但建议）**
+- [x] **Step 1: Core 封装（可选但建议）**
 
 `MotionDocumentCore`：
 
@@ -198,7 +198,7 @@ func clearAllCanvasPreviewTransforms(canvas: OpaquePointer) {
 }
 ```
 
-- [ ] **Step 2: FreeTransformDrag 拆分 preview vs commit**
+- [x] **Step 2: FreeTransformDrag 拆分 preview vs commit**
 
 增加辅助：
 
@@ -244,7 +244,7 @@ if Self.usesPathGeometryPreview(start) {
 
 把现 `applyShapeGeometryResize` 重命名/保留为 `commitShapeGeometryResize`，供松手调用（逻辑不变）。
 
-- [ ] **Step 3: CanvasViewController 生命周期**
+- [x] **Step 3: CanvasViewController 生命周期**
 
 `beginHandleTransform`：
 
@@ -302,7 +302,7 @@ registerEdit(freeTransformDrag.editName)
 
 **注意 clear 时机：** bake 写 Document 后、`requestDraw` 前 clear；`defer` clear 需在 bake 之后——上面 defer 在函数末尾执行，bake 在 defer 注册后、return 前执行，顺序正确（defer 后执行）。
 
-- [ ] **Step 4: 人机验证（可见 UI，确认前不 commit）**
+- [x] **Step 4: 人机验证（可见 UI，确认前不 commit）**
 
 1. 导入稠密文字转曲 SVG（~200 边）
 2. 拖角点：应流畅；选中框跟随
@@ -311,7 +311,7 @@ registerEdit(freeTransformDrag.editName)
 5. 空点手柄抬起：无 undo
 6. 对照：Rect/Image 缩放行为不变
 
-- [ ] **Step 5: Commit**（用户确认 UI 后）
+- [x] **Step 5: Commit**（用户确认 UI 后）
 
 ```bash
 git commit --only apps/MotionStudioApp/MotionStudioApp/Canvas/FreeTransformDrag.swift apps/MotionStudioApp/MotionStudioApp/Canvas/CanvasViewController.swift apps/MotionStudioApp/MotionStudioApp/Model/MotionDocumentCore.swift docs/superpowers/plans/2026-09-02-shapepath-resize-preview-matrix.md -m "Preview ShapePath resize with canvas matrices and bake on mouse up."
@@ -325,15 +325,15 @@ git commit --only apps/MotionStudioApp/MotionStudioApp/Canvas/FreeTransformDrag.
 - Modify: `docs/README.md`（specs 表加一行）
 - Modify: 本 plan 文件勾选与 `**Status:**`
 
-- [ ] **Step 1:** README 在 geometry-revision 条目附近增加：
+- [x] **Step 1:** README 在 geometry-revision 条目附近增加：
 
 `| [superpowers/specs/2026-09-02-shapepath-resize-preview-matrix-design.md](superpowers/specs/2026-09-02-shapepath-resize-preview-matrix-design.md) | ShapePath 缩放拖动：Canvas 预览矩阵，松手 bake 几何 |`
 
 并链到 plan（若 README 也列 plans；否则只列 spec）。
 
-- [ ] **Step 2:** 全部 Task 完成后将本 plan `**Status:** ✅ Done`，checkbox 全勾。
+- [x] **Step 2:** 全部 Task 完成后将本 plan `**Status:** ✅ Done`，checkbox 全勾。
 
-- [ ] **Step 3:** 与 Task 2 一并或紧随 commit（文档可与 spec 首次提交合并——见下方提交顺序）。
+- [x] **Step 3:** 与 Task 2 一并或紧随 commit（文档可与 spec 首次提交合并——见下方提交顺序）。
 
 ---
 

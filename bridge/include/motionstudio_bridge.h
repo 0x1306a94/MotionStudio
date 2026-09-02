@@ -1031,6 +1031,14 @@ void ms_canvas_set_selection_show_scale_handles(MSCanvas *canvas, bool showScale
 // Ignored when canvas is null.
 void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, float panY);
 
+// Local post-multiply preview Mat3 (row-major 9 floats, same layout as
+// motion::Mat3::values). effectiveWorld = layer.worldTransform * M.
+// Does not mutate the document or bump contentRevision. layer_id 0 or a null
+// matrix is ignored. Null canvas is a no-op.
+void ms_canvas_set_preview_transform(MSCanvas *canvas, uint64_t layer_id, const float m[9]);
+void ms_canvas_clear_preview_transform(MSCanvas *canvas, uint64_t layer_id);
+void ms_canvas_clear_all_preview_transforms(MSCanvas *canvas);
+
 // Path-edit hit kind, mirrors motion::PathHandleKind.
 typedef CF_CLOSED_ENUM(int, MS_PATH_HANDLE) {
     MS_PATH_HANDLE_NONE = 0,

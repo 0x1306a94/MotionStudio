@@ -143,6 +143,11 @@ enum FreeTransformKind {
     case anchor
 }
 
+struct PathPreviewUpdate {
+    var layerID: UInt64
+    var matrix: [Float]
+}
+
 struct FreeTransformDrag {
     let kind: FreeTransformKind
     let layerStarts: [LayerTransformStart]
@@ -152,6 +157,25 @@ struct FreeTransformDrag {
     /// For oriented single-layer scale: localPivot - startAnchor.
     let localPivotRelative: CGPoint?
     let editName: String
+    /// Last scale factors from applyScale; used to bake path geometry on mouse-up.
+    var lastScaleX: CGFloat = 1
+    var lastScaleY: CGFloat = 1
+
+    static func usesPathGeometryPreview(_ start: LayerTransformStart) -> Bool {
+        start.shapePath != nil
+    }
+
+    static func localPostMultiplyScale(localPivot: CGPoint, scaleX: CGFloat, scaleY: CGFloat) -> [Float] {
+        let pivotX = Float(localPivot.x)
+        let pivotY = Float(localPivot.y)
+        let sx = Float(scaleX)
+        let sy = Float(scaleY)
+        return [
+            sx, 0, pivotX - sx * pivotX,
+            0, sy, pivotY - sy * pivotY,
+            0, 0, 1,
+        ]
+    }
 
     static func makeLayerStarts(core: MotionDocumentCore, layerIDs: [UInt64], frame: Int64) -> [LayerTransformStart] {
         layerIDs.map { layerID in
@@ -291,21 +315,31 @@ struct FreeTransformDrag {
         }
     }
 
-    func apply(core: MotionDocumentCore,
-               frame: Int64,
-               scenePoint: CGPoint,
-               shift: Bool,
-               alternate: Bool)
+    mutating func apply(core: MotionDocumentCore,
+                        frame: Int64,
+                        scenePoint: CGPoint,
+                        shift: Bool,
+                        alternate: Bool) -> [PathPreviewUpdate]
     {
         switch kind {
         case .move:
             applyMove(core: core, frame: frame, scenePoint: scenePoint)
+            return []
         case .scaleCorner, .scaleEdge:
-            applyScale(core: core, frame: frame, scenePoint: scenePoint, shift: shift, alternate: alternate)
+            return applyScale(core: core, frame: frame, scenePoint: scenePoint, shift: shift, alternate: alternate)
         case .rotate:
             applyRotate(core: core, frame: frame, scenePoint: scenePoint, shift: shift)
+            return []
         case .anchor:
             applyAnchor(core: core, frame: frame, scenePoint: scenePoint)
+            return []
+        }
+    }
+
+    func commitPathGeometryResizes(core: MotionDocumentCore, frame: Int64) {
+        for start in layerStarts where Self.usesPathGeometryPreview(start) {
+            applyShapeGeometryResize(core: core, frame: frame, start: start,
+                                     scaleX: lastScaleX, scaleY: lastScaleY)
         }
     }
 
@@ -318,11 +352,11 @@ struct FreeTransformDrag {
         }
     }
 
-    private func applyScale(core: MotionDocumentCore,
-                            frame: Int64,
-                            scenePoint: CGPoint,
-                            shift: Bool,
-                            alternate: Bool)
+    private mutating func applyScale(core: MotionDocumentCore,
+                                     frame: Int64,
+                                     scenePoint: CGPoint,
+                                     shift: Bool,
+                                     alternate: Bool) -> [PathPreviewUpdate]
     {
         let axisX = normalized(startHandles.corners[1] - startHandles.corners[0])
         let axisY = normalized(startHandles.corners[3] - startHandles.corners[0])
@@ -362,7 +396,10 @@ struct FreeTransformDrag {
 
         scaleX = clampedScale(scaleX)
         scaleY = clampedScale(scaleY)
+        lastScaleX = scaleX
+        lastScaleY = scaleY
 
+        var pathPreviews: [PathPreviewUpdate] = []
         let orientedSingle = startHandles.isOriented && layerStarts.count == 1
         for start in layerStarts {
             if let contentSizePath = start.contentSizePath {
@@ -382,6 +419,12 @@ struct FreeTransformDrag {
                                              scaleX: scaleX,
                                              scaleY: scaleY)
                 }
+            } else if Self.usesPathGeometryPreview(start) {
+                let localPivot = localPivotForShapeGeometry(start: start)
+                pathPreviews.append(PathPreviewUpdate(
+                    layerID: start.layerID,
+                    matrix: Self.localPostMultiplyScale(localPivot: localPivot, scaleX: scaleX, scaleY: scaleY),
+                ))
             } else if start.hasShapeGeometry {
                 applyShapeGeometryResize(core: core, frame: frame, start: start,
                                          scaleX: scaleX, scaleY: scaleY)
@@ -395,6 +438,18 @@ struct FreeTransformDrag {
                           frame: frame, value: position, animated: start.positionAnimated)
             }
         }
+        return pathPreviews
+    }
+
+    private func localPivotForShapeGeometry(start: LayerTransformStart) -> CGPoint {
+        if let relative = localPivotRelative, startHandles.isOriented, layerStarts.count == 1 {
+            return CGPoint(x: relative.x + start.anchor.dx, y: relative.y + start.anchor.dy)
+        }
+        let unscaled = inverseRS(CGPoint(x: pivotScene.x - start.position.dx,
+                                         y: pivotScene.y - start.position.dy),
+                                 rotationDegrees: start.rotation,
+                                 scale: start.scale)
+        return CGPoint(x: unscaled.x + start.anchor.dx, y: unscaled.y + start.anchor.dy)
     }
 
     private func applyTransformScale(core: MotionDocumentCore,
@@ -425,16 +480,7 @@ struct FreeTransformDrag {
                                           scaleX: CGFloat,
                                           scaleY: CGFloat)
     {
-        let localPivot: CGPoint
-        if let relative = localPivotRelative, startHandles.isOriented, layerStarts.count == 1 {
-            localPivot = CGPoint(x: relative.x + start.anchor.dx, y: relative.y + start.anchor.dy)
-        } else {
-            let unscaled = inverseRS(CGPoint(x: pivotScene.x - start.position.dx,
-                                             y: pivotScene.y - start.position.dy),
-                                     rotationDegrees: start.rotation,
-                                     scale: start.scale)
-            localPivot = CGPoint(x: unscaled.x + start.anchor.dx, y: unscaled.y + start.anchor.dy)
-        }
+        let localPivot = localPivotForShapeGeometry(start: start)
 
         // Always rewrite from drag-start geometry — never scale the already-resized path.
         if let shapePath = start.shapePath {

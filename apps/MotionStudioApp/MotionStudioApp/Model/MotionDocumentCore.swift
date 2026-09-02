@@ -2090,6 +2090,24 @@ final class MotionDocumentCore {
 
     // MARK: - Canvas
 
+    /// Local post-multiply preview Mat3 (row-major 9 floats). Does not mutate Document.
+    func setCanvasPreviewTransform(canvas: OpaquePointer, layerID: UInt64, matrix: [Float]) {
+        guard matrix.count == 9 else {
+            return
+        }
+        matrix.withUnsafeBufferPointer { buffer in
+            ms_canvas_set_preview_transform(canvas, layerID, buffer.baseAddress)
+        }
+    }
+
+    func clearCanvasPreviewTransform(canvas: OpaquePointer, layerID: UInt64) {
+        ms_canvas_clear_preview_transform(canvas, layerID)
+    }
+
+    func clearAllCanvasPreviewTransforms(canvas: OpaquePointer) {
+        ms_canvas_clear_all_preview_transforms(canvas)
+    }
+
     /// Draws the composition at frame into the canvas's MTKView drawable.
     func drawFrame(canvas: OpaquePointer, compositionID: UInt64, frame: Int64) {
         ms_canvas_draw_frame(canvas, handle, compositionID, frame)

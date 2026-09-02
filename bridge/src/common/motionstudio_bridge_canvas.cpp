@@ -9,6 +9,7 @@
 #include "MSCanvas.h"
 #include "MSDocument.h"
 #include "PreviewEnsure.h"
+#include "PreviewTransformApply.h"
 #include "ProfileClock.h"
 
 #include "MotionStudio/common/BezierPath.h"
@@ -116,6 +117,31 @@ void ms_canvas_set_view_transform(MSCanvas *canvas, float zoom, float panX, floa
         return;
     }
     canvas->adapter->setViewTransform(zoom, panX, panY);
+}
+
+void ms_canvas_set_preview_transform(MSCanvas *canvas, uint64_t layer_id, const float m[9]) {
+    if (canvas == nullptr || layer_id == 0 || m == nullptr) {
+        return;
+    }
+    motion::Mat3 matrix = motion::Mat3::Identity();
+    for (int index = 0; index < 9; ++index) {
+        matrix.values[index] = m[index];
+    }
+    canvas->previewTransforms[EntityId{layer_id}] = matrix;
+}
+
+void ms_canvas_clear_preview_transform(MSCanvas *canvas, uint64_t layer_id) {
+    if (canvas == nullptr || layer_id == 0) {
+        return;
+    }
+    canvas->previewTransforms.erase(EntityId{layer_id});
+}
+
+void ms_canvas_clear_all_preview_transforms(MSCanvas *canvas) {
+    if (canvas == nullptr) {
+        return;
+    }
+    canvas->previewTransforms.clear();
 }
 
 void ms_canvas_set_selected_layers(MSCanvas *canvas, const uint64_t *layerIds, size_t count) {
@@ -390,10 +416,26 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
     const int64_t frameIndex = state.frameIndex;
     const float frameRate = state.frameRate;
 
+    const bool hasPreview = !canvas->previewTransforms.empty();
+    motion::SceneState previewState;
+    const motion::SceneState *drawState = &state;
+    if (hasPreview) {
+        previewState = state;
+        ApplyPreviewTransformsToScene(previewState, canvas->previewTransforms);
+        drawState = &previewState;
+    }
+
     canvas->frameCommandCache.invalidateIfStale(compositionId, document->contentRevision);
-    const bool usedFrameCache = canvas->frameCommandCache.find(previewTime) != nullptr;
+    const bool usedFrameCache = !hasPreview && canvas->frameCommandCache.find(previewTime) != nullptr;
     const auto buildStart = ProfileClock::now();
-    const motion::DrawCommandList *commands = EnsureSceneCommands(canvas, document, compositionId, previewTime, state);
+    motion::DrawCommandList previewCommands;
+    const motion::DrawCommandList *commands = nullptr;
+    if (hasPreview) {
+        previewCommands = motion::BuildCommands(*drawState);
+        commands = &previewCommands;
+    } else {
+        commands = EnsureSceneCommands(canvas, document, compositionId, previewTime, state);
+    }
     const auto buildEnd = ProfileClock::now();
     profile.buildCommandsMs = usedFrameCache ? 0.0 : Milliseconds(buildStart, buildEnd);
     profile.usedFrameCache = usedFrameCache;
@@ -405,17 +447,17 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         return;
     }
     if (!playbackMode) {
-        const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(state.viewportWidth, state.viewportHeight);
+        const float viewUnit = canvas->adapter->sceneUnitsPerViewPoint(drawState->viewportWidth, drawState->viewportHeight);
         const float outlineWidth = 1.5f * viewUnit;
         const float handleSize = 7.0f * viewUnit;
         constexpr motion::Color pathOverlayColor{1.0f, 0.85f, 0.2f, 1.0f};
-        std::vector<motion::PathOverlayItem> pathOverlays = motion::CollectMaskPathOverlays(state, canvas->selectedLayerIds, pathOverlayColor);
+        std::vector<motion::PathOverlayItem> pathOverlays = motion::CollectMaskPathOverlays(*drawState, canvas->selectedLayerIds, pathOverlayColor);
         pathOverlays.insert(pathOverlays.end(), canvas->customPathOverlays.begin(), canvas->customPathOverlays.end());
         pathOverlayCommands = motion::BuildPathOverlayCommands(pathOverlays, outlineWidth);
 
         if (canvas->hasPathEditTarget) {
             motion::PathEditHandles handles;
-            if (motion::BuildPathEditHandles(state, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
+            if (motion::BuildPathEditHandles(*drawState, canvas->pathEditTarget, canvas->pathEditSelectedVertex, handles)) {
                 pathEditCommands = motion::BuildPathEditCommands(handles, outlineWidth, handleSize);
             }
         }
@@ -423,7 +465,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         motion::DrawCommandList gradientEditCommands;
         if (!canvas->hasPathEditTarget && canvas->hasGradientEditTarget) {
             motion::GradientEditHandles handles;
-            if (motion::BuildGradientEditHandles(state, canvas->gradientEditTarget, handles)) {
+            if (motion::BuildGradientEditHandles(*drawState, canvas->gradientEditTarget, handles)) {
                 gradientEditCommands = motion::BuildGradientEditCommands(handles, outlineWidth, handleSize);
             }
         }
@@ -443,7 +485,7 @@ void ms_canvas_draw_frame_at_time_profiled(MSCanvas *canvas, MSDocument *documen
         if (!canvas->hasPathEditTarget) {
             const motion::EntityId primaryLayerId = canvas->selectedLayerIds.empty() ? motion::EntityId{} : canvas->selectedLayerIds.back();
             selectionCommands = motion::BuildSelectionOutlineCommands(
-                state, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
+                *drawState, canvas->selectedLayerIds, primaryLayerId, outlineWidth, handleSize,
                 canvas->showSelectionAnchor, canvas->showSelectionScaleHandles);
         }
         selectionCommands.insert(selectionCommands.end(), gradientEditCommands.begin(), gradientEditCommands.end());

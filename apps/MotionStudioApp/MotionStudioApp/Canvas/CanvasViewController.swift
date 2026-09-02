@@ -77,6 +77,8 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private var freeTransformDrag: FreeTransformDrag?
     private var gradientEditDrag: GradientEditDrag?
     private var freeTransformDidMove = false
+    /// When true, ShapePath scale uses canvas preview matrices; merge opens on mouse-up.
+    private var pathResizePreviewActive = false
 
     private struct PenDragState {
         var kind: MS_PATH_HANDLE
@@ -688,6 +690,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     private func beginFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
         freeTransformDrag = nil
         freeTransformDidMove = false
+        pathResizePreviewActive = false
         motionPathDrag = nil
         motionPathDragDidMove = false
         gradientEditDrag = nil
@@ -912,7 +915,16 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         let localRel = starts.first.flatMap {
             FreeTransformDrag.localPivotRelative(for: kind, handles: handles, start: $0, alternate: alternate)
         }
-        document.core.beginMergeGroup()
+        let needsPathPreview = switch kind {
+        case .scaleCorner, .scaleEdge:
+            starts.contains { FreeTransformDrag.usesPathGeometryPreview($0) }
+        default:
+            false
+        }
+        pathResizePreviewActive = needsPathPreview
+        if !needsPathPreview {
+            document.core.beginMergeGroup()
+        }
         freeTransformDrag = FreeTransformDrag(kind: kind,
                                               layerStarts: starts,
                                               startScenePoint: scenePoint,
@@ -937,7 +949,7 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
     }
 
     private func updateFreeTransform(at viewPoint: CGPoint, shift: Bool, alternate: Bool) {
-        guard let freeTransformDrag,
+        guard var freeTransformDrag,
               let scenePoint = scenePoint(fromViewPoint: viewPoint)
         else {
             return
@@ -947,23 +959,48 @@ final class CanvasViewController: UIViewController, MTKViewDelegate {
         guard abs(delta.x) > 0.001 || abs(delta.y) > 0.001 else {
             return
         }
-        freeTransformDrag.apply(core: document.core,
-                                frame: evaluationFrame,
-                                scenePoint: scenePoint,
-                                shift: shift,
-                                alternate: alternate)
+        let pathPreviews = freeTransformDrag.apply(core: document.core,
+                                                   frame: evaluationFrame,
+                                                   scenePoint: scenePoint,
+                                                   shift: shift,
+                                                   alternate: alternate)
+        self.freeTransformDrag = freeTransformDrag
+        if let canvas, !pathPreviews.isEmpty {
+            for preview in pathPreviews {
+                document.core.setCanvasPreviewTransform(canvas: canvas,
+                                                        layerID: preview.layerID,
+                                                        matrix: preview.matrix)
+            }
+        }
         freeTransformDidMove = true
         requestDraw()
     }
 
     private func endFreeTransform() {
         defer {
+            if let canvas {
+                document.core.clearAllCanvasPreviewTransforms(canvas: canvas)
+            }
             freeTransformDrag = nil
             freeTransformDidMove = false
+            pathResizePreviewActive = false
         }
         guard let freeTransformDrag else {
             return
         }
+
+        if pathResizePreviewActive {
+            guard freeTransformDidMove else {
+                return
+            }
+            document.core.beginMergeGroup()
+            freeTransformDrag.commitPathGeometryResizes(core: document.core, frame: evaluationFrame)
+            document.core.endMergeGroup()
+            registerEdit(freeTransformDrag.editName)
+            requestDraw()
+            return
+        }
+
         document.core.endMergeGroup()
         guard freeTransformDidMove else {
             return
